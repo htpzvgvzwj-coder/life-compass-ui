@@ -6615,3 +6615,356 @@ body.life-sim-active .life-sim-result-card {
   }
 }
 
+/* LifeVerse Volume 4.6 presentation polish */
+body.life-sim-active .life-sim-game::before {
+  animation: lifeverseBreathingVignette 7s ease-in-out infinite;
+}
+
+body.life-sim-active .life-sim-root canvas {
+  filter: saturate(1.08) contrast(1.03);
+}
+
+body.life-sim-active .life-sim-asset-status {
+  animation: lifeverseSoftNoticeIn 420ms ease both;
+}
+
+body.life-sim-active .lifeverse-hud strong,
+body.life-sim-active .lifeverse-time-card,
+body.life-sim-active .lifeverse-hud-stats span,
+body.life-sim-active .lifeverse-objective-pill {
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease,
+    background 220ms ease,
+    color 180ms ease;
+}
+
+body.life-sim-active .lifeverse-hud-stats span:hover,
+body.life-sim-active .lifeverse-time-card:hover {
+  transform: translateY(-1px);
+}
+
+body.life-sim-active .lifeverse-game-dock {
+  will-change: opacity, transform;
+}
+
+body.life-sim-active .lifeverse-game-dock button,
+body.life-sim-active .lifeverse-phone-app,
+body.life-sim-active .lifeverse-phone-card button,
+body.life-sim-active .lifeverse-journal-actions button,
+body.life-sim-active .lifeverse-pause-actions button,
+body.life-sim-active .lifeverse-context-button,
+body.life-sim-active .lifeverse-fast-grid button,
+body.life-sim-active .lifeverse-mini-button {
+  transition:
+    transform 150ms ease,
+    opacity 150ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+body.life-sim-active .lifeverse-game-dock button:active,
+body.life-sim-active .lifeverse-phone-app:active,
+body.life-sim-active .lifeverse-phone-card button:active,
+body.life-sim-active .lifeverse-journal-actions button:active,
+body.life-sim-active .lifeverse-pause-actions button:active,
+body.life-sim-active .lifeverse-context-button:active,
+body.life-sim-active .lifeverse-fast-grid button:active,
+body.life-sim-active .lifeverse-mini-button:active,
+body.life-sim-active .is-pressed-feedback {
+  transform: scale(0.965);
+}
+
+body.life-sim-active .life-sim-game.is-lifeverse-action-feedback::after {
+  animation: lifeverseActionFlash 520ms ease both;
+}
+
+body.life-sim-active .lifeverse-phone-overlay {
+  animation: lifeversePhoneOpen 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+body.life-sim-active .lifeverse-journal-panel {
+  animation: lifeverseJournalOpen 240ms ease both;
+}
+
+body.life-sim-active .lifeverse-map-panel {
+  animation: lifeverseMapOpen 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+body.life-sim-active .lifeverse-pause-panel {
+  animation: lifeversePauseOpen 220ms ease both;
+}
+
+body.life-sim-active .lifeverse-fast-forward-panel {
+  overflow: hidden;
+}
+
+body.life-sim-active .lifeverse-fast-forward-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(120deg, transparent, rgba(200, 169, 107, 0.16), transparent),
+    radial-gradient(circle at 50% 0%, rgba(183, 227, 107, 0.12), transparent 34%);
+  transform: translateX(-42%);
+  opacity: 0.78;
+  pointer-events: none;
+  animation: lifeverseTimelineSweep 4.6s ease-in-out infinite;
+}
+
+body.life-sim-active .lifeverse-fast-forward-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+body.life-sim-active .lifeverse-time-lapse article,
+body.life-sim-active .lifeverse-memory-report article,
+body.life-sim-active .lifeverse-report-list span,
+body.life-sim-active .lifeverse-map-grid article {
+  animation: lifeverseItemReveal 260ms ease both;
+}
+
+body.life-sim-active .lifeverse-time-lapse article:nth-child(2),
+body.life-sim-active .lifeverse-memory-report article:nth-child(2),
+body.life-sim-active .lifeverse-map-grid article:nth-child(2) {
+  animation-delay: 55ms;
+}
+
+body.life-sim-active .lifeverse-time-lapse article:nth-child(3),
+body.life-sim-active .lifeverse-memory-report article:nth-child(3),
+body.life-sim-active .lifeverse-map-grid article:nth-child(3) {
+  animation-delay: 110ms;
+}
+
+body.life-sim-active .lifeverse-time-lapse article:nth-child(4),
+body.life-sim-active .lifeverse-memory-report article:nth-child(4),
+body.life-sim-active .lifeverse-map-grid article:nth-child(4) {
+  animation-delay: 165ms;
+}
+
+body.life-sim-active .lifeverse-memory-report article {
+  border-left: 3px solid rgba(200, 169, 107, 0.58);
+}
+
+body.life-sim-active .lifeverse-memory-report article:last-child {
+  border-color: rgba(183, 227, 107, 0.72);
+  background: rgba(183, 227, 107, 0.08);
+}
+
+body.life-sim-active .lifeverse-memory-report strong {
+  color: #f8f6f2;
+  font-size: 13px;
+}
+
+body.life-sim-active .lifeverse-memory-report span {
+  display: block;
+  padding: 7px 0;
+  border-top: 1px solid rgba(248, 246, 242, 0.08);
+}
+
+body.life-sim-active .lifeverse-transition-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  color: #f8f6f2;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(200, 169, 107, 0.22), transparent 26%),
+    rgba(5, 6, 7, 0.18);
+  pointer-events: none;
+  animation: lifeverseTransitionIn 180ms ease both;
+}
+
+body.life-sim-active .lifeverse-transition-flash span {
+  padding: 10px 16px;
+  border: 1px solid rgba(248, 246, 242, 0.18);
+  border-radius: 999px;
+  background: rgba(5, 6, 7, 0.58);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.3);
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(16px);
+}
+
+body.life-sim-active .lifeverse-transition-flash.is-fast-forward::before {
+  content: "";
+  position: absolute;
+  width: 72vmax;
+  height: 72vmax;
+  border: 1px solid rgba(200, 169, 107, 0.28);
+  border-radius: 50%;
+  animation: lifeverseTimeRipple 620ms ease-out both;
+}
+
+body.life-sim-active .lifeverse-transition-flash.is-leaving {
+  animation: lifeverseTransitionOut 180ms ease both;
+}
+
+body.life-sim-active .life-sim-game.is-fast-forward-presentation .life-sim-root canvas {
+  filter: saturate(1.3) contrast(1.08) brightness(1.08);
+}
+
+body.life-sim-active .lifeverse-context-prompt {
+  animation: lifeverseContextFloat 2.9s ease-in-out infinite;
+}
+
+body.life-sim-active .lifeverse-consequence-toast {
+  animation: lifeverseToastIn 180ms ease both, lifeverseToastOut 420ms ease 3.58s forwards, lifeverseToastGlow 2s ease-in-out infinite;
+}
+
+@keyframes lifeverseBreathingVignette {
+  0%, 100% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.78;
+  }
+}
+
+@keyframes lifeverseSoftNoticeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes lifeverseActionFlash {
+  0% {
+    box-shadow: inset 0 0 0 rgba(200, 169, 107, 0);
+  }
+  35% {
+    box-shadow: inset 0 0 90px rgba(200, 169, 107, 0.18);
+  }
+  100% {
+    box-shadow: inset 0 0 0 rgba(200, 169, 107, 0);
+  }
+}
+
+@keyframes lifeversePhoneOpen {
+  from {
+    opacity: 0;
+    transform: translateX(26px) scale(0.94) rotateY(-4deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1) rotateY(0);
+  }
+}
+
+@keyframes lifeverseJournalOpen {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes lifeverseMapOpen {
+  from {
+    opacity: 0;
+    transform: translateX(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes lifeversePauseOpen {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes lifeverseItemReveal {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lifeverseTimelineSweep {
+  0%, 100% {
+    transform: translateX(-58%);
+  }
+  50% {
+    transform: translateX(58%);
+  }
+}
+
+@keyframes lifeverseTransitionIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lifeverseTransitionOut {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes lifeverseTimeRipple {
+  from {
+    opacity: 0.8;
+    transform: scale(0.08);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes lifeverseContextFloat {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-2px);
+  }
+}
+
+@keyframes lifeverseToastGlow {
+  0%, 100% {
+    border-color: rgba(200, 169, 107, 0.32);
+  }
+  50% {
+    border-color: rgba(183, 227, 107, 0.42);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.life-sim-active *,
+  body.life-sim-active *::before,
+  body.life-sim-active *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+

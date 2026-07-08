@@ -48,10 +48,17 @@
       moveVector: { x: 0, y: 0 },
       yaw: Math.PI,
       pitch: 0.54,
+      smoothMove: { x: 0, y: 0 },
+      moveSpeed: 0,
       walkPhase: 0,
+      footstepTimer: 0,
       isMoving: false,
       mixers: [],
-      productionAssetsLoaded: false
+      productionAssetsLoaded: false,
+      cameraPosition: new THREE.Vector3(0, 8, -16),
+      cameraLookAt: new THREE.Vector3(0, 1.55, -7),
+      cameraShake: 0,
+      presentation: null
     };
 
     const ui = {
@@ -61,7 +68,8 @@
     };
 
     const materials = createMaterials(THREE);
-    createLighting(THREE, scene);
+    const lighting = createLighting(THREE, scene);
+    state.presentation = createPresentationState(THREE, scene, renderer, lighting, materials, host);
 
     const player = createPlayer(THREE, materials);
     player.group.position.set(0, 0, -7);
@@ -71,8 +79,9 @@
       state.productionAssetsLoaded = loaded;
       if (!loaded) {
         createDistrict(THREE, scene, materials);
-        setAssetStatus(root, "Development preview assets active. Add licensed GLB assets and enable the manifest for production quality.", "warning");
+        setAssetStatus(root, "Preview district active. Volume 5 can swap in licensed 3D assets.", "warning");
       }
+      registerPresentationObjects(scene, state.presentation);
     });
 
     const clock = new THREE.Clock();
@@ -88,6 +97,7 @@
     const pointerDown = (event) => {
       if (event.target.closest("button, input, textarea, select, a")) return;
       if (event.pointerType === "mouse" && event.button !== 0) return;
+      state.presentation.audio.ensure();
 
       const rect = host.getBoundingClientRect();
       const normalizedX = (event.clientX - rect.left) / rect.width;
@@ -138,6 +148,17 @@
         state.lookStart = null;
       }
     };
+    const clickFeedback = (event) => {
+      const control = event.target.closest("button, [data-lifeverse-tab], [data-lifeverse-activity], [data-lifeverse-system-action], [data-lifeverse-fast-forward], [data-lifeverse-report-now]");
+      if (!control) return;
+      triggerInteractionFeedback(host, control);
+      state.cameraShake = Math.max(state.cameraShake, control.matches("[data-lifeverse-fast-forward]") ? 0.18 : 0.06);
+      if (control.matches("[data-lifeverse-fast-forward]")) state.presentation.audio.play("fastForward");
+      else if (control.matches("[data-lifeverse-report-now], [data-lifeverse-tab='report']")) state.presentation.audio.play("report");
+      else if (control.matches("[data-lifeverse-tab='phone']")) state.presentation.audio.play("phone");
+      else if (control.matches("[data-lifeverse-activity], [data-lifeverse-system-action]")) state.presentation.audio.play("interaction");
+      else state.presentation.audio.play("ui");
+    };
 
     window.addEventListener("keydown", keydown);
     window.addEventListener("keyup", keyup);
@@ -145,6 +166,7 @@
     host.addEventListener("pointermove", pointerMove);
     host.addEventListener("pointerup", pointerUp);
     host.addEventListener("pointercancel", pointerUp);
+    host.addEventListener("click", clickFeedback);
 
     function resize() {
       const width = Math.max(320, root.clientWidth || window.innerWidth || 320);
@@ -157,10 +179,12 @@
     function animate() {
       if (state.destroyed) return;
       const delta = Math.min(clock.getDelta(), 0.034);
+      const elapsed = clock.elapsedTime;
       state.mixers.forEach((mixer) => mixer.update(delta));
       updateMovement(delta);
       updateCharacter(delta, player);
-      updateCamera(player.group.position);
+      updateWorldPresentation(delta, elapsed, state, scene, renderer, options.getLifeVerseState);
+      updateCamera(player.group.position, delta, elapsed);
       updateZone(player.group.position);
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
@@ -179,6 +203,12 @@
         y = state.moveVector.y;
       }
 
+      const inputLength = Math.hypot(x, y);
+      state.smoothMove.x += (x - state.smoothMove.x) * Math.min(1, delta * 12);
+      state.smoothMove.y += (y - state.smoothMove.y) * Math.min(1, delta * 12);
+      x = Math.abs(state.smoothMove.x) < 0.02 ? 0 : state.smoothMove.x;
+      y = Math.abs(state.smoothMove.y) < 0.02 ? 0 : state.smoothMove.y;
+
       const length = Math.hypot(x, y);
       if (length > 1) {
         x /= length;
@@ -188,16 +218,23 @@
       const forward = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
       const right = new THREE.Vector3(Math.sin(state.yaw + Math.PI / 2), 0, Math.cos(state.yaw + Math.PI / 2));
       const direction = new THREE.Vector3().addScaledVector(forward, y).addScaledVector(right, x);
-      state.isMoving = direction.lengthSq() > 0.001;
+      state.isMoving = direction.lengthSq() > 0.001 || inputLength > 0.05;
+      const targetSpeed = state.isMoving ? Math.min(1, Math.max(0.18, length)) : 0;
+      state.moveSpeed += (targetSpeed - state.moveSpeed) * Math.min(1, delta * (state.isMoving ? 9 : 7));
 
       if (state.isMoving) {
         direction.normalize();
-        const speed = 8.4;
-        player.group.position.addScaledVector(direction, speed * delta);
+        const speed = 7.8 + state.moveSpeed * 1.25;
+        player.group.position.addScaledVector(direction, speed * state.moveSpeed * delta);
         player.group.position.x = clamp(player.group.position.x, -26, 26);
         player.group.position.z = clamp(player.group.position.z, -27, 25);
         const targetAngle = Math.atan2(direction.x, direction.z);
-        player.group.rotation.y = lerpAngle(player.group.rotation.y, targetAngle, Math.min(1, delta * 13));
+        player.group.rotation.y = lerpAngle(player.group.rotation.y, targetAngle, Math.min(1, delta * 8.5));
+        state.footstepTimer -= delta * state.moveSpeed;
+        if (state.footstepTimer <= 0) {
+          state.footstepTimer = 0.34;
+          state.presentation.audio.play("footstep");
+        }
       }
     }
 
@@ -206,29 +243,44 @@
         playCharacterAction(playerParts, state.isMoving ? "walk" : "idle");
         return;
       }
-      const bobSpeed = state.isMoving ? 9 : 2.4;
+      const bobSpeed = state.isMoving ? 8.2 : 1.75;
       state.walkPhase += delta * bobSpeed;
-      const swing = state.isMoving ? Math.sin(state.walkPhase) * 0.55 : Math.sin(state.walkPhase) * 0.06;
-      const bob = state.isMoving ? Math.abs(Math.sin(state.walkPhase)) * 0.06 : Math.sin(state.walkPhase) * 0.015;
+      const swing = state.isMoving ? Math.sin(state.walkPhase) * (0.42 + state.moveSpeed * 0.18) : Math.sin(state.walkPhase) * 0.035;
+      const bob = state.isMoving ? Math.abs(Math.sin(state.walkPhase)) * 0.055 * state.moveSpeed : Math.sin(state.walkPhase) * 0.018;
+      const breathe = Math.sin(state.walkPhase * 0.5) * 0.018;
       playerParts.body.position.y = 1.15 + bob;
-      playerParts.head.position.y = 2.28 + bob;
-      playerParts.hair.position.y = 2.48 + bob;
+      playerParts.body.rotation.z = Math.sin(state.walkPhase * 0.5) * (state.isMoving ? 0.025 : 0.012);
+      playerParts.head.position.y = 2.28 + bob + breathe;
+      playerParts.head.rotation.z = Math.sin(state.walkPhase * 0.45) * 0.014;
+      playerParts.hair.position.y = 2.48 + bob + breathe;
       playerParts.leftArm.rotation.x = swing;
       playerParts.rightArm.rotation.x = -swing;
       playerParts.leftLeg.rotation.x = -swing;
       playerParts.rightLeg.rotation.x = swing;
     }
 
-    function updateCamera(target) {
-      const distance = 9.5;
-      const height = 3.8 + state.pitch * 3.2;
+    function updateCamera(target, delta, elapsed) {
+      const distance = 9.4 - state.moveSpeed * 0.52;
+      const height = 3.75 + state.pitch * 3.05;
       const offset = new THREE.Vector3(
         Math.sin(state.yaw + Math.PI) * distance,
         height,
         Math.cos(state.yaw + Math.PI) * distance
       );
-      camera.position.lerp(target.clone().add(offset), 0.12);
-      camera.lookAt(target.x, target.y + 1.55, target.z);
+      const desiredPosition = target.clone().add(offset);
+      const lookTarget = new THREE.Vector3(target.x, target.y + 1.48 + state.moveSpeed * 0.12, target.z);
+      state.cameraPosition.lerp(desiredPosition, Math.min(1, delta * 5.8));
+      state.cameraLookAt.lerp(lookTarget, Math.min(1, delta * 7.2));
+      if (state.cameraShake > 0.002) {
+        const shake = state.cameraShake;
+        state.cameraPosition.x += Math.sin(elapsed * 42) * shake;
+        state.cameraPosition.y += Math.cos(elapsed * 37) * shake * 0.42;
+        state.cameraShake *= Math.pow(0.06, delta);
+      } else {
+        state.cameraShake = 0;
+      }
+      camera.position.copy(state.cameraPosition);
+      camera.lookAt(state.cameraLookAt);
     }
 
     function updateZone(position) {
@@ -243,6 +295,9 @@
 
       if ((nextZone && nextZone.id) !== (state.currentZone && state.currentZone.id)) {
         state.currentZone = nextZone;
+        state.presentation.focusZoneId = nextZone ? nextZone.id : "";
+        state.presentation.focusPulse = nextZone ? 1 : 0;
+        if (nextZone) state.presentation.audio.play("interaction");
         if (typeof options.onLocationChange === "function") options.onLocationChange(nextZone);
       }
     }
@@ -265,6 +320,8 @@
         host.removeEventListener("pointermove", pointerMove);
         host.removeEventListener("pointerup", pointerUp);
         host.removeEventListener("pointercancel", pointerUp);
+        host.removeEventListener("click", clickFeedback);
+        if (state.presentation) state.presentation.audio.destroy();
         renderer.dispose();
         root.innerHTML = "";
       }
@@ -306,6 +363,10 @@
       trunk: make(0x8a5227),
       lamp: standard(0x272b31),
       lampGlow: standard(0xfff0a6, 0xffd36a),
+      cloud: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.78, depthWrite: false }),
+      rain: new THREE.PointsMaterial({ color: 0xbfe9ff, size: 0.045, transparent: true, opacity: 0.0, depthWrite: false }),
+      dust: new THREE.PointsMaterial({ color: 0xfff0b8, size: 0.055, transparent: true, opacity: 0.22, depthWrite: false }),
+      commuter: make(0x2b315c),
       skin: make(0xffc49d),
       hair: make(0x16141a),
       outfit: make(0x18203a),
@@ -332,7 +393,8 @@
   }
 
   function createLighting(THREE, scene) {
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x91ad82, 1.75));
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x91ad82, 1.75);
+    scene.add(hemi);
 
     const sun = new THREE.DirectionalLight(0xffffff, 2.1);
     sun.position.set(-12, 24, 12);
@@ -344,6 +406,7 @@
     sun.shadow.camera.bottom = -38;
     scene.add(sun);
 
+    const streetLights = [];
     [
       [-17, 4.2, -12, 0xffb75d, 1.8],
       [5, 3.8, -3.5, 0xff4055, 1.9],
@@ -353,7 +416,388 @@
       const light = new THREE.PointLight(color, intensity, 16);
       light.position.set(x, y, z);
       scene.add(light);
+      streetLights.push(light);
     });
+
+    return { hemi, sun, streetLights };
+  }
+
+  function createPresentationState(THREE, scene, renderer, lighting, mat, host) {
+    const ambience = createAmbience(THREE, scene, mat);
+    return {
+      ambience,
+      audio: createAudioPolish(),
+      lighting,
+      host,
+      zoneRings: [],
+      treeCrowns: [],
+      streetGlowMeshes: [],
+      focusZoneId: "",
+      focusPulse: 0,
+      timeOfDay: "morning",
+      weather: "sunny",
+      skyColor: new THREE.Color(0xbfe7ff),
+      fogColor: new THREE.Color(0xd9efff),
+      targetSkyColor: new THREE.Color(0xbfe7ff),
+      targetFogColor: new THREE.Color(0xd9efff),
+      exposure: Number(renderer.toneMappingExposure || 1.08)
+    };
+  }
+
+  function createAmbience(THREE, scene, mat) {
+    const clouds = new THREE.Group();
+    clouds.name = "Presentation Moving Clouds";
+    for (let i = 0; i < 8; i++) {
+      clouds.add(createCloud(THREE, mat.cloud, -28 + i * 8, 12 + (i % 3) * 1.2, -27 + (i % 4) * 15, 1.15 + (i % 2) * 0.32));
+    }
+    scene.add(clouds);
+
+    const dust = createParticleField(THREE, mat.dust, 56, 32, 7.5, "Presentation Floating Dust");
+    scene.add(dust);
+
+    const rain = createParticleField(THREE, mat.rain, 110, 52, 12, "Presentation Rain");
+    rain.visible = false;
+    scene.add(rain);
+
+    const commuters = new THREE.Group();
+    commuters.name = "Presentation Ambient Commuters";
+    [
+      [-8, -3, 0.8, 0],
+      [8, 4, 1.1, Math.PI],
+      [-2, 9, 0.9, Math.PI / 2],
+      [18, -7, 0.7, -Math.PI / 2]
+    ].forEach(([x, z, speed, heading], index) => {
+      const commuter = createCommuter(THREE, mat, index);
+      commuter.position.set(x, 0, z);
+      commuter.rotation.y = heading;
+      commuter.userData.base = { x, z, speed, heading, phase: index * 1.7 };
+      commuters.add(commuter);
+    });
+    scene.add(commuters);
+
+    return { clouds, dust, rain, commuters };
+  }
+
+  function createCloud(THREE, material, x, y, z, scale) {
+    const group = new THREE.Group();
+    group.name = "Presentation Cloud";
+    group.position.set(x, y, z);
+    group.scale.setScalar(scale);
+    for (let i = 0; i < 4; i++) {
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(0.8 + i * 0.08, 12, 8), material);
+      puff.position.set((i - 1.5) * 0.9, Math.sin(i) * 0.18, i % 2 ? 0.22 : -0.12);
+      group.add(puff);
+    }
+    group.userData.baseX = x;
+    group.userData.drift = 0.45 + Math.abs(x) * 0.008;
+    return group;
+  }
+
+  function createParticleField(THREE, material, count, span, height, name) {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const seeds = [];
+    for (let i = 0; i < count; i++) {
+      const seed = (i * 16807) % 97;
+      seeds.push(seed / 97);
+      positions[i * 3] = (seeds[i] - 0.5) * span;
+      positions[i * 3 + 1] = 1.4 + ((i * 37) % 100) / 100 * height;
+      positions[i * 3 + 2] = ((((i * 53) % 100) / 100) - 0.5) * span;
+    }
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const points = new THREE.Points(geometry, material);
+    points.name = name;
+    points.userData.seeds = seeds;
+    points.userData.span = span;
+    points.userData.height = height;
+    return points;
+  }
+
+  function createCommuter(THREE, mat, index) {
+    const group = new THREE.Group();
+    group.name = `Presentation Commuter ${index + 1}`;
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.55, 5, 8), mat.commuter);
+    body.position.y = 0.72;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), mat.skin);
+    head.position.y = 1.15;
+    group.add(body, head);
+    return group;
+  }
+
+  function registerPresentationObjects(scene, presentation) {
+    if (!presentation) return;
+    presentation.zoneRings = [];
+    presentation.treeCrowns = [];
+    presentation.streetGlowMeshes = [];
+    scene.traverse((node) => {
+      if (!node || !node.name) return;
+      if (node.userData && node.userData.zoneId) presentation.zoneRings.push(node);
+      if (node.name === "Tree Crown") presentation.treeCrowns.push(node);
+      if (node.name === "Street Light Glow") presentation.streetGlowMeshes.push(node);
+    });
+  }
+
+  function updateWorldPresentation(delta, elapsed, state, scene, renderer, getLifeVerseState) {
+    const presentation = state.presentation;
+    if (!presentation) return;
+    const lifeState = typeof getLifeVerseState === "function" ? getLifeVerseState() : null;
+    const time = getTimeOfDayPresentation(lifeState);
+    const weather = getWeatherPresentation(lifeState);
+    presentation.timeOfDay = time.phase;
+    presentation.weather = weather.type;
+    applyPresentationTheme(scene, renderer, presentation, time, weather, delta);
+    updateAmbience(delta, elapsed, presentation, weather);
+    updateInteractiveFocus(delta, elapsed, presentation);
+    presentation.audio.setWeather(weather.type);
+  }
+
+  function getTimeOfDayPresentation(lifeState) {
+    const totalMinutes = Number(lifeState && lifeState.time && lifeState.time.totalMinutes);
+    const minutes = Number.isFinite(totalMinutes) ? ((totalMinutes % 1440) + 1440) % 1440 : 450;
+    if (minutes >= 300 && minutes < 660) {
+      return {
+        phase: "morning",
+        sky: 0xbfe7ff,
+        fog: 0xd9efff,
+        hemi: 1.85,
+        sun: 2.2,
+        lamp: 0.24,
+        exposure: 1.12,
+        sunPosition: [-12, 24, 12]
+      };
+    }
+    if (minutes >= 660 && minutes < 1020) {
+      return {
+        phase: "afternoon",
+        sky: 0xa9dfff,
+        fog: 0xd1f3ff,
+        hemi: 1.78,
+        sun: 2.35,
+        lamp: 0.18,
+        exposure: 1.08,
+        sunPosition: [-6, 28, 6]
+      };
+    }
+    if (minutes >= 1020 && minutes < 1170) {
+      return {
+        phase: "sunset",
+        sky: 0xffb980,
+        fog: 0xffd4a8,
+        hemi: 1.32,
+        sun: 1.65,
+        lamp: 0.78,
+        exposure: 1.02,
+        sunPosition: [14, 12, -8]
+      };
+    }
+    return {
+      phase: "night",
+      sky: 0x1d2b57,
+      fog: 0x17223f,
+      hemi: 0.62,
+      sun: 0.28,
+      lamp: 1.9,
+      exposure: 0.92,
+      sunPosition: [8, 8, -12]
+    };
+  }
+
+  function getWeatherPresentation(lifeState) {
+    const raw = String(lifeState && lifeState.world && lifeState.world.weather ? lifeState.world.weather : "").toLowerCase();
+    const day = Number(lifeState && lifeState.time && lifeState.time.day) || 1;
+    let type = "sunny";
+    if (raw.includes("rain")) type = "rain";
+    else if (raw.includes("fog") || raw.includes("haze")) type = "fog";
+    else if (raw.includes("cloud")) type = "cloudy";
+    else if (day % 9 === 0) type = "fog";
+    else if (day % 6 === 0) type = "rain";
+    else if (day % 4 === 0) type = "cloudy";
+    const settings = {
+      sunny: { cloud: 0.55, rain: 0, fogBoost: 0, light: 1 },
+      cloudy: { cloud: 0.9, rain: 0, fogBoost: 0.12, light: 0.86 },
+      rain: { cloud: 0.96, rain: 0.95, fogBoost: 0.24, light: 0.72 },
+      fog: { cloud: 0.76, rain: 0, fogBoost: 0.46, light: 0.68 }
+    };
+    return { type, ...(settings[type] || settings.sunny) };
+  }
+
+  function applyPresentationTheme(scene, renderer, presentation, time, weather, delta) {
+    const mix = Math.min(1, delta * 2.2);
+    presentation.targetSkyColor.setHex(time.sky);
+    presentation.targetFogColor.setHex(time.fog);
+    presentation.skyColor.lerp(presentation.targetSkyColor, mix);
+    presentation.fogColor.lerp(presentation.targetFogColor, mix);
+    scene.background = presentation.skyColor;
+    if (scene.fog) {
+      scene.fog.color.copy(presentation.fogColor);
+      scene.fog.near = 26 - weather.fogBoost * 12;
+      scene.fog.far = 88 - weather.fogBoost * 28;
+    }
+    const lights = presentation.lighting;
+    if (lights && lights.hemi) lights.hemi.intensity += ((time.hemi * weather.light) - lights.hemi.intensity) * mix;
+    if (lights && lights.sun) {
+      lights.sun.intensity += ((time.sun * weather.light) - lights.sun.intensity) * mix;
+      lights.sun.position.x += (time.sunPosition[0] - lights.sun.position.x) * mix;
+      lights.sun.position.y += (time.sunPosition[1] - lights.sun.position.y) * mix;
+      lights.sun.position.z += (time.sunPosition[2] - lights.sun.position.z) * mix;
+    }
+    (lights && lights.streetLights || []).forEach((light, index) => {
+      const pulse = 1 + Math.sin(Date.now() * 0.0015 + index) * 0.04;
+      light.intensity += ((time.lamp * pulse) - light.intensity) * mix;
+    });
+    presentation.streetGlowMeshes.forEach((mesh, index) => {
+      mesh.scale.setScalar(1 + time.lamp * 0.18 + Math.sin(Date.now() * 0.002 + index) * 0.025);
+      if (mesh.material && mesh.material.emissive) mesh.material.emissiveIntensity = 0.55 + time.lamp * 0.32;
+    });
+    renderer.toneMappingExposure += ((time.exposure * weather.light) - renderer.toneMappingExposure) * mix;
+  }
+
+  function updateAmbience(delta, elapsed, presentation, weather) {
+    const { clouds, dust, rain, commuters } = presentation.ambience;
+    clouds.children.forEach((cloud, index) => {
+      cloud.position.x = wrap(cloud.userData.baseX + elapsed * cloud.userData.drift, -34, 34);
+      cloud.position.y += Math.sin(elapsed * 0.55 + index) * 0.002;
+      cloud.scale.setScalar((cloud.scale.x * 0.98) + (0.82 + weather.cloud * 0.46) * 0.02);
+    });
+    clouds.children.forEach((cloud) => {
+      cloud.visible = weather.cloud > 0.35;
+      cloud.children.forEach((puff) => {
+        if (puff.material) puff.material.opacity = 0.36 + weather.cloud * 0.42;
+      });
+    });
+    updateParticleField(dust, delta, elapsed, 0.36, weather.type === "rain" ? 0.08 : 0.24);
+    if (dust.material) dust.material.opacity += ((weather.type === "rain" ? 0.06 : 0.22) - dust.material.opacity) * Math.min(1, delta * 3);
+    rain.visible = weather.rain > 0.02;
+    if (rain.material) rain.material.opacity += (weather.rain * 0.72 - rain.material.opacity) * Math.min(1, delta * 4);
+    if (rain.visible) updateParticleField(rain, delta, elapsed, 4.8, rain.material.opacity);
+    commuters.children.forEach((commuter, index) => {
+      const base = commuter.userData.base || {};
+      const offset = Math.sin(elapsed * base.speed + base.phase) * 5.5;
+      commuter.position.x = base.x + Math.cos(base.heading) * offset;
+      commuter.position.z = base.z + Math.sin(base.heading) * offset;
+      commuter.position.y = Math.abs(Math.sin(elapsed * 5 + index)) * 0.035;
+      commuter.rotation.y = base.heading + Math.sin(elapsed * base.speed + base.phase) * 0.12;
+    });
+    presentation.treeCrowns.forEach((tree, index) => {
+      tree.rotation.z = Math.sin(elapsed * 0.9 + index) * 0.035;
+      tree.rotation.x = Math.cos(elapsed * 0.7 + index) * 0.02;
+    });
+  }
+
+  function updateParticleField(points, delta, elapsed, fallSpeed, opacity) {
+    if (!points || !points.geometry) return;
+    const positions = points.geometry.getAttribute("position");
+    const span = points.userData.span || 40;
+    const height = points.userData.height || 8;
+    for (let i = 0; i < positions.count; i++) {
+      const seed = points.userData.seeds[i] || 0.5;
+      let x = positions.getX(i) + Math.sin(elapsed * 0.35 + seed * 12) * delta * 0.18;
+      let y = positions.getY(i) - fallSpeed * delta * (0.42 + seed);
+      let z = positions.getZ(i) + Math.cos(elapsed * 0.28 + seed * 8) * delta * 0.12;
+      if (y < 0.35) y = height + seed * 4;
+      if (x < -span / 2) x += span;
+      if (x > span / 2) x -= span;
+      if (z < -span / 2) z += span;
+      if (z > span / 2) z -= span;
+      positions.setXYZ(i, x, y, z);
+    }
+    positions.needsUpdate = opacity > 0.02;
+  }
+
+  function updateInteractiveFocus(delta, elapsed, presentation) {
+    presentation.focusPulse = Math.max(0, presentation.focusPulse - delta * 1.8);
+    presentation.zoneRings.forEach((ring, index) => {
+      const active = ring.userData.zoneId === presentation.focusZoneId;
+      const pulse = active ? 1 + presentation.focusPulse * 0.26 + Math.sin(elapsed * 4 + index) * 0.035 : 1 + Math.sin(elapsed * 1.2 + index) * 0.012;
+      ring.scale.set(pulse, 1, pulse);
+      if (ring.material) ring.material.opacity = active ? 0.42 : 0.18;
+    });
+  }
+
+  function createAudioPolish() {
+    let context = null;
+    let ambientGain = null;
+    let rainGain = null;
+
+    function ensure() {
+      if (context) {
+        if (context.state === "suspended") context.resume().catch(() => {});
+        return context;
+      }
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return null;
+      context = new AudioContext();
+      ambientGain = context.createGain();
+      ambientGain.gain.value = 0.018;
+      ambientGain.connect(context.destination);
+      const wind = context.createOscillator();
+      wind.type = "sine";
+      wind.frequency.value = 96;
+      wind.connect(ambientGain);
+      wind.start();
+
+      rainGain = context.createGain();
+      rainGain.gain.value = 0;
+      rainGain.connect(context.destination);
+      const rain = context.createOscillator();
+      rain.type = "triangle";
+      rain.frequency.value = 670;
+      rain.connect(rainGain);
+      rain.start();
+      return context;
+    }
+
+    function play(kind = "ui") {
+      const ctx = ensure();
+      if (!ctx) return;
+      const gain = ctx.createGain();
+      const osc = ctx.createOscillator();
+      const settings = {
+        ui: [520, 0.035, 0.018],
+        phone: [720, 0.07, 0.026],
+        report: [330, 0.12, 0.032],
+        interaction: [440, 0.06, 0.022],
+        fastForward: [180, 0.22, 0.04],
+        footstep: [120, 0.035, 0.012]
+      }[kind] || [420, 0.05, 0.018];
+      osc.type = kind === "footstep" ? "square" : "sine";
+      osc.frequency.setValueAtTime(settings[0], ctx.currentTime);
+      if (kind === "fastForward") osc.frequency.exponentialRampToValueAtTime(620, ctx.currentTime + settings[1]);
+      gain.gain.setValueAtTime(settings[2], ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + settings[1]);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + settings[1] + 0.02);
+    }
+
+    function setWeather(type) {
+      const ctx = context;
+      if (!ctx || !rainGain || !ambientGain) return;
+      const rainTarget = type === "rain" ? 0.015 : 0.0001;
+      const windTarget = type === "fog" || type === "cloudy" ? 0.024 : 0.016;
+      rainGain.gain.setTargetAtTime(rainTarget, ctx.currentTime, 0.8);
+      ambientGain.gain.setTargetAtTime(windTarget, ctx.currentTime, 0.9);
+    }
+
+    function destroy() {
+      if (context && context.state !== "closed") context.close().catch(() => {});
+      context = null;
+    }
+
+    return { ensure, play, setWeather, destroy };
+  }
+
+  function triggerInteractionFeedback(host, control) {
+    if (!host || !control) return;
+    control.classList.remove("is-pressed-feedback");
+    void control.offsetWidth;
+    control.classList.add("is-pressed-feedback");
+    window.setTimeout(() => control.classList.remove("is-pressed-feedback"), 280);
+    host.classList.remove("is-lifeverse-action-feedback");
+    void host.offsetWidth;
+    host.classList.add("is-lifeverse-action-feedback");
+    window.setTimeout(() => host.classList.remove("is-lifeverse-action-feedback"), 520);
   }
 
   async function loadProductionAssets(THREE, scene, mat, player, state, root) {
@@ -671,7 +1115,8 @@
 
   function addZones(THREE, scene, mat) {
     locationZones.forEach((zone) => {
-      addCylinder(THREE, scene, `${zone.name} Interaction Ring`, [zone.x, 0.08, zone.z], [zone.radius, 0.06, 48], mat.zone);
+      const ring = addCylinder(THREE, scene, `${zone.name} Interaction Ring`, [zone.x, 0.08, zone.z], [zone.radius, 0.06, 48], mat.zone);
+      ring.userData.zoneId = zone.id;
       addText(THREE, scene, zone.name.toUpperCase(), [zone.x - 2.1, 0.55, zone.z - zone.radius * 0.65], 0.46, 0x0d0d0d);
     });
   }
@@ -684,6 +1129,7 @@
   function addTree(THREE, scene, position, mat) {
     addCylinder(THREE, scene, "Tree Trunk", [position[0], 0.8, position[1]], [0.24, 1.6, 10], mat.trunk);
     const crown = new THREE.Group();
+    crown.name = "Tree Crown";
     for (let i = 0; i < 3; i++) {
       const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.9, 18, 12), mat.park);
       leaf.position.set((i - 1) * 0.55, 1.85 + i * 0.1, i === 1 ? 0.35 : 0);
@@ -821,6 +1267,11 @@
     return a + diff * t;
   }
 
+  function wrap(value, min, max) {
+    const width = max - min;
+    return ((((value - min) % width) + width) % width) + min;
+  }
+
   function isTyping(target) {
     if (!target) return false;
     const tag = target.tagName;
@@ -829,6 +1280,10 @@
 
   window.CompassLifeSim = {
     mount,
-    locations: locationZones
+    locations: locationZones,
+    presentationTest: {
+      getTimeOfDayPresentation,
+      getWeatherPresentation
+    }
   };
 })();

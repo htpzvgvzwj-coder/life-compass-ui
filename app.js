@@ -1708,9 +1708,9 @@ function lifeVersePhonePanel(state) {
         </div>
         <div class="lifeverse-phone-card">
           <p class="eyebrow">Quick life actions</p>
-          <button type="button" data-lifeverse-tab="fastForward"><strong>Open Calendar Fast Forward</strong><span>Calendar -> Command Bus -> Simulation</span></button>
-          <button type="button" data-lifeverse-system-action="finance:set-week-budget"><strong>Set weekly budget</strong><span>Banking -> Command Bus -> Simulation</span></button>
-          <button type="button" data-lifeverse-system-action="mentalWellbeing:stress-reset"><strong>Take a stress reset</strong><span>Wellbeing -> Command Bus -> Simulation</span></button>
+          <button type="button" data-lifeverse-tab="fastForward"><strong>Open Calendar Fast Forward</strong><span>Preview how repeated days may compound.</span></button>
+          <button type="button" data-lifeverse-system-action="finance:set-week-budget"><strong>Set weekly budget</strong><span>Plan this week's money before pressure rises.</span></button>
+          <button type="button" data-lifeverse-system-action="mentalWellbeing:stress-reset"><strong>Take a stress reset</strong><span>Calm pressure before the next choice.</span></button>
         </div>
       </div>
     </section>
@@ -1990,7 +1990,7 @@ function lifeVerseWorldPanel(state) {
           </article>
         `).join("")}
       </div>
-      <p class="lifeverse-note">World simulation is intentionally connected to finance, transport, housing, health, and future NPC systems.</p>
+      <p class="lifeverse-note">District conditions can shape money, transport, housing, health, relationships, and opportunity over time.</p>
     </section>
   `;
 }
@@ -2459,11 +2459,37 @@ function mountLifeSim() {
     return;
   }
   lifeSimInstance = window.CompassLifeSim.mount(root, {
+    getLifeVerseState: () => lifeVerseState(),
     onLocationChange(location) {
       trackerState.lifeSim.currentLocation = location ? location.id : null;
       saveTrackerState();
       updateLifeSimDom();
     }
+  });
+}
+
+function lifeVersePresentationPause(kind = "soft", duration = 420) {
+  const game = document.querySelector("[data-life-sim-game]");
+  if (!game) return Promise.resolve();
+  const overlay = document.createElement("div");
+  overlay.className = `lifeverse-transition-flash is-${kind}`;
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.innerHTML = kind === "fast-forward"
+    ? `<span>Time is moving...</span>`
+    : kind === "report-open"
+      ? `<span>Opening reflection...</span>`
+      : `<span>LifeVerse</span>`;
+  game.appendChild(overlay);
+  game.classList.add(`is-${kind}-presentation`);
+  return new Promise((resolve) => {
+    window.setTimeout(() => {
+      overlay.classList.add("is-leaving");
+      window.setTimeout(() => {
+        overlay.remove();
+        game.classList.remove(`is-${kind}-presentation`);
+        resolve();
+      }, 180);
+    }, duration);
   });
 }
 
@@ -5043,6 +5069,7 @@ document.addEventListener("click", async (event) => {
   }
   if (lifeVerseFastForward) {
     const days = Number(lifeVerseFastForward.dataset.lifeverseFastForward || 30);
+    await lifeVersePresentationPause("fast-forward", 620);
     const result = fastForwardLifeVerse(days);
     if (result && !result.error) {
       saveTrackerState();
@@ -5051,6 +5078,7 @@ document.addEventListener("click", async (event) => {
     }
   }
   if (lifeVerseReportNow) {
+    await lifeVersePresentationPause("report-open", 260);
     const report = createLifeVerseReport();
     if (report) {
       saveTrackerState();
