@@ -1,0 +1,120 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111311">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Compass">
+    <title>Compass - Future Mirror</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css?v=lifeverse-volume04-20260708-1">
+  </head>
+  <body class="compass-public-app">
+    <main class="page-shell">
+      <section class="prototype-view is-active" id="app-view">
+        <div class="phone-shell" aria-label="Compass mobile app">
+          <div class="phone-status">
+            <span>9:41</span>
+            <span class="status-dots"><i></i><i></i><i></i></span>
+          </div>
+          <section class="app-screen" id="screen-root" aria-live="polite"></section>
+          <nav class="bottom-nav" aria-label="Primary">
+            <button class="nav-item is-active" type="button" data-tab="home">
+              <img class="nav-icon" src="assets/icon-home.png" alt="">
+              Home
+            </button>
+            <button class="nav-item signature-nav" type="button" data-tab="future">
+              <img class="nav-icon" src="assets/icon-spark.png" alt="">
+              Mirror
+            </button>
+            <button class="nav-item" type="button" data-tab="growth">
+              <img class="nav-icon" src="assets/icon-learn.png" alt="">
+              Growth
+            </button>
+            <button class="nav-item" type="button" data-tab="stories">
+              <img class="nav-icon" src="assets/icon-stories.png" alt="">
+              Inspire
+            </button>
+            <button class="nav-item" type="button" data-tab="community">
+              <img class="nav-icon" src="assets/icon-support.png" alt="">
+              Community
+            </button>
+            <button class="nav-item" type="button" data-tab="opportunities">
+              <img class="nav-icon" src="assets/icon-work.png" alt="">
+              Opps
+            </button>
+            <button class="nav-item" type="button" data-tab="settings">
+              <img class="nav-icon" src="assets/icon-settings.png" alt="">
+              Profile
+            </button>
+          </nav>
+        </div>
+      </section>
+    </main>
+
+    <div class="onboarding-layer" id="onboarding-layer" aria-hidden="true">
+      <section class="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+        <p class="eyebrow">Google account sign-in</p>
+        <h2 id="onboarding-title">Welcome to Compass</h2>
+        <p class="muted">Use a Gmail address to create your mobile web account. Admin access requires the demo admin passcode.</p>
+        <form id="onboarding-form" class="username-form">
+          <label>
+            Gmail address
+            <input id="auth-email" type="email" autocomplete="email" placeholder="you@gmail.com">
+          </label>
+          <label>
+            Username
+            <input id="onboarding-username" type="text" maxlength="18" autocomplete="nickname" placeholder="Example: Aina">
+          </label>
+          <label>
+            Admin passcode optional
+            <input id="auth-admin-pass" type="password" autocomplete="off" placeholder="Only for admins">
+          </label>
+          <p class="tiny-note">Prototype note: this simulates Google Sign-In locally. Production needs Google Identity Services and server-side token verification.</p>
+          <p class="form-error" id="onboarding-error" aria-live="polite"></p>
+          <button class="primary-action" type="submit">Continue with Google</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-layer" id="modal-layer" aria-hidden="true"></div>
+    <script src="https://unpkg.com/three@0.146.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.146.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="event-bus.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="trace-engine.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="command-bus.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="state-store.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="persistence-service.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="save-service.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="entity-models.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="component-registry.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="service-registry.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="simulation-engine.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-state.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-time.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-needs.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-player.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-activities.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-career.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-education.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-finance.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-housing.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-transportation.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-relationships.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-health.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-mental-wellbeing.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-economy.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-npc-simulation.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-world-simulation.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-progression.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-system-registry.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-life-report.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-fast-forward.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-core.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="lifeverse-ux.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="life-sim.js?v=lifeverse-volume04-20260708-1"></script>
+    <script src="app.js?v=lifeverse-volume04-20260708-1"></script>
+  </body>
+</html>

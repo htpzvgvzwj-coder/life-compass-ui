@@ -1,0 +1,21 @@
+{
+  "name": "Compass Future Mirror",
+  "short_name": "Compass",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f7f8f4",
+  "theme_color": "#111311",
+  "description": "A mobile web app for youth choices, future planning, wellbeing, opportunities, and inspiration.",
+  "icons": [
+    {
+      "src": "assets/icon-home.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon-chat.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    }
+  ]
+}
