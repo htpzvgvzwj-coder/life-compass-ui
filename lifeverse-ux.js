@@ -33,16 +33,13 @@
   function getCriticalNeeds(state) {
     if (!state || !state.needs) return [];
     const checks = [
-      ["energy", "Energy", state.needs.energy, "low"],
-      ["hunger", "Food", state.needs.hunger, "low"],
-      ["sleep", "Sleep", state.needs.sleep, "low"],
-      ["social", "Social", state.needs.social, "low"],
-      ["stress", "Stress", state.needs.stress, "high"],
-      ["hygiene", "Hygiene", state.needs.hygiene, "low"]
+      ["energy", "Energy", state.needs.energy, "low", 25],
+      ["health", "Health", state.health ? state.health.physical : 100, "low", 35],
+      ["stress", "Stress", state.needs.stress, "high", 75]
     ];
     return checks
-      .map(([key, label, value, direction]) => ({ key, label, value: clamp(value), direction }))
-      .filter((need) => need.direction === "high" ? need.value >= 70 : need.value <= 35);
+      .map(([key, label, value, direction, threshold]) => ({ key, label, value: clamp(value), direction, threshold }))
+      .filter((need) => need.direction === "high" ? need.value > need.threshold : need.value < need.threshold);
   }
 
   function getPhoneApps(state) {
@@ -64,6 +61,7 @@
     const locationActions = {
       home: [
         { object: "Bed", hint: "Sleep, nap, or reset your energy.", activityId: "rest" },
+        { object: "Sleep Calendar", hint: "Fast forward one day from your bed.", fastForwardDays: 1 },
         { object: "Computer", hint: "Study, work online, or review budget.", activityId: "study-block" },
         { object: "Fridge", hint: "Eat or plan cheaper meals.", activityId: "budget-review" }
       ],

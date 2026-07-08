@@ -6257,3 +6257,361 @@ body.compass-public-app:not(.life-sim-active) .bottom-nav {
   border-radius: 0;
 }
 
+/* LifeVerse Volume 04.5 polish: world-first game view */
+body.life-sim-active .life-sim-game-topbar {
+  top: max(10px, env(safe-area-inset-top));
+  left: auto;
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 14;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+body.life-sim-active .life-sim-game-topbar > div {
+  display: none;
+}
+
+body.life-sim-active .sim-exit-button {
+  min-width: 52px;
+  padding: 8px 11px;
+  border-radius: 999px;
+  background: rgba(5, 6, 7, 0.42);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  opacity: 0.72;
+  pointer-events: auto;
+}
+
+body.life-sim-active .sim-exit-button:is(:hover, :focus-visible) {
+  opacity: 1;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-hud {
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  width: auto;
+  max-width: min(540px, calc(100vw - 160px));
+  align-items: center;
+  gap: 6px;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-time-card,
+body.life-sim-active .volume04-world-first .lifeverse-hud-stats,
+body.life-sim-active .volume04-world-first .lifeverse-objective-pill {
+  border-radius: 999px;
+  background: rgba(5, 6, 7, 0.38);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(16px);
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-time-card {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-time-card span,
+body.life-sim-active .volume04-world-first .lifeverse-time-card small {
+  display: none;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-time-card strong {
+  font-size: 13px;
+  line-height: 1;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-time-card::before {
+  content: "Day";
+  color: rgba(248, 246, 242, 0.62);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-hud-stats {
+  min-width: 0;
+  display: flex;
+  grid-template-columns: none;
+  gap: 3px;
+  padding: 4px;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-hud-stats span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  border-radius: 999px;
+  background: rgba(248, 246, 242, 0.08);
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-hud-stats small {
+  max-width: 16px;
+  overflow: hidden;
+  color: rgba(248, 246, 242, 0.64);
+  font-size: 0;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-hud-stats span:nth-child(1) small::before {
+  content: "$";
+  font-size: 11px;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-hud-stats span:nth-child(2) small::before {
+  content: "HP";
+  font-size: 10px;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-hud-stats span:nth-child(3) small::before {
+  content: "EN";
+  font-size: 10px;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-hud-stats strong {
+  color: #f8f6f2;
+  font-size: 12px;
+  line-height: 1;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-objective-pill {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  overflow: hidden;
+  color: #f8f6f2;
+  opacity: 0.5;
+  transition: width 160ms ease, opacity 160ms ease, padding 160ms ease;
+  pointer-events: auto;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-objective-pill::before {
+  content: "!";
+  color: #c8a96b;
+  font-weight: 1000;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-objective-pill small,
+body.life-sim-active .volume04-world-first .lifeverse-objective-pill strong {
+  display: none;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-objective-pill:is(:hover, :focus-within) {
+  width: min(280px, calc(100vw - 330px));
+  min-width: 190px;
+  justify-items: start;
+  padding: 7px 11px;
+  opacity: 1;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-objective-pill:is(:hover, :focus-within)::before {
+  display: none;
+}
+
+body.life-sim-active .volume04-world-first .lifeverse-objective-pill:is(:hover, :focus-within) small,
+body.life-sim-active .volume04-world-first .lifeverse-objective-pill:is(:hover, :focus-within) strong {
+  display: block;
+}
+
+body.life-sim-active .lifeverse-dynamic-hud {
+  top: max(52px, calc(env(safe-area-inset-top) + 44px));
+  left: max(12px, env(safe-area-inset-left));
+  width: auto;
+  max-width: 230px;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgba(70, 24, 20, 0.52);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+body.life-sim-active .lifeverse-dynamic-hud span {
+  padding: 5px 7px;
+  font-size: 10px;
+}
+
+body.life-sim-active .lifeverse-subtle-hint {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 7;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border: 1px solid rgba(248, 246, 242, 0.1);
+  border-radius: 999px;
+  color: rgba(248, 246, 242, 0.55);
+  background: rgba(5, 6, 7, 0.24);
+  font-size: 10px;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+body.life-sim-active .lifeverse-context-prompt {
+  bottom: max(20px, env(safe-area-inset-bottom));
+  width: auto;
+  min-width: min(300px, calc(100vw - 300px));
+  max-width: min(560px, calc(100vw - 300px));
+  grid-template-columns: minmax(150px, 1fr) auto;
+  padding: 10px;
+  border-radius: 20px;
+  background: rgba(5, 6, 7, 0.48);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.26);
+}
+
+body.life-sim-active .lifeverse-context-prompt.is-exploring {
+  display: none;
+}
+
+body.life-sim-active .lifeverse-context-prompt h3 {
+  font-size: 14px;
+}
+
+body.life-sim-active .lifeverse-context-prompt span {
+  font-size: 10px;
+}
+
+body.life-sim-active .lifeverse-context-button,
+body.life-sim-active .lifeverse-context-actions .lifeverse-activity-card {
+  min-width: 104px;
+  max-width: 138px;
+  padding: 9px 10px;
+  border-radius: 15px;
+}
+
+body.life-sim-active .lifeverse-game-dock {
+  right: max(10px, env(safe-area-inset-right));
+  gap: 6px;
+  padding: 6px;
+  border-radius: 22px;
+  background: rgba(5, 6, 7, 0.28);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
+  opacity: 0.38;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+body.life-sim-active .lifeverse-game-dock:is(:hover, :focus-within) {
+  opacity: 1;
+}
+
+body.life-sim-active .lifeverse-game-dock button {
+  width: 42px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 15px;
+  overflow: hidden;
+  transition: width 160ms ease, background 160ms ease;
+}
+
+body.life-sim-active .lifeverse-game-dock button:is(:hover, :focus-visible),
+body.life-sim-active .lifeverse-game-dock button.is-active {
+  width: 86px;
+}
+
+body.life-sim-active .lifeverse-game-dock span {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  font-size: 9px;
+}
+
+body.life-sim-active .lifeverse-game-dock strong {
+  display: none;
+  font-size: 9px;
+}
+
+body.life-sim-active .lifeverse-game-dock button:is(:hover, :focus-visible, .is-active) strong {
+  display: block;
+}
+
+body.life-sim-active .lifeverse-overlay-panel {
+  top: max(44px, calc(env(safe-area-inset-top) + 38px));
+  right: max(66px, calc(env(safe-area-inset-right) + 58px));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  width: min(390px, calc(100vw - 106px));
+  padding: 14px;
+  border-radius: 24px;
+  background: rgba(8, 9, 10, 0.64);
+}
+
+body.life-sim-active .lifeverse-consequence-toast {
+  position: absolute;
+  left: 50%;
+  bottom: max(74px, calc(env(safe-area-inset-bottom) + 66px));
+  z-index: 13;
+  width: min(360px, calc(100vw - 330px));
+  min-width: 260px;
+  display: grid;
+  gap: 4px;
+  transform: translateX(-50%);
+  padding: 11px 13px;
+  border: 1px solid rgba(200, 169, 107, 0.38);
+  border-radius: 18px;
+  background: rgba(10, 10, 9, 0.66);
+  color: #f8f6f2;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+  animation: lifeverseToastIn 180ms ease both, lifeverseToastOut 420ms ease 3.58s forwards;
+}
+
+body.life-sim-active .lifeverse-consequence-toast strong {
+  font-size: 13px;
+}
+
+body.life-sim-active .lifeverse-consequence-toast span {
+  color: rgba(248, 246, 242, 0.72);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+body.life-sim-active .lifeverse-consequence-toast button {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 999px;
+  color: #111;
+  background: #c8a96b;
+  font-size: 11px;
+  font-weight: 1000;
+}
+
+@keyframes lifeverseToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes lifeverseToastOut {
+  to {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+body.life-sim-active .sim-fast-forward-button,
+body.life-sim-active .life-sim-result-card {
+  display: none !important;
+}
+
+@media (max-height: 430px) and (orientation: landscape) {
+  body.life-sim-active .volume04-world-first .lifeverse-hud {
+    top: max(8px, env(safe-area-inset-top));
+  }
+
+  body.life-sim-active .lifeverse-context-prompt {
+    bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+

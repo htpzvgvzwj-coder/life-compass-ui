@@ -105,7 +105,9 @@ const defaultTrackerState = {
     },
     currentLocation: null,
     lastActivity: "",
-    consequence: ""
+    consequence: "",
+    consequenceToastUntil: 0,
+    reportPromptReady: false
   },
   activeRoleplaySessionId: null,
   moodSuggestion: null
@@ -750,7 +752,9 @@ function normalizeLifeSimState(state = {}) {
     },
     currentLocation: state.currentLocation || null,
     lastActivity: state.lastActivity || "",
-    consequence: state.consequence || ""
+    consequence: state.consequence || "",
+    consequenceToastUntil: Math.max(0, Math.round(Number(state.consequenceToastUntil) || 0)),
+    reportPromptReady: Boolean(state.reportPromptReady)
   };
 }
 
@@ -1552,6 +1556,7 @@ function lifeVerseGameShell() {
       ${lifeVerseWorldFirstContext(state, view)}
       ${lifeVerseGameDock(state)}
       ${lifeVerseOverlayPanel(state, view)}
+      ${lifeVerseConsequenceToast()}
     </section>
   `;
 }
@@ -1609,6 +1614,9 @@ function lifeVerseWorldFirstContext(state) {
   const interactions = lifeVerseEngine()?.lifeVerseUx?.getLocationInteractions
     ? lifeVerseEngine().lifeVerseUx.getLocationInteractions(state, location, activities)
     : [];
+  if (!locationInfo && !interactions.length && !activities.length) {
+    return `<div class="lifeverse-subtle-hint" aria-label="Explore hint">Move near a place to interact</div>`;
+  }
   return `
     <section class="lifeverse-context-prompt ${locationInfo ? "" : "is-exploring"}" aria-label="Context interaction">
       <div>
@@ -1624,6 +1632,14 @@ function lifeVerseWorldFirstContext(state) {
 }
 
 function lifeVerseContextButton(action) {
+  if (action.fastForwardDays) {
+    return `
+      <button class="lifeverse-context-button" type="button" data-lifeverse-fast-forward="${escapeHTML(action.fastForwardDays)}">
+        <strong>${escapeHTML(action.object)}</strong>
+        <span>${escapeHTML(action.hint)}</span>
+      </button>
+    `;
+  }
   if (action.activityId) {
     return `
       <button class="lifeverse-context-button" type="button" data-lifeverse-activity="${escapeHTML(action.activityId)}">
@@ -1692,6 +1708,7 @@ function lifeVersePhonePanel(state) {
         </div>
         <div class="lifeverse-phone-card">
           <p class="eyebrow">Quick life actions</p>
+          <button type="button" data-lifeverse-tab="fastForward"><strong>Open Calendar Fast Forward</strong><span>Calendar -> Command Bus -> Simulation</span></button>
           <button type="button" data-lifeverse-system-action="finance:set-week-budget"><strong>Set weekly budget</strong><span>Banking -> Command Bus -> Simulation</span></button>
           <button type="button" data-lifeverse-system-action="mentalWellbeing:stress-reset"><strong>Take a stress reset</strong><span>Wellbeing -> Command Bus -> Simulation</span></button>
         </div>
@@ -2242,6 +2259,26 @@ function lifeSimLastResult() {
   `;
 }
 
+function markLifeVerseConsequence(lastActivity, consequence, options = {}) {
+  trackerState.lifeSim.lastActivity = lastActivity || "";
+  trackerState.lifeSim.consequence = consequence || "";
+  trackerState.lifeSim.consequenceToastUntil = Date.now() + 4000;
+  trackerState.lifeSim.reportPromptReady = Boolean(options.reportPromptReady);
+}
+
+function lifeVerseConsequenceToast(now = Date.now()) {
+  const sim = trackerState.lifeSim || {};
+  if (!sim.consequence || Number(sim.consequenceToastUntil || 0) <= now) return "";
+  return `
+    <aside class="lifeverse-consequence-toast" aria-live="polite">
+      <p class="eyebrow">${sim.reportPromptReady ? "Fast Forward finished" : "Consequence recorded"}</p>
+      <strong>${escapeHTML(sim.lastActivity || "LifeVerse update")}</strong>
+      <span>${escapeHTML(sim.consequence)}</span>
+      ${sim.reportPromptReady ? `<button type="button" data-lifeverse-tab="report">View Life Report</button>` : ""}
+    </aside>
+  `;
+}
+
 function applyLifeSimChanges(effect = {}) {
   const stats = lifeSimStats();
   stats.money = Math.round(Number(stats.money || 0) + Number(effect.money || 0));
@@ -2313,9 +2350,9 @@ function performLifeVerseActivity(activityId) {
   });
   if (result && !result.error) {
     trackerState.lifeVerse = result.state;
+    trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    trackerState.lifeSim.lastActivity = result.activity.title;
-    trackerState.lifeSim.consequence = result.event.summary;
+    markLifeVerseConsequence(result.activity.title, result.event.summary);
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   }
   return result;
@@ -2332,11 +2369,10 @@ function performLifeVerseSystemAction(systemId, actionId) {
     trackerState.lifeVerse = result.state;
     trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    trackerState.lifeSim.lastActivity = result.action.title;
-    trackerState.lifeSim.consequence = result.event.summary;
+    markLifeVerseConsequence(result.action.title, result.event.summary);
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   } else if (result && result.error) {
-    trackerState.lifeSim.consequence = result.error;
+    markLifeVerseConsequence("Action unavailable", result.error);
   }
   return result;
 }
@@ -2350,10 +2386,9 @@ function fastForwardLifeVerse(days = 30) {
   const result = runFastForward(state, days);
   if (result && !result.error) {
     trackerState.lifeVerse = result.state;
-    trackerState.lifeVerse.activeView = "report";
+    trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    trackerState.lifeSim.lastActivity = `${days} Days Later`;
-    trackerState.lifeSim.consequence = result.event.summary;
+    markLifeVerseConsequence(`${days} Days Later`, result.event.summary, { reportPromptReady: true });
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   }
   return result;
@@ -2368,8 +2403,7 @@ function createLifeVerseReport() {
   const report = runReport(state, { type: "reflection" });
   trackerState.lifeVerse = state;
   trackerState.lifeVerse.activeView = "report";
-  trackerState.lifeSim.lastActivity = report.title;
-  trackerState.lifeSim.consequence = report.overview;
+  markLifeVerseConsequence(report.title, report.overview);
   if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   return report;
 }
@@ -2380,6 +2414,8 @@ function resetLifeVerse() {
   syncLifeSimFromLifeVerse();
   trackerState.lifeSim.lastActivity = "";
   trackerState.lifeSim.consequence = "";
+  trackerState.lifeSim.consequenceToastUntil = 0;
+  trackerState.lifeSim.reportPromptReady = false;
 }
 
 function destroyLifeSim() {
@@ -3802,13 +3838,6 @@ const screens = {
         <span>Drag right side</span>
       </div>
 
-      <button class="sim-fast-forward-button" type="button" data-sim-fast-forward>
-        <span>30 days</span>
-        Fast Forward
-      </button>
-
-      <button class="sim-reset-button" type="button" data-sim-reset>Reset</button>
-
       <div class="sim-joystick" data-sim-joystick aria-hidden="true">
         <span data-sim-joystick-knob></span>
       </div>
@@ -3816,8 +3845,6 @@ const screens = {
       <div class="sim-look-pad" data-sim-look-pad aria-hidden="true">
         <span>Drag to rotate</span>
       </div>
-
-      ${lifeSimLastResult()}
     </section>
   `,
 
@@ -4669,9 +4696,16 @@ function bindRenderedNavigation(container) {
       event.preventDefault();
       event.stopPropagation();
       const targetTab = button.dataset.tabJump;
+      if (targetTab === "simulator") setLifeVerseDefaultWorldView();
       if (targetTab) renderScreen(targetTab);
     });
   });
+}
+
+function setLifeVerseDefaultWorldView() {
+  trackerState.lifeVerse = lifeVerseState();
+  trackerState.lifeVerse.activeView = "today";
+  if (trackerState.lifeSim) trackerState.lifeSim.reportPromptReady = false;
 }
 
 function renderScreen(tab) {
@@ -4973,7 +5007,10 @@ document.addEventListener("click", async (event) => {
   const lifeVerseReset = event.target.closest("[data-lifeverse-reset]");
 
   if (opener) openModal(opener.dataset.open, opener.dataset.reflectionId || opener.dataset.openPayload || "");
-  if (tabJump) renderScreen(tabJump.dataset.tabJump);
+  if (tabJump) {
+    if (tabJump.dataset.tabJump === "simulator") setLifeVerseDefaultWorldView();
+    renderScreen(tabJump.dataset.tabJump);
+  }
   if (openLink) {
     const url = safeExternalUrl(openLink.dataset.openLink);
     if (url) window.open(url, "_blank", "noopener,noreferrer");
@@ -4981,6 +5018,9 @@ document.addEventListener("click", async (event) => {
   if (lifeVerseTab) {
     trackerState.lifeVerse = lifeVerseState();
     trackerState.lifeVerse.activeView = lifeVerseTab.dataset.lifeverseTab || "today";
+    if (trackerState.lifeVerse.activeView === "journal" || trackerState.lifeVerse.activeView === "report") {
+      trackerState.lifeSim.reportPromptReady = false;
+    }
     saveTrackerState();
     renderScreen("simulator");
   }
@@ -5031,8 +5071,7 @@ document.addEventListener("click", async (event) => {
     const activity = (lifeSimActivities[locationId] || []).find((item) => item.id === simActivity.dataset.simActivity);
     if (activity) {
       applyLifeSimChanges(activity.effect);
-      trackerState.lifeSim.lastActivity = activity.name;
-      trackerState.lifeSim.consequence = `${activity.name} completed. ${lifeSimEffectText(activity.effect)}`;
+      markLifeVerseConsequence(activity.name, `${activity.name} completed. ${lifeSimEffectText(activity.effect)}`);
       saveTrackerState();
       updateLifeSimDom();
       renderScreen("simulator");
@@ -5724,7 +5763,9 @@ const startupLifeVerseView = startupParams.get("lifeverseView");
 if (startupLifeVerseView) {
   trackerState.lifeVerse = lifeVerseState();
   trackerState.lifeVerse.activeView = startupLifeVerseView;
+} else if (startupTab === "simulator") {
+  setLifeVerseDefaultWorldView();
 }
-renderScreen(screenRenderers[startupTab] ? startupTab : "home");
+renderScreen(screens[startupTab] ? startupTab : "home");
 showAuthIfNeeded();
 
