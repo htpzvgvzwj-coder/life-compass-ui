@@ -1,11 +1,18 @@
 (function () {
   const locationZones = [
-    { id: "home", name: "Home", x: -18, z: 12, radius: 5.2 },
-    { id: "gym", name: "Gym", x: -4, z: 18, radius: 4.4 },
-    { id: "work", name: "Work", x: 16, z: 13, radius: 5 },
-    { id: "food", name: "Food Court", x: -17, z: -12, radius: 5.2 },
-    { id: "mall", name: "Shopping Mall", x: 16, z: -12, radius: 5.4 },
-    { id: "park", name: "Park", x: 1, z: -20, radius: 6.3 }
+    { id: "home", name: "Home", x: -24, z: 17, radius: 5.4 },
+    { id: "gym", name: "Gym", x: -9, z: 20, radius: 4.5 },
+    { id: "work", name: "Office", x: 18, z: 18, radius: 5 },
+    { id: "food", name: "Food Court", x: -22, z: -13, radius: 5.4 },
+    { id: "mall", name: "Shopping Mall", x: 18, z: -12, radius: 5.5 },
+    { id: "park", name: "Park", x: 2, z: -22, radius: 6.2 },
+    { id: "library", name: "Library", x: -25, z: 2, radius: 4.5 },
+    { id: "hospital", name: "Hospital", x: 30, z: 12, radius: 4.8 },
+    { id: "cafe", name: "Cafe", x: -9, z: -24, radius: 4 },
+    { id: "beach", name: "Beach", x: 24, z: -30, radius: 5 },
+    { id: "airport", name: "Airport", x: 35, z: -1, radius: 5.3 },
+    { id: "train", name: "Train Station", x: 4, z: -3.5, radius: 4.6 },
+    { id: "university", name: "University", x: -34, z: -7, radius: 5 }
   ];
 
   function mount(root, options = {}) {
@@ -34,7 +41,7 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace || renderer.outputColorSpace;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 0.72;
     root.appendChild(renderer.domElement);
 
     const state = {
@@ -47,7 +54,7 @@
       lookStart: null,
       moveVector: { x: 0, y: 0 },
       yaw: Math.PI,
-      pitch: 0.54,
+      pitch: 0.6,
       smoothMove: { x: 0, y: 0 },
       moveSpeed: 0,
       walkPhase: 0,
@@ -55,8 +62,8 @@
       isMoving: false,
       mixers: [],
       productionAssetsLoaded: false,
-      cameraPosition: new THREE.Vector3(0, 8, -16),
-      cameraLookAt: new THREE.Vector3(0, 1.55, -7),
+      cameraPosition: new THREE.Vector3(-19, 8, 0),
+      cameraLookAt: new THREE.Vector3(-19, 1.55, -10),
       cameraShake: 0,
       presentation: null
     };
@@ -72,14 +79,15 @@
     state.presentation = createPresentationState(THREE, scene, renderer, lighting, materials, host);
 
     const player = createPlayer(THREE, materials);
-    player.group.position.set(0, 0, -7);
+    player.group.position.set(-19, 0, -10);
     scene.add(player.group);
     loadProductionAssets(THREE, scene, materials, player, state, root).then((loaded) => {
       if (state.destroyed) return;
       state.productionAssetsLoaded = loaded;
       if (!loaded) {
         createDistrict(THREE, scene, materials);
-        setAssetStatus(root, "Preview district active. Volume 5 can swap in licensed 3D assets.", "warning");
+        setAssetStatus(root, "Stylized remastered district active.", "success");
+        window.setTimeout(() => clearAssetStatus(root), 2600);
       }
       registerPresentationObjects(scene, state.presentation);
     });
@@ -226,8 +234,8 @@
         direction.normalize();
         const speed = 7.8 + state.moveSpeed * 1.25;
         player.group.position.addScaledVector(direction, speed * state.moveSpeed * delta);
-        player.group.position.x = clamp(player.group.position.x, -26, 26);
-        player.group.position.z = clamp(player.group.position.z, -27, 25);
+        player.group.position.x = clamp(player.group.position.x, -38, 38);
+        player.group.position.z = clamp(player.group.position.z, -33, 27);
         const targetAngle = Math.atan2(direction.x, direction.z);
         player.group.rotation.y = lerpAngle(player.group.rotation.y, targetAngle, Math.min(1, delta * 8.5));
         state.footstepTimer -= delta * state.moveSpeed;
@@ -343,19 +351,48 @@
 
     return {
       grass: make(0x92d36f),
-      ground: make(0xf4eccc),
+      ground: make(0xead8a8),
+      warmGround: make(0xf8dfad),
       road: standard(0x1c2028),
       roadLine: make(0xffef84, 0x332a00),
-      sidewalk: make(0xd8d0b4),
-      curb: make(0xf9f3df),
+      sidewalk: make(0xcbbf9d),
+      curb: make(0xe6dac0),
+      curbWarm: make(0xf3dfad),
       hdb: make(0xbfdfff),
       hdbAccent: make(0xffd0d9),
-      hdbBalcony: make(0xffffff),
+      hdbBalcony: make(0xf4ead7),
       gym: make(0xff806f),
       work: make(0x6fa3ff),
       food: make(0xffc95b, 0x2c1700),
       mall: make(0xb69cff),
       park: make(0x43bf70),
+      library: make(0x93c7ff),
+      hospital: make(0xdcecf5),
+      hospitalAccent: make(0x7ed9ff),
+      cafe: make(0xffb678, 0x311600),
+      university: make(0xffe4a3),
+      airport: make(0xbcd1e6),
+      airportAccent: make(0x3b77d5, 0x03122a),
+      sand: make(0xffdc8a),
+      water: standard(0x3bb8ff, 0x00476f, 0.38, 0.02),
+      path: make(0xc9b991),
+      flowerPink: make(0xff79b4, 0x2a0012),
+      flowerYellow: make(0xffe66d, 0x2f2500),
+      flowerPurple: make(0xb28cff, 0x17002e),
+      bush: make(0x3f9f5e),
+      wood: make(0x9b6336),
+      furniture: make(0xd48359),
+      bookRed: make(0xe65151),
+      bookBlue: make(0x4b85ff),
+      bookGreen: make(0x49c482),
+      metal: standard(0x98a4ad, 0x000000, 0.42, 0.12),
+      equipment: make(0x2f3545),
+      screen: standard(0x171d2e, 0x122462),
+      poster: make(0xfff0b0),
+      signBlue: make(0x2f6dff, 0x00184b),
+      signGreen: make(0x3ac681, 0x002a10),
+      signGold: make(0xffc95b, 0x251100),
+      roofDark: make(0x404858),
       window: standard(0xfff2a0, 0x8c6f00),
       glass: glass(0xbfe9ff),
       mrt: make(0xe61d33, 0x4b0007),
@@ -393,10 +430,10 @@
   }
 
   function createLighting(THREE, scene) {
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x91ad82, 1.75);
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x91ad82, 0.95);
     scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xffffff, 2.1);
+    const sun = new THREE.DirectionalLight(0xffffff, 1.08);
     sun.position.set(-12, 24, 12);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -559,10 +596,10 @@
         phase: "morning",
         sky: 0xbfe7ff,
         fog: 0xd9efff,
-        hemi: 1.85,
-        sun: 2.2,
+        hemi: 0.98,
+        sun: 1.02,
         lamp: 0.24,
-        exposure: 1.12,
+        exposure: 0.74,
         sunPosition: [-12, 24, 12]
       };
     }
@@ -571,10 +608,10 @@
         phase: "afternoon",
         sky: 0xa9dfff,
         fog: 0xd1f3ff,
-        hemi: 1.78,
-        sun: 2.35,
+        hemi: 1.02,
+        sun: 1.12,
         lamp: 0.18,
-        exposure: 1.08,
+        exposure: 0.76,
         sunPosition: [-6, 28, 6]
       };
     }
@@ -583,10 +620,10 @@
         phase: "sunset",
         sky: 0xffb980,
         fog: 0xffd4a8,
-        hemi: 1.32,
-        sun: 1.65,
+        hemi: 0.82,
+        sun: 0.86,
         lamp: 0.78,
-        exposure: 1.02,
+        exposure: 0.72,
         sunPosition: [14, 12, -8]
       };
     }
@@ -594,10 +631,10 @@
       phase: "night",
       sky: 0x1d2b57,
       fog: 0x17223f,
-      hemi: 0.62,
-      sun: 0.28,
+      hemi: 0.5,
+      sun: 0.22,
       lamp: 1.9,
-      exposure: 0.92,
+      exposure: 0.66,
       sunPosition: [8, 8, -12]
     };
   }
@@ -1011,92 +1048,380 @@
   }
 
   function createDistrict(THREE, scene, mat) {
-    addPlane(THREE, scene, "Soft Anime Ground", [0, -0.03, 0], [62, 62], mat.ground);
-    addPlane(THREE, scene, "Grass North West", [-22, 0, 0], [10, 54], mat.grass);
-    addPlane(THREE, scene, "Grass East", [24, 0, 3], [8, 48], mat.grass);
+    addPlane(THREE, scene, "Soft Anime Town Ground", [0, -0.04, -3], [88, 76], mat.ground);
+    addPlane(THREE, scene, "North Residential Green", [-24, -0.02, 14], [23, 25], mat.grass);
+    addPlane(THREE, scene, "Campus Green", [-31, -0.015, -8], [18, 18], mat.grass);
+    addPlane(THREE, scene, "Park Green", [1, -0.01, -23], [22, 18], mat.park);
+    addPlane(THREE, scene, "Beach Sand", [26, 0, -31], [25, 10], mat.sand);
+    addPlane(THREE, scene, "Shallow Anime Sea", [26, 0.015, -37], [26, 8], mat.water);
 
-    addRoad(THREE, scene, mat);
+    addRoadNetwork(THREE, scene, mat);
     addHdbHome(THREE, scene, mat);
     addGym(THREE, scene, mat);
     addWorkTower(THREE, scene, mat);
     addFoodCourt(THREE, scene, mat);
     addMall(THREE, scene, mat);
     addPark(THREE, scene, mat);
-    addMrtEntrance(THREE, scene, mat);
+    addLibrary(THREE, scene, mat);
+    addHospital(THREE, scene, mat);
+    addCafe(THREE, scene, mat);
+    addBeach(THREE, scene, mat);
+    addAirport(THREE, scene, mat);
+    addTrainStation(THREE, scene, mat);
+    addUniversity(THREE, scene, mat);
     addStreetLife(THREE, scene, mat);
     addZones(THREE, scene, mat);
   }
 
-  function addRoad(THREE, scene, mat) {
-    addBox(THREE, scene, "Main Road NS", [0, 0.01, 0], [6.6, 0.08, 58], mat.road, true);
-    addBox(THREE, scene, "Main Road EW", [0, 0.02, 0], [58, 0.08, 6.6], mat.road, true);
-    addBox(THREE, scene, "Sidewalk North", [0, 0.08, 7], [52, 0.12, 1.8], mat.sidewalk, true);
-    addBox(THREE, scene, "Sidewalk South", [0, 0.08, -7], [52, 0.12, 1.8], mat.sidewalk, true);
-    addBox(THREE, scene, "Sidewalk West", [-7, 0.08, 0], [1.8, 0.12, 52], mat.sidewalk, true);
-    addBox(THREE, scene, "Sidewalk East", [7, 0.08, 0], [1.8, 0.12, 52], mat.sidewalk, true);
+  function addRoadNetwork(THREE, scene, mat) {
+    [
+      ["Main Road NS", [0, 0.01, -2], [6.8, 0.08, 65]],
+      ["Main Road EW", [0, 0.02, 0], [74, 0.08, 6.8]],
+      ["Residential Lane", [-20, 0.025, 8], [5.2, 0.08, 27]],
+      ["Airport Access Road", [28, 0.025, 2], [5.2, 0.08, 35]]
+    ].forEach(([name, position, scale]) => addBox(THREE, scene, name, position, scale, mat.road, true));
 
-    for (let z = -24; z <= 24; z += 6) addBox(THREE, scene, "Road Line", [0, 0.13, z], [0.25, 0.04, 2.2], mat.roadLine, true);
-    for (let x = -24; x <= 24; x += 6) addBox(THREE, scene, "Road Line", [x, 0.14, 0], [2.2, 0.04, 0.25], mat.roadLine, true);
-    for (let i = -5; i <= 5; i++) {
-      addBox(THREE, scene, "Crosswalk NS", [i * 0.75, 0.16, -4.2], [0.36, 0.04, 1.55], mat.curb, true);
-      addBox(THREE, scene, "Crosswalk EW", [-4.2, 0.17, i * 0.75], [1.55, 0.04, 0.36], mat.curb, true);
-    }
+    [
+      [0, 7, 72, 1.8],
+      [0, -7, 72, 1.8],
+      [-7, -2, 1.8, 62],
+      [7, -2, 1.8, 62],
+      [-26, 8, 1.6, 28],
+      [-14, 8, 1.6, 28],
+      [22, 2, 1.6, 36],
+      [34, 2, 1.6, 36]
+    ].forEach(([x, z, sx, sz]) => addBox(THREE, scene, "Anime Sidewalk", [x, 0.08, z], [sx, 0.12, sz], mat.sidewalk, true));
+
+    [
+      [-30, -6, -21, -13],
+      [-15, -13, -8, -24],
+      [7, -20, 17, -13],
+      [18, -18, 25, -29],
+      [-15, 18, -9, 20],
+      [18, 12, 30, 12]
+    ].forEach(([x1, z1, x2, z2]) => addPath(THREE, scene, [x1, z1], [x2, z2], 1.15, mat.path));
+
+    for (let z = -29; z <= 28; z += 6) addBox(THREE, scene, "Road Center Line NS", [0, 0.13, z], [0.25, 0.04, 2.15], mat.roadLine, true);
+    for (let x = -34; x <= 34; x += 6) addBox(THREE, scene, "Road Center Line EW", [x, 0.14, 0], [2.15, 0.04, 0.25], mat.roadLine, true);
+    [-20, 0, 28].forEach((x) => addCrosswalk(THREE, scene, [x, -4.2], mat, "x"));
+    [-7, 7].forEach((z) => addCrosswalk(THREE, scene, [-4.2, z], mat, "z"));
   }
 
   function addHdbHome(THREE, scene, mat) {
-    addBuildingCore(THREE, scene, "HDB Home Block A", [-20, 8, 17], [6, 16, 4.5], mat.hdb, mat);
-    addBuildingCore(THREE, scene, "HDB Home Block B", [-14, 6.2, 17.5], [5, 12.4, 4], mat.hdbAccent, mat);
-    addBox(THREE, scene, "HDB Void Deck", [-17.5, 1.1, 14.8], [8.5, 2.2, 3.2], mat.hdbBalcony);
-    addText(THREE, scene, "HOME", [-20.4, 3.3, 12.35], 0.75, 0x111111);
+    addBuildingCore(THREE, scene, "HDB Home Block A", [-27, 8, 19], [6, 16, 4.5], mat.hdb, mat);
+    addBuildingCore(THREE, scene, "HDB Home Block B", [-21, 6.3, 19.4], [5, 12.6, 4], mat.hdbAccent, mat);
+    addBox(THREE, scene, "Home Void Deck Community Space", [-24, 1.05, 15.8], [9, 2.1, 3.5], mat.hdbBalcony);
+    addBox(THREE, scene, "Home Cozy Bedroom Floor", [-25.8, 0.2, 12.4], [4.4, 0.35, 3.2], mat.warmGround);
+    addBox(THREE, scene, "Home Bed", [-27, 0.72, 12.1], [1.7, 0.45, 2.1], mat.curbWarm);
+    addBox(THREE, scene, "Home Pillow", [-27, 1.05, 11.25], [1.35, 0.25, 0.42], mat.hdbBalcony);
+    addBox(THREE, scene, "Home Study Desk", [-24.2, 0.75, 11.4], [1.4, 0.22, 0.68], mat.wood);
+    addBox(THREE, scene, "Home Laptop", [-24.2, 1.02, 11.2], [0.74, 0.08, 0.42], mat.screen);
+    addBox(THREE, scene, "Home Wardrobe", [-23.6, 1.3, 13.6], [0.8, 1.9, 0.42], mat.furniture);
+    addBox(THREE, scene, "Home Kitchen Counter", [-26.8, 0.75, 13.95], [2.1, 0.55, 0.55], mat.furniture);
+    addSignBoard(THREE, scene, "Home Sign", "HOME", [-26.5, 3.15, 14.1], mat.signGreen, 0xffffff);
+    addFlowerBed(THREE, scene, [-28.5, 14.1], 4.2, mat);
   }
 
   function addGym(THREE, scene, mat) {
-    addBox(THREE, scene, "Gym Rounded Base", [-4, 2, 21], [7, 4, 5], mat.gym);
-    addCylinder(THREE, scene, "Gym Roof", [-4, 4.3, 21], [4.3, 0.35, 16], mat.curb, Math.PI / 2);
-    addBox(THREE, scene, "Gym Glass", [-4, 2.25, 18.42], [5.3, 2.4, 0.14], mat.glass);
-    addText(THREE, scene, "GYM", [-5.6, 3.4, 18.18], 0.72, 0xffffff);
+    addBox(THREE, scene, "Gym Fitness Studio", [-9, 2, 22], [8, 4, 5.4], mat.gym);
+    addBox(THREE, scene, "Gym Dark Toon Roof", [-9, 4.35, 22], [8.7, 0.5, 6.1], mat.roofDark);
+    addBox(THREE, scene, "Gym Mirror Wall", [-9, 2.25, 19.18], [6.1, 2.4, 0.14], mat.glass);
+    addTreadmill(THREE, scene, [-11.3, 19.9], mat);
+    addTreadmill(THREE, scene, [-9.1, 19.9], mat);
+    addBarbell(THREE, scene, [-6.5, 21.9], mat);
+    addBox(THREE, scene, "Gym Yoga Mat", [-10.9, 0.22, 23.8], [1.4, 0.07, 2.0], mat.signGreen, true);
+    addBox(THREE, scene, "Gym Locker Row", [-5.4, 1.4, 23.2], [0.7, 2.4, 3.2], mat.metal);
+    addSignBoard(THREE, scene, "Gym Sign", "GYM", [-11.3, 3.55, 18.8], mat.signGold, 0x151515);
   }
 
   function addWorkTower(THREE, scene, mat) {
-    addBuildingCore(THREE, scene, "Work Tower", [16, 10, 17], [8, 20, 5], mat.work, mat);
-    addBox(THREE, scene, "Work Lobby", [16, 1.8, 13.9], [9, 3.6, 2.2], mat.glass);
-    addText(THREE, scene, "WORK", [13.8, 4, 12.62], 0.72, 0xffffff);
+    addBuildingCore(THREE, scene, "Office Tower", [18, 10, 20], [8, 20, 5], mat.work, mat);
+    addBox(THREE, scene, "Office Lobby Glass", [18, 1.8, 16.9], [9, 3.6, 2.2], mat.glass);
+    addDeskComputer(THREE, scene, [15.5, 15.9], mat);
+    addDeskComputer(THREE, scene, [18.0, 15.9], mat);
+    addDeskComputer(THREE, scene, [20.5, 15.9], mat);
+    addBox(THREE, scene, "Office Meeting Table", [18, 0.82, 13.8], [3.1, 0.28, 1.2], mat.wood);
+    addBox(THREE, scene, "Office Coffee Counter", [21.9, 0.75, 15.0], [0.68, 0.65, 2.2], mat.furniture);
+    addSignBoard(THREE, scene, "Office Sign", "OFFICE", [15.6, 4.15, 15.65], mat.signBlue, 0xffffff);
   }
 
   function addFoodCourt(THREE, scene, mat) {
-    addBox(THREE, scene, "Food Court Floor", [-17, 0.25, -15], [10, 0.5, 7], mat.food);
-    addBox(THREE, scene, "Food Court Roof", [-17, 3.4, -15], [11.5, 0.45, 8.2], mat.food);
-    for (let x = -21; x <= -13; x += 4) {
-      for (let z = -17; z <= -13; z += 3) addTableSet(THREE, scene, [x, z], mat);
+    addBox(THREE, scene, "Food Court Tile Floor", [-22, 0.22, -15], [12, 0.44, 8.5], mat.food);
+    addBox(THREE, scene, "Food Court Warm Roof", [-22, 3.45, -15], [13, 0.45, 9.2], mat.signGold);
+    [-26, -23, -20].forEach((x, index) => addFoodStall(THREE, scene, [x, -18.6], ["NOODLES", "RICE", "DRINKS"][index], mat));
+    for (let x = -26; x <= -18; x += 4) {
+      for (let z = -16.3; z <= -12.8; z += 2.8) addTableSet(THREE, scene, [x, z], mat);
     }
-    addText(THREE, scene, "FOOD COURT", [-21.2, 4.05, -19.05], 0.58, 0x111111);
+    addTray(THREE, scene, [-24, -13.2], mat);
+    addTray(THREE, scene, [-20, -16.3], mat);
+    addSignBoard(THREE, scene, "Food Court Sign", "FOOD COURT", [-26.8, 4.08, -19.7], mat.curbWarm, 0x111111);
   }
 
   function addMall(THREE, scene, mat) {
-    addBox(THREE, scene, "Mall Main", [16, 3.4, -16], [11, 6.8, 7], mat.mall);
-    addBox(THREE, scene, "Mall Glass Front", [16, 3.1, -19.58], [8.5, 4.6, 0.16], mat.glass);
-    addCylinder(THREE, scene, "Mall Atrium", [20.2, 3.4, -16], [2.2, 6.8, 24], mat.glass);
-    addText(THREE, scene, "MALL", [13.9, 5.8, -19.9], 0.75, 0xffffff);
+    addBox(THREE, scene, "Mall Main Atrium", [18, 3.4, -15], [12, 6.8, 7], mat.mall);
+    addBox(THREE, scene, "Mall Glass Front", [18, 3.1, -18.58], [9.5, 4.6, 0.16], mat.glass);
+    addCylinder(THREE, scene, "Mall Round Atrium", [22.8, 3.4, -15], [2.1, 6.8, 24], mat.glass);
+    addShopFront(THREE, scene, [13.4, -18.7], "FASHION", mat.signPurple || mat.mall, mat);
+    addShopFront(THREE, scene, [18.0, -18.7], "CINEMA", mat.signBlue, mat);
+    addShopFront(THREE, scene, [22.5, -18.7], "ATM", mat.signGreen, mat);
+    addBox(THREE, scene, "Mall Plant Decor", [14.2, 0.5, -12.1], [0.75, 0.6, 0.75], mat.bush);
+    addBox(THREE, scene, "Mall Hanging Banner", [18, 4.9, -18.75], [3.6, 1.1, 0.08], mat.poster);
+    addSignBoard(THREE, scene, "Mall Sign", "MALL", [15.7, 5.85, -18.85], mat.signBlue, 0xffffff);
   }
 
   function addPark(THREE, scene, mat) {
-    addPlane(THREE, scene, "Park Lawn", [1, 0.02, -20], [15, 10], mat.park);
-    addBox(THREE, scene, "Park Path", [1, 0.11, -20], [12, 0.08, 1.15], mat.sidewalk, true);
-    addBench(THREE, scene, [-3, -21.8], mat);
-    addBench(THREE, scene, [4, -18.6], mat);
-    addText(THREE, scene, "PARK", [-1.2, 0.55, -25.2], 0.8, 0x111111);
+    addPlane(THREE, scene, "Park Lawn", [2, 0.02, -23], [18, 13], mat.park);
+    addPath(THREE, scene, [-6, -23], [10, -20], 1.05, mat.path);
+    addCylinder(THREE, scene, "Park Pond", [3, 0.08, -25.6], [2.2, 0.08, 28], mat.water);
+    addBench(THREE, scene, [-3, -24.8], mat);
+    addBench(THREE, scene, [7, -19.2], mat);
+    addFlowerBed(THREE, scene, [-4, -19.4], 5.1, mat);
+    addDecorativeRock(THREE, scene, [6.3, -26.2], mat);
+    addBirds(THREE, scene, [0, 4.2, -23], mat);
+    addSignBoard(THREE, scene, "Park Sign", "PARK", [-1.3, 0.85, -29.4], mat.curbWarm, 0x111111);
   }
 
-  function addMrtEntrance(THREE, scene, mat) {
-    addBox(THREE, scene, "MRT Entrance Base", [4.8, 0.35, -4.8], [5, 0.7, 4], mat.mrt);
-    addBox(THREE, scene, "MRT Entrance Roof", [4.8, 2.1, -4.8], [5.4, 0.45, 4.4], mat.mrt);
-    addBox(THREE, scene, "MRT Glass Side", [3.1, 1.3, -4.8], [0.18, 1.9, 3.3], mat.glass);
-    addText(THREE, scene, "MRT", [3.55, 2.45, -7.15], 0.75, 0xffffff);
+  function addLibrary(THREE, scene, mat) {
+    addBox(THREE, scene, "Library Reading Hall", [-25, 2.1, 2], [8.5, 4.2, 5.8], mat.library);
+    addBox(THREE, scene, "Library Roof", [-25, 4.5, 2], [9.2, 0.42, 6.4], mat.roofDark);
+    addBox(THREE, scene, "Library Quiet Glass", [-25, 2.25, -1.02], [6.6, 2.4, 0.12], mat.glass);
+    [-28, -25, -22].forEach((x) => addBookshelf(THREE, scene, [x, 3.9], mat));
+    addDeskComputer(THREE, scene, [-26.7, -0.5], mat);
+    addBox(THREE, scene, "Library Study Table", [-23.3, 0.7, -0.45], [2.4, 0.2, 0.9], mat.wood);
+    addSignBoard(THREE, scene, "Library Sign", "LIBRARY", [-28.6, 3.55, -1.25], mat.signBlue, 0xffffff);
+  }
+
+  function addHospital(THREE, scene, mat) {
+    addBox(THREE, scene, "Hospital Clean Main Wing", [30, 3.2, 12], [9, 6.4, 6], mat.hospital);
+    addBox(THREE, scene, "Hospital Blue Entrance", [30, 1.6, 8.72], [5.8, 3.2, 0.35], mat.hospitalAccent);
+    addBox(THREE, scene, "Hospital Reception Desk", [27.6, 0.75, 8.1], [2.4, 0.65, 0.45], mat.furniture);
+    addWaitingChairs(THREE, scene, [31.4, 8.4], mat);
+    addBox(THREE, scene, "Hospital Doctor Room Door", [33.4, 1.2, 10.2], [0.16, 2.1, 1.0], mat.signBlue);
+    addSignBoard(THREE, scene, "Hospital Cross Sign", "+ HOSPITAL", [27.1, 4.6, 8.36], mat.hospitalAccent, 0xffffff);
+  }
+
+  function addCafe(THREE, scene, mat) {
+    addBox(THREE, scene, "Cafe Cozy Shop", [-9, 1.8, -25.5], [7.2, 3.6, 4.5], mat.cafe);
+    addBox(THREE, scene, "Cafe Awning", [-9, 3.72, -27.95], [7.9, 0.35, 1.0], mat.signGold);
+    addBox(THREE, scene, "Cafe Counter", [-11.2, 0.82, -27.15], [2.5, 0.72, 0.55], mat.wood);
+    addTableSet(THREE, scene, [-8.4, -29.2], mat);
+    addTableSet(THREE, scene, [-5.7, -26.1], mat);
+    addBox(THREE, scene, "Cafe Laptop User Table", [-10.9, 0.72, -24.2], [1.7, 0.18, 0.72], mat.wood);
+    addBox(THREE, scene, "Cafe Laptop Screen", [-10.9, 1.0, -24.45], [0.72, 0.08, 0.42], mat.screen);
+    addSignBoard(THREE, scene, "Cafe Sign", "CAFE", [-11.25, 3.65, -28.25], mat.curbWarm, 0x111111);
+  }
+
+  function addBeach(THREE, scene, mat) {
+    addBox(THREE, scene, "Beach Boardwalk", [22, 0.16, -29.2], [12, 0.18, 1.4], mat.wood, true);
+    addUmbrella(THREE, scene, [18, -31.4], mat.signGold, mat);
+    addUmbrella(THREE, scene, [25, -30.6], mat.signBlue, mat);
+    addBench(THREE, scene, [21.3, -28.1], mat);
+    addDecorativeRock(THREE, scene, [29.8, -30.4], mat);
+    addCylinder(THREE, scene, "Beach Life Ring", [16.9, 1.0, -29.0], [0.45, 0.1, 24], mat.mrt, Math.PI / 2);
+    addSignBoard(THREE, scene, "Beach Sign", "BEACH", [21.2, 0.95, -33.0], mat.curbWarm, 0x111111);
+  }
+
+  function addAirport(THREE, scene, mat) {
+    addBox(THREE, scene, "Airport Terminal", [35, 2.5, -1], [8.8, 5.0, 7.2], mat.airport);
+    addBox(THREE, scene, "Airport Glass Departures", [35, 2.45, -4.78], [7.0, 2.9, 0.18], mat.glass);
+    addBoxRotated(THREE, scene, "Airport Runway", [35, 0.05, -9.2], [14.5, 0.08, 3.2], mat.road, 0.1, true);
+    for (let x = 30; x <= 40; x += 2.5) addBox(THREE, scene, "Airport Runway Marking", [x, 0.13, -9.2], [1.1, 0.04, 0.18], mat.curb, true);
+    addWaitingChairs(THREE, scene, [32.2, -4.9], mat);
+    addBox(THREE, scene, "Airport Luggage Cart", [37.5, 0.55, -5.2], [1.1, 0.55, 0.7], mat.metal);
+    addBox(THREE, scene, "Airport Control Tower", [40.2, 3.2, 2.6], [1.6, 6.4, 1.6], mat.airportAccent);
+    addBox(THREE, scene, "Airport Tower Glass", [40.2, 6.6, 2.6], [2.2, 1.1, 2.2], mat.glass);
+    addSignBoard(THREE, scene, "Airport Sign", "AIRPORT", [31.7, 4.4, -5.05], mat.signBlue, 0xffffff);
+  }
+
+  function addTrainStation(THREE, scene, mat) {
+    addBox(THREE, scene, "Train Station Platform", [4, 0.32, -3.5], [8.8, 0.64, 4.8], mat.mrt);
+    addBox(THREE, scene, "Train Station Roof", [4, 2.35, -3.5], [9.8, 0.45, 5.6], mat.roofDark);
+    addBox(THREE, scene, "Train Ticket Gates", [1.4, 0.82, -5.6], [3.2, 0.65, 0.52], mat.metal);
+    addBox(THREE, scene, "Train Ticket Machine", [6.8, 1.0, -5.5], [0.8, 1.7, 0.55], mat.signBlue);
+    addBox(THREE, scene, "Train Route Board", [4, 2.0, -6.0], [4.4, 1.1, 0.12], mat.screen);
+    addCylinder(THREE, scene, "Train Rail Left", [4, 0.2, -1.35], [0.06, 8.6, 12], mat.rail, Math.PI / 2);
+    addCylinder(THREE, scene, "Train Rail Right", [4, 0.2, -0.68], [0.06, 8.6, 12], mat.rail, Math.PI / 2);
+    addSignBoard(THREE, scene, "Train Station Sign", "MRT", [2.25, 2.7, -6.35], mat.mrt, 0xffffff);
+  }
+
+  function addUniversity(THREE, scene, mat) {
+    addBox(THREE, scene, "University Main Hall", [-34, 2.9, -7], [9.5, 5.8, 6], mat.university);
+    addBox(THREE, scene, "University Lecture Roof", [-34, 6.02, -7], [10.3, 0.42, 6.8], mat.roofDark);
+    addBox(THREE, scene, "University Entrance Columns", [-37.8, 1.35, -10.25], [0.4, 2.7, 0.4], mat.curbWarm);
+    addBox(THREE, scene, "University Entrance Columns", [-30.2, 1.35, -10.25], [0.4, 2.7, 0.4], mat.curbWarm);
+    addBox(THREE, scene, "University Lecture Seats", [-35.6, 0.58, -10.7], [3.8, 0.4, 0.5], mat.furniture);
+    addBox(THREE, scene, "University Student Cafe Counter", [-30.6, 0.78, -6.2], [0.65, 0.65, 2.0], mat.cafe);
+    addBookshelf(THREE, scene, [-37.4, -4.4], mat);
+    addText(THREE, scene, "UNI", [-35.2, 4.6, -10.55], 0.72, 0x111111);
+    addSignBoard(THREE, scene, "University Sign", "UNIVERSITY", [-38.2, 3.6, -10.48], mat.curbWarm, 0x111111);
   }
 
   function addStreetLife(THREE, scene, mat) {
-    [[-24, 7], [-24, -7], [24, 7], [24, -7], [-9, 23], [9, 23], [-9, -25], [9, -25]].forEach(([x, z]) => addStreetLight(THREE, scene, [x, z], mat));
-    [[-25, 17], [-10, 23], [25, 18], [25, -20], [-25, -18], [0, -26], [10, -24], [-12, -25]].forEach(([x, z]) => addTree(THREE, scene, [x, z], mat));
+    [[-33, 8], [-27, 23], [-15, 23], [-34, -1], [-24, -18], [-9, -29], [4, -29], [14, -25], [28, -24], [34, 6], [28, 18], [13, 23], [7, 8], [-7, 8]].forEach(([x, z]) => addStreetLight(THREE, scene, [x, z], mat));
+    [[-35, 18], [-18, 24], [-32, 4], [-35, -12], [-23, -23], [-4, -29], [8, -26], [12, -17], [3, -17], [27, -18], [31, 21], [22, 23], [38, 6]].forEach(([x, z]) => addTree(THREE, scene, [x, z], mat));
+    [[-13, 7], [11, 7], [-13, -7], [11, -7], [25, 4], [-23, 7]].forEach(([x, z]) => addTrashBin(THREE, scene, [x, z], mat));
+    [[-17, 8], [20, 7], [29, -6], [-29, -17]].forEach(([x, z]) => addPosterBoard(THREE, scene, [x, z], mat));
+    addFenceLine(THREE, scene, [-38, -17], [-38, 21], mat);
+    addFenceLine(THREE, scene, [13, -33], [36, -33], mat);
+    addPlanterRow(THREE, scene, [-3, 7.9], 5, mat);
+    addPlanterRow(THREE, scene, [10.5, -7.9], 4, mat);
+  }
+
+  function addPath(THREE, scene, start, end, width, material) {
+    const dx = end[0] - start[0];
+    const dz = end[1] - start[1];
+    const length = Math.hypot(dx, dz);
+    const mid = [(start[0] + end[0]) / 2, 0.115, (start[1] + end[1]) / 2];
+    addBoxRotated(THREE, scene, "Curved District Path", mid, [width, 0.08, length], material, Math.atan2(dx, dz), true);
+  }
+
+  function addCrosswalk(THREE, scene, position, mat, axis) {
+    for (let i = -4; i <= 4; i++) {
+      if (axis === "x") addBox(THREE, scene, "Crosswalk Stripe", [position[0] + i * 0.72, 0.16, position[1]], [0.34, 0.04, 1.5], mat.curb, true);
+      else addBox(THREE, scene, "Crosswalk Stripe", [position[0], 0.16, position[1] + i * 0.72], [1.5, 0.04, 0.34], mat.curb, true);
+    }
+  }
+
+  function addSignBoard(THREE, scene, name, text, position, material, textColor) {
+    addBox(THREE, scene, name, position, [3.2, 0.88, 0.16], material);
+    addText(THREE, scene, text, [position[0] - 1.42, position[1] + 0.08, position[2] - 0.15], 0.44, textColor);
+  }
+
+  function addFlowerBed(THREE, scene, position, width, mat) {
+    addBox(THREE, scene, "Flower Bed Soil", [position[0], 0.18, position[1]], [width, 0.2, 0.72], mat.trunk, true);
+    for (let i = 0; i < 8; i++) {
+      const x = position[0] - width * 0.42 + i * (width * 0.84 / 7);
+      addCylinder(THREE, scene, "Flower Stem", [x, 0.42, position[1]], [0.03, 0.38, 6], mat.bush);
+      addCylinder(THREE, scene, "Flower Bloom", [x, 0.68, position[1] + (i % 2 ? 0.12 : -0.08)], [0.12, 0.08, 8], [mat.flowerPink, mat.flowerYellow, mat.flowerPurple][i % 3]);
+    }
+  }
+
+  function addTreadmill(THREE, scene, position, mat) {
+    addBoxRotated(THREE, scene, "Gym Treadmill Belt", [position[0], 0.42, position[1]], [1.0, 0.18, 1.7], mat.equipment, 0, true);
+    addBox(THREE, scene, "Gym Treadmill Console", [position[0], 1.08, position[1] - 0.72], [0.9, 0.45, 0.12], mat.screen);
+    addCylinder(THREE, scene, "Gym Treadmill Handle", [position[0] - 0.55, 0.95, position[1] - 0.48], [0.04, 0.92, 8], mat.metal);
+    addCylinder(THREE, scene, "Gym Treadmill Handle", [position[0] + 0.55, 0.95, position[1] - 0.48], [0.04, 0.92, 8], mat.metal);
+  }
+
+  function addBarbell(THREE, scene, position, mat) {
+    addCylinder(THREE, scene, "Gym Barbell Bar", [position[0], 0.62, position[1]], [0.05, 2.4, 12], mat.metal, Math.PI / 2);
+    addCylinder(THREE, scene, "Gym Weight Plate", [position[0], 0.62, position[1] - 1.35], [0.32, 0.16, 16], mat.equipment, Math.PI / 2);
+    addCylinder(THREE, scene, "Gym Weight Plate", [position[0], 0.62, position[1] + 1.35], [0.32, 0.16, 16], mat.equipment, Math.PI / 2);
+  }
+
+  function addDeskComputer(THREE, scene, position, mat) {
+    addBox(THREE, scene, "Office Desk", [position[0], 0.72, position[1]], [1.75, 0.22, 0.86], mat.wood);
+    addBox(THREE, scene, "Office Computer Screen", [position[0], 1.14, position[1] - 0.28], [0.76, 0.52, 0.08], mat.screen);
+    addBox(THREE, scene, "Office Keyboard", [position[0], 0.88, position[1] + 0.16], [0.68, 0.05, 0.18], mat.metal);
+    addChair(THREE, scene, [position[0], position[1] + 0.8], mat);
+  }
+
+  function addFoodStall(THREE, scene, position, label, mat) {
+    addBox(THREE, scene, "Food Stall Counter", [position[0], 0.9, position[1]], [2.7, 1.2, 0.9], mat.curbWarm);
+    addBox(THREE, scene, "Food Stall Menu Board", [position[0], 2.0, position[1] - 0.52], [2.45, 0.86, 0.12], mat.screen);
+    addText(THREE, scene, label, [position[0] - 1.08, 2.12, position[1] - 0.72], 0.28, 0xffef84);
+    addCylinder(THREE, scene, "Food Stall Hanging Light", [position[0], 2.75, position[1] + 0.15], [0.22, 0.16, 16], mat.lampGlow);
+  }
+
+  function addTray(THREE, scene, position, mat) {
+    addBox(THREE, scene, "Food Tray", [position[0], 0.93, position[1]], [0.72, 0.05, 0.42], mat.mrt);
+    addCylinder(THREE, scene, "Food Bowl", [position[0] - 0.18, 1.02, position[1]], [0.16, 0.1, 12], mat.curbWarm);
+    addCylinder(THREE, scene, "Food Cup", [position[0] + 0.22, 1.04, position[1] + 0.06], [0.11, 0.24, 12], mat.signGold);
+  }
+
+  function addShopFront(THREE, scene, position, label, material, mat) {
+    addBox(THREE, scene, "Mall Shop Front", [position[0], 1.5, position[1]], [3.1, 2.5, 0.22], mat.glass);
+    addBox(THREE, scene, "Mall Shop Sign", [position[0], 3.0, position[1] - 0.08], [2.8, 0.55, 0.18], material);
+    addText(THREE, scene, label, [position[0] - 1.22, 3.08, position[1] - 0.27], 0.28, 0xffffff);
+  }
+
+  function addBookshelf(THREE, scene, position, mat) {
+    addBox(THREE, scene, "Library Bookshelf Frame", [position[0], 1.25, position[1]], [1.4, 2.25, 0.45], mat.wood);
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 4; col++) {
+        const bookMat = [mat.bookRed, mat.bookBlue, mat.bookGreen, mat.poster][(row + col) % 4];
+        addBox(THREE, scene, "Library Book Spine", [position[0] - 0.48 + col * 0.31, 0.55 + row * 0.55, position[1] - 0.27], [0.22, 0.42, 0.08], bookMat);
+      }
+    }
+  }
+
+  function addWaitingChairs(THREE, scene, position, mat) {
+    for (let i = 0; i < 4; i++) {
+      addChair(THREE, scene, [position[0] + i * 0.72, position[1]], mat);
+    }
+  }
+
+  function addChair(THREE, scene, position, mat) {
+    addBox(THREE, scene, "Chair Seat", [position[0], 0.52, position[1]], [0.5, 0.14, 0.48], mat.furniture);
+    addBox(THREE, scene, "Chair Back", [position[0], 0.86, position[1] + 0.22], [0.5, 0.55, 0.12], mat.furniture);
+    addCylinder(THREE, scene, "Chair Leg", [position[0] - 0.18, 0.28, position[1] - 0.15], [0.035, 0.42, 6], mat.metal);
+    addCylinder(THREE, scene, "Chair Leg", [position[0] + 0.18, 0.28, position[1] - 0.15], [0.035, 0.42, 6], mat.metal);
+  }
+
+  function addUmbrella(THREE, scene, position, canopyMaterial, mat) {
+    addCylinder(THREE, scene, "Beach Umbrella Pole", [position[0], 0.9, position[1]], [0.05, 1.8, 10], mat.wood);
+    const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.15, 0.55, 18), canopyMaterial);
+    canopy.name = "Beach Umbrella Canopy";
+    canopy.position.set(position[0], 1.9, position[1]);
+    canopy.rotation.y = Math.PI / 18;
+    canopy.castShadow = true;
+    scene.add(canopy);
+  }
+
+  function addDecorativeRock(THREE, scene, position, mat) {
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.65, 0), mat.sidewalk);
+    rock.name = "Decorative Rock";
+    rock.position.set(position[0], 0.5, position[1]);
+    rock.scale.set(1.2, 0.58, 0.85);
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    scene.add(rock);
+  }
+
+  function addBirds(THREE, scene, position, mat) {
+    const group = new THREE.Group();
+    group.name = "Park Bird Silhouettes";
+    for (let i = 0; i < 4; i++) {
+      const bird = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 3), mat.lamp);
+      bird.position.set((i - 1.5) * 0.8, Math.sin(i) * 0.25, i * 0.35);
+      bird.rotation.z = Math.PI / 2;
+      group.add(bird);
+    }
+    group.position.set(position[0], position[1], position[2]);
+    scene.add(group);
+  }
+
+  function addTrashBin(THREE, scene, position, mat) {
+    addCylinder(THREE, scene, "Street Trash Bin", [position[0], 0.45, position[1]], [0.28, 0.9, 10], mat.signGreen);
+    addBox(THREE, scene, "Street Trash Bin Lid", [position[0], 0.92, position[1]], [0.7, 0.08, 0.5], mat.roofDark);
+  }
+
+  function addPosterBoard(THREE, scene, position, mat) {
+    addBox(THREE, scene, "Street Poster Board", [position[0], 1.55, position[1]], [1.8, 2.2, 0.16], mat.poster);
+    addBox(THREE, scene, "Street Poster Stripe", [position[0], 1.95, position[1] - 0.1], [1.35, 0.32, 0.07], mat.flowerPink);
+    addBox(THREE, scene, "Street Poster Stripe", [position[0], 1.45, position[1] - 0.1], [1.1, 0.25, 0.07], mat.signBlue);
+  }
+
+  function addFenceLine(THREE, scene, start, end, mat) {
+    const dx = end[0] - start[0];
+    const dz = end[1] - start[1];
+    const length = Math.hypot(dx, dz);
+    const steps = Math.max(2, Math.floor(length / 2.4));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = start[0] + dx * t;
+      const z = start[1] + dz * t;
+      addCylinder(THREE, scene, "Fence Post", [x, 0.55, z], [0.07, 1.1, 8], mat.wood);
+    }
+    addPath(THREE, scene, start, end, 0.12, mat.wood);
+  }
+
+  function addPlanterRow(THREE, scene, position, count, mat) {
+    for (let i = 0; i < count; i++) {
+      const x = position[0] + i * 1.5;
+      addBox(THREE, scene, "Street Planter Box", [x, 0.32, position[1]], [1.0, 0.38, 0.55], mat.wood);
+      addCylinder(THREE, scene, "Street Planter Bush", [x, 0.72, position[1]], [0.42, 0.38, 12], mat.bush);
+    }
   }
 
   function addBuildingCore(THREE, scene, name, position, scale, material, mat) {
@@ -1223,6 +1548,12 @@
     mesh.castShadow = !receiveOnly;
     mesh.receiveShadow = true;
     scene.add(mesh);
+    return mesh;
+  }
+
+  function addBoxRotated(THREE, scene, name, position, scale, material, rotationY = 0, receiveOnly = false) {
+    const mesh = addBox(THREE, scene, name, position, scale, material, receiveOnly);
+    mesh.rotation.y = rotationY;
     return mesh;
   }
 

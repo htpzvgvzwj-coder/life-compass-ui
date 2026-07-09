@@ -135,10 +135,17 @@ const roleplayScenarios = [
 const lifeSimLocations = [
   { id: "home", name: "Home", description: "Your HDB home base. Rest, reset, and manage your routine." },
   { id: "gym", name: "Gym", description: "A neighbourhood gym for discipline, strength, and stress control." },
-  { id: "work", name: "Work", description: "A bright work tower where skills and money grow, but pressure can rise too." },
+  { id: "work", name: "Office", description: "A bright office tower where skills and money grow, but pressure can rise too." },
   { id: "food", name: "Food Court", description: "A hawker-centre-inspired place for everyday meals and small happiness." },
   { id: "mall", name: "Shopping Mall", description: "A colourful mall with tempting spending choices." },
-  { id: "park", name: "Park", description: "A green space for slowing down, breathing, and balancing stress." }
+  { id: "park", name: "Park", description: "A green space for slowing down, breathing, and balancing stress." },
+  { id: "library", name: "Library", description: "A quiet study space with shelves, desks, and focus-friendly corners." },
+  { id: "hospital", name: "Hospital", description: "A clean care space with reception, waiting seats, and health support cues." },
+  { id: "cafe", name: "Cafe", description: "A warm small cafe for reflection, laptops, and gentle social energy." },
+  { id: "beach", name: "Beach", description: "A calm coastal edge for recovery, perspective, and fresh air." },
+  { id: "airport", name: "Airport", description: "A travel gateway that hints at future mobility, planning, and opportunity." },
+  { id: "train", name: "Train Station", description: "A transit hub with gates, route boards, and daily movement through the city." },
+  { id: "university", name: "University", description: "A campus area for long-term learning, lectures, and student life." }
 ];
 
 const lifeSimActivities = {
@@ -1622,7 +1629,7 @@ function lifeVerseWorldFirstContext(state) {
       <div>
         <p class="eyebrow">${locationInfo ? "Context interaction" : "Explore mode"}</p>
         <h3>${escapeHTML(locationInfo ? locationInfo.name : "Walk toward a place")}</h3>
-        <span>${escapeHTML(locationInfo ? locationInfo.description : "The world is the primary interface. Move near Home, Work, Food Court, Gym, Mall, or Park.")}</span>
+        <span>${escapeHTML(locationInfo ? locationInfo.description : "The world is the primary interface. Move near a recognizable LifeVerse place.")}</span>
       </div>
       <div class="lifeverse-context-actions">
         ${interactions.length ? interactions.map(lifeVerseContextButton).join("") : activities.slice(0, 2).map(lifeVerseActivityCard).join("")}
@@ -2189,7 +2196,7 @@ function lifeSimLocationPanel() {
       <div class="life-sim-location-card is-empty" data-sim-location-card>
         <p class="eyebrow">Explore mode</p>
         <h3>Find a glowing zone.</h3>
-        <p class="muted">Move near Home, Gym, Work, Food Court, Mall, or Park to unlock an action.</p>
+        <p class="muted">Move near a recognizable place. Some locations have playable actions now; others are visual spaces for this remaster.</p>
         <div class="sim-activity-list" data-sim-activity-list></div>
       </div>
     `;
@@ -2333,7 +2340,7 @@ function updateLifeSimDom() {
     card.innerHTML = `
       <p class="eyebrow">Explore mode</p>
       <h3>Find a glowing zone.</h3>
-      <p class="muted">Move near Home, Gym, Work, Food Court, Mall, or Park to unlock an action.</p>
+      <p class="muted">Move near a recognizable place. Some locations have playable actions now; others are visual spaces for this remaster.</p>
       <div class="sim-activity-list" data-sim-activity-list></div>
     `;
   }
