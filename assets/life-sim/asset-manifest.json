@@ -7,7 +7,8 @@
     "Keep total first-load model + texture size under 45MB for mobile."
   ],
   "environment": {
-    "url": "assets/life-sim/models/singapore-district.glb",
+    "id": "singapore-district",
+    "url": "assets/environment/singapore-district.glb",
     "position": [0, 0, 0],
     "rotation": [0, 0, 0],
     "scale": [1, 1, 1],
@@ -17,7 +18,7 @@
     {
       "id": "home",
       "label": "HDB Home",
-      "url": "assets/life-sim/models/hdb-block.glb",
+      "url": "assets/environment/hdb-block.glb",
       "position": [-18, 0, 12],
       "scale": [1, 1, 1],
       "toonify": true
@@ -25,7 +26,7 @@
     {
       "id": "mrt",
       "label": "MRT Entrance",
-      "url": "assets/life-sim/models/mrt-entrance.glb",
+      "url": "assets/environment/mrt-entrance.glb",
       "position": [4.8, 0, -4.8],
       "scale": [1, 1, 1],
       "toonify": true
@@ -33,7 +34,7 @@
     {
       "id": "food",
       "label": "Food Court",
-      "url": "assets/life-sim/models/food-court.glb",
+      "url": "assets/environment/food-court.glb",
       "position": [-17, 0, -12],
       "scale": [1, 1, 1],
       "toonify": true
@@ -41,7 +42,7 @@
     {
       "id": "mall",
       "label": "Shopping Mall",
-      "url": "assets/life-sim/models/mall.glb",
+      "url": "assets/environment/mall.glb",
       "position": [16, 0, -12],
       "scale": [1, 1, 1],
       "toonify": true
@@ -49,7 +50,7 @@
     {
       "id": "park",
       "label": "Park",
-      "url": "assets/life-sim/models/park.glb",
+      "url": "assets/environment/park.glb",
       "position": [1, 0, -20],
       "scale": [1, 1, 1],
       "toonify": true
@@ -57,14 +58,15 @@
     {
       "id": "cbd",
       "label": "CBD Skyline",
-      "url": "assets/life-sim/models/cbd-skyline.glb",
+      "url": "assets/environment/cbd-skyline.glb",
       "position": [0, 0, 36],
       "scale": [1, 1, 1],
       "toonify": true
     }
   ],
   "character": {
-    "url": "assets/life-sim/models/anime-youth-character.glb",
+    "id": "anime-youth-character",
+    "url": "assets/characters/anime-youth-character.glb",
     "position": [0, 0, 0],
     "rotation": [0, 3.14159, 0],
     "scale": [1, 1, 1],
@@ -79,13 +81,18 @@
       "exercise": ["exercise", "workout"]
     },
     "extraAnimationFiles": {
-      "idle": "assets/life-sim/animations/idle.glb",
-      "walk": "assets/life-sim/animations/walk.glb",
-      "run": "assets/life-sim/animations/run.glb",
-      "jump": "assets/life-sim/animations/jump.glb",
-      "eat": "assets/life-sim/animations/eat.glb",
-      "sit": "assets/life-sim/animations/sit.glb",
-      "exercise": "assets/life-sim/animations/exercise.glb"
+      "idle": "assets/characters/animations/idle.glb",
+      "walk": "assets/characters/animations/walk.glb",
+      "run": "assets/characters/animations/run.glb",
+      "jump": "assets/characters/animations/jump.glb",
+      "eat": "assets/characters/animations/eat.glb",
+      "sit": "assets/characters/animations/sit.glb",
+      "exercise": "assets/characters/animations/exercise.glb"
     }
-  }
+  },
+  "prefabs": [
+    { "id": "prop:bench", "url": "assets/props/bench.glb", "material": "wood" },
+    { "id": "prop:street-lamp", "url": "assets/props/street-lamp.glb", "material": "metal" },
+    { "id": "prop:food-table", "url": "assets/props/food-table.glb", "material": "plastic" }
+  ]
 }

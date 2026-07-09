@@ -33,15 +33,23 @@
     const host = root.closest("[data-life-sim-game]") || root;
     const scene = new THREE.Scene();
     scene.background = createSkyTexture(THREE);
-    scene.fog = new THREE.Fog(0xd9efff, 34, 92);
+    if (window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.configureAtmosphere) {
+      window.LifeVerseRenderPipeline.configureAtmosphere(THREE, scene, { fogColor: 0xd9efff, fogNear: 34, fogFar: 92 });
+    } else {
+      scene.fog = new THREE.Fog(0xd9efff, 34, 92);
+    }
 
     const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 180);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.outputColorSpace = THREE.SRGBColorSpace || renderer.outputColorSpace;
-    renderer.toneMappingExposure = 0.72;
+    if (window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.configureRenderer) {
+      window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.72, shadows: true, maxPixelRatio: 2 });
+    } else {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputColorSpace = THREE.SRGBColorSpace || renderer.outputColorSpace;
+      renderer.toneMappingExposure = 0.72;
+    }
     root.appendChild(renderer.domElement);
 
     const state = {
@@ -62,6 +70,8 @@
       isMoving: false,
       mixers: [],
       productionAssetsLoaded: false,
+      assetManager: null,
+      assetDebug: null,
       cameraPosition: new THREE.Vector3(-19, 8, 0),
       cameraLookAt: new THREE.Vector3(-19, 1.55, -10),
       cameraShake: 0,
@@ -75,13 +85,21 @@
     };
 
     const materials = createMaterials(THREE);
+    state.assetManager = window.LifeVerseAssets && window.LifeVerseAssets.createAssetManager
+      ? window.LifeVerseAssets.createAssetManager({
+        THREE,
+        materialLibrary: materials.library,
+        manifestUrl: "assets/life-sim/asset-manifest.json"
+      })
+      : null;
     const lighting = createLighting(THREE, scene);
     state.presentation = createPresentationState(THREE, scene, renderer, lighting, materials, host);
+    if (state.assetManager) state.assetDebug = state.assetManager.createDebugPanel(host, renderer, scene);
 
     const player = createPlayer(THREE, materials);
     player.group.position.set(-19, 0, -10);
     scene.add(player.group);
-    loadProductionAssets(THREE, scene, materials, player, state, root).then((loaded) => {
+    loadProductionAssets(THREE, scene, materials, player, state, root, state.assetManager).then((loaded) => {
       if (state.destroyed) return;
       state.productionAssetsLoaded = loaded;
       if (!loaded) {
@@ -192,6 +210,7 @@
       updateMovement(delta);
       updateCharacter(delta, player);
       updateWorldPresentation(delta, elapsed, state, scene, renderer, options.getLifeVerseState);
+      if (state.assetDebug) state.assetDebug.update();
       updateCamera(player.group.position, delta, elapsed);
       updateZone(player.group.position);
       renderer.render(scene, camera);
@@ -330,6 +349,7 @@
         host.removeEventListener("pointercancel", pointerUp);
         host.removeEventListener("click", clickFeedback);
         if (state.presentation) state.presentation.audio.destroy();
+        if (state.assetManager) state.assetManager.dispose();
         renderer.dispose();
         root.innerHTML = "";
       }
@@ -337,6 +357,10 @@
   }
 
   function createMaterials(THREE) {
+    const library = window.LifeVerseAssets && window.LifeVerseAssets.createMaterialLibrary
+      ? window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" })
+      : null;
+    const shared = (key, fallback) => library && library.get ? library.get(key) : fallback();
     const make = (color, emissive = 0x000000, roughness = 0.7) => new THREE.MeshToonMaterial({ color, emissive });
     const standard = (color, emissive = 0x000000, roughness = 0.68, metalness = 0.02) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness });
     const glass = (color) => new THREE.MeshPhysicalMaterial({
@@ -350,13 +374,14 @@
     const transparent = (color, opacity = 0.28) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
 
     return {
-      grass: make(0x92d36f),
+      library,
+      grass: shared("grass", () => make(0x92d36f)),
       ground: make(0xead8a8),
       warmGround: make(0xf8dfad),
-      road: standard(0x1c2028),
+      road: shared("road", () => standard(0x1c2028)),
       roadLine: make(0xffef84, 0x332a00),
-      sidewalk: make(0xcbbf9d),
-      curb: make(0xe6dac0),
+      sidewalk: shared("concrete", () => make(0xcbbf9d)),
+      curb: shared("stone", () => make(0xe6dac0)),
       curbWarm: make(0xf3dfad),
       hdb: make(0xbfdfff),
       hdbAccent: make(0xffd0d9),
@@ -374,19 +399,19 @@
       airport: make(0xbcd1e6),
       airportAccent: make(0x3b77d5, 0x03122a),
       sand: make(0xffdc8a),
-      water: standard(0x3bb8ff, 0x00476f, 0.38, 0.02),
+      water: shared("water", () => standard(0x3bb8ff, 0x00476f, 0.38, 0.02)),
       path: make(0xc9b991),
       flowerPink: make(0xff79b4, 0x2a0012),
       flowerYellow: make(0xffe66d, 0x2f2500),
       flowerPurple: make(0xb28cff, 0x17002e),
       bush: make(0x3f9f5e),
-      wood: make(0x9b6336),
+      wood: shared("wood", () => make(0x9b6336)),
       furniture: make(0xd48359),
       bookRed: make(0xe65151),
       bookBlue: make(0x4b85ff),
       bookGreen: make(0x49c482),
-      metal: standard(0x98a4ad, 0x000000, 0.42, 0.12),
-      equipment: make(0x2f3545),
+      metal: shared("metal", () => standard(0x98a4ad, 0x000000, 0.42, 0.12)),
+      equipment: shared("plastic", () => make(0x2f3545)),
       screen: standard(0x171d2e, 0x122462),
       poster: make(0xfff0b0),
       signBlue: make(0x2f6dff, 0x00184b),
@@ -394,7 +419,7 @@
       signGold: make(0xffc95b, 0x251100),
       roofDark: make(0x404858),
       window: standard(0xfff2a0, 0x8c6f00),
-      glass: glass(0xbfe9ff),
+      glass: shared("glass", () => glass(0xbfe9ff)),
       mrt: make(0xe61d33, 0x4b0007),
       rail: standard(0xdde7ef),
       trunk: make(0x8a5227),
@@ -430,18 +455,28 @@
   }
 
   function createLighting(THREE, scene) {
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x91ad82, 0.95);
-    scene.add(hemi);
-
-    const sun = new THREE.DirectionalLight(0xffffff, 1.08);
-    sun.position.set(-12, 24, 12);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -38;
-    sun.shadow.camera.right = 38;
-    sun.shadow.camera.top = 38;
-    sun.shadow.camera.bottom = -38;
-    scene.add(sun);
+    const rig = window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.createLightingRig
+      ? window.LifeVerseRenderPipeline.createLightingRig(THREE, scene, {
+        ambientIntensity: 0.95,
+        sunIntensity: 1.08,
+        sunPosition: [-12, 24, 12],
+        shadowSize: 2048,
+        shadowCameraSize: 38
+      })
+      : null;
+    const hemi = rig ? rig.hemi : new THREE.HemisphereLight(0xffffff, 0x91ad82, 0.95);
+    const sun = rig ? rig.sun : new THREE.DirectionalLight(0xffffff, 1.08);
+    if (!rig) {
+      scene.add(hemi);
+      sun.position.set(-12, 24, 12);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.camera.left = -38;
+      sun.shadow.camera.right = 38;
+      sun.shadow.camera.top = 38;
+      sun.shadow.camera.bottom = -38;
+      scene.add(sun);
+    }
 
     const streetLights = [];
     [
@@ -837,40 +872,38 @@
     window.setTimeout(() => host.classList.remove("is-lifeverse-action-feedback"), 520);
   }
 
-  async function loadProductionAssets(THREE, scene, mat, player, state, root) {
+  async function loadProductionAssets(THREE, scene, mat, player, state, root, assetManager) {
+    if (!assetManager) return false;
     try {
-      const manifest = await loadLifeSimManifest();
+      const manifest = await assetManager.loadManifest("assets/life-sim/asset-manifest.json");
       if (!manifest || !manifest.enabled) return false;
-      await ensureGltfLoader(THREE);
-      if (!THREE.GLTFLoader) {
+      const loaderReady = await assetManager.ensureGltfLoader();
+      if (!loaderReady) {
         setAssetStatus(root, "Production assets are enabled, but GLTFLoader did not load. Check the GLTFLoader script in index.html.", "error");
         return false;
       }
 
-      const loader = new THREE.GLTFLoader();
       setAssetStatus(root, "Loading production 3D assets...", "loading");
 
       let loadedCount = 0;
       if (manifest.environment && manifest.environment.url) {
-        const environment = await loadGltf(loader, manifest.environment.url);
-        prepareAssetModel(THREE, environment.scene, manifest.environment, mat);
-        scene.add(environment.scene);
-        loadedCount += 1;
+        const environment = await assetManager.instantiatePrefab("environment:main", scene, manifest.environment);
+        if (environment && !environment.fallback) loadedCount += 1;
       }
 
       const locations = Array.isArray(manifest.locationModels) ? manifest.locationModels : [];
       for (const location of locations) {
         if (!location || !location.url) continue;
-        const gltf = await loadGltf(loader, location.url);
-        prepareAssetModel(THREE, gltf.scene, location, mat);
-        scene.add(gltf.scene);
-        loadedCount += 1;
+        const loaded = await assetManager.instantiatePrefab(`location:${location.id || location.label || location.url}`, scene, location);
+        if (loaded && !loaded.fallback) loadedCount += 1;
       }
 
       if (manifest.character && manifest.character.url) {
-        const character = await loadGltf(loader, manifest.character.url);
-        installCharacterAsset(THREE, loader, player, character, manifest.character, state, mat);
-        loadedCount += 1;
+        const character = await assetManager.loadModel(manifest.character.url, manifest.character);
+        if (character && !character.fallback) {
+          await installCharacterAsset(THREE, assetManager, player, character, manifest.character, state, mat);
+          loadedCount += 1;
+        }
       }
 
       addZones(THREE, scene, mat);
@@ -887,98 +920,21 @@
     }
   }
 
-  async function ensureGltfLoader(THREE) {
-    if (THREE.GLTFLoader) return true;
-    const urls = [
-      "https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/GLTFLoader.js",
-      "https://unpkg.com/three@0.146.0/examples/js/loaders/GLTFLoader.js"
-    ];
-    for (const url of urls) {
-      try {
-        await injectScript(url);
-        if (THREE.GLTFLoader) return true;
-      } catch (error) {
-        console.warn(`[Life Sim] Could not load GLTFLoader from ${url}:`, error);
-      }
-    }
-    return false;
-  }
-
-  function injectScript(src) {
-    return new Promise((resolve, reject) => {
-      const existing = document.querySelector(`script[src="${src}"]`);
-      if (existing) {
-        existing.remove();
-      }
-      const script = document.createElement("script");
-      script.src = src;
-      script.async = true;
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  }
-
-  async function loadLifeSimManifest() {
-    const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
-    if (!response.ok) return null;
-    return response.json();
-  }
-
-  function loadGltf(loader, url) {
-    return new Promise((resolve, reject) => {
-      loader.load(url, resolve, undefined, reject);
-    });
-  }
-
-  function prepareAssetModel(THREE, model, config = {}, mat) {
-    applyTransform(model, config);
-    model.traverse((node) => {
-      if (!node.isMesh) return;
-      node.castShadow = true;
-      node.receiveShadow = true;
-      if (config.toonify) node.material = toonifyMaterial(THREE, node.material, mat);
-    });
-  }
-
-  function applyTransform(model, config = {}) {
-    const position = config.position || [0, 0, 0];
-    const rotation = config.rotation || [0, 0, 0];
-    const scale = config.scale || [1, 1, 1];
-    model.position.set(Number(position[0] || 0), Number(position[1] || 0), Number(position[2] || 0));
-    model.rotation.set(Number(rotation[0] || 0), Number(rotation[1] || 0), Number(rotation[2] || 0));
-    model.scale.set(Number(scale[0] || 1), Number(scale[1] || 1), Number(scale[2] || 1));
-  }
-
-  function toonifyMaterial(THREE, sourceMaterial, mat) {
-    if (Array.isArray(sourceMaterial)) return sourceMaterial.map((material) => toonifyMaterial(THREE, material, mat));
-    if (!sourceMaterial) return mat.hdb;
-    const color = sourceMaterial.color ? sourceMaterial.color.clone() : new THREE.Color(0xffffff);
-    const toon = new THREE.MeshToonMaterial({
-      color,
-      map: sourceMaterial.map || null,
-      transparent: Boolean(sourceMaterial.transparent),
-      opacity: typeof sourceMaterial.opacity === "number" ? sourceMaterial.opacity : 1
-    });
-    toon.name = `${sourceMaterial.name || "asset"} Toon`;
-    return toon;
-  }
-
-  async function installCharacterAsset(THREE, loader, player, characterGltf, config = {}, state, mat) {
+  async function installCharacterAsset(THREE, assetManager, player, characterAsset, config = {}, state) {
     hideFallbackCharacter(player);
-    const model = characterGltf.scene;
-    prepareAssetModel(THREE, model, config, mat);
+    const model = characterAsset.scene;
+    if (assetManager && assetManager.prepareModel) assetManager.prepareModel(model, config);
     player.group.add(model);
     player.realModel = model;
     player.actions = {};
 
-    const clips = [...(characterGltf.animations || [])];
+    const clips = [...(characterAsset.animations || [])];
     const extraFiles = config.extraAnimationFiles || {};
     for (const [name, url] of Object.entries(extraFiles)) {
       if (!url) continue;
       try {
-        const animationGltf = await loadGltf(loader, url);
-        const clip = animationGltf.animations && animationGltf.animations[0];
+        const animationAsset = await assetManager.loadModel(url, { id: `animation:${name}`, label: `${name} animation`, type: "glb" });
+        const clip = animationAsset.animations && animationAsset.animations[0];
         if (clip) {
           clip.name = name;
           clips.push(clip);

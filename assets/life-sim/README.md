@@ -4,9 +4,12 @@ Life Sim is built into the existing Vercel web app, so production assets must be
 
 ## Required Folders
 
-- `models/` for city, HDB, MRT, food court, mall, park, CBD, and anime character models.
-- `animations/` for Mixamo-style animation clips exported as GLB.
-- `textures/` for compressed textures referenced by GLB files.
+- `../environment/` for city, HDB, MRT, food court, mall, park, CBD, and district chunks.
+- `../characters/` for anime or semi-realistic character models.
+- `../characters/animations/` for Mixamo-style animation clips exported as GLB.
+- `../props/` for reusable benches, lamps, tables, signs, furniture, and equipment.
+- `../textures/` for compressed textures referenced by GLB files.
+- `../materials/` for reusable material descriptors.
 
 ## Recommended Asset Types
 
@@ -34,7 +37,7 @@ These match the requested direction, but availability/licensing/pricing must be 
 2. Apply mobile-friendly toon/cel-shaded materials.
 3. Bake or optimize textures; prefer 1K/2K textures and compressed formats.
 4. Export final models as GLB.
-5. Place files using the paths in `asset-manifest.json`.
+5. Place files using the Volume 5.0 folder paths in `asset-manifest.json`.
 6. Set `"enabled": true` in `asset-manifest.json`.
 7. Redeploy the existing `life-compass-ui` project.
 
@@ -48,3 +51,5 @@ These match the requested direction, but availability/licensing/pricing must be 
 ## Important
 
 Do not commit paid Unity Asset Store files unless your license allows distribution inside this project. Use only assets you own or assets with clear commercial/web distribution rights.
+
+See also `docs/volume5-asset-pipeline.md` for the full Volume 5.0 asset rules.

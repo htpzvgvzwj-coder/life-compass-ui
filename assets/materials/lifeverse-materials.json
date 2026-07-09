@@ -1,0 +1,16 @@
+{
+  "version": "5.0",
+  "pipeline": "LifeVerse reusable material foundation",
+  "materials": [
+    { "id": "road", "textureSlots": ["albedo", "normal", "roughness"] },
+    { "id": "grass", "textureSlots": ["albedo", "normal"] },
+    { "id": "concrete", "textureSlots": ["albedo", "normal", "roughness"] },
+    { "id": "wood", "textureSlots": ["albedo", "normal"] },
+    { "id": "metal", "textureSlots": ["albedo", "normal", "metallic", "roughness"] },
+    { "id": "glass", "textureSlots": ["albedo", "normal"] },
+    { "id": "water", "textureSlots": ["albedo", "normal", "flow"] },
+    { "id": "stone", "textureSlots": ["albedo", "normal", "roughness"] },
+    { "id": "plastic", "textureSlots": ["albedo", "normal"] },
+    { "id": "fabric", "textureSlots": ["albedo", "normal"] }
+  ]
+}

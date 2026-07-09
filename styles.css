@@ -6957,6 +6957,37 @@ body.life-sim-active .lifeverse-consequence-toast {
   }
 }
 
+.lifeverse-asset-debug {
+  position: fixed;
+  left: 14px;
+  bottom: 92px;
+  z-index: 80;
+  display: grid;
+  gap: 4px;
+  min-width: 150px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
+  background: rgba(13, 13, 13, 0.72);
+  color: #f8f6f2;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(16px);
+}
+
+.lifeverse-asset-debug strong {
+  color: #c8a96b;
+  font-size: 0.78rem;
+}
+
+.lifeverse-asset-debug span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: rgba(248, 246, 242, 0.82);
+}
+
 @media (prefers-reduced-motion: reduce) {
   body.life-sim-active *,
   body.life-sim-active *::before,
