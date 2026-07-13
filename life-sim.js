@@ -99,6 +99,18 @@
 
     const player = createPlayer(THREE, materials);
     player.group.position.set(-19, 0, -10);
+    const debugParams = new URLSearchParams(location.search);
+    const spawnOverride = debugParams.get("spawn");
+    if (spawnOverride) {
+      const [sx, sy, sz] = spawnOverride.split(",").map(Number);
+      if (Number.isFinite(sx) && Number.isFinite(sz)) {
+        player.group.position.set(sx, Number.isFinite(sy) ? sy : 0, sz);
+        state.cameraPosition.set(sx, 8, sz - 12);
+        state.cameraLookAt.set(sx, 1.55, sz);
+      }
+      const yawOverride = Number(debugParams.get("yaw"));
+      if (Number.isFinite(yawOverride)) state.yaw = yawOverride;
+    }
     scene.add(player.group);
     loadProductionAssets(THREE, scene, materials, player, state, root, state.assetManager).then((loaded) => {
       if (state.destroyed) return;
@@ -107,6 +119,7 @@
         createDistrict(THREE, scene, materials);
         setAssetStatus(root, "Stylized remastered district active.", "success");
         window.setTimeout(() => clearAssetStatus(root), 2600);
+        loadDistrictAssetSamples(THREE, scene, state.assetManager, state);
       }
       registerPresentationObjects(scene, state.presentation);
     });
@@ -1047,6 +1060,51 @@
     addUniversity(THREE, scene, mat);
     addStreetLife(THREE, scene, mat);
     addZones(THREE, scene, mat);
+  }
+
+  // Volume 5 Anime World Remaster, step 2: swap a couple of procedural placeholder
+  // buildings for real CC0 low-poly GLB models, one location at a time, while the
+  // rest of the hand-built district (furniture, stalls, signs) stays untouched.
+  async function loadDistrictAssetSamples(THREE, scene, assetManager, state) {
+    if (!assetManager) return;
+    const ready = await assetManager.ensureGltfLoader();
+    if (!ready || (state && state.destroyed)) return;
+
+    const swaps = [
+      {
+        url: "assets/environment/hdb-block.glb",
+        hideNamePrefixes: ["HDB Home Block A", "HDB Home Block B"],
+        position: [-24, 0, 19.2],
+        scale: [5.5, 5.5, 5.5]
+      },
+      {
+        url: "assets/environment/office-tower.glb",
+        hideNamePrefixes: ["Office Tower"],
+        position: [18, 0, 20],
+        scale: [5.5, 5.5, 5.5]
+      }
+    ];
+
+    for (const swap of swaps) {
+      try {
+        const asset = await assetManager.loadModel(swap.url, {
+          toonify: true,
+          position: swap.position,
+          scale: swap.scale,
+          label: swap.url
+        });
+        if (state && state.destroyed) return;
+        if (!asset || asset.fallback || !asset.scene) continue;
+        scene.add(asset.scene);
+        scene.children.forEach((child) => {
+          if (swap.hideNamePrefixes.some((prefix) => child.name && child.name.startsWith(prefix))) {
+            child.visible = false;
+          }
+        });
+      } catch (error) {
+        console.warn(`[Life Sim] Optional district asset swap failed: ${swap.url}`, error);
+      }
+    }
   }
 
   function addRoadNetwork(THREE, scene, mat) {
