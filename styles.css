@@ -2275,6 +2275,52 @@ h3 {
   background: var(--color-mint);
 }
 
+.portrait-layer {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.portrait-layer.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.portrait-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 84px;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgba(20, 20, 22, 0.28);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 8px 20px rgba(20, 20, 22, 0.18);
+}
+
+.portrait-image {
+  width: 100%;
+  aspect-ratio: 220 / 300;
+  object-fit: cover;
+  border-radius: 12px;
+  display: block;
+}
+
+.portrait-name {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+
 .modal-layer {
   position: fixed;
   inset: 0;
@@ -2645,6 +2691,41 @@ h3 {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+}
+
+.roleplay-character-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.roleplay-portrait {
+  width: 64px;
+  aspect-ratio: 220 / 300;
+  object-fit: cover;
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
+}
+
+.roleplay-character-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.roleplay-character-name {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.roleplay-character-row #roleplay-chat-title,
+.roleplay-character-row + h3 {
+  margin: 0;
 }
 
 .ghost-circle {

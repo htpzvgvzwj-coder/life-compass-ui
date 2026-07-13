@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="300" viewBox="0 0 220 300">
+  <rect width="220" height="300" rx="20" fill="#7a4de0"/>
+  <circle cx="110" cy="108" r="50" fill="#ffffff" fill-opacity="0.88"/>
+  <rect x="48" y="172" width="124" height="98" rx="26" fill="#ffffff" fill-opacity="0.88"/>
+  <text x="110" y="288" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#ffffff" text-anchor="middle">LIFE REPORT</text>
+</svg>

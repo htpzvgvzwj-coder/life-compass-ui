@@ -10,6 +10,10 @@ const navItems = [...document.querySelectorAll(".nav-item")];
 const viewButtons = [...document.querySelectorAll(".view-button")];
 const staticScreens = [...document.querySelectorAll("[data-static-screen]")];
 
+const portraitLayer = document.querySelector("#portrait-layer");
+const portraitImageEl = document.querySelector("#portrait-image");
+const portraitNameEl = document.querySelector("#portrait-name");
+
 const ADMIN_PASSCODE = "STEADY-ADMIN";
 const COMPASS_SYSTEM_PROMPT = "You are Compass AI, a helpful AI coach for students and youth. Answer the user's actual question directly. Be supportive, practical, and clear. Do not invent facts about the user. Only use information from the current conversation, saved user profile, or uploaded documents. If you are unsure, ask a short follow-up question.";
 const FUTURE_MIRROR_SYSTEM_PROMPT = "You are Future Mirror inside the Compass app. You are a decision impact simulator, not a prediction tool. Help youth compare how today's choices may shape possible future outcomes. Do not guarantee outcomes or claim to predict the future. Use language like possible outcomes, potential risks, likely impact, and possible long-term effects. Be supportive, practical, concise, and youth-friendly.";
@@ -4301,12 +4305,18 @@ const modals = {
     if (!session) return modals.roleplayList();
     const scenario = roleplayScenarios.find((item) => item.id === session.scenario_type);
     return `
-      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="roleplay-chat-title">
+      <div class="modal-card assessment-modal roleplay-card" role="dialog" aria-modal="true" aria-labelledby="roleplay-chat-title">
         <div class="modal-top">
           <span class="risk-pill calm">Roleplay</span>
           <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
         </div>
-        <h3 id="roleplay-chat-title">${escapeHTML(scenario ? scenario.title : "Practice")}</h3>
+        <div class="roleplay-character-row">
+          <img class="roleplay-portrait" src="${PORTRAITS.event.src}" alt="${escapeHTML(PORTRAITS.event.label)}">
+          <div class="roleplay-character-info">
+            <span class="roleplay-character-name">${escapeHTML(PORTRAITS.event.label)}</span>
+            <h3 id="roleplay-chat-title">${escapeHTML(scenario ? scenario.title : "Practice")}</h3>
+          </div>
+        </div>
         <section class="chat-room roleplay-room">
           <div class="chat-messages">${roleplayMessages(session)}<span class="typing-dot" id="roleplay-loading" hidden>Compass is thinking...</span></div>
           <div class="chat-input-row">
@@ -4323,10 +4333,16 @@ const modals = {
     const session = activeRoleplaySession();
     const reflection = session ? roleplayReflection(session) : { wentWell: "You practiced.", improve: "Try again with one specific detail.", nextStep: "Choose another scenario." };
     return `
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="roleplay-reflection-title">
+      <div class="modal-card roleplay-card" role="dialog" aria-modal="true" aria-labelledby="roleplay-reflection-title">
         <div class="modal-top">
           <span class="risk-pill calm">Practice reflection</span>
           <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <div class="roleplay-character-row">
+          <img class="roleplay-portrait" src="${PORTRAITS.event.src}" alt="${escapeHTML(PORTRAITS.event.label)}">
+          <div class="roleplay-character-info">
+            <span class="roleplay-character-name">${escapeHTML(PORTRAITS.event.label)}</span>
+          </div>
         </div>
         <h3 id="roleplay-reflection-title">You finished the practice</h3>
         <div class="advice-stack">
@@ -4741,6 +4757,71 @@ function setLifeVerseDefaultWorldView() {
   if (trackerState.lifeSim) trackerState.lifeSim.reportPromptReady = false;
 }
 
+// Volume 5 Anime World Remaster, step 3: a 2D character-portrait overlay for
+// dialogue, special events, and Life Report. Lives outside #screen-root and
+// #modal-layer on purpose - those get their innerHTML replaced wholesale on
+// every re-render (chat send, roleplay reply, tab switch), which would tear
+// down and rebuild an <img> living inside them and cause a visible flicker
+// every single time. Placeholder art only; real portraits come later.
+// The roleplay modal renders its "event" portrait inline in its own template
+// instead (see modals.roleplayChat/roleplayReflection) - a modal is a fresh
+// render every time it opens, so there's no persistent-overlay flicker risk
+// there, and the VN-style layout (portrait next to the dialogue) reads better
+// than a small badge floating in the corner behind the modal backdrop.
+const PORTRAITS = {
+  compass: { label: "Compass AI", src: "assets/portraits/placeholder-compass.svg" },
+  event: { label: "Practice Partner", src: "assets/portraits/placeholder-event.svg" },
+  report: { label: "Life Report", src: "assets/portraits/placeholder-report.svg" }
+};
+
+// "report" is not a top-level tab - Life Report is a sub-view inside the
+// "simulator" tab (trackerState.lifeVerse.activeView === "report"), reached via
+// data-lifeverse-tab="report" buttons that call renderScreen("simulator").
+function computeActivePortraitId(tab) {
+  if (tab === "compass") return "compass";
+  if (tab === "simulator" && trackerState.lifeVerse && trackerState.lifeVerse.activeView === "report") return "report";
+  return null;
+}
+const PORTRAIT_SWAP_MS = 220;
+let currentPortraitId = null;
+let portraitSwapTimer = null;
+
+function setPortraitContent(id) {
+  const portrait = PORTRAITS[id];
+  if (!portrait || !portraitImageEl) return;
+  portraitImageEl.src = portrait.src;
+  portraitImageEl.alt = portrait.label;
+  if (portraitNameEl) portraitNameEl.textContent = portrait.label;
+  currentPortraitId = id;
+}
+
+function showPortrait(id) {
+  if (!portraitLayer || !PORTRAITS[id]) return;
+  window.clearTimeout(portraitSwapTimer);
+  if (currentPortraitId === id) {
+    portraitLayer.classList.add("is-visible");
+    return;
+  }
+  const wasVisible = portraitLayer.classList.contains("is-visible");
+  if (wasVisible) {
+    portraitLayer.classList.remove("is-visible");
+    portraitSwapTimer = window.setTimeout(() => {
+      setPortraitContent(id);
+      portraitLayer.classList.add("is-visible");
+    }, PORTRAIT_SWAP_MS);
+  } else {
+    setPortraitContent(id);
+    portraitLayer.classList.add("is-visible");
+  }
+}
+
+function hidePortrait() {
+  if (!portraitLayer) return;
+  window.clearTimeout(portraitSwapTimer);
+  portraitLayer.classList.remove("is-visible");
+  currentPortraitId = null;
+}
+
 function renderScreen(tab) {
   activeTab = tab;
   if (tab === "simulator") {
@@ -4753,6 +4834,9 @@ function renderScreen(tab) {
   bindRenderedNavigation(screenRoot);
   const navTab = tab === "assess" || tab === "compass" ? "home" : tab === "simulator" ? "growth" : tab;
   navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.tab === navTab));
+  const activePortraitId = computeActivePortraitId(tab);
+  if (activePortraitId) showPortrait(activePortraitId);
+  else hidePortrait();
   if (tab === "compass") {
     const chatMessagesEl = document.querySelector("#chat-messages");
     if (chatMessagesEl) chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
