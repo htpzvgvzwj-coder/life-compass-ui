@@ -1062,9 +1062,20 @@
     addZones(THREE, scene, mat);
   }
 
-  // Volume 5 Anime World Remaster, step 2: swap a couple of procedural placeholder
-  // buildings for real CC0 low-poly GLB models, one location at a time, while the
-  // rest of the hand-built district (furniture, stalls, signs) stays untouched.
+  // Volume 5 Anime World Remaster, step 2: swap procedural placeholder buildings
+  // (and, for trees, every scattered instance of one) for real CC0 low-poly GLB
+  // models, while the rest of the hand-built district (furniture, stalls, signs)
+  // stays untouched. Each swap hides only exact node names it owns - several
+  // helpers (addBookshelf, addShopFront) reuse their parent location's name as a
+  // prefix for their own props ("Library Bookshelf Frame", "Mall Shop Front"),
+  // so prefix-based hiding would take those out too. Only HDB/Office Tower's own
+  // per-floor window/balcony loop is safe to match by prefix, since nothing else
+  // in the scene shares that exact prefix.
+  const TREE_POSITIONS = [
+    [-35, 18], [-18, 24], [-32, 4], [-35, -12], [-23, -23], [-4, -29], [8, -26],
+    [12, -17], [3, -17], [27, -18], [31, 21], [22, 23], [38, 6]
+  ];
+
   async function loadDistrictAssetSamples(THREE, scene, assetManager, state) {
     if (!assetManager) return;
     const ready = await assetManager.ensureGltfLoader();
@@ -1082,6 +1093,24 @@
         hideNamePrefixes: ["Office Tower"],
         position: [18, 0, 20],
         scale: [5.5, 5.5, 5.5]
+      },
+      {
+        url: "assets/environment/library.glb",
+        hideNames: ["Library Reading Hall", "Library Roof", "Library Quiet Glass"],
+        position: [-25, 0, 2],
+        scale: [2.5, 2.5, 2.5]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/mall-building.glb",
+        hideNames: ["Mall Main Atrium", "Mall Glass Front", "Mall Round Atrium"],
+        position: [18, 0, -15],
+        scale: [6, 6, 6]
+      },
+      {
+        url: "assets/environment/tree-oak.glb",
+        hideNames: ["Tree Trunk", "Tree Crown"],
+        positions: TREE_POSITIONS,
+        scale: [2.4, 2.4, 2.4]
       }
     ];
 
@@ -1089,15 +1118,35 @@
       try {
         const asset = await assetManager.loadModel(swap.url, {
           toonify: true,
-          position: swap.position,
           scale: swap.scale,
           label: swap.url
         });
         if (state && state.destroyed) return;
         if (!asset || asset.fallback || !asset.scene) continue;
-        scene.add(asset.scene);
+
+        if (Array.isArray(swap.positions)) {
+          swap.positions.forEach(([x, z]) => {
+            const instance = asset.scene.clone(true);
+            assetManager.prepareModel(instance, { toonify: true, position: [x, 0, z], scale: swap.scale });
+            scene.add(instance);
+            // registerPresentationObjects() already ran (synchronously, before this
+            // async load resolved) and only found the original procedural "Tree
+            // Crown" groups this is about to hide. Register the replacement
+            // directly so it keeps the same wind-sway animation instead of going static.
+            if (state && state.presentation && Array.isArray(state.presentation.treeCrowns)) {
+              state.presentation.treeCrowns.push(instance);
+            }
+          });
+        } else {
+          assetManager.prepareModel(asset.scene, { toonify: true, position: swap.position, scale: swap.scale });
+          scene.add(asset.scene);
+        }
+
+        const hideNames = swap.hideNames || [];
+        const hidePrefixes = swap.hideNamePrefixes || [];
         scene.children.forEach((child) => {
-          if (swap.hideNamePrefixes.some((prefix) => child.name && child.name.startsWith(prefix))) {
+          if (!child.name) return;
+          if (hideNames.includes(child.name) || hidePrefixes.some((prefix) => child.name.startsWith(prefix))) {
             child.visible = false;
           }
         });

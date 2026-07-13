@@ -2308,6 +2308,7 @@ h3 {
   width: 100%;
   aspect-ratio: 220 / 300;
   object-fit: cover;
+  object-position: top;
   border-radius: 12px;
   display: block;
 }
@@ -2704,6 +2705,7 @@ h3 {
   width: 64px;
   aspect-ratio: 220 / 300;
   object-fit: cover;
+  object-position: top;
   border-radius: 14px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
   flex-shrink: 0;

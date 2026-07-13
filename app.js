@@ -4762,16 +4762,18 @@ function setLifeVerseDefaultWorldView() {
 // #modal-layer on purpose - those get their innerHTML replaced wholesale on
 // every re-render (chat send, roleplay reply, tab switch), which would tear
 // down and rebuild an <img> living inside them and cause a visible flicker
-// every single time. Placeholder art only; real portraits come later.
+// every single time.
 // The roleplay modal renders its "event" portrait inline in its own template
 // instead (see modals.roleplayChat/roleplayReflection) - a modal is a fresh
 // render every time it opens, so there's no persistent-overlay flicker risk
 // there, and the VN-style layout (portrait next to the dialogue) reads better
 // than a small badge floating in the corner behind the modal backdrop.
+// Art: Breezy's "Visual Novel Sprites!" (CC0) - see assets/portraits/CREDITS.md
+// for the license and the role-to-character pairing rationale.
 const PORTRAITS = {
-  compass: { label: "Compass AI", src: "assets/portraits/placeholder-compass.svg" },
-  event: { label: "Practice Partner", src: "assets/portraits/placeholder-event.svg" },
-  report: { label: "Life Report", src: "assets/portraits/placeholder-report.svg" }
+  compass: { label: "Compass AI", src: "assets/portraits/compass-cyrus.png" },
+  event: { label: "Practice Partner", src: "assets/portraits/event-lyn.png" },
+  report: { label: "Life Report", src: "assets/portraits/report-oak.png" }
 };
 
 // "report" is not a top-level tab - Life Report is a sub-view inside the
