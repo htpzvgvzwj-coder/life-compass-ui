@@ -75,7 +75,8 @@
       cameraPosition: new THREE.Vector3(-19, 8, 0),
       cameraLookAt: new THREE.Vector3(-19, 1.55, -10),
       cameraShake: 0,
-      presentation: null
+      presentation: null,
+      outline: null
     };
 
     const ui = {
@@ -114,6 +115,22 @@
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(root);
     resize();
+
+    const celOutlineEnabled = new URLSearchParams(location.search).get("cel") !== "0";
+    if (celOutlineEnabled && window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.createOutlinePipeline) {
+      window.LifeVerseRenderPipeline.createOutlinePipeline(THREE, renderer, scene, camera, {
+        width: Math.max(320, root.clientWidth || window.innerWidth || 320),
+        height: Math.max(240, root.clientHeight || window.innerHeight || 240)
+      }).then((outline) => {
+        if (state.destroyed) {
+          outline.dispose();
+          return;
+        }
+        state.outline = outline;
+      }).catch((error) => {
+        console.warn("[LifeVerse] Cel outline pipeline unavailable, falling back to plain render.", error);
+      });
+    }
 
     const keydown = (event) => {
       if (isTyping(event.target)) return;
@@ -200,6 +217,7 @@
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      if (state.outline) state.outline.setSize(width, height);
     }
 
     function animate() {
@@ -213,7 +231,8 @@
       if (state.assetDebug) state.assetDebug.update();
       updateCamera(player.group.position, delta, elapsed);
       updateZone(player.group.position);
-      renderer.render(scene, camera);
+      if (state.outline) state.outline.render();
+      else renderer.render(scene, camera);
       requestAnimationFrame(animate);
     }
 
@@ -350,6 +369,7 @@
         host.removeEventListener("click", clickFeedback);
         if (state.presentation) state.presentation.audio.destroy();
         if (state.assetManager) state.assetManager.dispose();
+        if (state.outline) state.outline.dispose();
         renderer.dispose();
         root.innerHTML = "";
       }
@@ -358,7 +378,7 @@
 
   function createMaterials(THREE) {
     const library = window.LifeVerseAssets && window.LifeVerseAssets.createMaterialLibrary
-      ? window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" })
+      ? window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "toon" })
       : null;
     const shared = (key, fallback) => library && library.get ? library.get(key) : fallback();
     const make = (color, emissive = 0x000000, roughness = 0.7) => new THREE.MeshToonMaterial({ color, emissive });
