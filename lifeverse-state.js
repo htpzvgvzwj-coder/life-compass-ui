@@ -17,8 +17,76 @@
     return { ...fallback, ...(value && typeof value === "object" ? value : {}) };
   }
 
+  // Character creation choices (Volume 04 Ch8) shift starting resources and a
+  // few early stats rather than unlocking different content - keeps every
+  // path playable while still making the choice feel real. Difficulty only
+  // affects starting resources here, not ongoing decay/growth rates - a
+  // deliberate scope cut for this pass, not an oversight.
+  function applyCharacterCreationProfile(state, profile) {
+    const ageGroup = profile.ageGroup || "";
+    const background = profile.background || "";
+    const trait = profile.startingTrait || "";
+    const difficulty = profile.difficulty || "standard";
+
+    if (ageGroup === "late-teens") {
+      state.player.capability.independence = clamp(state.player.capability.independence - 6);
+      state.education.path = "Full-time student";
+    } else if (ageGroup === "adult") {
+      state.player.capability.independence = clamp(state.player.capability.independence + 8);
+      state.career.readiness = clamp(state.career.readiness + 6);
+      state.finance.savings = Math.max(0, Math.round(state.finance.savings + 300));
+    }
+
+    if (background === "fresh-graduate") {
+      state.education.qualificationProgress = clamp(state.education.qualificationProgress + 20);
+      state.career.readiness = clamp(state.career.readiness + 5);
+      state.finance.money = Math.max(0, Math.round(state.finance.money - 150));
+    } else if (background === "already-working") {
+      state.career.status = "Entry role";
+      state.career.experience = clamp(state.career.experience + 15);
+      state.finance.money = Math.round(state.finance.money + 200);
+    } else if (background === "studying-part-time") {
+      state.education.studyConsistency = clamp(state.education.studyConsistency + 10);
+      state.career.performance = clamp(state.career.performance + 5);
+      state.needs.energy = clamp(state.needs.energy - 8);
+    }
+
+    if (trait === "disciplined") {
+      state.player.habits.studyConsistency = clamp(state.player.habits.studyConsistency + 15);
+      state.player.capability.discipline = clamp(state.player.capability.discipline + 10);
+    } else if (trait === "sociable") {
+      state.relationships.support = clamp(state.relationships.support + 12);
+      state.relationships.friends = clamp(state.relationships.friends + 12);
+    } else if (trait === "ambitious") {
+      state.career.readiness = clamp(state.career.readiness + 12);
+      state.career.reputation = clamp(state.career.reputation + 8);
+    } else if (trait === "careful-with-money") {
+      state.finance.confidence = clamp(state.finance.confidence + 12);
+      state.player.habits.budgeting = clamp(state.player.habits.budgeting + 15);
+    }
+
+    if (difficulty === "relaxed") {
+      state.finance.money = Math.round(state.finance.money + 300);
+      state.needs.stress = clamp(state.needs.stress - 10);
+    } else if (difficulty === "challenging") {
+      state.finance.money = Math.max(0, Math.round(state.finance.money - 200));
+      state.needs.stress = clamp(state.needs.stress + 10);
+    }
+
+    state.player.ageGroup = ageGroup;
+    state.player.background = background;
+    state.player.startingTrait = trait;
+    state.difficulty = difficulty;
+  }
+
   function createInitialState(options = {}) {
     const profile = options.profile || {};
+    const state = buildBaseState(profile);
+    if (options.applyCharacterCreation) applyCharacterCreationProfile(state, profile);
+    return state;
+  }
+
+  function buildBaseState(profile) {
     return {
       version: 1,
       architectureVersion: game.ARCHITECTURE_VERSION || "volume03.1",
@@ -76,7 +144,22 @@
         debt: 0,
         dailyLivingCost: 18,
         monthlyRent: 0,
-        confidence: 36
+        confidence: 36,
+        creditScore: 620,
+        investments: {
+          bonds: 0,
+          stocks: 0,
+          property: 0
+        },
+        insurance: {
+          health: false,
+          home: false,
+          vehicle: false
+        },
+        taxAwareness: 20,
+        lastTaxFiledDay: 0,
+        totalTaxPaid: 0,
+        lastTaxOwed: 0
       },
       career: {
         status: "Entry preparation",
@@ -294,7 +377,11 @@
         memory: Array.isArray(source.player && source.player.memory) ? source.player.memory.slice(-40) : fallback.player.memory
       },
       needs: mergeObject(fallback.needs, source.needs),
-      finance: mergeObject(fallback.finance, source.finance),
+      finance: {
+        ...mergeObject(fallback.finance, source.finance),
+        investments: mergeObject(fallback.finance.investments, source.finance && source.finance.investments),
+        insurance: mergeObject(fallback.finance.insurance, source.finance && source.finance.insurance)
+      },
       career: mergeObject(fallback.career, source.career),
       education: mergeObject(fallback.education, source.education),
       housing: mergeObject(fallback.housing, source.housing),
@@ -398,6 +485,17 @@
     merged.finance.money = Math.round(Number(merged.finance.money) || 0);
     merged.finance.savings = Math.max(0, Math.round(Number(merged.finance.savings) || 0));
     merged.finance.debt = Math.max(0, Math.round(Number(merged.finance.debt) || 0));
+    merged.finance.creditScore = Math.max(300, Math.min(850, Math.round(Number(merged.finance.creditScore) || 620)));
+    merged.finance.taxAwareness = clamp(merged.finance.taxAwareness);
+    merged.finance.lastTaxFiledDay = Math.max(0, Math.round(Number(merged.finance.lastTaxFiledDay) || 0));
+    merged.finance.totalTaxPaid = Math.max(0, Math.round(Number(merged.finance.totalTaxPaid) || 0));
+    merged.finance.lastTaxOwed = Math.max(0, Math.round(Number(merged.finance.lastTaxOwed) || 0));
+    ["bonds", "stocks", "property"].forEach((key) => {
+      merged.finance.investments[key] = Math.max(0, Math.round(Number(merged.finance.investments[key]) || 0));
+    });
+    ["health", "home", "vehicle"].forEach((key) => {
+      merged.finance.insurance[key] = Boolean(merged.finance.insurance[key]);
+    });
     merged.progression.independenceIndex = clamp(merged.progression.independenceIndex);
     ["personalGrowthScore", "stabilityScore", "resilienceScore", "opportunityScore", "legacyScore"].forEach((key) => {
       merged.progression[key] = clamp(merged.progression[key]);

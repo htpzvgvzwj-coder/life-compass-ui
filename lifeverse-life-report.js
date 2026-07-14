@@ -102,6 +102,8 @@
   function buildSystemExplanations(state) {
     return [
       `Finance: cash ${state.finance.money}, savings ${state.finance.savings}, and debt ${state.finance.debt} reflect spending, budgeting, living costs, interest, and income decisions.`,
+      `Credit score is ${state.finance.creditScore} (${game.creditTier ? game.creditTier(state.finance.creditScore) : "unknown"}), shaped by debt load, savings, and consistent budgeting rather than any single purchase.`,
+      `Investments: bonds $${state.finance.investments.bonds}, stocks $${state.finance.investments.stocks}, property $${state.finance.investments.property}. Insurance active: ${["health", "home", "vehicle"].filter((key) => state.finance.insurance[key]).join(", ") || "none"}.`,
       `Career: readiness ${state.career.readiness}/100 reflects preparation, reputation, burnout risk, world job pressure, and education evidence.`,
       `Education: progress ${state.education.qualificationProgress}/100 reflects study consistency, learning efficiency, opportunity level, and portfolio work.`,
       `Housing: stability ${state.housing.stability}/100 and affordability ${state.housing.affordability}/100 reflect rent pressure, maintenance, comfort, commute, and money confidence.`,
@@ -183,6 +185,8 @@
     if (state.mentalWellbeing.burnoutRisk > 60) recommendations.push("Lower pressure before adding new goals; burnout turns useful ambition into avoidance.");
     if (state.economy.costOfLivingIndex > 65) recommendations.push("Adjust budget and transport choices because the economy is raising daily-life pressure.");
     if (state.npcSimulation.communityTrust < 40) recommendations.push("Interact with the district; NPC support grows when community trust is maintained.");
+    if (state.finance.creditScore < 580) recommendations.push("Credit score is in the poor range; paying down debt and building steady savings would rebuild it fastest.");
+    if (!state.finance.insurance.health && state.finance.money > 200) recommendations.push("Consider health insurance; a single illness could cost far more than the premium.");
     if (!recommendations.length) recommendations.push("Keep balancing useful effort with recovery. Stable routines create future freedom.");
     return recommendations.slice(0, 3);
   }

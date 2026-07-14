@@ -101,10 +101,10 @@ assert.ok(sim.locations.length >= requiredLocations.length, "Life Sim exposes al
   "Library",
   "Hospital",
   "Cafe",
-  "Beach",
+  "Sentosa",
   "Airport",
   "Train Station",
-  "University"
+  "University Town"
 ].forEach((name) => {
   assert.ok(appSource.includes(`name: "${name}"`), `${name} is represented in LifeVerse map/context descriptions`);
 });

@@ -269,6 +269,13 @@
       composer.addPass(outlinePass);
 
       let enabled = true;
+      // Three.js resets renderer.info.render.calls at the start of every single
+      // renderer.render() call. This pipeline issues several per visual frame
+      // (the normal/depth pre-pass, then the composer's beauty pass, then its
+      // ShaderPass screen quad) - left on auto-reset, the debug panel only ever
+      // saw the count from that last full-screen quad (always ~1), never the
+      // real per-frame total. Take over resetting manually, once per frame.
+      renderer.info.autoReset = false;
 
       function renderNormalDepth() {
         const previousTarget = renderer.getRenderTarget();
@@ -285,6 +292,7 @@
       }
 
       function render() {
+        renderer.info.reset();
         if (!enabled) {
           renderer.render(scene, camera);
           return;
@@ -307,6 +315,7 @@
       }
 
       function dispose() {
+        renderer.info.autoReset = true;
         normalTarget.dispose();
         normalMaterial.dispose();
         if (composer.dispose) composer.dispose();

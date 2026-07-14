@@ -6,6 +6,10 @@ const authEmailInput = document.querySelector("#auth-email");
 const authUsernameInput = document.querySelector("#onboarding-username");
 const authAdminPassInput = document.querySelector("#auth-admin-pass");
 const authError = document.querySelector("#onboarding-error");
+const characterCreationLayer = document.querySelector("#character-creation-layer");
+const characterCreationForm = document.querySelector("#character-creation-form");
+const openingNarrativeLayer = document.querySelector("#opening-narrative-layer");
+const openingNarrativeContinueButton = document.querySelector("#opening-narrative-continue");
 const navItems = [...document.querySelectorAll(".nav-item")];
 const viewButtons = [...document.querySelectorAll(".view-button")];
 const staticScreens = [...document.querySelectorAll("[data-static-screen]")];
@@ -61,7 +65,11 @@ const defaultUserProfile = {
   dreamUniversity: "",
   dreamCareer: "",
   dreamLifestyle: "",
-  visionBoard: ""
+  visionBoard: "",
+  background: "",
+  startingTrait: "",
+  difficulty: "standard",
+  characterCreated: false
 };
 
 function lifeVerseEngine() {
@@ -69,6 +77,12 @@ function lifeVerseEngine() {
 }
 
 function createDefaultLifeVerseState() {
+  // Called once at module-load time to seed defaultTrackerState, before the
+  // real userProfile const further down the file is initialized - must stay
+  // on the static default here. Character-creation choices are applied later,
+  // for real, via the opening-narrative "Begin" handler which calls
+  // createInitialState({ profile: userProfile, applyCharacterCreation: true })
+  // directly, well after the whole script has finished loading.
   const engine = lifeVerseEngine();
   return engine && engine.createInitialState ? engine.createInitialState({ profile: defaultUserProfile }) : null;
 }
@@ -114,6 +128,7 @@ const defaultTrackerState = {
     reportPromptReady: false
   },
   activeRoleplaySessionId: null,
+  systemTutorialsSeen: {},
   moodSuggestion: null
 };
 
@@ -140,16 +155,17 @@ const lifeSimLocations = [
   { id: "home", name: "Home", description: "Your HDB home base. Rest, reset, and manage your routine." },
   { id: "gym", name: "Gym", description: "A neighbourhood gym for discipline, strength, and stress control." },
   { id: "work", name: "Office", description: "A bright office tower where skills and money grow, but pressure can rise too." },
-  { id: "food", name: "Food Court", description: "A hawker-centre-inspired place for everyday meals and small happiness." },
-  { id: "mall", name: "Shopping Mall", description: "A colourful mall with tempting spending choices." },
+  { id: "food", name: "Hawker Centre", description: "A hawker-centre-inspired place for everyday meals and small happiness." },
+  { id: "mall", name: "Orchard Road", description: "A colourful shopping belt with tempting spending choices." },
   { id: "park", name: "Park", description: "A green space for slowing down, breathing, and balancing stress." },
   { id: "library", name: "Library", description: "A quiet study space with shelves, desks, and focus-friendly corners." },
   { id: "hospital", name: "Hospital", description: "A clean care space with reception, waiting seats, and health support cues." },
   { id: "cafe", name: "Cafe", description: "A warm small cafe for reflection, laptops, and gentle social energy." },
-  { id: "beach", name: "Beach", description: "A calm coastal edge for recovery, perspective, and fresh air." },
+  { id: "beach", name: "Sentosa", description: "A calm coastal escape for recovery, perspective, and fresh air." },
   { id: "airport", name: "Airport", description: "A travel gateway that hints at future mobility, planning, and opportunity." },
   { id: "train", name: "Train Station", description: "A transit hub with gates, route boards, and daily movement through the city." },
-  { id: "university", name: "University", description: "A campus area for long-term learning, lectures, and student life." }
+  { id: "university", name: "University Town", description: "A campus area for long-term learning, lectures, and student life." },
+  { id: "marina-bay", name: "Marina Bay", description: "The city's financial skyline - ambition, pressure, and the clearest symbol of \"making it\"." }
 ];
 
 const lifeSimActivities = {
@@ -738,6 +754,7 @@ function normalizeTrackerState(state) {
     lifeVerse: normalizeLifeVerseState(state.lifeVerse || fallback.lifeVerse),
     lifeSim: normalizeLifeSimState(state.lifeSim || fallback.lifeSim),
     activeRoleplaySessionId: state.activeRoleplaySessionId || null,
+    systemTutorialsSeen: (state.systemTutorialsSeen && typeof state.systemTutorialsSeen === "object") ? state.systemTutorialsSeen : {},
     moodSuggestion: state.moodSuggestion || null
   };
 }
@@ -1786,6 +1803,9 @@ function lifeVerseMapPanel(state) {
           <article class="${location.active ? "is-current" : ""}">
             <strong>${escapeHTML(location.name)}</strong>
             <span>${escapeHTML(location.description)}</span>
+            ${location.active
+              ? `<span class="lifeverse-map-current-tag">You are here</span>`
+              : `<button type="button" class="lifeverse-mini-button" data-lifeverse-travel="${escapeHTML(location.id)}">Take the MRT here</button>`}
           </article>
         `).join("")}
       </div>
@@ -1914,6 +1934,33 @@ function lifeVerseLifePanel(state, view) {
   `;
 }
 
+const SYSTEM_TUTORIAL_HINTS = {
+  career: "Career tracks your job readiness, performance, and burnout. Preparation and consistency matter more than luck here.",
+  education: "Education builds skills and qualifications over time - it pays off later, not immediately.",
+  finance: "Finance is your money, savings, debt, credit, and investments. Small habits here compound into big outcomes.",
+  housing: "Housing affects your comfort, cost of living, and how far you commute every day.",
+  transportation: "Transportation is how you get around - it trades money, time, and stress against each other.",
+  relationships: "Relationships track the people supporting you. Neglect them and support quietly disappears.",
+  health: "Health reflects sleep, food, and activity over time - it rarely drops from one bad day, only from a bad pattern.",
+  mentalWellbeing: "Mental wellbeing tracks stress, motivation, and burnout risk - protect it before it protects itself.",
+  economy: "Economy is the world around you - inflation and job market shift on their own, and you adapt to them.",
+  npcSimulation: "NPC Simulation is the community around you - neighbours keep living their own lives whether you visit or not.",
+  worldSimulation: "World Simulation is the wider city - it evolves in the background and quietly shapes every other system.",
+  progression: "Progression reflects long-term growth across every system, not a simple level-up counter."
+};
+
+function lifeVerseSystemTutorialHint(system) {
+  if (trackerState.systemTutorialsSeen[system.id]) return "";
+  const hint = SYSTEM_TUTORIAL_HINTS[system.id];
+  if (!hint) return "";
+  return `
+    <div class="lifeverse-system-tutorial" data-lifeverse-system-tutorial="${escapeHTML(system.id)}">
+      <span>${escapeHTML(hint)}</span>
+      <button type="button" data-dismiss-system-tutorial="${escapeHTML(system.id)}">Got it</button>
+    </div>
+  `;
+}
+
 function lifeVerseSystemCard(system) {
   return `
     <article class="lifeverse-system-card">
@@ -1924,6 +1971,7 @@ function lifeVerseSystemCard(system) {
           <small>${escapeHTML(system.summary || "")}</small>
         </div>
       </div>
+      ${lifeVerseSystemTutorialHint(system)}
       <div class="lifeverse-system-metrics">
         ${(system.metrics || []).slice(0, 4).map(([label, value]) => `
           <span><small>${escapeHTML(label)}</small><b>${escapeHTML(value)}</b></span>
@@ -2461,6 +2509,17 @@ function exitLifeSimMode() {
   }
 }
 
+// renderScreen("simulator") replaces #screen-root's innerHTML wholesale on
+// every overlay change (map/journal/pause all live in that same template),
+// which destroys and recreates #life-sim-root along with it - mountLifeSim()
+// always has to build a brand new CompassLifeSim instance, there is no
+// "already mounted, just update" path. That's fine for stats (those live in
+// trackerState.lifeVerse, untouched by remounts) but it means any 3D-only
+// state - like the player's physical position - resets to the default spawn
+// every time, silently undoing a teleport requested just before the remount.
+// Route the destination through the remount instead of fighting it.
+let pendingTeleportLocationId = null;
+
 function mountLifeSim() {
   const root = document.querySelector("#life-sim-root");
   if (!root) return;
@@ -2469,8 +2528,11 @@ function mountLifeSim() {
     root.innerHTML = `<div class="sim-canvas-fallback"><strong>3D simulator is unavailable</strong><span>Refresh the page once, then open Life Sim again.</span></div>`;
     return;
   }
+  const initialLocationId = pendingTeleportLocationId;
+  pendingTeleportLocationId = null;
   lifeSimInstance = window.CompassLifeSim.mount(root, {
     getLifeVerseState: () => lifeVerseState(),
+    initialLocationId,
     onLocationChange(location) {
       trackerState.lifeSim.currentLocation = location ? location.id : null;
       saveTrackerState();
@@ -3985,6 +4047,7 @@ const screens = {
       <div>
         <strong>${displayName()}</strong>
         <p>${escapeHTML(userProfile.email)} - ${escapeHTML(userProfile.role)} role</p>
+        <span class="risk-pill warn demo-account-badge">Demo account - saved on this device only</span>
       </div>
     </section>
     <div class="profile-actions">
@@ -3992,9 +4055,9 @@ const screens = {
       <button class="secondary-action" type="button" data-open="guide">Guide / Help</button>
     </div>
     <section class="profile-card">
-      <div class="toggle-row"><span>Google-style login</span><strong>Connected</strong></div>
+      <div class="toggle-row"><span>Login method</span><strong>Local demo (not verified)</strong></div>
       <div class="toggle-row"><span>Role permissions</span><strong>${isAdmin() ? "Admin" : "User"}</strong></div>
-      <div class="toggle-row"><span>Local browser storage</span><strong>On</strong></div>
+      <div class="toggle-row"><span>Progress storage</span><strong>This browser only</strong></div>
     </section>
     <section class="profile-card">
       <p class="eyebrow">Compass AI voice</p>
@@ -5054,9 +5117,66 @@ authForm.addEventListener("submit", (event) => {
   applyScopedChatState();
   saveTrackerState();
   hideAuth();
-  renderScreen("home");
-  refreshStaticScreens();
+  if (!userProfile.characterCreated) {
+    showCharacterCreation();
+  } else {
+    renderScreen("home");
+    refreshStaticScreens();
+  }
 });
+
+function showCharacterCreation() {
+  if (!characterCreationLayer) return;
+  characterCreationLayer.classList.add("is-open");
+  characterCreationLayer.setAttribute("aria-hidden", "false");
+}
+
+function hideCharacterCreation() {
+  if (!characterCreationLayer) return;
+  characterCreationLayer.classList.remove("is-open");
+  characterCreationLayer.setAttribute("aria-hidden", "true");
+}
+
+function showOpeningNarrative() {
+  if (!openingNarrativeLayer) return;
+  openingNarrativeLayer.classList.add("is-open");
+  openingNarrativeLayer.setAttribute("aria-hidden", "false");
+}
+
+function hideOpeningNarrative() {
+  if (!openingNarrativeLayer) return;
+  openingNarrativeLayer.classList.remove("is-open");
+  openingNarrativeLayer.setAttribute("aria-hidden", "true");
+}
+
+if (characterCreationForm) {
+  characterCreationForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formData = new FormData(characterCreationForm);
+    userProfile.ageGroup = String(formData.get("ageGroup") || "young-adult");
+    userProfile.background = String(formData.get("background") || "fresh-graduate");
+    userProfile.startingTrait = String(formData.get("startingTrait") || "disciplined");
+    userProfile.difficulty = String(formData.get("difficulty") || "standard");
+    saveUserProfile();
+    hideCharacterCreation();
+    showOpeningNarrative();
+  });
+}
+
+if (openingNarrativeContinueButton) {
+  openingNarrativeContinueButton.addEventListener("click", () => {
+    const engine = lifeVerseEngine();
+    if (engine && engine.createInitialState) {
+      trackerState.lifeVerse = engine.createInitialState({ profile: userProfile, applyCharacterCreation: true });
+      saveTrackerState();
+    }
+    userProfile.characterCreated = true;
+    saveUserProfile();
+    hideOpeningNarrative();
+    renderScreen("home");
+    refreshStaticScreens();
+  });
+}
 
 navItems.forEach((item) => {
   item.addEventListener("click", () => renderScreen(item.dataset.tab));
@@ -5124,8 +5244,28 @@ document.addEventListener("click", async (event) => {
   const lifeVerseFastForward = event.target.closest("[data-lifeverse-fast-forward]");
   const lifeVerseReportNow = event.target.closest("[data-lifeverse-report-now]");
   const lifeVerseReset = event.target.closest("[data-lifeverse-reset]");
+  const lifeVerseTravel = event.target.closest("[data-lifeverse-travel]");
+  const dismissSystemTutorial = event.target.closest("[data-dismiss-system-tutorial]");
 
   if (opener) openModal(opener.dataset.open, opener.dataset.reflectionId || opener.dataset.openPayload || "");
+  if (dismissSystemTutorial) {
+    trackerState.systemTutorialsSeen[dismissSystemTutorial.dataset.dismissSystemTutorial] = true;
+    saveTrackerState();
+    renderScreen("simulator");
+  }
+  if (lifeVerseTravel) {
+    const destinationId = lifeVerseTravel.dataset.lifeverseTravel;
+    // Closing the map overlay goes through renderScreen("simulator"), which
+    // always remounts the 3D scene from scratch (see mountLifeSim) - calling
+    // teleportTo() on the live instance here would just get thrown away.
+    // Queue the destination so the remount itself spawns there instead.
+    pendingTeleportLocationId = destinationId;
+    trackerState.lifeSim.currentLocation = destinationId;
+    saveTrackerState();
+    trackerState.lifeVerse = lifeVerseState();
+    trackerState.lifeVerse.activeView = "today";
+    renderScreen("simulator");
+  }
   if (tabJump) {
     if (tabJump.dataset.tabJump === "simulator") setLifeVerseDefaultWorldView();
     renderScreen(tabJump.dataset.tabJump);

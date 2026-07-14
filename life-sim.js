@@ -12,7 +12,8 @@
     { id: "beach", name: "Beach", x: 24, z: -30, radius: 5 },
     { id: "airport", name: "Airport", x: 35, z: -1, radius: 5.3 },
     { id: "train", name: "Train Station", x: 4, z: -3.5, radius: 4.6 },
-    { id: "university", name: "University", x: -34, z: -7, radius: 5 }
+    { id: "university", name: "University", x: -34, z: -7, radius: 5 },
+    { id: "marina-bay", name: "Marina Bay", x: 25, z: 32, radius: 6 }
   ];
 
   function mount(root, options = {}) {
@@ -99,6 +100,14 @@
 
     const player = createPlayer(THREE, materials);
     player.group.position.set(-19, 0, -10);
+    if (options.initialLocationId) {
+      const targetZone = locationZones.find((zone) => zone.id === options.initialLocationId);
+      if (targetZone) {
+        player.group.position.set(targetZone.x, 0, targetZone.z);
+        state.cameraPosition.set(targetZone.x, 8, targetZone.z - 12);
+        state.cameraLookAt.set(targetZone.x, 1.55, targetZone.z);
+      }
+    }
     const debugParams = new URLSearchParams(location.search);
     const spawnOverride = debugParams.get("spawn");
     if (spawnOverride) {
@@ -1059,7 +1068,21 @@
     addTrainStation(THREE, scene, mat);
     addUniversity(THREE, scene, mat);
     addStreetLife(THREE, scene, mat);
+    addMarinaBayLandmark(THREE, scene, mat);
     addZones(THREE, scene, mat);
+  }
+
+  function addMarinaBayLandmark(THREE, scene, mat) {
+    const baseX = 25;
+    const baseZ = 30;
+    const towerHeight = 22;
+    [-5, 0, 5].forEach((offsetX, index) => {
+      addBox(THREE, scene, `Marina Bay Tower ${index + 1}`, [baseX + offsetX, towerHeight / 2, baseZ], [3.2, towerHeight, 3.2], mat.work);
+    });
+    const skypark = addBox(THREE, scene, "Marina Bay Skypark", [baseX, towerHeight + 1.2, baseZ], [19, 1.6, 5.5], mat.glass);
+    skypark.rotation.z = 0.04;
+    addBox(THREE, scene, "Marina Bay Plaza", [baseX, 0.1, baseZ - 6], [16, 0.2, 6], mat.sidewalk, true);
+    addSignBoard(THREE, scene, "Marina Bay Sign", "MARINA BAY", [baseX - 9, 3.2, baseZ + 4], mat.signBlue, 0xffffff);
   }
 
   // Volume 5 Anime World Remaster, step 2: swap procedural placeholder buildings
@@ -1075,6 +1098,12 @@
     [-35, 18], [-18, 24], [-32, 4], [-35, -12], [-23, -23], [-4, -29], [8, -26],
     [12, -17], [3, -17], [27, -18], [31, 21], [22, 23], [38, 6]
   ];
+
+  // Sentosa: palm trees ring the existing Beach zone (boardwalk/umbrellas/
+  // bench/rock stay untouched) - upright palms mark the open sand, bent
+  // palms lean in near the shoreline for variety.
+  const SENTOSA_PALM_POSITIONS = [[14, -32], [16, -25.5], [23, -25], [31, -28.5]];
+  const SENTOSA_PALM_BEND_POSITIONS = [[20, -34.5], [28, -33]];
 
   async function loadDistrictAssetSamples(THREE, scene, assetManager, state) {
     if (!assetManager) return;
@@ -1111,6 +1140,62 @@
         hideNames: ["Tree Trunk", "Tree Crown"],
         positions: TREE_POSITIONS,
         scale: [2.4, 2.4, 2.4]
+      },
+      // Orchard Road: extends the Mall zone with two more shopfronts along the
+      // same street instead of replacing anything, so the existing shop
+      // fronts/signage/plants stay exactly where they were.
+      {
+        url: "assets/environment/city-kit-commercial/orchard-shop-a.glb",
+        position: [10, 0, -15],
+        scale: [6.5, 6.5, 6.5]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/orchard-shop-b.glb",
+        position: [26, 0, -15],
+        scale: [4.2, 4.2, 4.2]
+      },
+      // University Town: adds a lecture hall and a hostel block near the
+      // existing University zone, purely additive like Orchard Road above.
+      {
+        url: "assets/environment/university-lecture-hall.glb",
+        position: [-40, 0, -7],
+        scale: [3.5, 3.5, 3.5]
+      },
+      {
+        url: "assets/environment/university-hostel.glb",
+        position: [-34, 0, -14],
+        scale: [3.2, 3.2, 3.2]
+      },
+      // Marina Bay / CBD: three City Kit Commercial skyscrapers cluster around
+      // the hand-built Marina-Bay-Sands-style landmark (addMarinaBayLandmark),
+      // which uses the same primitive-box style as every other district
+      // building rather than a downloaded model - there's no free CC0 model
+      // of that specific silhouette.
+      {
+        url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
+        position: [15, 0, 26],
+        scale: [4.9, 4.9, 4.9]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/marina-skyscraper-c.glb",
+        position: [25, 0, 34],
+        scale: [4.4, 4.4, 4.4]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
+        position: [35, 0, 26],
+        scale: [3.9, 3.9, 3.9]
+      },
+      // Sentosa: purely additive palm trees around the existing Beach zone.
+      {
+        url: "assets/environment/tree-palm.glb",
+        positions: SENTOSA_PALM_POSITIONS,
+        scale: [3.0, 3.0, 3.0]
+      },
+      {
+        url: "assets/environment/tree-palm-bend.glb",
+        positions: SENTOSA_PALM_BEND_POSITIONS,
+        scale: [3.0, 3.0, 3.0]
       }
     ];
 
@@ -1229,15 +1314,16 @@
   }
 
   function addFoodCourt(THREE, scene, mat) {
-    addBox(THREE, scene, "Food Court Tile Floor", [-22, 0.22, -15], [12, 0.44, 8.5], mat.food);
-    addBox(THREE, scene, "Food Court Warm Roof", [-22, 3.45, -15], [13, 0.45, 9.2], mat.signGold);
-    [-26, -23, -20].forEach((x, index) => addFoodStall(THREE, scene, [x, -18.6], ["NOODLES", "RICE", "DRINKS"][index], mat));
-    for (let x = -26; x <= -18; x += 4) {
+    addBox(THREE, scene, "Food Court Tile Floor", [-21.5, 0.22, -15], [17, 0.44, 8.5], mat.food);
+    addBox(THREE, scene, "Food Court Warm Roof", [-21.5, 3.45, -15], [18, 0.45, 9.2], mat.signGold);
+    [-26, -23, -20, -17, -14].forEach((x, index) => addFoodStall(THREE, scene, [x, -18.6], ["NOODLES", "RICE", "SATAY", "LAKSA", "DRINKS"][index], mat));
+    for (let x = -26; x <= -15; x += 4) {
       for (let z = -16.3; z <= -12.8; z += 2.8) addTableSet(THREE, scene, [x, z], mat);
     }
     addTray(THREE, scene, [-24, -13.2], mat);
     addTray(THREE, scene, [-20, -16.3], mat);
-    addSignBoard(THREE, scene, "Food Court Sign", "FOOD COURT", [-26.8, 4.08, -19.7], mat.curbWarm, 0x111111);
+    addTray(THREE, scene, [-16, -14.5], mat);
+    addSignBoard(THREE, scene, "Food Court Sign", "HAWKER CENTRE", [-29.3, 4.08, -19.7], mat.curbWarm, 0x111111);
   }
 
   function addMall(THREE, scene, mat) {

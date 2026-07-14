@@ -20,7 +20,9 @@
     const rentCost = Math.round((Number(state.housing.monthlyCost || 0) / 30) * safeDays);
     const commuteCost = Math.round(safeDays * 0.65 * Number(state.transportation.costPerCommute || 4));
     const debtCost = Math.round((Number(state.finance.debt || 0) * ((Number(state.economy.interestRate || 0) + 2) / 100) / 30) * safeDays);
-    const totalCost = livingCost + rentCost + commuteCost + debtCost;
+    const insurance = state.finance.insurance || {};
+    const insuranceCost = Math.round(safeDays * ((insurance.health ? 1.2 : 0) + (insurance.home ? 0.8 : 0) + (insurance.vehicle ? 1.5 : 0)));
+    const totalCost = livingCost + rentCost + commuteCost + debtCost + insuranceCost;
     const worldPressure = state.worldSimulation.jobMarketPressure * 0.01 + state.worldSimulation.housingMarketPressure * 0.006 + Math.max(0, 65 - state.worldSimulation.publicHealthCondition) * 0.006;
     const opportunityLift = state.worldSimulation.educationOpportunityLevel * 0.008 + state.economy.opportunityIndex * 0.006;
     const studyGrowth = (state.education.studyConsistency + state.player.habits.studyConsistency) * safeDays * 0.006 + opportunityLift * safeDays * 0.08;
@@ -39,6 +41,16 @@
     const debtGrowth = Math.round(state.finance.debt * Math.max(0, state.economy.interestRate + 2) / 100 * (safeDays / 365));
     state.finance.savings = Math.max(0, Math.round(state.finance.savings + savingsGrowth));
     state.finance.debt = Math.max(0, Math.round(state.finance.debt + debtGrowth));
+    const investments = state.finance.investments || { bonds: 0, stocks: 0, property: 0 };
+    const bondsGrowth = Math.round(investments.bonds * 0.045 * (safeDays / 365));
+    const propertyGrowth = Math.round(investments.property * 0.06 * (safeDays / 365));
+    const stockSeed = Math.sin(state.time.day * 12.9898 + safeDays * 78.233) * 43758.5453;
+    const stockVariance = (stockSeed - Math.floor(stockSeed)) * 2 - 1;
+    const stockGrowth = Math.round(investments.stocks * (0.03 + stockVariance * 0.14) * (safeDays / 365));
+    investments.bonds = Math.max(0, investments.bonds + bondsGrowth);
+    investments.property = Math.max(0, investments.property + propertyGrowth);
+    investments.stocks = Math.max(0, investments.stocks + stockGrowth);
+    state.finance.investments = investments;
     if (state.finance.money < 0) {
       state.finance.debt = Math.max(0, Math.round(state.finance.debt + Math.abs(state.finance.money)));
       state.finance.money = 0;
@@ -84,6 +96,7 @@
     state.economy.jobMarket = game.clamp(state.economy.jobMarket + state.economy.opportunityIndex * 0.006 - state.economy.inflation * 0.02);
     state.economy.consumerPressure = game.clamp(state.economy.consumerPressure + state.economy.costOfLivingIndex * 0.006 - state.finance.confidence * 0.01);
     if (game.refreshWorldEconomyLabel) game.refreshWorldEconomyLabel(state);
+    if (game.recalculateCreditScore) game.recalculateCreditScore(state);
     const npcSummaries = game.simulateNPCs ? game.simulateNPCs(state, safeDays) : [];
     state.progression.independenceIndex = game.clamp(state.progression.independenceIndex + state.player.habits.budgeting * 0.01 + state.player.habits.reflection * 0.01 + state.career.readiness * 0.002);
     const xpGained = game.updateProgressionFromFastForward ? game.updateProgressionFromFastForward(state, safeDays) : 0;
@@ -96,7 +109,10 @@
       consequences: [
         `Money changed from $${beforeMoney} to $${state.finance.money}.`,
         `Savings changed from $${beforeSavings} to $${state.finance.savings}; debt changed from $${beforeDebt} to $${state.finance.debt}.`,
-        `Estimated costs: $${totalCost} ($${livingCost} daily life, $${rentCost} housing, $${commuteCost} transport, $${debtCost} debt pressure).`,
+        `Estimated costs: $${totalCost} ($${livingCost} daily life, $${rentCost} housing, $${commuteCost} transport, $${debtCost} debt pressure, $${insuranceCost} insurance premiums).`,
+        (investments.bonds || investments.stocks || investments.property)
+          ? `Investments: bonds $${investments.bonds}, stocks $${investments.stocks} (${stockGrowth >= 0 ? "+" : ""}${stockGrowth} this period), property $${investments.property}. Credit score is now ${state.finance.creditScore}.`
+          : `No active investments yet. Credit score is ${state.finance.creditScore}.`,
         `Career readiness changed from ${beforeReadiness}/100 to ${state.career.readiness}/100.`,
         `Education progress changed from ${beforeEducation}/100 to ${state.education.qualificationProgress}/100.`,
         `Relationship support changed from ${beforeRelationships}/100 to ${state.relationships.support}/100.`,
