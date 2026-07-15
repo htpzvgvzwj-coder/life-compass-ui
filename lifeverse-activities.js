@@ -53,7 +53,7 @@
       location: "work",
       durationMinutes: 480,
       effects: {
-        finance: { money: 80 },
+        finance: {},
         needs: { energy: -18, hunger: -12, stress: 12, social: -4 },
         career: { performance: 3, readiness: 2, burnoutRisk: 4 },
         skills: { career: 3, social: 1 },
@@ -185,14 +185,23 @@
   function performActivity(state, activityId, options = {}) {
     const activity = findActivity(activityId);
     if (!activity) return { error: "Activity not found." };
+    if (activity.id === "work-shift" && !state.career.employed) {
+      return { error: "You do not currently have a job - search for work before you can take a shift." };
+    }
 
     const before = game.getTimeSnapshot(state);
     if (game.decayNeeds) game.decayNeeds(state, activity.durationMinutes);
     if (game.advanceMinutes) game.advanceMinutes(state, activity.durationMinutes, activity.title);
 
     const effects = activity.effects || {};
+    // Work-shift pay tracks the player's actual career.incomePerShift (raised by
+    // promotions/category choice) instead of a flat number, so those systems
+    // have a real, felt consequence rather than only moving an abstract stat.
+    const financeEffects = activity.id === "work-shift"
+      ? { ...effects.finance, money: Math.round(state.career.incomePerShift) }
+      : (effects.finance || {});
     if (game.applyNeedEffects) game.applyNeedEffects(state, effects);
-    addFinance(state, effects.finance || {});
+    addFinance(state, financeEffects);
     addCareer(state, effects.career || {});
     if (game.applyPlayerEffects) game.applyPlayerEffects(state, activity);
 
@@ -214,7 +223,7 @@
       title: activity.title,
       summary: activity.consequence,
       systems: affectedSystems(activity),
-      consequences: buildConsequences(activity),
+      consequences: buildConsequences({ ...activity, effects: { ...effects, finance: financeEffects } }),
       reflection: activity.reflection,
       occurredAt: after.stamp
     });

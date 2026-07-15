@@ -219,22 +219,34 @@
       model.scale.set(Number(scale[0] || 1), Number(scale[1] || 1), Number(scale[2] || 1));
     }
 
+    // Historically converted imported GLTF materials to MeshToonMaterial for
+    // the Volume 5 anime cel-shading pass (docs/volume5-asset-pipeline.md).
+    // That direction was dropped for a semi-realistic "Stylized Low Poly
+    // City" PBR look, so this now normalizes into consistent PBR roughness/
+    // metalness ranges instead - keeping the imported albedo/normal/etc maps
+    // intact rather than discarding them the way the toon conversion did.
     function toonifyMaterial(sourceMaterial) {
       if (Array.isArray(sourceMaterial)) return sourceMaterial.map((material) => toonifyMaterial(material));
       if (!sourceMaterial) return materialLibrary && materialLibrary.get ? materialLibrary.get("debugFallback") : null;
-      const color = sourceMaterial.color ? sourceMaterial.color.clone() : new THREE.Color(0xffffff);
-      const toon = new THREE.MeshToonMaterial({
-        color,
+      if (sourceMaterial.isMeshStandardMaterial || sourceMaterial.isMeshPhysicalMaterial) {
+        sourceMaterial.roughness = Math.min(0.92, Math.max(0.35, typeof sourceMaterial.roughness === "number" ? sourceMaterial.roughness : 0.7));
+        sourceMaterial.metalness = Math.min(0.35, typeof sourceMaterial.metalness === "number" ? sourceMaterial.metalness : 0.05);
+        return sourceMaterial;
+      }
+      const pbr = new THREE.MeshStandardMaterial({
+        color: sourceMaterial.color ? sourceMaterial.color.clone() : new THREE.Color(0xffffff),
         map: sourceMaterial.map || null,
+        roughness: 0.7,
+        metalness: 0.05,
         transparent: Boolean(sourceMaterial.transparent),
         opacity: typeof sourceMaterial.opacity === "number" ? sourceMaterial.opacity : 1
       });
-      toon.name = `${sourceMaterial.name || "asset"} Toon`;
-      toon.userData.lifeVerseMaterial = {
+      pbr.name = `${sourceMaterial.name || "asset"} PBR`;
+      pbr.userData.lifeVerseMaterial = {
         source: sourceMaterial.name || "asset",
         generatedBy: "LifeVerseAssetManager"
       };
-      return toon;
+      return pbr;
     }
 
     function cloneAssetScene(scene) {

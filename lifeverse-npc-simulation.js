@@ -11,22 +11,23 @@
     const safeDays = Math.max(1, Math.min(365, Math.round(Number(days) || 1)));
     const summaries = [];
     state.npcs = (state.npcs || []).map((npc, index) => {
-      const focus = chooseFocus(npc, state, index);
+      const focus = chooseFocus(npc, state);
       const relationshipDrift = state.relationships.neglectRisk > 60 ? -Math.ceil(safeDays * 0.12) : Math.ceil(state.npcSimulation.communityTrust * safeDays * 0.003);
       const wellbeingDrift = focus === "recovery" ? Math.ceil(safeDays * 0.18) : state.economy.costOfLivingIndex > 70 ? -Math.ceil(safeDays * 0.1) : Math.ceil(safeDays * 0.05);
       const moneyDelta = focus === "career" ? Math.round(safeDays * 8) : focus === "study" ? -Math.round(safeDays * 2) : 0;
       const progressDelta = focus === "career" || focus === "study" ? Math.ceil(safeDays * 0.2) : Math.ceil(safeDays * 0.08);
       const updated = {
         ...npc,
-        scheduleFocus: focus,
+        scheduleFocus: focus.choice,
+        lastUtilityScores: focus.scores,
         location: rotateLocation(index, state.time.day + safeDays),
         relationship: game.clamp(Number(npc.relationship || 0) + relationshipDrift),
         wellbeing: game.clamp(Number(npc.wellbeing || 0) + wellbeingDrift),
         money: Math.max(0, Math.round(Number(npc.money || 0) + moneyDelta - state.economy.costOfLivingIndex * safeDays * 0.02)),
         lifeProgress: game.clamp(Number(npc.lifeProgress || 0) + progressDelta),
-        lastDecision: npcDecisionText(focus, state)
+        lastDecision: npcDecisionText(focus.choice, state)
       };
-      summaries.push(`${updated.name} focused on ${focus} near ${updated.location}.`);
+      summaries.push(`${updated.name} focused on ${focus.choice} near ${updated.location}.`);
       return updated;
     });
     state.npcSimulation.lastSimulatedDay = state.time.day;
@@ -36,12 +37,47 @@
     return summaries;
   }
 
-  function chooseFocus(npc, state, index) {
-    if (state.needs.stress > 75 || npc.wellbeing < 35) return "recovery";
-    if (index === 0 && state.npcSimulation.studyCulture >= 45) return "study";
-    if (index === 1 && state.economy.jobMarket >= 45) return "career";
-    if (state.relationships.support < 45) return "community";
-    return npc.scheduleFocus || "routine";
+  // Utility AI (bible S11.6 / S16.5): every candidate action gets a score
+  // built from the NPC's needs, personality, and world context; the highest
+  // score wins. Personality shifts the weights rather than hard-branching on
+  // NPC index, so the SAME conditions produce different choices for a
+  // disciplined NPC vs a sociable one - "different personalities produce
+  // different lifestyles" instead of every NPC following an identical script.
+  function chooseFocus(npc, state) {
+    const personality = npc.personality || {};
+    const trait = (key) => Number(personality[key] || 50);
+
+    const scores = {
+      recovery: 15
+        + Math.max(0, 100 - npc.wellbeing) * 0.5
+        + Math.max(0, state.needs.stress - 50) * 0.3
+        + Math.max(0, 50 - trait("patience")) * 0.2,
+      study: 8
+        + trait("discipline") * 0.35
+        + trait("curiosity") * 0.3
+        + state.npcSimulation.studyCulture * 0.2
+        - trait("riskTolerance") * 0.05,
+      career: 8
+        + trait("responsibility") * 0.3
+        + trait("riskTolerance") * 0.2
+        + trait("discipline") * 0.15
+        + Math.max(0, state.economy.jobMarket - 40) * 0.4,
+      community: 8
+        + trait("sociability") * 0.45
+        + trait("optimism") * 0.15
+        + Math.max(0, 50 - state.relationships.support) * 0.2,
+      routine: 22 + trait("patience") * 0.2
+    };
+
+    let choice = "routine";
+    let best = -Infinity;
+    Object.keys(scores).forEach((key) => {
+      if (scores[key] > best) {
+        best = scores[key];
+        choice = key;
+      }
+    });
+    return { choice, scores };
   }
 
   function npcDecisionText(focus, state) {

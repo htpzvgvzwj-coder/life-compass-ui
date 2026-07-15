@@ -65,6 +65,15 @@
     });
   }
 
+  function resolveFastForwardInterventionCommand(state, choiceId) {
+    if (!game.dispatchLifeVerseCommand) return game.resolveFastForwardIntervention ? game.resolveFastForwardIntervention(state, choiceId) : null;
+    return game.dispatchLifeVerseCommand(state, {
+      type: "ResolveFastForwardInterventionCommand",
+      actor: "player-main",
+      payload: { choiceId }
+    });
+  }
+
   function generateLifeReportCommand(state, context = {}) {
     if (!game.dispatchLifeVerseCommand) return game.generateLifeReport ? game.generateLifeReport(state, context) : null;
     const result = game.dispatchLifeVerseCommand(state, {
@@ -90,6 +99,7 @@
   game.performActivityCommand = performActivityCommand;
   game.performSystemActionCommand = performSystemActionCommand;
   game.fastForwardCommand = fastForwardCommand;
+  game.resolveFastForwardInterventionCommand = resolveFastForwardInterventionCommand;
   game.generateLifeReportCommand = generateLifeReportCommand;
   game.saveLifeVerseState = saveLifeVerseState;
   game.loadLifeVerseState = loadLifeVerseState;

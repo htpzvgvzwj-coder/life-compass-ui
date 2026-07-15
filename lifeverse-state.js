@@ -17,6 +17,23 @@
     return { ...fallback, ...(value && typeof value === "object" ? value : {}) };
   }
 
+  const PERSONALITY_KEYS = ["responsibility", "sociability", "optimism", "patience", "riskTolerance", "discipline", "curiosity"];
+
+  // Bible S16.5 Personality Model: NPCs without an explicit personality (new
+  // NPCs added later, or state saved before this system existed) still get a
+  // distinct, stable personality instead of a bland flat 50 - derived
+  // deterministically from their id so the same NPC always lands on the same
+  // profile rather than reshuffling every normalize pass.
+  function defaultPersonalityFor(id) {
+    const seed = String(id || "npc").split("").reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 7);
+    const values = {};
+    PERSONALITY_KEYS.forEach((key, index) => {
+      const wobble = ((seed >> (index * 3)) & 15) - 7.5;
+      values[key] = clamp(50 + wobble * 4);
+    });
+    return values;
+  }
+
   // Character creation choices (Volume 04 Ch8) shift starting resources and a
   // few early stats rather than unlocking different content - keeps every
   // path playable while still making the choice feel real. Difficulty only
@@ -172,7 +189,10 @@
         reputation: 30,
         interviewPrep: 20,
         applications: [],
-        currentJob: null
+        currentJob: null,
+        employed: true,
+        category: null,
+        lastUnemploymentClaimDay: 0
       },
       education: {
         path: "Self-directed learning",
@@ -194,7 +214,13 @@
         safety: 72,
         satisfaction: 62,
         monthlyCost: 0,
-        selectedOption: "family-home"
+        selectedOption: "family-home",
+        furnitureLevel: 35,
+        internetConnected: false,
+        hasRoommate: false,
+        roommateRelationship: 0,
+        communityTies: 30,
+        lastUtilityPaidDay: 0
       },
       transportation: {
         mode: "MRT and bus",
@@ -205,7 +231,11 @@
         commuteStress: 32,
         timeFlexibility: 54,
         environmentalImpact: 28,
-        selectedMode: "public-transport"
+        selectedMode: "public-transport",
+        ownsVehicle: false,
+        vehicleMaintenance: 70,
+        parkingSecured: false,
+        vehicleLoanBalance: 0
       },
       relationships: {
         support: 55,
@@ -265,7 +295,9 @@
         publicHealthCondition: 72,
         socialTrustLevel: 52,
         districtActivityLevel: 58,
-        randomEvents: []
+        randomEvents: [],
+        activeCommunityEvent: null,
+        lastCommunityEventDay: 0
       },
       npcs: [
         {
@@ -279,7 +311,8 @@
           money: 320,
           scheduleFocus: "study",
           lifeProgress: 24,
-          lastDecision: "Preparing for class"
+          lastDecision: "Preparing for class",
+          personality: { responsibility: 58, sociability: 48, optimism: 60, patience: 52, riskTolerance: 34, discipline: 74, curiosity: 78 }
         },
         {
           id: "npc-daniel",
@@ -292,7 +325,8 @@
           money: 780,
           scheduleFocus: "career",
           lifeProgress: 31,
-          lastDecision: "Balancing overtime and recovery"
+          lastDecision: "Balancing overtime and recovery",
+          personality: { responsibility: 68, sociability: 46, optimism: 54, patience: 36, riskTolerance: 62, discipline: 64, curiosity: 50 }
         },
         {
           id: "npc-auntie-lim",
@@ -305,7 +339,8 @@
           money: 540,
           scheduleFocus: "community",
           lifeProgress: 45,
-          lastDecision: "Checking on neighbours"
+          lastDecision: "Checking on neighbours",
+          personality: { responsibility: 70, sociability: 88, optimism: 76, patience: 80, riskTolerance: 24, discipline: 58, curiosity: 46 }
         }
       ],
       world: {
@@ -334,7 +369,9 @@
         diagnostics: {},
         nextCommandId: 1,
         nextEventId: 1,
-        nextTraceId: 1
+        nextTraceId: 1,
+        pendingIntervention: null,
+        lastInterventionDay: 0
       },
       persistence: {
         gameVersion: "1.0.0",
@@ -433,23 +470,30 @@
       merged.career[key] = clamp(merged.career[key]);
     });
     merged.career.applications = Array.isArray(merged.career.applications) ? merged.career.applications.slice(-20) : [];
+    merged.career.employed = merged.career.employed !== false;
+    merged.career.category = merged.career.category || null;
+    merged.career.lastUnemploymentClaimDay = Math.max(0, Math.round(Number(merged.career.lastUnemploymentClaimDay) || 0));
     ["studyConsistency", "learningEfficiency", "credits", "qualificationProgress", "tuitionPressure", "portfolio"].forEach((key) => {
       merged.education[key] = clamp(merged.education[key]);
     });
-    ["stability", "comfort", "affordability", "maintenance", "safety", "satisfaction"].forEach((key) => {
+    ["stability", "comfort", "affordability", "maintenance", "safety", "satisfaction", "furnitureLevel", "roommateRelationship", "communityTies"].forEach((key) => {
       merged.housing[key] = clamp(merged.housing[key]);
     });
-    ["commuteMinutes", "monthlyCost"].forEach((key) => {
+    ["commuteMinutes", "monthlyCost", "lastUtilityPaidDay"].forEach((key) => {
       const value = Number(merged.housing[key]);
       merged.housing[key] = Math.max(0, Math.round(Number.isFinite(value) ? value : fallback.housing[key]));
     });
-    ["reliability", "commuteStress", "timeFlexibility", "environmentalImpact"].forEach((key) => {
+    merged.housing.internetConnected = Boolean(merged.housing.internetConnected);
+    merged.housing.hasRoommate = Boolean(merged.housing.hasRoommate);
+    ["reliability", "commuteStress", "timeFlexibility", "environmentalImpact", "vehicleMaintenance"].forEach((key) => {
       merged.transportation[key] = clamp(merged.transportation[key]);
     });
-    ["costPerCommute", "activeMinutes", "monthlyCost"].forEach((key) => {
+    ["costPerCommute", "activeMinutes", "monthlyCost", "vehicleLoanBalance"].forEach((key) => {
       const value = Number(merged.transportation[key]);
       merged.transportation[key] = Math.max(0, Math.round(Number.isFinite(value) ? value : fallback.transportation[key]));
     });
+    merged.transportation.ownsVehicle = Boolean(merged.transportation.ownsVehicle);
+    merged.transportation.parkingSecured = Boolean(merged.transportation.parkingSecured);
     ["support", "family", "friends", "trust", "communication", "network", "valuesClarity", "neglectRisk"].forEach((key) => {
       merged.relationships[key] = clamp(merged.relationships[key]);
     });
@@ -469,19 +513,29 @@
       merged.worldSimulation[key] = clamp(merged.worldSimulation[key]);
     });
     merged.worldSimulation.randomEvents = Array.isArray(merged.worldSimulation.randomEvents) ? merged.worldSimulation.randomEvents.slice(-20) : [];
-    merged.npcs = merged.npcs.map((npc, index) => ({
-      id: npc.id || `npc-${index}`,
-      name: npc.name || "Neighbour",
-      role: npc.role || "Resident",
-      location: npc.location || "Neighbourhood",
-      careerStatus: npc.careerStatus || "Exploring options",
-      relationship: clamp(npc.relationship),
-      wellbeing: clamp(npc.wellbeing),
-      money: Math.max(0, Math.round(Number(npc.money) || 0)),
-      scheduleFocus: npc.scheduleFocus || "routine",
-      lifeProgress: clamp(npc.lifeProgress),
-      lastDecision: npc.lastDecision || "Following a normal routine"
-    })).slice(-24);
+    merged.worldSimulation.lastCommunityEventDay = Math.max(0, Math.round(Number(merged.worldSimulation.lastCommunityEventDay) || 0));
+    merged.worldSimulation.activeCommunityEvent = merged.worldSimulation.activeCommunityEvent && typeof merged.worldSimulation.activeCommunityEvent === "object"
+      ? merged.worldSimulation.activeCommunityEvent
+      : null;
+    merged.npcs = merged.npcs.map((npc, index) => {
+      const id = npc.id || `npc-${index}`;
+      const personality = mergeObject(defaultPersonalityFor(id), npc.personality);
+      PERSONALITY_KEYS.forEach((key) => { personality[key] = clamp(personality[key]); });
+      return {
+        id,
+        name: npc.name || "Neighbour",
+        role: npc.role || "Resident",
+        location: npc.location || "Neighbourhood",
+        careerStatus: npc.careerStatus || "Exploring options",
+        relationship: clamp(npc.relationship),
+        wellbeing: clamp(npc.wellbeing),
+        money: Math.max(0, Math.round(Number(npc.money) || 0)),
+        scheduleFocus: npc.scheduleFocus || "routine",
+        lifeProgress: clamp(npc.lifeProgress),
+        lastDecision: npc.lastDecision || "Following a normal routine",
+        personality
+      };
+    }).slice(-24);
     merged.finance.money = Math.round(Number(merged.finance.money) || 0);
     merged.finance.savings = Math.max(0, Math.round(Number(merged.finance.savings) || 0));
     merged.finance.debt = Math.max(0, Math.round(Number(merged.finance.debt) || 0));

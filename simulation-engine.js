@@ -78,6 +78,16 @@
         return result;
       });
 
+      this.commandBus.register("ResolveFastForwardInterventionCommand", (command, context) => {
+        const result = game.resolveFastForwardIntervention(context.state, command.payload.choiceId);
+        if (result && !result.error && context.state.persistence) {
+          context.state.persistence.dirty = true;
+          context.state.persistence.dirtyDomains = [...new Set([...(context.state.persistence.dirtyDomains || []), "fastForward", "lifeReport", "events", "traces"])];
+        }
+        publishCommandFact(context.state, "FastForwardInterventionResolved", command, result, context, true);
+        return result;
+      });
+
       this.commandBus.register("GenerateLifeReportCommand", (command, context) => {
         const report = game.generateLifeReport(context.state, command.payload.context || {});
         const result = { state: context.state, report };

@@ -1704,7 +1704,32 @@ function lifeVerseGameDock(state) {
   `;
 }
 
+function lifeVerseInterventionPanel(state) {
+  const pending = state.simulation.pendingIntervention;
+  return `
+    <section class="lifeverse-overlay-panel lifeverse-intervention-panel" data-lifeverse-intervention>
+      <div class="lifeverse-panel-head">
+        <div>
+          <p class="eyebrow">A decision point</p>
+          <h3>${escapeHTML(pending.title)}</h3>
+        </div>
+      </div>
+      <p class="lifeverse-note">${escapeHTML(pending.prompt)}</p>
+      <div class="lifeverse-intervention-choices">
+        ${(pending.choices || []).map((choice) => `
+          <button type="button" data-lifeverse-intervention-choice="${escapeHTML(choice.id)}">
+            <strong>${escapeHTML(choice.label)}</strong>
+            <span>${escapeHTML(choice.description)}</span>
+          </button>
+        `).join("")}
+      </div>
+      <p class="lifeverse-note">Fast Forward is paused until you choose.</p>
+    </section>
+  `;
+}
+
 function lifeVerseOverlayPanel(state, view) {
+  if (state.simulation && state.simulation.pendingIntervention) return lifeVerseInterventionPanel(state);
   const active = state.activeView || "today";
   if (active === "phone") return lifeVersePhonePanel(state);
   if (active === "journal") return lifeVerseJournalPanel(state, view);
@@ -2445,9 +2470,35 @@ function fastForwardLifeVerse(days = 30) {
   const result = runFastForward(state, days);
   if (result && !result.error) {
     trackerState.lifeVerse = result.state;
+    if (result.pendingIntervention) {
+      // Fast Forward paused partway through - hold on "today" so the
+      // intervention panel (which lifeVerseOverlayPanel shows unconditionally
+      // while a decision is pending) is what the player actually sees.
+      trackerState.lifeVerse.activeView = "today";
+      syncLifeSimFromLifeVerse();
+      if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
+      return result;
+    }
     trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
     markLifeVerseConsequence(`${days} Days Later`, result.event.summary, { reportPromptReady: true });
+    if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
+  }
+  return result;
+}
+
+function resolveLifeVerseIntervention(choiceId) {
+  const engine = lifeVerseEngine();
+  const state = lifeVerseState();
+  if (!engine || !state) return null;
+  const resolve = engine.resolveFastForwardInterventionCommand || engine.resolveFastForwardIntervention;
+  if (!resolve) return null;
+  const result = resolve(state, choiceId);
+  if (result && !result.error) {
+    trackerState.lifeVerse = result.state;
+    trackerState.lifeVerse.activeView = "today";
+    syncLifeSimFromLifeVerse();
+    markLifeVerseConsequence("Decision made", result.event.summary, { reportPromptReady: true });
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   }
   return result;
@@ -5246,6 +5297,7 @@ document.addEventListener("click", async (event) => {
   const lifeVerseReset = event.target.closest("[data-lifeverse-reset]");
   const lifeVerseTravel = event.target.closest("[data-lifeverse-travel]");
   const dismissSystemTutorial = event.target.closest("[data-dismiss-system-tutorial]");
+  const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
 
   if (opener) openModal(opener.dataset.open, opener.dataset.reflectionId || opener.dataset.openPayload || "");
   if (dismissSystemTutorial) {
@@ -5304,6 +5356,16 @@ document.addEventListener("click", async (event) => {
     const days = Number(lifeVerseFastForward.dataset.lifeverseFastForward || 30);
     await lifeVersePresentationPause("fast-forward", 620);
     const result = fastForwardLifeVerse(days);
+    if (result && !result.error) {
+      saveTrackerState();
+      renderScreen("simulator");
+      refreshStaticScreens();
+    }
+  }
+  if (lifeVerseInterventionChoice) {
+    const choiceId = lifeVerseInterventionChoice.dataset.lifeverseInterventionChoice;
+    await lifeVersePresentationPause("fast-forward", 420);
+    const result = resolveLifeVerseIntervention(choiceId);
     if (result && !result.error) {
       saveTrackerState();
       renderScreen("simulator");

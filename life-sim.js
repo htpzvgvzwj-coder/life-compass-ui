@@ -138,7 +138,11 @@
     resizeObserver.observe(root);
     resize();
 
-    const celOutlineEnabled = new URLSearchParams(location.search).get("cel") !== "0";
+    // The Volume 5 anime cel-shading pass (docs/volume5-asset-pipeline.md) was
+    // superseded by a semi-realistic "Stylized Low Poly City" PBR direction -
+    // the outline pipeline stays intact below (?cel=1 still re-enables it for
+    // comparison) but is now opt-in rather than the default.
+    const celOutlineEnabled = new URLSearchParams(location.search).get("cel") === "1";
     if (celOutlineEnabled && window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.createOutlinePipeline) {
       window.LifeVerseRenderPipeline.createOutlinePipeline(THREE, renderer, scene, camera, {
         width: Math.max(320, root.clientWidth || window.innerWidth || 320),
@@ -294,8 +298,14 @@
         direction.normalize();
         const speed = 7.8 + state.moveSpeed * 1.25;
         player.group.position.addScaledVector(direction, speed * state.moveSpeed * delta);
-        player.group.position.x = clamp(player.group.position.x, -38, 38);
-        player.group.position.z = clamp(player.group.position.z, -33, 27);
+        // Bounds must cover every built zone's full extent, not just its
+        // trigger-radius center - Marina Bay's towers (z up to 34), the
+        // University Town lecture hall (x -40), and Sentosa's palms (z -34.5)
+        // previously sat outside the old (-38..38, -33..27) box, so walking
+        // toward them (or even standing still after a teleport there) got
+        // silently snapped back mid-stride the instant you moved.
+        player.group.position.x = clamp(player.group.position.x, -44, 44);
+        player.group.position.z = clamp(player.group.position.z, -38, 38);
         const targetAngle = Math.atan2(direction.x, direction.z);
         player.group.rotation.y = lerpAngle(player.group.rotation.y, targetAngle, Math.min(1, delta * 8.5));
         state.footstepTimer -= delta * state.moveSpeed;
@@ -399,11 +409,16 @@
   }
 
   function createMaterials(THREE) {
+    // Volume 5's anime cel-shading direction (docs/volume5-asset-pipeline.md) was
+    // superseded by a semi-realistic "Stylized Low Poly City" PBR look - real
+    // building proportions and material roughness/metalness variation, no
+    // photoreal detail, no ray tracing/reflections/volumetric lighting, and
+    // nothing more expensive than Three.js's standard PBR lighting model.
     const library = window.LifeVerseAssets && window.LifeVerseAssets.createMaterialLibrary
-      ? window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "toon" })
+      ? window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" })
       : null;
     const shared = (key, fallback) => library && library.get ? library.get(key) : fallback();
-    const make = (color, emissive = 0x000000, roughness = 0.7) => new THREE.MeshToonMaterial({ color, emissive });
+    const make = (color, emissive = 0x000000, roughness = 0.7, metalness = 0.03) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness });
     const standard = (color, emissive = 0x000000, roughness = 0.68, metalness = 0.02) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness });
     const glass = (color) => new THREE.MeshPhysicalMaterial({
       color,
@@ -435,11 +450,11 @@
       park: make(0x43bf70),
       library: make(0x93c7ff),
       hospital: make(0xdcecf5),
-      hospitalAccent: make(0x7ed9ff),
+      hospitalAccent: make(0x7ed9ff, 0x000000, 0.22, 0.05),
       cafe: make(0xffb678, 0x311600),
       university: make(0xffe4a3),
       airport: make(0xbcd1e6),
-      airportAccent: make(0x3b77d5, 0x03122a),
+      airportAccent: make(0x3b77d5, 0x03122a, 0.28, 0.18),
       sand: make(0xffdc8a),
       water: shared("water", () => standard(0x3bb8ff, 0x00476f, 0.38, 0.02)),
       path: make(0xc9b991),
@@ -459,10 +474,10 @@
       signBlue: make(0x2f6dff, 0x00184b),
       signGreen: make(0x3ac681, 0x002a10),
       signGold: make(0xffc95b, 0x251100),
-      roofDark: make(0x404858),
+      roofDark: make(0x404858, 0x000000, 0.5, 0.2),
       window: standard(0xfff2a0, 0x8c6f00),
       glass: shared("glass", () => glass(0xbfe9ff)),
-      mrt: make(0xe61d33, 0x4b0007),
+      mrt: make(0xe61d33, 0x4b0007, 0.45, 0.32),
       rail: standard(0xdde7ef),
       trunk: make(0x8a5227),
       lamp: standard(0x272b31),

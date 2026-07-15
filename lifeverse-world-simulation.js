@@ -39,6 +39,84 @@
     return worldEvents[seed % worldEvents.length];
   }
 
+  // Community Events (bible S17.11): festivals, career fairs, farmers'
+  // markets, sports events, cultural celebrations, and charity activities.
+  // Distinct from the background worldEvents above - these are discrete,
+  // optional opportunities the player can choose to join for a real reward,
+  // not passive economic-climate flavour.
+  const COMMUNITY_EVENT_TYPES = [
+    {
+      id: "neighbourhood-festival",
+      title: "Neighbourhood festival",
+      summary: "Stalls, music, and neighbours out enjoying the district together.",
+      effects(state) {
+        state.finance.money = Math.max(0, Math.round(state.finance.money - 15));
+        state.needs.social = game.clamp(state.needs.social + 12);
+        state.mentalWellbeing.happiness = game.clamp(state.mentalWellbeing.happiness + 6);
+        state.npcSimulation.communityTrust = game.clamp(state.npcSimulation.communityTrust + 4);
+      }
+    },
+    {
+      id: "career-fair",
+      title: "Community career fair",
+      summary: "Local employers and training programmes set up booths for the day.",
+      effects(state) {
+        state.career.readiness = game.clamp(state.career.readiness + 5);
+        state.career.reputation = game.clamp(state.career.reputation + 3);
+        state.relationships.network = game.clamp(state.relationships.network + 4);
+        state.economy.opportunityIndex = game.clamp(state.economy.opportunityIndex + 2);
+      }
+    },
+    {
+      id: "farmers-market",
+      title: "Farmers' market",
+      summary: "Fresh produce and local vendors fill the square this weekend.",
+      effects(state) {
+        state.finance.money = Math.max(0, Math.round(state.finance.money - 20));
+        state.health.nutrition = game.clamp(state.health.nutrition + 8);
+        state.relationships.support = game.clamp(state.relationships.support + 2);
+      }
+    },
+    {
+      id: "sports-event",
+      title: "District sports event",
+      summary: "A casual community sports day - open to anyone who wants to join in.",
+      effects(state) {
+        state.health.physical = game.clamp(state.health.physical + 6);
+        state.health.activity = game.clamp(state.health.activity + 8);
+        state.relationships.friends = game.clamp(state.relationships.friends + 5);
+        state.mentalWellbeing.resilience = game.clamp(state.mentalWellbeing.resilience + 3);
+      }
+    },
+    {
+      id: "cultural-celebration",
+      title: "Cultural celebration",
+      summary: "A shared cultural celebration draws the whole neighbourhood out.",
+      effects(state) {
+        state.relationships.trust = game.clamp(state.relationships.trust + 5);
+        state.npcSimulation.communityTrust = game.clamp(state.npcSimulation.communityTrust + 6);
+        state.mentalWellbeing.happiness = game.clamp(state.mentalWellbeing.happiness + 5);
+        state.mentalWellbeing.loneliness = game.clamp(state.mentalWellbeing.loneliness - 4);
+      }
+    },
+    {
+      id: "charity-drive",
+      title: "Community charity drive",
+      summary: "A local charity drive is collecting donations and volunteer time.",
+      effects(state) {
+        state.finance.money = Math.max(0, Math.round(state.finance.money - 30));
+        state.mentalWellbeing.purposeClarity = game.clamp(state.mentalWellbeing.purposeClarity + 8);
+        state.career.reputation = game.clamp(state.career.reputation + 2);
+        state.npcSimulation.communityTrust = game.clamp(state.npcSimulation.communityTrust + 5);
+      }
+    }
+  ];
+
+  function pickCommunityEventType(state) {
+    const seed = Math.abs(Math.round(state.time.day * 11 + (state.time.totalMinutes || 0) / 30));
+    return COMMUNITY_EVENT_TYPES[seed % COMMUNITY_EVENT_TYPES.length];
+  }
+
   function updateWorldConditions(state, days = 1, options = {}) {
     const safeDays = Math.max(1, Math.min(1825, Math.round(Number(days) || 1)));
     const event = options.event || pickWorldEvent(state, safeDays);
@@ -116,7 +194,8 @@
         ["Inflation", state.worldSimulation.inflationLevel],
         ["Job pressure", state.worldSimulation.jobMarketPressure],
         ["Housing", state.worldSimulation.housingMarketPressure],
-        ["Social trust", state.worldSimulation.socialTrustLevel]
+        ["Social trust", state.worldSimulation.socialTrustLevel],
+        ["Community event", state.worldSimulation.activeCommunityEvent ? state.worldSimulation.activeCommunityEvent.title : "None scheduled"]
       ];
     },
     actions: [
@@ -200,6 +279,52 @@
         },
         consequence: "Preparation lowered the personal impact of a competitive job market.",
         reflection: "What proof of skill can you create before you need it?"
+      },
+      {
+        id: "check-community-calendar",
+        title: "Check the community calendar",
+        description: "See what's happening in the district this week - festivals, fairs, markets, and more.",
+        durationMinutes: 15,
+        effects: {
+          needs: { purpose: 2 }
+        },
+        after(state) {
+          if (!state.worldSimulation.activeCommunityEvent) {
+            const canSchedule = !state.worldSimulation.lastCommunityEventDay || (state.time.day - state.worldSimulation.lastCommunityEventDay) >= 10;
+            if (canSchedule) {
+              const eventType = pickCommunityEventType(state);
+              state.worldSimulation.activeCommunityEvent = {
+                id: eventType.id,
+                title: eventType.title,
+                summary: eventType.summary,
+                scheduledDay: state.time.day
+              };
+              state.worldSimulation.lastCommunityEventDay = state.time.day;
+            }
+          }
+        },
+        consequence: "Checking the calendar surfaces what's on, without committing you to anything yet.",
+        reflection: "Is there a community event you keep meaning to check out but never do?"
+      },
+      {
+        id: "join-community-event",
+        title: "Join the community event",
+        description: "Show up and take part instead of just reading about it.",
+        durationMinutes: 150,
+        canPerform(state) {
+          return Boolean(state.worldSimulation.activeCommunityEvent) || "Check the community calendar first - there is nothing scheduled right now.";
+        },
+        effects: {
+          needs: { energy: -6 }
+        },
+        after(state) {
+          const active = state.worldSimulation.activeCommunityEvent;
+          const eventType = COMMUNITY_EVENT_TYPES.find((entry) => entry.id === active.id) || COMMUNITY_EVENT_TYPES[0];
+          eventType.effects(state);
+          state.worldSimulation.activeCommunityEvent = null;
+        },
+        consequence: "Participation is optional, but showing up is usually where the actual value was.",
+        reflection: "What made today's event worth attending, or not?"
       }
     ]
   };

@@ -226,6 +226,7 @@
         description: "Settle what you owe (or get back) based on your recent income and spending.",
         durationMinutes: 90,
         canPerform(state) {
+          if (!state.finance.lastTaxFiledDay) return true;
           return (state.time.day - state.finance.lastTaxFiledDay) >= 30 || "Taxes were already filed recently - this is usually done periodically, not every day.";
         },
         effects: {

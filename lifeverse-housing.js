@@ -13,7 +13,9 @@
         ["Stability", state.housing.stability],
         ["Comfort", state.housing.comfort],
         ["Affordability", state.housing.affordability],
-        ["Commute", state.housing.commuteMinutes]
+        ["Commute", state.housing.commuteMinutes],
+        ["Furniture", state.housing.furnitureLevel],
+        ["Neighbourhood ties", state.housing.communityTies]
       ];
     },
     actions: [
@@ -65,6 +67,170 @@
         },
         consequence: "Moving reduced commute pressure but increased recurring housing costs.",
         reflection: "Did buying time create enough value to justify the rent?"
+      },
+      {
+        id: "buy-furniture",
+        title: "Buy furniture and home essentials",
+        description: "Turn an empty room into somewhere you actually want to spend time.",
+        durationMinutes: 90,
+        canPerform(state) {
+          return state.finance.money >= 120 || "You need at least $120 in cash to furnish the place properly.";
+        },
+        effects: {
+          needs: { energy: -5, purpose: 4 },
+          housing: { comfort: 6, satisfaction: 6 },
+          capability: { responsibility: 1 }
+        },
+        after(state) {
+          state.finance.money = Math.max(0, Math.round(state.finance.money - 120));
+          state.housing.furnitureLevel = game.clamp(state.housing.furnitureLevel + 20);
+        },
+        consequence: "A properly furnished home raises daily comfort, but furniture is a real, one-time cash cost.",
+        reflection: "Did this purchase make the space feel more like yours?"
+      },
+      {
+        id: "pay-utility-bills",
+        title: "Pay utility bills",
+        description: "Keep electricity, water, and basic services running without interruption.",
+        durationMinutes: 20,
+        effects: {
+          needs: { hygiene: 4, purpose: 2 },
+          housing: { comfort: 2 },
+          capability: { responsibility: 1 }
+        },
+        after(state) {
+          const overdue = Math.max(0, state.time.day - state.housing.lastUtilityPaidDay - 30);
+          const bill = Math.round(35 + overdue * 1.5);
+          state.finance.money = Math.max(0, Math.round(state.finance.money - bill));
+          state.housing.lastUtilityPaidDay = state.time.day;
+        },
+        consequence: "Paying on time avoids a larger bill later - utilities left unpaid too long quietly cost more, not less.",
+        reflection: "Is this the kind of bill that is easy to forget until it becomes a real problem?"
+      },
+      {
+        id: "upgrade-internet",
+        title: "Upgrade home internet",
+        description: "Pay for a faster, more reliable connection that supports remote study and work.",
+        durationMinutes: 45,
+        canPerform(state) {
+          if (state.housing.internetConnected) return "Home internet is already upgraded.";
+          return state.finance.money >= 80 || "You need at least $80 in cash to upgrade the connection.";
+        },
+        effects: {
+          needs: { purpose: 4 },
+          education: { learningEfficiency: 5 },
+          career: { readiness: 3 },
+          skills: { learning: 2 },
+          capability: { decisionMaking: 1 }
+        },
+        after(state) {
+          state.finance.money = Math.max(0, Math.round(state.finance.money - 80));
+          state.housing.internetConnected = true;
+          state.housing.monthlyCost = Math.max(0, Math.round(state.housing.monthlyCost + 15));
+        },
+        consequence: "A reliable connection removes a recurring source of friction from both study and work, for a small recurring cost.",
+        reflection: "How much time has a slow or unreliable connection cost you in the past?"
+      },
+      {
+        id: "find-roommate",
+        title: "Find a roommate",
+        description: "Share the space and the rent - and take on a new relationship to manage.",
+        durationMinutes: 120,
+        canPerform(state) {
+          return !state.housing.hasRoommate || "You already have a roommate.";
+        },
+        effects: {
+          needs: { energy: -6, social: 6, stress: 5, purpose: 5 },
+          relationships: { network: 2 },
+          capability: { communication: 2 }
+        },
+        after(state) {
+          state.housing.hasRoommate = true;
+          state.housing.roommateRelationship = 45;
+          state.housing.monthlyCost = Math.max(0, Math.round(state.housing.monthlyCost * 0.65));
+          state.housing.affordability = game.clamp(state.housing.affordability + 8);
+        },
+        consequence: "Splitting the cost of a home immediately improves affordability, but shared space adds a relationship you now have to maintain.",
+        reflection: "What boundary will matter most for sharing this space well?"
+      },
+      {
+        id: "manage-roommate-relationship",
+        title: "Check in with your roommate",
+        description: "Keep a shared living arrangement running smoothly with a short, honest conversation.",
+        durationMinutes: 30,
+        canPerform(state) {
+          return state.housing.hasRoommate || "You do not currently have a roommate.";
+        },
+        effects: {
+          needs: { social: 4, stress: -3, purpose: 3 },
+          relationships: { support: 2, communication: 2 },
+          capability: { communication: 1 }
+        },
+        after(state) {
+          state.housing.roommateRelationship = game.clamp(state.housing.roommateRelationship + 10);
+        },
+        consequence: "A little regular communication prevents small shared-living frictions from becoming resentment.",
+        reflection: "What would happen to this arrangement if you never had this conversation?"
+      },
+      {
+        id: "end-roommate-arrangement",
+        title: "End the roommate arrangement",
+        description: "Trade a lower monthly cost for full privacy and control over the space again.",
+        durationMinutes: 60,
+        canPerform(state) {
+          return state.housing.hasRoommate || "You do not currently have a roommate to move out.";
+        },
+        effects: {
+          needs: { stress: 4, purpose: 2 },
+          housing: { comfort: 3 }
+        },
+        after(state) {
+          state.housing.hasRoommate = false;
+          state.housing.roommateRelationship = 0;
+          state.housing.monthlyCost = Math.max(0, Math.round(state.housing.monthlyCost / 0.65));
+          state.housing.affordability = game.clamp(state.housing.affordability - 8);
+        },
+        consequence: "Regaining full privacy raised the monthly cost back up - shared housing was trading space for affordability.",
+        reflection: "Was the trade-off worth reversing, or did circumstances just change?"
+      },
+      {
+        id: "get-to-know-neighbourhood",
+        title: "Get to know the neighbourhood",
+        description: "Spend unhurried time noticing the people and rhythms nearby.",
+        durationMinutes: 60,
+        effects: {
+          needs: { social: 4, stress: -3, purpose: 4 },
+          housing: { safety: 2, satisfaction: 2 },
+          mentalWellbeing: { loneliness: -3 },
+          capability: { communication: 1 }
+        },
+        after(state) {
+          state.housing.communityTies = game.clamp(state.housing.communityTies + 10);
+          state.npcSimulation.communityTrust = game.clamp(state.npcSimulation.communityTrust + 3);
+        },
+        consequence: "A place starts to feel like home once its people stop being strangers.",
+        reflection: "Which neighbour would you actually recognise by name?"
+      },
+      {
+        id: "join-neighbourhood-watch",
+        title: "Join the neighbourhood watch",
+        description: "Take on a small civic responsibility that makes the whole block a little safer.",
+        durationMinutes: 90,
+        canPerform(state) {
+          return state.housing.communityTies >= 40 || "Build more familiarity with the neighbourhood first - this needs some existing trust to join.";
+        },
+        effects: {
+          needs: { energy: -6, purpose: 8 },
+          housing: { safety: 6 },
+          relationships: { network: 3, trust: 2 },
+          capability: { responsibility: 2, communication: 1 }
+        },
+        after(state) {
+          state.housing.communityTies = game.clamp(state.housing.communityTies + 6);
+          state.npcSimulation.communityTrust = game.clamp(state.npcSimulation.communityTrust + 5);
+        },
+        consequence: "Formal civic participation compounds on top of informal familiarity - safety here was built, not given.",
+        reflection: "What does this neighbourhood owe you, and what do you owe it?"
       }
     ]
   };

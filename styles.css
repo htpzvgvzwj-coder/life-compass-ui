@@ -5300,6 +5300,7 @@ body.life-sim-active .life-sim-root canvas {
 
 .lifeverse-activity-list,
 .lifeverse-fast-grid,
+.lifeverse-intervention-choices,
 .lifeverse-life-grid,
 .lifeverse-world-list {
   display: grid;
@@ -5308,6 +5309,7 @@ body.life-sim-active .life-sim-root canvas {
 
 .lifeverse-activity-card,
 .lifeverse-fast-grid button,
+.lifeverse-intervention-choices button,
 .lifeverse-life-grid article,
 .lifeverse-world-list article,
 .lifeverse-schedule article,
@@ -5327,8 +5329,17 @@ body.life-sim-active .life-sim-root canvas {
   cursor: pointer;
 }
 
+.lifeverse-intervention-panel {
+  border: 1px solid rgba(255, 196, 92, 0.55);
+}
+
+.lifeverse-intervention-choices button {
+  border-color: rgba(255, 196, 92, 0.4);
+}
+
 .lifeverse-activity-card:active,
 .lifeverse-fast-grid button:active,
+.lifeverse-intervention-choices button:active,
 .lifeverse-nav button:active {
   transform: scale(0.98);
 }
@@ -5336,6 +5347,7 @@ body.life-sim-active .life-sim-root canvas {
 .lifeverse-activity-card span,
 .lifeverse-life-grid span,
 .lifeverse-fast-grid span,
+.lifeverse-intervention-choices span,
 .lifeverse-schedule span,
 .lifeverse-empty span {
   color: rgba(255, 255, 255, 0.64);
@@ -5345,6 +5357,7 @@ body.life-sim-active .life-sim-root canvas {
 
 .lifeverse-activity-card strong,
 .lifeverse-fast-grid strong,
+.lifeverse-intervention-choices strong,
 .lifeverse-life-grid strong,
 .lifeverse-world-list strong,
 .lifeverse-empty strong {
