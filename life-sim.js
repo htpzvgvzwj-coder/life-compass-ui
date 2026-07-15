@@ -1,19 +1,29 @@
 (function () {
+  // Coordinates below are a compact, correctly-relative approximation of real
+  // Singapore geography (+x = east, -x = west, +z = north, -z = south) - not
+  // to-scale GPS, but Marina Bay sits on the south coast, Sentosa is further
+  // south across the strait, Orchard Road is just north of downtown, NUS/
+  // University Town is far west, Changi/Airport is far east, and the
+  // Chinatown/Little India/Bugis trio sits where they really do relative to
+  // the rest: south, north-central, and central.
   const locationZones = [
-    { id: "home", name: "Home", x: -24, z: 17, radius: 5.4 },
-    { id: "gym", name: "Gym", x: -9, z: 20, radius: 4.5 },
-    { id: "work", name: "Office", x: 18, z: 18, radius: 5 },
-    { id: "food", name: "Food Court", x: -22, z: -13, radius: 5.4 },
-    { id: "mall", name: "Shopping Mall", x: 18, z: -12, radius: 5.5 },
-    { id: "park", name: "Park", x: 2, z: -22, radius: 6.2 },
-    { id: "library", name: "Library", x: -25, z: 2, radius: 4.5 },
-    { id: "hospital", name: "Hospital", x: 30, z: 12, radius: 4.8 },
-    { id: "cafe", name: "Cafe", x: -9, z: -24, radius: 4 },
-    { id: "beach", name: "Beach", x: 24, z: -30, radius: 5 },
-    { id: "airport", name: "Airport", x: 35, z: -1, radius: 5.3 },
-    { id: "train", name: "Train Station", x: 4, z: -3.5, radius: 4.6 },
-    { id: "university", name: "University", x: -34, z: -7, radius: 5 },
-    { id: "marina-bay", name: "Marina Bay", x: 25, z: 32, radius: 6 }
+    { id: "home", name: "Home", x: -6, z: 24, radius: 5.4 },
+    { id: "gym", name: "Gym", x: -20, z: 26, radius: 4.5 },
+    { id: "work", name: "Office", x: -6, z: -26, radius: 5 },
+    { id: "food", name: "Food Court", x: 10, z: -14, radius: 5.4 },
+    { id: "mall", name: "Shopping Mall", x: -6, z: -2, radius: 5.5 },
+    { id: "park", name: "Park", x: 10, z: 28, radius: 6.2 },
+    { id: "library", name: "Library", x: 10, z: 2, radius: 4.5 },
+    { id: "hospital", name: "Hospital", x: 26, z: -14, radius: 4.8 },
+    { id: "cafe", name: "Cafe", x: -22, z: -2, radius: 4 },
+    { id: "beach", name: "Beach", x: 28, z: -30, radius: 5 },
+    { id: "airport", name: "Airport", x: 36, z: 10, radius: 5.3 },
+    { id: "train", name: "Train Station", x: -6, z: 10, radius: 4.6 },
+    { id: "university", name: "University", x: -36, z: 0, radius: 5 },
+    { id: "marina-bay", name: "Marina Bay", x: 14, z: -26, radius: 6 },
+    { id: "chinatown", name: "Chinatown", x: -10, z: -14, radius: 5 },
+    { id: "little-india", name: "Little India", x: 10, z: 14, radius: 5 },
+    { id: "bugis", name: "Bugis", x: 24, z: 2, radius: 4.8 }
   ];
 
   function mount(root, options = {}) {
@@ -1060,30 +1070,66 @@
     if (status) status.remove();
   }
 
+  // Urban planning pass: each zone's building function still uses the
+  // ABSOLUTE literal coordinates it always had (its own implicit "home"
+  // origin) - addZoneAt() builds it into a throwaway THREE.Group instead of
+  // straight into `scene`, then repositions that whole group by a delta, so
+  // every prop inside moves together without touching a single literal.
+  // Deltas below are (new real-Singapore-aligned center) - (old center).
+  const ZONE_DELTA = {
+    home: [18, 7],
+    gym: [-11, 6],
+    work: [-24, -44],
+    food: [32, -1],
+    mall: [-24, 10],
+    park: [8, 50],
+    library: [35, 0],
+    hospital: [-4, -26],
+    cafe: [-13, 22],
+    beach: [4, 0],
+    airport: [1, 11],
+    train: [-10, 13.5],
+    university: [-2, 7],
+    "marina-bay": [-11, -58]
+  };
+
+  function addZoneAt(buildFn, THREE, scene, mat, deltaKey) {
+    const [dx, dz] = ZONE_DELTA[deltaKey] || [0, 0];
+    const group = new THREE.Group();
+    group.name = `Zone Offset Group: ${deltaKey}`;
+    buildFn(THREE, group, mat);
+    group.position.set(dx, 0, dz);
+    scene.add(group);
+    return group;
+  }
+
   function createDistrict(THREE, scene, mat) {
     addPlane(THREE, scene, "Soft Anime Town Ground", [0, -0.04, -3], [88, 76], mat.ground);
-    addPlane(THREE, scene, "North Residential Green", [-24, -0.02, 14], [23, 25], mat.grass);
-    addPlane(THREE, scene, "Campus Green", [-31, -0.015, -8], [18, 18], mat.grass);
-    addPlane(THREE, scene, "Park Green", [1, -0.01, -23], [22, 18], mat.park);
-    addPlane(THREE, scene, "Beach Sand", [26, 0, -31], [25, 10], mat.sand);
-    addPlane(THREE, scene, "Shallow Anime Sea", [26, 0.015, -37], [26, 8], mat.water);
+    addPlane(THREE, scene, "North Residential Green", [-6, -0.02, 21], [23, 25], mat.grass);
+    addPlane(THREE, scene, "Campus Green", [-33, -0.015, -1], [18, 18], mat.grass);
+    addPlane(THREE, scene, "Park Green", [9, -0.01, 27], [22, 18], mat.park);
+    addPlane(THREE, scene, "Beach Sand", [30, 0, -31], [25, 10], mat.sand);
+    addPlane(THREE, scene, "Shallow Anime Sea", [30, 0.015, -37], [26, 8], mat.water);
 
     addRoadNetwork(THREE, scene, mat);
-    addHdbHome(THREE, scene, mat);
-    addGym(THREE, scene, mat);
-    addWorkTower(THREE, scene, mat);
-    addFoodCourt(THREE, scene, mat);
-    addMall(THREE, scene, mat);
-    addPark(THREE, scene, mat);
-    addLibrary(THREE, scene, mat);
-    addHospital(THREE, scene, mat);
-    addCafe(THREE, scene, mat);
-    addBeach(THREE, scene, mat);
-    addAirport(THREE, scene, mat);
-    addTrainStation(THREE, scene, mat);
-    addUniversity(THREE, scene, mat);
+    addZoneAt(addHdbHome, THREE, scene, mat, "home");
+    addZoneAt(addGym, THREE, scene, mat, "gym");
+    addZoneAt(addWorkTower, THREE, scene, mat, "work");
+    addZoneAt(addFoodCourt, THREE, scene, mat, "food");
+    addZoneAt(addMall, THREE, scene, mat, "mall");
+    addZoneAt(addPark, THREE, scene, mat, "park");
+    addZoneAt(addLibrary, THREE, scene, mat, "library");
+    addZoneAt(addHospital, THREE, scene, mat, "hospital");
+    addZoneAt(addCafe, THREE, scene, mat, "cafe");
+    addZoneAt(addBeach, THREE, scene, mat, "beach");
+    addZoneAt(addAirport, THREE, scene, mat, "airport");
+    addZoneAt(addTrainStation, THREE, scene, mat, "train");
+    addZoneAt(addUniversity, THREE, scene, mat, "university");
+    addZoneAt(addMarinaBayLandmark, THREE, scene, mat, "marina-bay");
     addStreetLife(THREE, scene, mat);
-    addMarinaBayLandmark(THREE, scene, mat);
+    addChinatown(THREE, scene, mat);
+    addLittleIndia(THREE, scene, mat);
+    addBugis(THREE, scene, mat);
     addZones(THREE, scene, mat);
   }
 
@@ -1117,8 +1163,8 @@
   // Sentosa: palm trees ring the existing Beach zone (boardwalk/umbrellas/
   // bench/rock stay untouched) - upright palms mark the open sand, bent
   // palms lean in near the shoreline for variety.
-  const SENTOSA_PALM_POSITIONS = [[14, -32], [16, -25.5], [23, -25], [31, -28.5]];
-  const SENTOSA_PALM_BEND_POSITIONS = [[20, -34.5], [28, -33]];
+  const SENTOSA_PALM_POSITIONS = [[18, -32], [20, -25.5], [27, -25], [35, -28.5]];
+  const SENTOSA_PALM_BEND_POSITIONS = [[24, -34.5], [32, -33]];
 
   async function loadDistrictAssetSamples(THREE, scene, assetManager, state) {
     if (!assetManager) return;
@@ -1129,25 +1175,25 @@
       {
         url: "assets/environment/hdb-block.glb",
         hideNamePrefixes: ["HDB Home Block A", "HDB Home Block B"],
-        position: [-24, 0, 19.2],
+        position: [-6, 0, 26.2],
         scale: [5.5, 5.5, 5.5]
       },
       {
         url: "assets/environment/office-tower.glb",
         hideNamePrefixes: ["Office Tower"],
-        position: [18, 0, 20],
+        position: [-6, 0, -24],
         scale: [5.5, 5.5, 5.5]
       },
       {
         url: "assets/environment/library.glb",
         hideNames: ["Library Reading Hall", "Library Roof", "Library Quiet Glass"],
-        position: [-25, 0, 2],
+        position: [10, 0, 2],
         scale: [2.5, 2.5, 2.5]
       },
       {
         url: "assets/environment/city-kit-commercial/mall-building.glb",
         hideNames: ["Mall Main Atrium", "Mall Glass Front", "Mall Round Atrium"],
-        position: [18, 0, -15],
+        position: [-6, 0, -5],
         scale: [6, 6, 6]
       },
       {
@@ -1161,24 +1207,24 @@
       // fronts/signage/plants stay exactly where they were.
       {
         url: "assets/environment/city-kit-commercial/orchard-shop-a.glb",
-        position: [10, 0, -15],
+        position: [-14, 0, -5],
         scale: [6.5, 6.5, 6.5]
       },
       {
         url: "assets/environment/city-kit-commercial/orchard-shop-b.glb",
-        position: [26, 0, -15],
+        position: [2, 0, -5],
         scale: [4.2, 4.2, 4.2]
       },
       // University Town: adds a lecture hall and a hostel block near the
       // existing University zone, purely additive like Orchard Road above.
       {
         url: "assets/environment/university-lecture-hall.glb",
-        position: [-40, 0, -7],
+        position: [-42, 0, 0],
         scale: [3.5, 3.5, 3.5]
       },
       {
         url: "assets/environment/university-hostel.glb",
-        position: [-34, 0, -14],
+        position: [-36, 0, -7],
         scale: [3.2, 3.2, 3.2]
       },
       // Marina Bay / CBD: three City Kit Commercial skyscrapers cluster around
@@ -1188,17 +1234,17 @@
       // of that specific silhouette.
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
-        position: [15, 0, 26],
+        position: [4, 0, -32],
         scale: [4.9, 4.9, 4.9]
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-c.glb",
-        position: [25, 0, 34],
+        position: [14, 0, -24],
         scale: [4.4, 4.4, 4.4]
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
-        position: [35, 0, 26],
+        position: [24, 0, -32],
         scale: [3.9, 3.9, 3.9]
       },
       // Sentosa: purely additive palm trees around the existing Beach zone.
@@ -1244,7 +1290,11 @@
 
         const hideNames = swap.hideNames || [];
         const hidePrefixes = swap.hideNamePrefixes || [];
-        scene.children.forEach((child) => {
+        // Zones now build into a per-zone offset Group (see addZoneAt) rather
+        // than straight into `scene`, so the procedural placeholders this is
+        // hiding sit one level deeper than they used to - traverse() finds
+        // them at any depth instead of only scene's direct children.
+        scene.traverse((child) => {
           if (!child.name) return;
           if (hideNames.includes(child.name) || hidePrefixes.some((prefix) => child.name.startsWith(prefix))) {
             child.visible = false;
@@ -1438,6 +1488,41 @@
     addBookshelf(THREE, scene, [-37.4, -4.4], mat);
     addText(THREE, scene, "UNI", [-35.2, 4.6, -10.55], 0.72, 0x111111);
     addSignBoard(THREE, scene, "University Sign", "UNIVERSITY", [-38.2, 3.6, -10.48], mat.curbWarm, 0x111111);
+  }
+
+  function addChinatown(THREE, scene, mat) {
+    addPlane(THREE, scene, "Chinatown Street Floor", [-10, 0.02, -14], [14, 9], mat.curbWarm);
+    addBuildingCore(THREE, scene, "Chinatown Shophouse Red", [-14, 3.6, -17], [4.4, 7.2, 4.2], mat.gym, mat);
+    addBuildingCore(THREE, scene, "Chinatown Shophouse Gold", [-7, 3.1, -17], [4, 6.2, 4], mat.signGold, mat);
+    addBox(THREE, scene, "Chinatown Shophouse Roof Red", [-14, 7.4, -17], [4.8, 0.4, 4.6], mat.roofDark);
+    addBox(THREE, scene, "Chinatown Shophouse Roof Gold", [-7, 6.4, -17], [4.4, 0.4, 4.4], mat.roofDark);
+    addBox(THREE, scene, "Chinatown Gate Pillar", [-12.5, 2.2, -10.4], [0.5, 4.4, 0.5], mat.signGold);
+    addBox(THREE, scene, "Chinatown Gate Pillar", [-7.5, 2.2, -10.4], [0.5, 4.4, 0.5], mat.signGold);
+    addBox(THREE, scene, "Chinatown Gate Beam", [-10, 4.5, -10.4], [5.6, 0.5, 0.5], mat.gym);
+    addFlowerBed(THREE, scene, [-16.6, -12.8], 3.2, mat);
+    addSignBoard(THREE, scene, "Chinatown Sign", "CHINATOWN", [-17, 4.2, -18.8], mat.gym, 0xffffff);
+  }
+
+  function addLittleIndia(THREE, scene, mat) {
+    addPlane(THREE, scene, "Little India Street Floor", [10, 0.02, 14], [14, 9], mat.curbWarm);
+    addBuildingCore(THREE, scene, "Little India Shophouse Pink", [6, 3.6, 11], [4.4, 7.2, 4.2], mat.hdbAccent, mat);
+    addBuildingCore(THREE, scene, "Little India Shophouse Purple", [13, 3.1, 11], [4, 6.2, 4], mat.mall, mat);
+    addBox(THREE, scene, "Little India Roof Pink", [6, 7.4, 11], [4.8, 0.4, 4.6], mat.roofDark);
+    addBox(THREE, scene, "Little India Roof Purple", [13, 6.4, 11], [4.4, 0.4, 4.4], mat.roofDark);
+    addBox(THREE, scene, "Little India Temple Base", [10, 1.1, 17.3], [3.2, 2.2, 3.0], mat.food);
+    addCylinder(THREE, scene, "Little India Temple Spire", [10, 3.4, 17.3], [1.1, 2.6, 4], mat.signGold);
+    addFlowerBed(THREE, scene, [3.4, 9.2], 3.2, mat);
+    addSignBoard(THREE, scene, "Little India Sign", "LITTLE INDIA", [3, 4.2, 8.2], mat.hdbAccent, 0x2a0012);
+  }
+
+  function addBugis(THREE, scene, mat) {
+    addPlane(THREE, scene, "Bugis Street Floor", [24, 0.02, 2], [13, 9], mat.sidewalk);
+    addBuildingCore(THREE, scene, "Bugis Junction Building", [28, 4.4, -1], [6, 8.8, 5], mat.mall, mat);
+    addBox(THREE, scene, "Bugis Junction Glass Front", [28, 3.2, 1.6], [5.4, 4.2, 0.16], mat.glass);
+    addBox(THREE, scene, "Bugis Market Stall", [19.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
+    addBox(THREE, scene, "Bugis Market Stall", [21.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
+    addBox(THREE, scene, "Bugis Market Awning", [20.5, 1.9, 3.4], [5.4, 0.16, 1.6], mat.signBlue);
+    addSignBoard(THREE, scene, "Bugis Sign", "BUGIS", [30.6, 4.4, 5.2], mat.signBlue, 0xffffff);
   }
 
   function addStreetLife(THREE, scene, mat) {

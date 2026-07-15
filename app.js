@@ -165,7 +165,10 @@ const lifeSimLocations = [
   { id: "airport", name: "Airport", description: "A travel gateway that hints at future mobility, planning, and opportunity." },
   { id: "train", name: "Train Station", description: "A transit hub with gates, route boards, and daily movement through the city." },
   { id: "university", name: "University Town", description: "A campus area for long-term learning, lectures, and student life." },
-  { id: "marina-bay", name: "Marina Bay", description: "The city's financial skyline - ambition, pressure, and the clearest symbol of \"making it\"." }
+  { id: "marina-bay", name: "Marina Bay", description: "The city's financial skyline - ambition, pressure, and the clearest symbol of \"making it\"." },
+  { id: "chinatown", name: "Chinatown", description: "A shophouse street of red and gold, where heritage and daily life sit side by side." },
+  { id: "little-india", name: "Little India", description: "A vivid, spice-scented street lined with colourful shopfronts and a small temple." },
+  { id: "bugis", name: "Bugis", description: "A street market meets a modern junction - bargains, crowds, and city energy." }
 ];
 
 const lifeSimActivities = {
