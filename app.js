@@ -168,7 +168,8 @@ const lifeSimLocations = [
   { id: "marina-bay", name: "Marina Bay", description: "The city's financial skyline - ambition, pressure, and the clearest symbol of \"making it\"." },
   { id: "chinatown", name: "Chinatown", description: "A shophouse street of red and gold, where heritage and daily life sit side by side." },
   { id: "little-india", name: "Little India", description: "A vivid, spice-scented street lined with colourful shopfronts and a small temple." },
-  { id: "bugis", name: "Bugis", description: "A street market meets a modern junction - bargains, crowds, and city energy." }
+  { id: "bugis", name: "Bugis", description: "A street market meets a modern junction - bargains, crowds, and city energy." },
+  { id: "woodlands", name: "Woodlands", description: "A northern regional town built around its transport hub, a big mall, HDB estates, and the checkpoint to Malaysia." }
 ];
 
 const lifeSimActivities = {

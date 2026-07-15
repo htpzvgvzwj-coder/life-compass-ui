@@ -23,7 +23,11 @@
     { id: "marina-bay", name: "Marina Bay", x: 14, z: -26, radius: 6 },
     { id: "chinatown", name: "Chinatown", x: -10, z: -14, radius: 5 },
     { id: "little-india", name: "Little India", x: 10, z: 14, radius: 5 },
-    { id: "bugis", name: "Bugis", x: 24, z: 2, radius: 4.8 }
+    { id: "bugis", name: "Bugis", x: 24, z: 2, radius: 4.8 },
+    // Woodlands sits at the true far north of real Singapore (by the
+    // Causeway to Malaysia) - placed beyond the north heartland cluster,
+    // which needed the map's north bound extended from 38 to 60 to fit it.
+    { id: "woodlands", name: "Woodlands", x: 0, z: 50, radius: 7.5 }
   ];
 
   function mount(root, options = {}) {
@@ -314,8 +318,10 @@
         // previously sat outside the old (-38..38, -33..27) box, so walking
         // toward them (or even standing still after a teleport there) got
         // silently snapped back mid-stride the instant you moved.
+        // Extended north (was -38..38) to make room for the new Woodlands
+        // district at the far north edge of the map.
         player.group.position.x = clamp(player.group.position.x, -44, 44);
-        player.group.position.z = clamp(player.group.position.z, -38, 38);
+        player.group.position.z = clamp(player.group.position.z, -38, 60);
         const targetAngle = Math.atan2(direction.x, direction.z);
         player.group.rotation.y = lerpAngle(player.group.rotation.y, targetAngle, Math.min(1, delta * 8.5));
         state.footstepTimer -= delta * state.moveSpeed;
@@ -1104,7 +1110,7 @@
   }
 
   function createDistrict(THREE, scene, mat) {
-    addPlane(THREE, scene, "Soft Anime Town Ground", [0, -0.04, -3], [88, 76], mat.ground);
+    addPlane(THREE, scene, "Soft Anime Town Ground", [0, -0.04, 11], [90, 100], mat.ground);
     addPlane(THREE, scene, "North Residential Green", [-6, -0.02, 21], [23, 25], mat.grass);
     addPlane(THREE, scene, "Campus Green", [-33, -0.015, -1], [18, 18], mat.grass);
     addPlane(THREE, scene, "Park Green", [9, -0.01, 27], [22, 18], mat.park);
@@ -1130,20 +1136,62 @@
     addChinatown(THREE, scene, mat);
     addLittleIndia(THREE, scene, mat);
     addBugis(THREE, scene, mat);
+    addWoodlands(THREE, scene, mat);
+    addBox(THREE, scene, "Woodlands Access Road", [0, 0.025, 34], [5.2, 0.08, 32], mat.road, true);
+    for (let z = 20; z <= 56; z += 6) addBox(THREE, scene, "Road Center Line NS", [0, 0.13, z], [0.25, 0.04, 2.15], mat.roadLine, true);
     addZones(THREE, scene, mat);
   }
 
+  // Modelled by hand from publicly available photos/descriptions of the real
+  // building (Wikipedia, Safdie Architects, Arup) - no Google map data or 3D
+  // mesh involved. Real MBS: 3 towers leaning outward at an angle, topped by
+  // a single ~340m SkyPark deck that cantilevers ~65m past one tower like a
+  // boat hull, not a symmetric flat slab.
   function addMarinaBayLandmark(THREE, scene, mat) {
     const baseX = 25;
     const baseZ = 30;
     const towerHeight = 22;
+    const towerLean = [-0.16, 0.03, 0.18];
     [-5, 0, 5].forEach((offsetX, index) => {
-      addBox(THREE, scene, `Marina Bay Tower ${index + 1}`, [baseX + offsetX, towerHeight / 2, baseZ], [3.2, towerHeight, 3.2], mat.work);
+      const pivot = new THREE.Group();
+      pivot.name = `Marina Bay Tower ${index + 1} Pivot`;
+      pivot.position.set(baseX + offsetX, 0, baseZ);
+      pivot.rotation.z = towerLean[index];
+      addBox(THREE, pivot, `Marina Bay Tower ${index + 1}`, [0, towerHeight / 2, 0], [3.2, towerHeight, 3.2], mat.work);
+      scene.add(pivot);
     });
-    const skypark = addBox(THREE, scene, "Marina Bay Skypark", [baseX, towerHeight + 1.2, baseZ], [19, 1.6, 5.5], mat.glass);
-    skypark.rotation.z = 0.04;
+
+    const deckY = towerHeight + 1.2;
+    const deckStartX = -8;
+    const deckEndX = 16;
+    const deckLength = deckEndX - deckStartX;
+    const deckCenterX = (deckStartX + deckEndX) / 2;
+    const skypark = addBox(THREE, scene, "Marina Bay Skypark Deck", [baseX + deckCenterX, deckY, baseZ], [deckLength, 1.6, 6.2], mat.glass);
+    skypark.rotation.z = 0.02;
+    addBox(THREE, scene, "Marina Bay Skypark End Rise", [baseX + deckStartX - 0.8, deckY + 0.5, baseZ], [1.8, 0.9, 5.6], mat.glass);
+    addBox(THREE, scene, "Marina Bay Skypark Cantilever Tip", [baseX + deckEndX + 0.9, deckY + 0.9, baseZ], [2.2, 1.7, 5.6], mat.glass);
+
     addBox(THREE, scene, "Marina Bay Plaza", [baseX, 0.1, baseZ - 6], [16, 0.2, 6], mat.sidewalk, true);
     addSignBoard(THREE, scene, "Marina Bay Sign", "MARINA BAY", [baseX - 9, 3.2, baseZ + 4], mat.signBlue, 0xffffff);
+
+    addArtScienceMuseum(THREE, scene, [baseX - 16, baseZ - 3], mat);
+  }
+
+  // A simplified low-poly nod to the ArtScience Museum's lotus/fanned-fingers
+  // silhouette near the real Marina Bay - not a precise replica, just enough
+  // shape language to read as a second Marina Bay landmark rather than an
+  // isolated tower.
+  function addArtScienceMuseum(THREE, scene, position, mat) {
+    const [px, pz] = position;
+    addCylinder(THREE, scene, "ArtScience Museum Base", [px, 0.5, pz], [4.2, 1.0, 20], mat.hospital);
+    const petalCount = 10;
+    for (let i = 0; i < petalCount; i++) {
+      const angle = (i / petalCount) * Math.PI * 2;
+      const petal = addBox(THREE, scene, "ArtScience Museum Petal", [px + Math.sin(angle) * 3.2, 2.6, pz + Math.cos(angle) * 3.2], [1.6, 4.4, 0.35], mat.hospital);
+      petal.rotation.y = angle;
+      petal.rotation.x = -0.35;
+    }
+    addSignBoard(THREE, scene, "ArtScience Museum Sign", "ARTSCIENCE", [px - 4.5, 1.6, pz + 5], mat.signBlue, 0xffffff);
   }
 
   // Volume 5 Anime World Remaster, step 2: swap procedural placeholder buildings
@@ -1159,6 +1207,12 @@
     [-35, 18], [-18, 24], [-32, 4], [-35, -12], [-23, -23], [-4, -29], [8, -26],
     [12, -17], [3, -17], [27, -18], [31, 21], [22, 23], [38, 6]
   ];
+
+  // Orchard Road's famous dense rain-tree canopy - noticeably denser than the
+  // generic city-wide TREE_POSITIONS scatter, lining the pedestrian mall walk
+  // added in addMall(). World coordinates already account for the "mall"
+  // zone's urban-planning delta of (-24, +10).
+  const ORCHARD_STREET_TREE_POSITIONS = [[-16, -12], [-12, -12], [-8, -12], [-4, -12], [0, -12], [4, -12]];
 
   // Sentosa: palm trees ring the existing Beach zone (boardwalk/umbrellas/
   // bench/rock stay untouched) - upright palms mark the open sand, bent
@@ -1201,6 +1255,13 @@
         hideNames: ["Tree Trunk", "Tree Crown"],
         positions: TREE_POSITIONS,
         scale: [2.4, 2.4, 2.4]
+      },
+      // Orchard Road's dense rain-tree canopy - purely additive, denser than
+      // the city-wide tree scatter above.
+      {
+        url: "assets/environment/tree-oak.glb",
+        positions: ORCHARD_STREET_TREE_POSITIONS,
+        scale: [2.2, 2.2, 2.2]
       },
       // Orchard Road: extends the Mall zone with two more shopfronts along the
       // same street instead of replacing anything, so the existing shop
@@ -1391,6 +1452,11 @@
     addSignBoard(THREE, scene, "Food Court Sign", "HAWKER CENTRE", [-29.3, 4.08, -19.7], mat.curbWarm, 0x111111);
   }
 
+  // Orchard Road reference points (URA urban design guidelines, Wikipedia,
+  // Wikivoyage): pedestrian-only sidewalks much wider than the rest of the
+  // road network, a dense rain-tree canopy along the whole 2.5km stretch, and
+  // a network of covered linkways connecting malls so shoppers barely touch
+  // the street - hand-modelled from those descriptions, no map data involved.
   function addMall(THREE, scene, mat) {
     addBox(THREE, scene, "Mall Main Atrium", [18, 3.4, -15], [12, 6.8, 7], mat.mall);
     addBox(THREE, scene, "Mall Glass Front", [18, 3.1, -18.58], [9.5, 4.6, 0.16], mat.glass);
@@ -1401,6 +1467,24 @@
     addBox(THREE, scene, "Mall Plant Decor", [14.2, 0.5, -12.1], [0.75, 0.6, 0.75], mat.bush);
     addBox(THREE, scene, "Mall Hanging Banner", [18, 4.9, -18.75], [3.6, 1.1, 0.08], mat.poster);
     addSignBoard(THREE, scene, "Mall Sign", "MALL", [15.7, 5.85, -18.85], mat.signBlue, 0xffffff);
+
+    // Pedestrian-only mall walk, deliberately much wider than the standard
+    // ~1.6-1.8 unit sidewalks used everywhere else in the road network.
+    addBox(THREE, scene, "Orchard Pedestrian Mall Walk", [18, 0.09, -20], [24, 0.14, 4.5], mat.sidewalk, true);
+
+    // Covered linkway between two shopfronts, echoing the underpasses/linkways
+    // that let shoppers move mall-to-mall without stepping onto the street.
+    // Raised well above the 3rd-person camera's height range (~4.75-7.65
+    // above the player) so walking underneath doesn't clip the camera into
+    // the roof the way an early pass at y=3.8 did.
+    addBox(THREE, scene, "Orchard Covered Linkway Roof", [15.7, 8, -18], [10, 0.3, 2.4], mat.roofDark);
+    addCylinder(THREE, scene, "Orchard Linkway Pillar", [11, 4, -18.9], [0.18, 8, 8], mat.metal);
+    addCylinder(THREE, scene, "Orchard Linkway Pillar", [20.4, 4, -18.9], [0.18, 8, 8], mat.metal);
+
+    // Large outdoor screen/billboard, larger than the standard addSignBoard
+    // size - Orchard Road's malls lean on big illuminated display facades.
+    addBox(THREE, scene, "Orchard Giant Screen Frame", [29, 5.6, -18.62], [5.2, 3.7, 0.1], mat.roofDark);
+    addBox(THREE, scene, "Orchard Giant Screen", [29, 5.6, -18.5], [4.8, 3.3, 0.14], mat.screen);
   }
 
   function addPark(THREE, scene, mat) {
@@ -1496,9 +1580,9 @@
     addBuildingCore(THREE, scene, "Chinatown Shophouse Gold", [-7, 3.1, -17], [4, 6.2, 4], mat.signGold, mat);
     addBox(THREE, scene, "Chinatown Shophouse Roof Red", [-14, 7.4, -17], [4.8, 0.4, 4.6], mat.roofDark);
     addBox(THREE, scene, "Chinatown Shophouse Roof Gold", [-7, 6.4, -17], [4.4, 0.4, 4.4], mat.roofDark);
-    addBox(THREE, scene, "Chinatown Gate Pillar", [-12.5, 2.2, -10.4], [0.5, 4.4, 0.5], mat.signGold);
-    addBox(THREE, scene, "Chinatown Gate Pillar", [-7.5, 2.2, -10.4], [0.5, 4.4, 0.5], mat.signGold);
-    addBox(THREE, scene, "Chinatown Gate Beam", [-10, 4.5, -10.4], [5.6, 0.5, 0.5], mat.gym);
+    addBox(THREE, scene, "Chinatown Gate Pillar", [-12.5, 4, -10.4], [0.5, 8, 0.5], mat.signGold);
+    addBox(THREE, scene, "Chinatown Gate Pillar", [-7.5, 4, -10.4], [0.5, 8, 0.5], mat.signGold);
+    addBox(THREE, scene, "Chinatown Gate Beam", [-10, 8, -10.4], [5.6, 0.5, 0.5], mat.gym);
     addFlowerBed(THREE, scene, [-16.6, -12.8], 3.2, mat);
     addSignBoard(THREE, scene, "Chinatown Sign", "CHINATOWN", [-17, 4.2, -18.8], mat.gym, 0xffffff);
   }
@@ -1523,6 +1607,51 @@
     addBox(THREE, scene, "Bugis Market Stall", [21.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
     addBox(THREE, scene, "Bugis Market Awning", [20.5, 1.9, 3.4], [5.4, 0.16, 1.6], mat.signBlue);
     addSignBoard(THREE, scene, "Bugis Sign", "BUGIS", [30.6, 4.4, 5.2], mat.signBlue, 0xffffff);
+  }
+
+  // Woodlands - modelled from public descriptions (Wikipedia, HDB Town
+  // Design Guide, URA Woodlands Regional Centre page), not map data: the
+  // real town is built around an MRT/bus interchange integrated with
+  // Causeway Point (one of Singapore's largest malls), surrounded by the
+  // Woodlands/Admiralty/Marsiling HDB estates, with the Woodlands Checkpoint
+  // (the land border crossing to Malaysia) at its northern edge.
+  function addWoodlands(THREE, scene, mat) {
+    const baseX = 0;
+    const baseZ = 50;
+
+    // Integrated transport hub (MRT + bus interchange)
+    addBox(THREE, scene, "Woodlands Interchange Platform", [baseX, 0.32, baseZ], [10, 0.64, 6], mat.mrt);
+    addBox(THREE, scene, "Woodlands Interchange Roof", [baseX, 3.1, baseZ], [11, 0.45, 7], mat.roofDark);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX - 4, 1.5, baseZ - 2.5], [0.2, 3, 8], mat.metal);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX + 4, 1.5, baseZ - 2.5], [0.2, 3, 8], mat.metal);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX - 4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX + 4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
+    addSignBoard(THREE, scene, "Woodlands Interchange Sign", "WOODLANDS", [baseX - 4.5, 4.4, baseZ - 3.6], mat.signBlue, 0xffffff);
+
+    // Causeway Point mall, right next to the interchange (as it is in reality)
+    addBox(THREE, scene, "Causeway Point Mall", [baseX + 12, 4.2, baseZ - 1], [10, 8.4, 8], mat.mall);
+    addBox(THREE, scene, "Causeway Point Glass Front", [baseX + 12, 3.6, baseZ - 5.1], [8, 5.5, 0.18], mat.glass);
+    addBox(THREE, scene, "Causeway Point Roof", [baseX + 12, 8.6, baseZ - 1], [10.8, 0.4, 8.8], mat.roofDark);
+    addSignBoard(THREE, scene, "Causeway Point Sign", "CAUSEWAY POINT", [baseX + 7.5, 6.8, baseZ - 5.3], mat.signBlue, 0xffffff);
+
+    // Woodlands/Admiralty/Marsiling HDB heartland cluster
+    addBuildingCore(THREE, scene, "Woodlands HDB Block A", [baseX - 13, 9, baseZ + 3], [6, 18, 4.6], mat.hdb, mat);
+    addBuildingCore(THREE, scene, "Woodlands HDB Block B", [baseX - 19, 7.5, baseZ - 3], [5.2, 15, 4.2], mat.hdbAccent, mat);
+    addFlowerBed(THREE, scene, [baseX - 13, baseZ + 8], 4, mat);
+
+    // Woodlands Waterfront / Admiralty Park green strip
+    addPlane(THREE, scene, "Woodlands Waterfront Park", [baseX + 2, -0.01, baseZ - 8], [16, 7], mat.park);
+    addBench(THREE, scene, [baseX, baseZ - 9.5], mat);
+    addBench(THREE, scene, [baseX + 5, baseZ - 7], mat);
+    addDecorativeRock(THREE, scene, [baseX + 8, baseZ - 9], mat);
+
+    // Woodlands Checkpoint - the land border crossing to Malaysia, placed at
+    // the northern edge of the district as a symbolic endpoint rather than a
+    // literal depiction of the causeway/Malaysia itself.
+    addBox(THREE, scene, "Woodlands Checkpoint Booth", [baseX, 2, baseZ + 9], [7, 4, 3.4], mat.hospital);
+    addBox(THREE, scene, "Woodlands Checkpoint Canopy", [baseX, 4.3, baseZ + 9], [9, 0.35, 5], mat.roofDark);
+    addBox(THREE, scene, "Woodlands Checkpoint Barrier", [baseX - 3.2, 0.9, baseZ + 11.2], [0.18, 0.18, 4], mat.signGold);
+    addSignBoard(THREE, scene, "Woodlands Checkpoint Sign", "CHECKPOINT", [baseX - 4.4, 5.0, baseZ + 9], mat.signGold, 0x151515);
   }
 
   function addStreetLife(THREE, scene, mat) {
