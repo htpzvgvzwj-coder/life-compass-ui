@@ -19,8 +19,21 @@ const portraitImageEl = document.querySelector("#portrait-image");
 const portraitNameEl = document.querySelector("#portrait-name");
 
 const ADMIN_PASSCODE = "STEADY-ADMIN";
-const COMPASS_SYSTEM_PROMPT = "You are Compass AI, a helpful AI coach for students and youth. Answer the user's actual question directly. Be supportive, practical, and clear. Do not invent facts about the user. Only use information from the current conversation, saved user profile, or uploaded documents. If you are unsure, ask a short follow-up question.";
+// AI Coach (Future Mirror bible Ch.8) - built after Blueprint/Reflection/
+// Roadmap exist on purpose, so it has real context to reference instead of
+// being a generic chatbot. Proactively references specific real context
+// rather than waiting to be reminded - the "remembers you" feeling is the
+// practical version of the future-self-continuity mechanism this whole
+// product is built on. Tone adapts to personalBlueprint.personality/workStyle
+// in context, but never fabricates a reference that isn't in realSavedFacts.
+const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question.";
 const FUTURE_MIRROR_SYSTEM_PROMPT = "You are Future Mirror inside the Compass app. You are a decision impact simulator, not a prediction tool. Help youth compare how today's choices may shape possible future outcomes. Do not guarantee outcomes or claim to predict the future. Use language like possible outcomes, potential risks, likely impact, and possible long-term effects. Be supportive, practical, concise, and youth-friendly.";
+// Future Self module (Future Mirror bible Ch.4) - grounded in Hershfield's
+// future self-continuity research: vividness matters more than certainty
+// framing. Never phrase as "you will be X" - always "if you continue on this
+// path, you may be approaching something like X."
+const FUTURE_SELF_SYSTEM_PROMPT = "You are the Future Self module inside Compass's Future Mirror. You write a vivid, specific, first-person, present-tense scene of what the user's future self might be living, grounded only in their real saved data. This is never a prediction - always conditional (\"if you continue,\" \"this path suggests,\" \"you may be\"), never deterministic (\"you will be\"). Prioritize a vivid narrated scene over a dry stat summary - vividness is what makes this effective, not certainty. Be honest about low confidence when the user's saved data is thin rather than fabricating specific detail to sound impressive.";
+const DETERMINISTIC_PHRASES = ["you will be", "you will have", "you'll be", "you'll have", "you are going to be", "guaranteed", "definitely will"];
 const COMPASS_API_ERROR = "Sorry, Compass AI is having trouble responding right now. Please try again.";
 const COMPASS_API_URL = window.location.protocol === "file:" ? "http://localhost:5179/api/compass-chat" : "/api/compass-chat";
 
@@ -110,6 +123,22 @@ const defaultTrackerState = {
   futureMirror: {
     latest: null,
     saved: []
+  },
+  // Future Mirror upgrade (separate system from LifeVerse - no shared state,
+  // no cross-reads, per the Future Mirror bible's scope boundary). Blueprint
+  // is versioned/append-only: every other Future Mirror module reads from
+  // blueprint.history[blueprint.history.length-1] rather than keeping its
+  // own copy of "what the user is like".
+  blueprint: {
+    history: []
+  },
+  reflectionEntries: [],
+  decisions: [],
+  roadmapGoals: [],
+  futureSelfSnapshots: [],
+  careerStudio: {
+    interviewSessions: [],
+    resume: null
   },
   lifeVerse: createDefaultLifeVerseState(),
   lifeSim: {
@@ -663,8 +692,73 @@ let isCompassResponding = false;
 let isFutureMirrorLoading = false;
 let futureMirrorError = "";
 let futureMirrorDraft = null;
+let futureMirrorMode = "simulator";
 let assessmentStep = 0;
 let assessmentDraft = { answers: {}, freeText: "", preferences: [] };
+
+// Discover Yourself (Future Mirror bible Ch.3) - three short sessions rather
+// than one long form, each producing a new Blueprint version. Personality/
+// motivation/learning/work/decision fields are scenario-based ("what do you
+// do first"), not self-labeling, per the bible's explicit reasoning that
+// people are bad at naming their own style on a form.
+const BLUEPRINT_VALUE_OPTIONS = ["Growth", "Stability", "Connection", "Independence", "Achievement", "Creativity", "Fairness", "Adventure"];
+const BLUEPRINT_STRENGTH_OPTIONS = ["Written communication", "Pattern recognition", "Empathy", "Organisation", "Creativity", "Persistence", "Leadership", "Technical problem-solving"];
+
+const BLUEPRINT_PERSONALITY_SCENARIO = {
+  question: "Your plans change suddenly and without warning. What's closest to how you react?",
+  options: [
+    { value: "adaptive-fast", label: "Adjust quickly and keep moving", style: "adaptive", pace: "fast" },
+    { value: "reflective-deliberate", label: "Need a short pause to reset before continuing", style: "reflective", pace: "deliberate" },
+    { value: "driven-fast", label: "Feel frustrated but push through anyway", style: "driven", pace: "fast" },
+    { value: "collaborative-deliberate", label: "Look to someone else for the new plan", style: "collaborative", pace: "deliberate" }
+  ]
+};
+const BLUEPRINT_MOTIVATION_SCENARIO = {
+  question: "What actually gets you to follow through on something hard?",
+  options: [
+    { value: "external-accountability", label: "Knowing someone else is checking in on my progress" },
+    { value: "internal-purpose", label: "A clear personal reason why it matters to me" },
+    { value: "competition", label: "Comparing my progress against others or a target" },
+    { value: "small-rewards", label: "Breaking it into small wins with a reward at each step" }
+  ]
+};
+const BLUEPRINT_LEARNING_SCENARIO = {
+  question: "You're learning something totally new. What helps most?",
+  options: [
+    { value: "example-first", label: "Seeing a worked example before the theory" },
+    { value: "step-by-step", label: "Clear step-by-step instructions" },
+    { value: "trial-and-error", label: "Just trying it and adjusting as I go" },
+    { value: "discussion", label: "Talking it through with someone else" }
+  ]
+};
+const BLUEPRINT_WORK_SCENARIO = {
+  question: "Your ideal way to actually get something done is...",
+  options: [
+    { value: "deep-focus-blocks", label: "One long uninterrupted focus block" },
+    { value: "short-bursts", label: "Short bursts with breaks in between" },
+    { value: "collaborative", label: "Working alongside other people" },
+    { value: "flexible", label: "Whenever inspiration hits, on my own schedule" }
+  ]
+};
+const BLUEPRINT_DECISION_SCENARIO = {
+  question: "You're given a new task with unclear instructions. What do you do first?",
+  options: [
+    { value: "research-heavy", label: "Research and gather information before doing anything" },
+    { value: "ask-someone", label: "Ask someone who might already know" },
+    { value: "just-start", label: "Just start and adjust as I go" },
+    { value: "quick-plan", label: "Make a quick plan, then go" }
+  ]
+};
+
+const BLUEPRINT_SESSIONS = [
+  { id: 1, title: "Values & Personality", description: "What matters most to you, and how you tend to handle change." },
+  { id: 2, title: "Strengths & Motivation", description: "What you're good at, and what actually gets you to follow through." },
+  { id: 3, title: "How you learn, work, and decide", description: "Three quick scenario questions - no self-labeling." }
+];
+
+let blueprintActiveSession = 1;
+let blueprintDraft = { values: [], personalityChoice: "", strengths: [], strengthsOther: "", motivationChoice: "", learningChoice: "", workChoice: "", decisionChoice: "" };
+let blueprintMicroInsightText = "";
 let inspireSearch = "";
 let inspireCategory = "All";
 let opportunityCategory = "All";
@@ -755,12 +849,28 @@ function normalizeTrackerState(state) {
       ...(state.futureMirror || {}),
       saved: Array.isArray(state.futureMirror && state.futureMirror.saved) ? state.futureMirror.saved : fallback.futureMirror.saved
     },
+    blueprint: {
+      history: Array.isArray(state.blueprint && state.blueprint.history) ? state.blueprint.history : fallback.blueprint.history
+    },
+    reflectionEntries: Array.isArray(state.reflectionEntries) ? state.reflectionEntries : fallback.reflectionEntries,
+    decisions: Array.isArray(state.decisions) ? state.decisions : fallback.decisions,
+    roadmapGoals: Array.isArray(state.roadmapGoals) ? state.roadmapGoals : fallback.roadmapGoals,
+    futureSelfSnapshots: Array.isArray(state.futureSelfSnapshots) ? state.futureSelfSnapshots : fallback.futureSelfSnapshots,
+    careerStudio: {
+      interviewSessions: Array.isArray(state.careerStudio && state.careerStudio.interviewSessions) ? state.careerStudio.interviewSessions : fallback.careerStudio.interviewSessions,
+      resume: (state.careerStudio && state.careerStudio.resume && typeof state.careerStudio.resume === "object") ? state.careerStudio.resume : fallback.careerStudio.resume
+    },
     lifeVerse: normalizeLifeVerseState(state.lifeVerse || fallback.lifeVerse),
     lifeSim: normalizeLifeSimState(state.lifeSim || fallback.lifeSim),
     activeRoleplaySessionId: state.activeRoleplaySessionId || null,
     systemTutorialsSeen: (state.systemTutorialsSeen && typeof state.systemTutorialsSeen === "object") ? state.systemTutorialsSeen : {},
     moodSuggestion: state.moodSuggestion || null
   };
+}
+
+function latestBlueprint() {
+  const history = trackerState.blueprint && Array.isArray(trackerState.blueprint.history) ? trackerState.blueprint.history : [];
+  return history.length ? history[history.length - 1] : null;
 }
 
 function normalizeLifeVerseState(state = {}) {
@@ -1131,6 +1241,10 @@ function latestRealMoodEntry() {
 
 function realGrowthFacts() {
   const facts = [];
+  const blueprint = latestBlueprint();
+  if (blueprint) {
+    facts.push(`Personal Blueprint v${blueprint.version}: values ${blueprint.values.join(", ") || "not set"}; strengths ${blueprint.strengths.join(", ") || "not set"}; personality ${blueprint.personality && blueprint.personality.style ? `${blueprint.personality.style} (${blueprint.personality.pace} pace)` : "not set"}; motivation style ${blueprint.motivationStyle || "not set"}; learning style ${blueprint.learningStyle || "not set"}; work style ${blueprint.workStyle || "not set"}; decision style ${blueprint.decisionStyle || "not set"}`);
+  }
   const profileFields = [
     ["Goals", userProfile.goals],
     ["Dream university", userProfile.dreamUniversity],
@@ -1156,8 +1270,18 @@ function realGrowthFacts() {
   }
   const missionCount = trackerState.missionProgress.filter((item) => item.user_id === currentUserId()).length;
   if (missionCount) facts.push(`Daily missions completed: ${missionCount}`);
+  const roadmapGoals = myRoadmapGoals();
+  if (roadmapGoals.length) {
+    const nextMilestone = roadmapGoals.flatMap((goal) => goal.milestones.filter((m) => m.status !== "done").map((m) => ({ ...m, goalTitle: goal.title }))).sort((a, b) => a.month - b.month)[0];
+    facts.push(`Life Roadmap goals: ${roadmapGoals.map((g) => g.title).join(", ")}.${nextMilestone ? ` Next open milestone: "${nextMilestone.title}" (month ${nextMilestone.month} of "${nextMilestone.goalTitle}").` : ""}`);
+  }
   const journalCount = trackerState.journalEntries.filter((entry) => entry.user_id === currentUserId()).length;
   if (journalCount) facts.push(`Journal entries written: ${journalCount}`);
+  const nativeReflections = trackerState.reflectionEntries.filter((entry) => entry.user_id === currentUserId());
+  if (nativeReflections.length) {
+    const byMode = nativeReflections.reduce((acc, entry) => { acc[entry.mode] = (acc[entry.mode] || 0) + 1; return acc; }, {});
+    facts.push(`Reflection Engine entries: ${Object.entries(byMode).map(([mode, count]) => `${count} ${mode}`).join(", ")}. Most recent: "${cleanText(nativeReflections[0].content, 220)}"`);
+  }
   const activeChallenges = trackerState.challengeProgress.filter((item) => item.user_id === currentUserId());
   if (activeChallenges.length) facts.push(`Active challenges: ${activeChallenges.map((item) => item.title).join(", ")}`);
   return facts;
@@ -1166,6 +1290,132 @@ function realGrowthFacts() {
 function realGrowthFactsText() {
   const facts = realGrowthFacts();
   return facts.length ? facts.join(" | ") : "No saved Compass data yet.";
+}
+
+// Knowledge Vault / Life Dashboard - the capstone Future Mirror module. It
+// does not hold its own data store: every section reads the SAME per-module
+// arrays/functions the other 8 modules already write to (Blueprint history,
+// futureSelfSnapshots, reflectionEntries + Decision Journal, roadmapGoals,
+// careerStudio). This is a read-only aggregation view, so there is no new
+// source of truth to keep in sync and nothing here can drift from what the
+// other modules actually show.
+function knowledgeVaultStats() {
+  return [
+    { label: "Blueprint versions", count: trackerState.blueprint.history.length },
+    { label: "Future Self snapshots", count: trackerState.futureSelfSnapshots.length },
+    { label: "Reflections & decisions", count: allReflectionLikeEntries().length },
+    { label: "Roadmap goals", count: myRoadmapGoals().length },
+    { label: "Interview sessions", count: trackerState.careerStudio.interviewSessions.length }
+  ];
+}
+
+function knowledgeVaultBlueprintSection() {
+  const blueprint = latestBlueprint();
+  if (!blueprint) {
+    return `<div class="vault-empty-row"><span>No Personal Blueprint yet.</span><button class="secondary-action compact-action" type="button" data-open="discoverYourself">Start</button></div>`;
+  }
+  return `
+    <div class="vault-entry-row">
+      <strong>Blueprint v${blueprint.version}</strong>
+      <span>Values: ${escapeHTML(blueprint.values.join(", ") || "not set")} - Strengths: ${escapeHTML(blueprint.strengths.join(", ") || "not set")}</span>
+      <button class="text-action" type="button" data-open="discoverYourself">View / update</button>
+    </div>
+  `;
+}
+
+function knowledgeVaultFutureSelfSection() {
+  const snapshots = FUTURE_SELF_HORIZONS.map((horizon) => ({ horizon, snapshot: latestFutureSelfSnapshot(horizon.value) })).filter((item) => item.snapshot);
+  if (!snapshots.length) {
+    return `<div class="vault-empty-row"><span>No Future Self snapshots yet.</span><button class="secondary-action compact-action" type="button" data-tab-jump="future">Start</button></div>`;
+  }
+  return snapshots.map(({ horizon, snapshot }) => `
+    <div class="vault-entry-row">
+      <strong>${escapeHTML(horizon.label)}</strong>
+      <span>${escapeHTML(cleanText(snapshot.narrative, 160))}</span>
+      <button class="text-action" type="button" data-open="futureSelfView">View</button>
+    </div>
+  `).join("");
+}
+
+function knowledgeVaultReflectionSection() {
+  const entries = allReflectionLikeEntries().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
+  if (!entries.length) {
+    return `<div class="vault-empty-row"><span>No reflections or saved decisions yet.</span></div>`;
+  }
+  return entries.map((entry) => `
+    <div class="vault-entry-row">
+      <strong>${escapeHTML(entry.mode === "decisionJournal" ? "Decision Journal" : entry.mode)}</strong>
+      <span>${escapeHTML(cleanText(entry.content, 160))}</span>
+      <span class="tiny-note">${escapeHTML(entry.displayTime || "")}</span>
+    </div>
+  `).join("");
+}
+
+function knowledgeVaultRoadmapSection() {
+  const goals = myRoadmapGoals();
+  if (!goals.length) {
+    return `<div class="vault-empty-row"><span>No Life Roadmap goals yet.</span><button class="secondary-action compact-action" type="button" data-open="roadmapView">Start</button></div>`;
+  }
+  return goals.map((goal) => {
+    const done = goal.milestones.filter((m) => m.status === "done").length;
+    return `
+      <div class="vault-entry-row">
+        <strong>${escapeHTML(goal.title)}</strong>
+        <span>${done}/${goal.milestones.length} milestones done</span>
+        <button class="text-action" type="button" data-open="roadmapView">View</button>
+      </div>
+    `;
+  }).join("");
+}
+
+function knowledgeVaultCareerSection() {
+  const sessions = trackerState.careerStudio.interviewSessions;
+  const resume = trackerState.careerStudio.resume;
+  const rows = [];
+  if (sessions.length) {
+    const done = sessions.filter((s) => s.completedAt).length;
+    rows.push(`<div class="vault-entry-row"><strong>Interview Practice</strong><span>${done} completed of ${sessions.length} started</span><button class="text-action" type="button" data-open="careerStudio">View</button></div>`);
+  }
+  if (resume && resume.polishedText) {
+    rows.push(`<div class="vault-entry-row"><strong>Resume</strong><span>Last updated ${escapeHTML(new Date(resume.updatedAt).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }))}</span><button class="text-action" type="button" data-open="careerStudio">View</button></div>`);
+  }
+  if (!rows.length) {
+    return `<div class="vault-empty-row"><span>No Career Studio activity yet.</span><button class="secondary-action compact-action" type="button" data-open="careerStudio">Start</button></div>`;
+  }
+  return rows.join("");
+}
+
+function knowledgeVaultExportText() {
+  const lines = [`Future Mirror Knowledge Vault - exported ${new Date().toLocaleString()}`, ""];
+  const blueprint = latestBlueprint();
+  lines.push("PERSONAL BLUEPRINT", blueprint ? `v${blueprint.version} - values: ${blueprint.values.join(", ") || "not set"}; strengths: ${blueprint.strengths.join(", ") || "not set"}; work style: ${blueprint.workStyle || "not set"}; decision style: ${blueprint.decisionStyle || "not set"}` : "Not started.", "");
+  lines.push("FUTURE SELF SNAPSHOTS");
+  const snapshots = trackerState.futureSelfSnapshots;
+  lines.push(snapshots.length ? snapshots.map((s) => `- [${s.horizon}] ${s.narrative}`).join("\n") : "None yet.", "");
+  lines.push("REFLECTIONS & DECISION JOURNAL");
+  const entries = allReflectionLikeEntries();
+  lines.push(entries.length ? entries.map((e) => `- [${e.mode}, ${e.displayTime || ""}] ${e.content}`).join("\n") : "None yet.", "");
+  lines.push("LIFE ROADMAP");
+  const goals = myRoadmapGoals();
+  lines.push(goals.length ? goals.map((g) => `- ${g.title}: ${g.milestones.filter((m) => m.status === "done").length}/${g.milestones.length} milestones done`).join("\n") : "None yet.", "");
+  lines.push("CAREER STUDIO");
+  const sessions = trackerState.careerStudio.interviewSessions;
+  const resume = trackerState.careerStudio.resume;
+  lines.push(`Interview sessions: ${sessions.length}${resume && resume.polishedText ? "\nResume: saved" : ""}`, "");
+  return lines.join("\n");
+}
+
+function downloadKnowledgeVaultExport() {
+  const text = knowledgeVaultExportText();
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "future-mirror-knowledge-vault.txt";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function growthPromptFromData(request) {
@@ -1316,11 +1566,13 @@ function opportunityProfileFacts() {
 
 function opportunityRecommendationPrompt() {
   const facts = opportunityProfileFacts();
+  const growthFacts = realGrowthFacts();
   const categoryList = opportunityCategories.filter((category) => category !== "All").join(", ");
-  if (!facts.length) {
+  if (!facts.length && !growthFacts.length) {
     return `I have not filled in my age, interests, goals, or career aspiration yet. Ask me a few short questions, then recommend suitable opportunities from these categories: ${categoryList}. Keep it practical and youth-friendly.`;
   }
-  return `Use only this saved profile data and do not invent anything: ${facts.join(" | ")}. Recommend suitable youth opportunities from these categories: ${categoryList}. Include 3 best-fit options, why they fit, what to prepare, and one safe next step.`;
+  const allFacts = facts.concat(growthFacts);
+  return `Use only this saved data and do not invent anything: ${allFacts.join(" | ")}. Recommend suitable youth opportunities from these categories: ${categoryList}. Include 3 best-fit options, why they fit (referencing my saved values/strengths/goals where relevant), what to prepare, and one safe next step.`;
 }
 
 function opportunityRecommendationCard() {
@@ -2637,13 +2889,27 @@ function growthHubPreviewCard() {
   `;
 }
 
-function futureMirrorPrompt(question, category, pathA, pathB) {
+// Decision Simulator + Life Compass (Future Mirror bible Ch.6) share this one
+// prompt/engine - "mode" only changes framing copy (structured comparison vs
+// exploratory), per the bible's "one engine, two views" design. The
+// "dimensions" field is the actual multi-dimensional comparison the bible
+// asks for (money/happiness/growth/stress/opportunity-cost/family) - the AI
+// is told to surface only whichever of those are relevant, not force all six.
+const DECISION_DIMENSION_CATALOG = ["financial", "happiness/wellbeing", "growth/learning", "stress/risk", "opportunity cost", "family/relationship"];
+
+function futureMirrorPrompt(question, category, pathA, pathB, mode = "simulator") {
   const profileFacts = realGrowthFactsText();
-  return `Create a Future Mirror decision impact simulation as strict JSON only. Do not include markdown. The JSON shape must be:
+  const framingLine = mode === "compass"
+    ? "This is Life Compass mode - the question may be less clearly bounded than a simple A-vs-B choice. Help the user see the shape of the choice, don't force it into a rigid verdict."
+    : "This is Decision Simulator mode - a structured comparison between named options.";
+  return `Create a Future Mirror decision impact simulation as strict JSON only. Do not include markdown. ${framingLine} The JSON shape must be:
 {
   "question": "string",
   "category": "string",
   "summary": "string",
+  "dimensions": [
+    { "name": "one of: ${DECISION_DIMENSION_CATALOG.join(" | ")}", "relevantBecause": "string", "pathAScore": 0, "pathAReason": "string", "pathBScore": 0, "pathBReason": "string" }
+  ],
   "paths": [
     {
       "name": "Path A",
@@ -2681,7 +2947,7 @@ Category: ${category}
 Path A: ${pathA}
 Path B: ${pathB}
 Saved user context, if any: ${profileFacts}
-Rules: This is not prediction. Use possible outcome, potential risk, likely impact, and possible long-term effects. Include exactly two paths unless the question clearly needs a third. Scores must be 0-100 and should estimate alignment with the user's stated goals when available. Future Self Letter should sound emotional, realistic, encouraging, and connected to the user's goals, not dramatic or guaranteed. Future Score should explain why categories increase or decrease. End with these themes: which future feels closer to goals, which choice aligns with the person they want to become, and one small action today.`;
+Rules: This is not prediction. Use possible outcome, potential risk, likely impact, and possible long-term effects. Include exactly two paths unless the question clearly needs a third. Scores must be 0-100 and should estimate alignment with the user's stated goals when available. For "dimensions", only include the 2-4 that are genuinely relevant to this specific decision - do not force all six in if some don't apply (e.g. a course-choice question usually doesn't need "family/relationship"). Future Self Letter should sound emotional, realistic, encouraging, and connected to the user's goals, not dramatic or guaranteed. Future Score should explain why categories increase or decrease. Hard rule, never break it: never state or imply a recommended choice ("you should," "the better option is," "I recommend") - end instead with a reflective question that hands the decision back to the user, referencing one of their Blueprint values by name if the saved context includes one. Other themes to weave in: which future feels closer to goals, which choice aligns with the person they want to become, and one small action today.`;
 }
 
 function extractJsonObject(text) {
@@ -2702,13 +2968,34 @@ function extractJsonObject(text) {
   }
 }
 
+const VERDICT_PHRASES = ["you should choose", "you should pick", "you should go with", "the better option is", "the better choice is", "i recommend", "my recommendation", "the best choice is", "the best option is"];
+
+function containsVerdictLanguage(text) {
+  const lower = String(text || "").toLowerCase();
+  return VERDICT_PHRASES.some((phrase) => lower.includes(phrase));
+}
+
+function normalizeDimensions(rawDimensions) {
+  const list = Array.isArray(rawDimensions) ? rawDimensions : [];
+  return list.slice(0, 4).map((dimension) => ({
+    name: cleanText(dimension.name || "Relevant factor", 60),
+    relevantBecause: cleanText(dimension.relevantBecause || "This factor matters for this specific decision.", 220),
+    pathAScore: Math.max(0, Math.min(100, Number(dimension.pathAScore || 50))),
+    pathAReason: cleanText(dimension.pathAReason || "Score reflects how this path affects this factor.", 220),
+    pathBScore: Math.max(0, Math.min(100, Number(dimension.pathBScore || 50))),
+    pathBReason: cleanText(dimension.pathBReason || "Score reflects how this path affects this factor.", 220)
+  })).filter((dimension) => dimension.name);
+}
+
 function normalizeFutureMirrorResult(parsed, fallback) {
   const safePaths = Array.isArray(parsed && parsed.paths) ? parsed.paths : [];
   return {
     id: `future-mirror-${Date.now()}`,
     user_id: currentUserId(),
+    mode: fallback.mode || "simulator",
     question: cleanText((parsed && parsed.question) || fallback.question, 260),
     category: futureMirrorCategories.includes(parsed && parsed.category) ? parsed.category : fallback.category,
+    dimensions: normalizeDimensions(parsed && parsed.dimensions),
     summary: cleanText((parsed && parsed.summary) || "Future Mirror compares possible impacts. It does not predict or guarantee outcomes.", 500),
     paths: safePaths.slice(0, 3).map((path, index) => ({
       name: cleanText(path.name || `Path ${String.fromCharCode(65 + index)}`, 40),
@@ -2756,6 +3043,657 @@ function normalizeFutureScore(score = {}) {
     explanation: cleanText(score.explanation || "Scores rise when a choice supports learning, healthy routines, relationships, and future options. Scores fall when the choice creates avoidable risk or moves away from your goals.", 360),
     categories
   };
+}
+
+const FUTURE_SELF_HORIZONS = [
+  { value: "1yr", label: "1 year from now" },
+  { value: "3yr", label: "3 years from now" },
+  { value: "5yr", label: "5 years from now" },
+  { value: "age30", label: "Around age 30" }
+];
+
+function latestFutureSelfSnapshot(horizon) {
+  const list = trackerState.futureSelfSnapshots.filter((snap) => !horizon || snap.horizon === horizon);
+  return list.length ? list[list.length - 1] : null;
+}
+
+function containsDeterministicLanguage(text) {
+  const lower = String(text || "").toLowerCase();
+  return DETERMINISTIC_PHRASES.some((phrase) => lower.includes(phrase));
+}
+
+function futureSelfPrompt(blueprint, horizon, previousSnapshot) {
+  const horizonLabel = (FUTURE_SELF_HORIZONS.find((item) => item.value === horizon) || {}).label || horizon;
+  const facts = realGrowthFactsText();
+  return `Write a Future Self snapshot as strict JSON only, no markdown. Shape:
+{
+  "narrative": "string - a vivid, specific, first-person present-tense scene, 120-220 words, conditional language only",
+  "domains": {
+    "lifestyle": "string",
+    "career": "string",
+    "skills": "string",
+    "finance": "string",
+    "relationships": "string",
+    "dailyRoutine": "string"
+  },
+  "confidenceNote": "string - honest about how specific this can be given how much saved data exists"
+}
+Horizon: ${horizonLabel}
+User's real saved data (use only this, do not invent beyond it): ${facts}
+${previousSnapshot ? `Previous snapshot narrative for the same horizon, for continuity (mention what's changed if relevant): ${previousSnapshot.narrative}` : "No previous snapshot for this horizon yet."}
+Rules: Never write "you will be" or any deterministic claim - always "if you continue," "this path suggests," "you may be." If saved data is thin, say so honestly in confidenceNote rather than fabricating specific detail.`;
+}
+
+function normalizeFutureSelfSnapshot(parsed, horizon, blueprint, previousSnapshot) {
+  const domains = (parsed && parsed.domains) || {};
+  return {
+    id: `fs-${Date.now()}`,
+    user_id: currentUserId(),
+    horizon,
+    generatedAt: new Date().toISOString(),
+    displayTime: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+    basedOnBlueprintVersion: blueprint ? blueprint.version : 0,
+    narrative: cleanText((parsed && parsed.narrative) || "If you keep building on what you've saved so far, this future comes into focus - update your Blueprint and add a few reflections for a more specific scene.", 1400),
+    domains: {
+      lifestyle: cleanText(domains.lifestyle || "This may become clearer as more of your saved data builds up.", 260),
+      career: cleanText(domains.career || "This may become clearer as more of your saved data builds up.", 260),
+      skills: cleanText(domains.skills || "This may become clearer as more of your saved data builds up.", 260),
+      finance: cleanText(domains.finance || "This may become clearer as more of your saved data builds up.", 260),
+      relationships: cleanText(domains.relationships || "This may become clearer as more of your saved data builds up.", 260),
+      dailyRoutine: cleanText(domains.dailyRoutine || "This may become clearer as more of your saved data builds up.", 260)
+    },
+    confidenceNote: cleanText((parsed && parsed.confidenceNote) || "This snapshot will get more specific as you add more to your Blueprint and reflections.", 260),
+    previousSnapshotId: previousSnapshot ? previousSnapshot.id : null
+  };
+}
+
+let isFutureSelfLoading = false;
+let futureSelfError = "";
+let futureSelfActiveHorizon = "1yr";
+
+async function generateFutureSelfSnapshot(horizon) {
+  const blueprint = latestBlueprint();
+  if (!blueprint) {
+    futureSelfError = "Complete Discover Yourself first - Future Self needs your Blueprint to be meaningful, not generic.";
+    openModal("futureSelfView");
+    return;
+  }
+  futureSelfActiveHorizon = horizon;
+  futureSelfError = "";
+  isFutureSelfLoading = true;
+  openModal("futureSelfView");
+  const previousSnapshot = latestFutureSelfSnapshot(horizon);
+  try {
+    const reply = await requestCompassDirect(FUTURE_SELF_SYSTEM_PROMPT, futureSelfPrompt(blueprint, horizon, previousSnapshot));
+    const parsed = extractJsonObject(reply);
+    const snapshot = normalizeFutureSelfSnapshot(parsed, horizon, blueprint, previousSnapshot);
+    if (containsDeterministicLanguage(snapshot.narrative)) {
+      snapshot.narrative = snapshot.narrative.replace(/you will be/gi, "you may be").replace(/you'll be/gi, "you may be").replace(/you are going to be/gi, "you may be approaching");
+    }
+    trackerState.futureSelfSnapshots.push(snapshot);
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Future Self] Request failed", error);
+    futureSelfError = "Future Self is having trouble generating a snapshot right now. Please try again.";
+  } finally {
+    isFutureSelfLoading = false;
+    openModal("futureSelfView");
+  }
+}
+
+// Reflection Engine (Future Mirror bible Ch.5) - one data store, four trigger
+// modes. Decision-journal-mode entries already existed before this bible as
+// trackerState.futureMirror.saved (a working "generate a comparison, save it,
+// reflect on it later" flow) - rather than migrate that already-working code
+// into a new parallel array, allReflectionLikeEntries() merges both stores
+// into one read view, so blind-spot inference, Knowledge Vault, and the
+// resurfacing mechanic all see one unified picture, per the bible's "one
+// engine" acceptance criteria, without a risky rewrite of working code. This
+// is a deliberate deviation from a literal single-array schema - reported
+// here rather than done silently.
+const REFLECTION_RESURFACE_DAYS = { daily: 30, weeklyLetter: 14, decisionJournal: 90, milestoneLetter: 90 };
+const DAILY_REFLECTION_PROMPTS = [
+  { id: "mood", label: "How would you describe your mood today, and why?" },
+  { id: "stress", label: "What's taking up the most mental space right now?" },
+  { id: "growth", label: "What's one thing you did today that your future self would thank you for?" },
+  { id: "procrastination", label: "What did you put off today, and what made it easy to avoid?" }
+];
+
+function createReflectionEntry(mode, content, options = {}) {
+  const now = new Date();
+  const resurfaceDays = options.resurfaceDays != null ? options.resurfaceDays : REFLECTION_RESURFACE_DAYS[mode] || 30;
+  const entry = {
+    id: `refl-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    user_id: currentUserId(),
+    mode,
+    createdAt: now.toISOString(),
+    displayTime: now.toLocaleString([], { month: "short", day: "numeric" }),
+    resurfaceAt: new Date(now.getTime() + resurfaceDays * 86400000).toISOString(),
+    resurfacedAt: null,
+    dismissedAt: null,
+    ignoredCount: 0,
+    content: cleanText(content, 1200),
+    linkedDecisionId: options.linkedDecisionId || null,
+    tags: options.tags || [mode]
+  };
+  trackerState.reflectionEntries.unshift(entry);
+  saveTrackerState();
+  return entry;
+}
+
+function allReflectionLikeEntries() {
+  const native = trackerState.reflectionEntries.filter((entry) => entry.user_id === currentUserId()).map((entry) => ({ ...entry, _source: "reflection" }));
+  const decisions = savedFutureDecisions().map((item) => ({
+    id: item.id,
+    user_id: item.user_id,
+    mode: "decisionJournal",
+    createdAt: item.generated_at,
+    displayTime: item.display_time,
+    resurfaceAt: item.resurfaceAt || new Date(new Date(item.generated_at).getTime() + REFLECTION_RESURFACE_DAYS.decisionJournal * 86400000).toISOString(),
+    resurfacedAt: item.resurfacedAt || null,
+    dismissedAt: item.dismissedAt || null,
+    ignoredCount: item.ignoredCount || 0,
+    content: item.decisionMade || item.question,
+    tags: ["decision"],
+    _source: "futureMirror"
+  }));
+  return [...native, ...decisions];
+}
+
+function dueForResurfacing() {
+  const now = Date.now();
+  return allReflectionLikeEntries().filter((entry) => !entry.dismissedAt && new Date(entry.resurfaceAt).getTime() <= now);
+}
+
+function resurfaceEntryAction(id, action) {
+  const merged = allReflectionLikeEntries().find((entry) => entry.id === id);
+  if (!merged) return;
+  if (merged._source === "reflection") {
+    const original = trackerState.reflectionEntries.find((entry) => entry.id === id);
+    if (!original) return;
+    if (action === "engage") {
+      original.resurfacedAt = new Date().toISOString();
+    } else {
+      original.ignoredCount = (original.ignoredCount || 0) + 1;
+      if (original.ignoredCount >= 3) {
+        original.dismissedAt = new Date().toISOString();
+      } else {
+        original.resurfaceAt = new Date(Date.now() + (REFLECTION_RESURFACE_DAYS[original.mode] || 30) * 86400000 * (original.ignoredCount + 1)).toISOString();
+      }
+    }
+  } else {
+    const original = trackerState.futureMirror.saved.find((item) => item.id === id);
+    if (!original) return;
+    if (action === "engage") {
+      original.resurfacedAt = new Date().toISOString();
+    } else {
+      original.ignoredCount = (original.ignoredCount || 0) + 1;
+      if (original.ignoredCount >= 3) {
+        original.dismissedAt = new Date().toISOString();
+      } else {
+        original.resurfaceAt = new Date(Date.now() + REFLECTION_RESURFACE_DAYS.decisionJournal * 86400000 * (original.ignoredCount + 1)).toISOString();
+      }
+    }
+  }
+  saveTrackerState();
+}
+
+function resurfacingCard() {
+  const due = dueForResurfacing().slice(0, 3);
+  if (!due.length) return "";
+  return `
+    <section class="future-reflection-list resurfacing-card">
+      <div class="section-row">
+        <div><p class="eyebrow">Worth another look</p><h3>Reflections resurfaced for you</h3></div>
+        <span>${due.length}</span>
+      </div>
+      ${due.map((entry) => `
+        <article class="future-reflection-item">
+          <div>
+            <strong>${escapeHTML(entry.mode === "decisionJournal" ? "A decision you journaled" : entry.mode === "weeklyLetter" ? "A letter to your past self" : entry.mode === "milestoneLetter" ? "A milestone letter" : "A daily reflection")}</strong>
+            <p>${escapeHTML(entry.content)}</p>
+            <small>${escapeHTML(entry.displayTime || "")} - how does it look now?</small>
+          </div>
+          <div class="profile-actions">
+            <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(entry.id)}:engage">Reflect again</button>
+            <button class="text-action" type="button" data-resurface-action="${escapeHTML(entry.id)}:dismiss">Not now</button>
+          </div>
+        </article>
+      `).join("")}
+    </section>
+  `;
+}
+
+let dailyReflectionPromptIndex = 0;
+
+// Life Roadmap (Future Mirror bible Ch.7) - one data model, three views
+// (timeline/calendar/long-horizon) rather than three separate features with
+// separate state. Pacing respects the Blueprint's motivation style instead
+// of one default pace for everyone.
+const ROADMAP_SYSTEM_PROMPT = "You are the Life Roadmap module inside Compass's Future Mirror. Break a goal into a realistic milestone sequence. Be concrete and practical, not generic. Respect the user's motivation style when pacing milestones: external-accountability likes frequent check-ins, internal-purpose likes fewer purpose-tied milestones, competition likes comparison points, small-rewards likes many small wins.";
+const ROADMAP_HORIZONS = [
+  { value: "3-month", label: "3 months", months: 3 },
+  { value: "1-year", label: "1 year", months: 12 },
+  { value: "2-year", label: "2 years", months: 24 }
+];
+let roadmapView = "timeline";
+let isRoadmapLoading = false;
+let roadmapError = "";
+
+function roadmapPrompt(title, horizonMonths, pacingProfile) {
+  return `Create a milestone roadmap as strict JSON only, no markdown. Shape:
+{
+  "milestones": [ { "month": 1, "title": "string", "requires": "string - skills/projects/actions needed" } ]
+}
+Goal: ${title}
+Horizon: ${horizonMonths} months
+User's motivation style (pace milestones to fit this): ${pacingProfile || "not set - use a balanced default pace"}
+User's real saved data: ${realGrowthFactsText()}
+Rules: Space milestones sensibly across the ${horizonMonths}-month horizon (do not put one per month if that's unrealistic for the goal). Each milestone must be concrete and actionable, not vague.`;
+}
+
+async function generateRoadmapGoal(title, horizonValue) {
+  const horizon = ROADMAP_HORIZONS.find((item) => item.value === horizonValue) || ROADMAP_HORIZONS[1];
+  const blueprint = latestBlueprint();
+  roadmapError = "";
+  isRoadmapLoading = true;
+  openModal("roadmapView");
+  try {
+    const reply = await requestCompassDirect(ROADMAP_SYSTEM_PROMPT, roadmapPrompt(title, horizon.months, blueprint ? blueprint.motivationStyle : ""));
+    const parsed = extractJsonObject(reply);
+    const milestones = Array.isArray(parsed && parsed.milestones) ? parsed.milestones.slice(0, 24) : [];
+    const goal = {
+      id: `goal-${Date.now()}`,
+      user_id: currentUserId(),
+      title: cleanText(title, 160),
+      horizon: horizon.value,
+      createdAt: new Date().toISOString(),
+      pacingProfile: blueprint ? blueprint.motivationStyle : "",
+      milestones: milestones.length ? milestones.map((item, index) => ({
+        id: `ms-${Date.now()}-${index}`,
+        month: Math.max(1, Math.min(horizon.months, Number(item.month || index + 1))),
+        title: cleanText(item.title || "Milestone", 200),
+        requires: cleanText(item.requires || "", 200),
+        status: "pending"
+      })) : [{ id: `ms-${Date.now()}-0`, month: 1, title: "Define the first concrete step toward this goal", requires: "", status: "pending" }]
+    };
+    trackerState.roadmapGoals.push(goal);
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Life Roadmap] Request failed", error);
+    roadmapError = "Life Roadmap is having trouble generating milestones right now. Please try again.";
+  } finally {
+    isRoadmapLoading = false;
+    openModal("roadmapView");
+  }
+}
+
+function myRoadmapGoals() {
+  return trackerState.roadmapGoals.filter((goal) => goal.user_id === currentUserId());
+}
+
+function setMilestoneStatus(goalId, milestoneId, status) {
+  const goal = trackerState.roadmapGoals.find((item) => item.id === goalId);
+  if (!goal) return;
+  const milestone = goal.milestones.find((item) => item.id === milestoneId);
+  if (!milestone) return;
+  milestone.status = status;
+  saveTrackerState();
+  if (status === "done") {
+    milestoneJustCompleted = { goalTitle: goal.title, milestoneTitle: milestone.title };
+  }
+}
+
+let milestoneJustCompleted = null;
+
+function roadmapTimelineView() {
+  const goals = myRoadmapGoals();
+  if (!goals.length) return `<p class="muted">No roadmap goals yet. Create one above and it'll break into concrete monthly steps.</p>`;
+  return goals.map((goal) => `
+    <article class="future-reflection-item roadmap-goal-card">
+      <div style="width:100%">
+        <strong>${escapeHTML(goal.title)}</strong>
+        <small>${escapeHTML((ROADMAP_HORIZONS.find((item) => item.value === goal.horizon) || {}).label || goal.horizon)} horizon${goal.pacingProfile ? ` - paced for ${escapeHTML(goal.pacingProfile)} motivation` : ""}</small>
+        <div class="mirror-timeline">
+          ${goal.milestones.sort((a, b) => a.month - b.month).map((milestone) => `
+            <div class="timeline-step milestone-step is-${milestone.status}">
+              <span>Month ${milestone.month}</span>
+              <p><strong>${escapeHTML(milestone.title)}</strong>${milestone.requires ? ` - ${escapeHTML(milestone.requires)}` : ""}</p>
+              <div class="profile-actions">
+                ${milestone.status !== "in-progress" ? `<button class="text-action" type="button" data-set-milestone-status="${escapeHTML(goal.id)}:${escapeHTML(milestone.id)}:in-progress">In progress</button>` : ""}
+                ${milestone.status !== "done" ? `<button class="text-action" type="button" data-set-milestone-status="${escapeHTML(goal.id)}:${escapeHTML(milestone.id)}:done">Mark done</button>` : `<span class="risk-pill calm">Done</span>`}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    </article>
+  `).join("");
+}
+
+function roadmapCalendarView() {
+  const goals = myRoadmapGoals();
+  const byMonth = {};
+  goals.forEach((goal) => goal.milestones.forEach((milestone) => {
+    const key = milestone.month;
+    byMonth[key] = byMonth[key] || [];
+    byMonth[key].push({ goalTitle: goal.title, ...milestone });
+  }));
+  const months = Object.keys(byMonth).map(Number).sort((a, b) => a - b);
+  if (!months.length) return `<p class="muted">No roadmap goals yet.</p>`;
+  return months.map((month) => `
+    <article class="future-reflection-item">
+      <div>
+        <strong>Month ${month}</strong>
+        ${byMonth[month].map((item) => `<p>${escapeHTML(item.goalTitle)}: ${escapeHTML(item.title)} ${item.status === "done" ? "(done)" : item.status === "in-progress" ? "(in progress)" : ""}</p>`).join("")}
+      </div>
+    </article>
+  `).join("");
+}
+
+function roadmapLongHorizonView() {
+  const goals = myRoadmapGoals();
+  if (!goals.length) return `<p class="muted">No roadmap goals yet.</p>`;
+  const snapshot = latestFutureSelfSnapshot();
+  return `
+    ${goals.map((goal) => {
+      const done = goal.milestones.filter((m) => m.status === "done").length;
+      return `
+        <article class="future-reflection-item">
+          <div>
+            <strong>${escapeHTML(goal.title)}</strong>
+            <p>${done}/${goal.milestones.length} milestones done - ${escapeHTML((ROADMAP_HORIZONS.find((item) => item.value === goal.horizon) || {}).label || goal.horizon)} horizon</p>
+          </div>
+        </article>
+      `;
+    }).join("")}
+    ${snapshot ? `<p class="tiny-note">Your Future Self snapshot (${escapeHTML((FUTURE_SELF_HORIZONS.find((item) => item.value === snapshot.horizon) || {}).label || snapshot.horizon)}) was generated before some of this roadmap progress - consider regenerating it to reflect where you actually are now.</p>` : `<button class="secondary-action compact-action" type="button" data-open="futureSelfView">See how this connects to your Future Self</button>`}
+  `;
+}
+
+// Career Studio - Interview Practice (Future Mirror bible Ch.9). Reuses the
+// existing roleplay session/chat-bubble UI pattern, but real AI-generated
+// persona responses instead of roleplay's simple keyword-matched replies,
+// since interviewer style needs to genuinely differ by persona. Voice/tone
+// feedback is the lightweight version confirmed with the user: response
+// timing + filler-word counts from the transcript, not new audio
+// infrastructure - gracefully degrades to transcript-content feedback plus
+// these two light signals, per Ch.17.
+const INTERVIEW_PERSONAS = [
+  {
+    id: "bank-competency",
+    label: "Structured (bank/finance)",
+    description: "Formal, STAR-method, follows a checklist, presses for specific numbers and outcomes.",
+    systemPrompt: "You are a structured competency-based interviewer at a bank/finance firm. Formal tone. Ask one question at a time, follow the STAR method (situation, task, action, result), and press the candidate for specific numbers, outcomes, and evidence rather than accepting vague answers. Stay strictly professional, no small talk."
+  },
+  {
+    id: "startup-conversational",
+    label: "Conversational (early-stage startup)",
+    description: "Informal, tangential, curious about passion and scrappiness over credentials.",
+    systemPrompt: "You are a founder interviewing at an early-stage startup. Informal, conversational tone, some tangents. You care more about scrappiness, genuine passion, and how someone thinks on their feet than polished credentials. Ask follow-ups that probe how they'd handle ambiguity or a lack of resources."
+  },
+  {
+    id: "corporate-hr",
+    label: "Polite screener (corporate HR)",
+    description: "Moderate formality, checklist-driven behavioral questions, courteous.",
+    systemPrompt: "You are a corporate HR screener conducting a first-round behavioral interview. Moderately formal, polite, checklist-driven. Ask standard behavioral questions (teamwork, conflict, deadlines) one at a time and a brief, courteous follow-up to each answer."
+  }
+];
+const INTERVIEW_TURNS_TARGET = 4;
+const FILLER_WORD_PATTERN = /\b(um+|uh+|like|you know|kind of|sort of)\b/gi;
+
+let activeInterviewSessionId = null;
+let isInterviewLoading = false;
+let interviewError = "";
+let interviewQuestionShownAt = 0;
+
+function activeInterviewSession() {
+  return trackerState.careerStudio.interviewSessions.find((session) => session.id === activeInterviewSessionId) || null;
+}
+
+function countFillerWords(text) {
+  const matches = String(text || "").match(FILLER_WORD_PATTERN);
+  return matches ? matches.length : 0;
+}
+
+async function startInterviewSession(personaId) {
+  const persona = INTERVIEW_PERSONAS.find((item) => item.id === personaId) || INTERVIEW_PERSONAS[0];
+  isInterviewLoading = true;
+  interviewError = "";
+  const session = {
+    id: `int-${Date.now()}`,
+    user_id: currentUserId(),
+    persona: persona.id,
+    startedAt: new Date().toISOString(),
+    completedAt: null,
+    transcript: [],
+    feedback: []
+  };
+  trackerState.careerStudio.interviewSessions.push(session);
+  activeInterviewSessionId = session.id;
+  openModal("interviewPractice");
+  try {
+    const reply = await requestCompassDirect(persona.systemPrompt + " This is the very first question of the interview - a natural opener.", "Ask your opening interview question. Reply with only the question, no preamble.");
+    session.transcript.push({ turn: 1, sender: "interviewer", text: cleanText(reply, 400) });
+    saveTrackerState();
+    interviewQuestionShownAt = Date.now();
+  } catch (error) {
+    console.error("[Interview Practice] Failed to start", error);
+    interviewError = "Couldn't start the interview right now. Please try again.";
+  } finally {
+    isInterviewLoading = false;
+    openModal("interviewPractice");
+  }
+}
+
+async function sendInterviewAnswer(text) {
+  const session = activeInterviewSession();
+  if (!session) return;
+  const persona = INTERVIEW_PERSONAS.find((item) => item.id === session.persona) || INTERVIEW_PERSONAS[0];
+  const respondedAfterMs = interviewQuestionShownAt ? Date.now() - interviewQuestionShownAt : null;
+  const fillerWordCount = countFillerWords(text);
+  session.transcript.push({ turn: session.transcript.length + 1, sender: "candidate", text: cleanText(text, 900), respondedAfterMs, fillerWordCount });
+  saveTrackerState();
+  const answeredTurns = session.transcript.filter((t) => t.sender === "candidate").length;
+  isInterviewLoading = true;
+  openModal("interviewPractice");
+  try {
+    if (answeredTurns >= INTERVIEW_TURNS_TARGET) {
+      await finishInterviewSession(session, persona);
+    } else {
+      const history = session.transcript.map((t) => `${t.sender === "interviewer" ? "Interviewer" : "Candidate"}: ${t.text}`).join("\n");
+      const reply = await requestCompassDirect(persona.systemPrompt, `Interview so far:\n${history}\n\nAsk your next question or a natural follow-up, in character. Reply with only the question/follow-up, no preamble.`);
+      session.transcript.push({ turn: session.transcript.length + 1, sender: "interviewer", text: cleanText(reply, 400) });
+      saveTrackerState();
+      interviewQuestionShownAt = Date.now();
+    }
+  } catch (error) {
+    console.error("[Interview Practice] Failed to continue", error);
+    interviewError = "Couldn't get the next question right now. Please try again.";
+  } finally {
+    isInterviewLoading = false;
+    openModal("interviewPractice");
+  }
+}
+
+async function finishInterviewSession(session, persona) {
+  const history = session.transcript.map((t) => `Turn ${t.turn} (${t.sender}): ${t.text}${t.sender === "candidate" ? ` [responded after ${t.respondedAfterMs ? Math.round(t.respondedAfterMs / 1000) + "s" : "unknown"}, ${t.fillerWordCount || 0} filler words]` : ""}`).join("\n");
+  const feedbackPrompt = `Full interview transcript with timing/filler-word signals:\n${history}\n\nGive feedback as strict JSON only: { "feedback": [ { "momentRef": "string quoting or referencing a specific turn", "observation": "string", "suggestion": "string" } ] }. Reference specific moments/turns, not just an aggregate score. Include the timing and filler-word signals where they're actually notable (e.g. a long pause or many filler words on a specific turn) - do not fabricate audio/tone detail beyond what the transcript, timing, and filler-word counts actually show.`;
+  try {
+    const reply = await requestCompassDirect(persona.systemPrompt, feedbackPrompt);
+    const parsed = extractJsonObject(reply);
+    session.feedback = Array.isArray(parsed && parsed.feedback) ? parsed.feedback.slice(0, 6).map((item) => ({
+      momentRef: cleanText(item.momentRef || "", 160),
+      observation: cleanText(item.observation || "", 260),
+      suggestion: cleanText(item.suggestion || "", 260)
+    })) : [];
+  } catch (error) {
+    console.error("[Interview Practice] Feedback generation failed", error);
+  }
+  session.completedAt = new Date().toISOString();
+  saveTrackerState();
+}
+
+function interviewPersonaPicker() {
+  return INTERVIEW_PERSONAS.map((persona) => `
+    <button class="wide-action" type="button" data-start-interview="${escapeHTML(persona.id)}">
+      <img src="assets/icon-boundary.png" alt="">
+      <span><strong>${escapeHTML(persona.label)}</strong><small>${escapeHTML(persona.description)}</small></span>
+    </button>
+  `).join("");
+}
+
+// Career Studio - Resume Builder (Ch.9). Standard pattern: the user writes
+// their real experience/education in plain language, AI only cleans up
+// wording/structure - it is explicitly instructed not to invent employers,
+// dates, or achievements, so the output stays trustworthy.
+let isResumeLoading = false;
+let resumeError = "";
+
+function saveResumeDraft() {
+  const existing = trackerState.careerStudio.resume || {};
+  const fullNameInput = modalLayer.querySelector("#resume-full-name");
+  const headlineInput = modalLayer.querySelector("#resume-headline");
+  const experienceInput = modalLayer.querySelector("#resume-experience");
+  const educationInput = modalLayer.querySelector("#resume-education");
+  const skillsInput = modalLayer.querySelector("#resume-skills");
+  const resume = {
+    fullName: fullNameInput ? fullNameInput.value.trim().slice(0, 80) : (existing.fullName || ""),
+    headline: headlineInput ? headlineInput.value.trim().slice(0, 120) : (existing.headline || ""),
+    rawExperience: experienceInput ? experienceInput.value.trim().slice(0, 3000) : (existing.rawExperience || ""),
+    rawEducation: educationInput ? educationInput.value.trim().slice(0, 1500) : (existing.rawEducation || ""),
+    rawSkills: skillsInput ? skillsInput.value.trim().slice(0, 500) : (existing.rawSkills || ""),
+    polishedText: existing.polishedText || "",
+    updatedAt: new Date().toISOString()
+  };
+  trackerState.careerStudio.resume = resume;
+  saveTrackerState();
+  return resume;
+}
+
+async function polishResumeWithAI() {
+  const resume = saveResumeDraft();
+  if (!resume.headline && !resume.rawExperience && !resume.rawEducation) {
+    resumeError = "Add a headline, some experience, or education first - there's nothing to polish yet.";
+    openModal("resumeBuilder");
+    return;
+  }
+  isResumeLoading = true;
+  resumeError = "";
+  openModal("resumeBuilder");
+  try {
+    const systemPrompt = "You are a professional resume writer. Write clean, honest resume content using only the facts given - never invent employers, dates, titles, or achievements that were not provided. Use strong action verbs and only quantify what was actually stated. Plain text only, no markdown symbols like ** or #.";
+    const userPrompt = `Candidate facts:\nName: ${resume.fullName || "(not given)"}\nHeadline: ${resume.headline || "(not given)"}\nExperience (raw notes):\n${resume.rawExperience || "(none provided)"}\nEducation (raw notes):\n${resume.rawEducation || "(none provided)"}\nSkills (raw notes):\n${resume.rawSkills || "(none provided)"}\n\nOther real saved context about this person, for tone/emphasis only - do not invent resume line items from it:\n${realGrowthFactsText()}\n\nWrite a plain-text resume with sections in this order: NAME/HEADLINE, SUMMARY (2-3 sentences), EXPERIENCE (bullet points per role using dashes), EDUCATION, SKILLS.`;
+    const reply = await requestCompassDirect(systemPrompt, userPrompt);
+    resume.polishedText = cleanText(reply, 4000);
+    resume.updatedAt = new Date().toISOString();
+    trackerState.careerStudio.resume = resume;
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Resume Builder] Polish failed", error);
+    resumeError = "Couldn't polish the resume right now. Please try again.";
+  } finally {
+    isResumeLoading = false;
+    openModal("resumeBuilder");
+  }
+}
+
+function resumeBuilderView() {
+  const resume = trackerState.careerStudio.resume || {};
+  return `
+    <label>Full name<input type="text" id="resume-full-name" value="${escapeHTML(resume.fullName || "")}" placeholder="Your name"></label>
+    <label>Headline<input type="text" id="resume-headline" value="${escapeHTML(resume.headline || "")}" placeholder="e.g. Recent graduate, Marketing"></label>
+    <label>Experience (plain language - role, dates, what you did)<textarea id="resume-experience" rows="4" placeholder="e.g. Cafe barista, 2024-2025, handled orders and cash register, trained 2 new staff">${escapeHTML(resume.rawExperience || "")}</textarea></label>
+    <label>Education<textarea id="resume-education" rows="2" placeholder="e.g. XYZ Secondary School, graduated 2025">${escapeHTML(resume.rawEducation || "")}</textarea></label>
+    <label>Skills (comma separated)<input type="text" id="resume-skills" value="${escapeHTML(resume.rawSkills || "")}" placeholder="e.g. Excel, communication, Canva"></label>
+    ${resumeError ? `<p class="form-error">${escapeHTML(resumeError)}</p>` : ""}
+    <div class="modal-action-row">
+      <button class="secondary-action compact-action" type="button" data-save-resume-draft>Save draft</button>
+      <button class="primary-action compact-action" type="button" data-polish-resume ${isResumeLoading ? "disabled" : ""}>${isResumeLoading ? "Polishing..." : "Polish with AI"}</button>
+    </div>
+    ${resume.polishedText ? `
+      <div class="resume-preview-card">
+        <div class="modal-action-row"><strong>Preview</strong><button class="secondary-action compact-action" type="button" data-copy-resume>Copy text</button></div>
+        <pre class="resume-preview-text">${escapeHTML(resume.polishedText)}</pre>
+      </div>
+    ` : ""}
+  `;
+}
+
+// Career Studio - Job Matching (Ch.9). Deterministic, not AI-based: a fit
+// score against a fixed catalog of well-known role archetypes, computed from
+// the user's real saved Personal Blueprint (values/strengths/work/decision
+// style). Standard, explainable scoring - no novel design needed here.
+const WORK_STYLE_LABEL_BY_VALUE = Object.fromEntries(BLUEPRINT_WORK_SCENARIO.options.map((option) => [option.value, option.label]));
+const DECISION_STYLE_LABEL_BY_VALUE = Object.fromEntries(BLUEPRINT_DECISION_SCENARIO.options.map((option) => [option.value, option.label]));
+
+const CAREER_ROLE_ARCHETYPES = [
+  { id: "data-analyst", title: "Data & Research Analyst", description: "Finding patterns in information and turning them into clear answers.", values: ["Growth", "Achievement"], strengths: ["Pattern recognition", "Technical problem-solving"], workStyle: ["deep-focus-blocks"], decisionStyle: ["research-heavy"] },
+  { id: "ux-product-designer", title: "UX / Product Designer", description: "Shaping how a product looks, feels, and solves real user problems.", values: ["Creativity", "Growth"], strengths: ["Creativity", "Empathy"], workStyle: ["flexible", "collaborative"], decisionStyle: ["quick-plan"] },
+  { id: "software-engineer", title: "Software Engineer", description: "Building and problem-solving with code, usually in focused stretches.", values: ["Growth", "Achievement", "Independence"], strengths: ["Technical problem-solving", "Pattern recognition", "Persistence"], workStyle: ["deep-focus-blocks"], decisionStyle: ["research-heavy", "just-start"] },
+  { id: "marketing-brand", title: "Marketing & Brand", description: "Telling a story about a product or idea that gets people to care.", values: ["Creativity", "Connection", "Adventure"], strengths: ["Creativity", "Written communication"], workStyle: ["collaborative", "flexible"], decisionStyle: ["quick-plan"] },
+  { id: "people-hr", title: "People & HR", description: "Helping people do their best work and resolving what gets in the way.", values: ["Connection", "Fairness"], strengths: ["Empathy", "Organisation", "Leadership"], workStyle: ["collaborative"], decisionStyle: ["ask-someone"] },
+  { id: "operations-pm", title: "Operations / Project Management", description: "Keeping many moving parts on track toward a deadline.", values: ["Stability", "Achievement"], strengths: ["Organisation", "Leadership", "Persistence"], workStyle: ["short-bursts", "deep-focus-blocks"], decisionStyle: ["quick-plan"] },
+  { id: "sales-partnerships", title: "Sales & Partnerships", description: "Building relationships and making the case for why something is worth it.", values: ["Achievement", "Adventure", "Connection"], strengths: ["Leadership", "Written communication"], workStyle: ["collaborative", "flexible"], decisionStyle: ["just-start"] },
+  { id: "finance-accounting", title: "Finance / Accounting", description: "Making sure the numbers are right and the plan is sound.", values: ["Stability", "Fairness"], strengths: ["Organisation", "Pattern recognition"], workStyle: ["deep-focus-blocks"], decisionStyle: ["research-heavy"] },
+  { id: "teaching-training", title: "Teaching / Training", description: "Helping other people understand something you already know.", values: ["Connection", "Growth"], strengths: ["Empathy", "Written communication", "Leadership"], workStyle: ["collaborative"], decisionStyle: ["ask-someone"] },
+  { id: "creative-content", title: "Creative / Content", description: "Making things - writing, video, design - that people want to consume.", values: ["Creativity", "Adventure"], strengths: ["Creativity", "Written communication"], workStyle: ["flexible"], decisionStyle: ["just-start"] }
+];
+
+function scoreCareerRole(role, blueprint) {
+  const matchedValues = role.values.filter((value) => blueprint.values.includes(value));
+  const matchedStrengths = role.strengths.filter((strength) => blueprint.strengths.includes(strength));
+  const workMatch = role.workStyle.includes(blueprint.workStyle);
+  const decisionMatch = role.decisionStyle.includes(blueprint.decisionStyle);
+  const score = matchedValues.length * 2 + matchedStrengths.length * 2 + (workMatch ? 1 : 0) + (decisionMatch ? 1 : 0);
+  const max = role.values.length * 2 + role.strengths.length * 2 + 2;
+  const percent = max ? Math.round((score / max) * 100) : 0;
+  const matchedTraits = [...matchedValues, ...matchedStrengths];
+  if (workMatch) matchedTraits.push(WORK_STYLE_LABEL_BY_VALUE[blueprint.workStyle] || blueprint.workStyle);
+  if (decisionMatch) matchedTraits.push(DECISION_STYLE_LABEL_BY_VALUE[blueprint.decisionStyle] || blueprint.decisionStyle);
+  return { role, percent, matchedTraits };
+}
+
+function jobMatchResults() {
+  const blueprint = latestBlueprint();
+  if (!blueprint) return null;
+  return CAREER_ROLE_ARCHETYPES.map((role) => scoreCareerRole(role, blueprint)).sort((a, b) => b.percent - a.percent).slice(0, 5);
+}
+
+function jobMatchingView() {
+  const results = jobMatchResults();
+  if (!results) {
+    return `
+      <div class="empty-state-card">
+        <p class="muted">Job matching uses your saved Personal Blueprint (values, strengths, work style) - complete that first.</p>
+        <button class="primary-action" type="button" data-close-and-open="discoverYourself">Start Discover Yourself</button>
+      </div>
+    `;
+  }
+  return `
+    <p class="muted">Based on your saved Personal Blueprint - a starting point for exploration, not a verdict on what you should do.</p>
+    <div class="action-stack">
+      ${results.map((result) => `
+        <div class="job-match-card">
+          <div class="modal-action-row"><strong>${escapeHTML(result.role.title)}</strong><span class="risk-pill calm">${result.percent}% fit</span></div>
+          <p class="muted">${escapeHTML(result.role.description)}</p>
+          ${result.matchedTraits.length ? `<div class="chip-row">${result.matchedTraits.map((trait) => `<span class="mini-chip">${escapeHTML(trait)}</span>`).join("")}</div>` : ""}
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function futureSelfEntryCard() {
+  const snapshot = latestFutureSelfSnapshot();
+  return `
+    <section class="mirror-form-card future-self-entry-card">
+      <p class="eyebrow">Future Self</p>
+      <h3>${snapshot ? "See your future self again" : "Meet your future self"}</h3>
+      <p class="muted">${snapshot ? `Last generated ${escapeHTML(snapshot.displayTime)} - ${escapeHTML((FUTURE_SELF_HORIZONS.find((item) => item.value === snapshot.horizon) || {}).label || "")}.` : "A vivid, grounded scene of where your current path may lead - not a prediction."}</p>
+      <button class="secondary-action compact-action" type="button" data-open="futureSelfView">${snapshot ? "View Future Self" : "Start Future Self"}</button>
+    </section>
+  `;
 }
 
 function futureMirrorPathCards(result) {
@@ -2871,6 +3809,35 @@ function futureReflectionList() {
   `;
 }
 
+function futureMirrorDimensionsCard(result) {
+  const dimensions = result.dimensions || [];
+  if (!dimensions.length) return "";
+  const pathNames = (result.paths || []).map((path) => path.name);
+  return `
+    <section class="mirror-timeline-card dimensions-card">
+      <p class="eyebrow">Dimensions that matter for this decision</p>
+      ${dimensions.map((dimension) => `
+        <article>
+          <strong>${escapeHTML(dimension.name)}</strong>
+          <p class="muted tiny-note">${escapeHTML(dimension.relevantBecause)}</p>
+          <div class="mirror-list-grid">
+            <div>
+              <strong><small>${escapeHTML(pathNames[0] || "Path A")}</small> ${dimension.pathAScore}/100</strong>
+              <div class="mirror-score-bar"><i style="width:${dimension.pathAScore}%"></i></div>
+              <p>${escapeHTML(dimension.pathAReason)}</p>
+            </div>
+            <div>
+              <strong><small>${escapeHTML(pathNames[1] || "Path B")}</small> ${dimension.pathBScore}/100</strong>
+              <div class="mirror-score-bar"><i style="width:${dimension.pathBScore}%"></i></div>
+              <p>${escapeHTML(dimension.pathBReason)}</p>
+            </div>
+          </div>
+        </article>
+      `).join("")}
+    </section>
+  `;
+}
+
 function futureMirrorResultCard() {
   const result = trackerState.futureMirror && trackerState.futureMirror.latest;
   if (isFutureMirrorLoading) {
@@ -2909,6 +3876,7 @@ function futureMirrorResultCard() {
       <p class="tiny-note">Future Mirror shows possible outcomes, not guaranteed results.</p>
     </section>
     <div class="mirror-path-grid">${futureMirrorPathCards(result)}</div>
+    ${futureMirrorDimensionsCard(result)}
     ${futureMirrorTimeline(result)}
     ${futureScoreCard(result)}
     ${futureSelfLetterCard(result)}
@@ -3337,6 +4305,119 @@ function captureAssessmentDraft() {
   assessmentDraft.preferences = [...modalLayer.querySelectorAll('input[name="assessment-preference"]:checked')].map((input) => input.value);
 }
 
+function captureBlueprintDraft() {
+  // Only overwrite a field if the currently-rendered session actually has
+  // those inputs - each session renders a different subset of the form, and
+  // an unconditional overwrite would wipe out an earlier session's answers
+  // with an empty array once that session's inputs leave the DOM.
+  if (modalLayer.querySelector('input[name="blueprint-value"]')) {
+    blueprintDraft.values = [...modalLayer.querySelectorAll('input[name="blueprint-value"]:checked')].map((input) => input.value);
+  }
+  const personality = modalLayer.querySelector('input[name="blueprint-personality"]:checked');
+  if (personality) blueprintDraft.personalityChoice = personality.value;
+  if (modalLayer.querySelector('input[name="blueprint-strength"]')) {
+    blueprintDraft.strengths = [...modalLayer.querySelectorAll('input[name="blueprint-strength"]:checked')].map((input) => input.value);
+  }
+  const strengthOther = modalLayer.querySelector("#blueprint-strength-other");
+  if (strengthOther) blueprintDraft.strengthsOther = strengthOther.value.trim();
+  const motivation = modalLayer.querySelector('input[name="blueprint-motivation"]:checked');
+  if (motivation) blueprintDraft.motivationChoice = motivation.value;
+  const learning = modalLayer.querySelector('input[name="blueprint-learning"]:checked');
+  if (learning) blueprintDraft.learningChoice = learning.value;
+  const work = modalLayer.querySelector('input[name="blueprint-work"]:checked');
+  if (work) blueprintDraft.workChoice = work.value;
+  const decision = modalLayer.querySelector('input[name="blueprint-decision"]:checked');
+  if (decision) blueprintDraft.decisionChoice = decision.value;
+}
+
+// Blind spots (Ch.3): never asked directly on a form - inferred gently from
+// patterns already visible in Journal/Reflection entries, and always
+// presented as an observation with evidence, never a diagnosis (Ch.12).
+const BLIND_SPOT_PATTERNS = [
+  { id: "conflict-avoidance", keywords: ["avoid", "didn't say anything", "didn't bring it up", "kept quiet", "didn't want to make it awkward"], observation: "avoiding a conversation" },
+  { id: "procrastination", keywords: ["put it off", "procrastinat", "kept delaying", "waited until the last", "ran out of time"], observation: "putting off something important until late" },
+  { id: "self-doubt", keywords: ["not good enough", "imposter", "don't deserve", "everyone else is better"], observation: "doubting your own ability even when things went well" },
+  { id: "overcommitting", keywords: ["said yes even though", "too much on my plate", "overcommitted", "spread too thin"], observation: "saying yes to more than felt manageable" }
+];
+
+function inferBlindSpots() {
+  const texts = [
+    ...trackerState.journalEntries.filter((entry) => entry.user_id === currentUserId()).map((entry) => entry.content || entry.text || ""),
+    ...allReflectionLikeEntries().map((entry) => entry.content || "")
+  ].map((text) => String(text || "").toLowerCase());
+  if (!texts.length) return [];
+  return BLIND_SPOT_PATTERNS.map((pattern) => {
+    const matchCount = texts.filter((text) => pattern.keywords.some((keyword) => text.includes(keyword))).length;
+    return matchCount >= 2 ? { observation: `mentioned ${pattern.observation} in ${matchCount} recent entries`, confirmedByUser: false } : null;
+  }).filter(Boolean);
+}
+
+function saveBlueprintSession(sessionId) {
+  captureBlueprintDraft();
+  const previous = latestBlueprint();
+  const history = trackerState.blueprint.history;
+  const nextVersion = {
+    version: (previous ? previous.version : 0) + 1,
+    versionedAt: new Date().toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }),
+    values: blueprintDraft.values.length ? blueprintDraft.values.slice(0, 3) : (previous ? previous.values : []),
+    personality: (() => {
+      const option = BLUEPRINT_PERSONALITY_SCENARIO.options.find((item) => item.value === blueprintDraft.personalityChoice);
+      return option ? { style: option.style, pace: option.pace } : (previous ? previous.personality : { style: "", pace: "" });
+    })(),
+    personalityChoice: blueprintDraft.personalityChoice || (previous ? previous.personalityChoice : ""),
+    strengths: blueprintDraft.strengths.length ? blueprintDraft.strengths.slice(0, 3) : (previous ? previous.strengths : []),
+    strengthsOther: blueprintDraft.strengthsOther,
+    blindSpots: inferBlindSpots(),
+    motivationStyle: blueprintDraft.motivationChoice || (previous ? previous.motivationStyle : ""),
+    motivationChoice: blueprintDraft.motivationChoice,
+    learningStyle: blueprintDraft.learningChoice || (previous ? previous.learningStyle : ""),
+    learningChoice: blueprintDraft.learningChoice,
+    workStyle: blueprintDraft.workChoice || (previous ? previous.workStyle : ""),
+    workChoice: blueprintDraft.workChoice,
+    decisionStyle: blueprintDraft.decisionChoice || (previous ? previous.decisionStyle : ""),
+    decisionChoice: blueprintDraft.decisionChoice
+  };
+  history.push(nextVersion);
+  saveTrackerState();
+  return nextVersion;
+}
+
+function blueprintMicroInsight(version) {
+  if (version.values.length) return `Your top value looks like ${version.values[0].toLowerCase()} - we'll check in on how your choices reflect that over time.`;
+  if (version.strengths.length) return `${version.strengths[0]} stands out as a strength - future modules will build on it.`;
+  if (version.decisionStyle) return `You tend to decide by "${BLUEPRINT_DECISION_SCENARIO.options.find((option) => option.value === version.decisionStyle)?.label.toLowerCase()}" - that shapes how Decision Compass will frame things for you.`;
+  return "Your Blueprint is saved and ready for the rest of Future Mirror to use.";
+}
+
+function blueprintSummaryCard() {
+  const version = latestBlueprint();
+  const insight = blueprintMicroInsightText;
+  blueprintMicroInsightText = "";
+  if (!version) {
+    return `
+      <section class="growth-hero-card blueprint-card">
+        <div>
+          <p class="eyebrow">Discover Yourself</p>
+          <h3>Build the foundation everything else reads from.</h3>
+          <p>Three short sessions - values, strengths, and how you learn/work/decide. Future Self, Decision Compass, Roadmap, and AI Coach all get more useful once this exists.</p>
+        </div>
+        <button class="primary-action" type="button" data-open="discoverYourself">Start Discover Yourself</button>
+      </section>
+    `;
+  }
+  return `
+    <section class="growth-hero-card blueprint-card">
+      <div>
+        <p class="eyebrow">Your Blueprint - v${version.version}</p>
+        <h3>${version.values.length ? `Values: ${escapeHTML(version.values.join(", "))}` : "Blueprint saved"}</h3>
+        <p>${escapeHTML(insight || `${version.strengths.length ? `Strengths: ${version.strengths.join(", ")}.` : ""} ${version.personality && version.personality.style ? `Personality: ${version.personality.style}, ${version.personality.pace} pace.` : ""}`.trim() || "Keep building this out - more sessions make every other module more useful.")}</p>
+        ${version.blindSpots.length ? `<p class="tiny-note">Noticed pattern: ${escapeHTML(version.blindSpots[0].observation)} - does that feel accurate to you?</p>` : ""}
+      </div>
+      <button class="secondary-action compact-action" type="button" data-open="discoverYourself">Update Blueprint</button>
+    </section>
+  `;
+}
+
 function visibleStories() {
   return contentState.stories.filter((story) => isAdmin() || story.published !== false);
 }
@@ -3483,6 +4564,33 @@ function safeExternalUrl(value) {
     return ["http:", "https:"].includes(url.protocol) ? url.href : "";
   } catch {
     return "";
+  }
+}
+
+// Deterministic, never AI-generated - built directly from real stored fields
+// so it can never fabricate a reference (Ch.8 integrity requirement). Checked
+// in priority order: an overdue Roadmap milestone, a recent Reflection entry,
+// a resurfaced Decision, then a Blueprint-based opener, else the generic
+// default (per Ch.17: honest about thin data rather than faking specificity).
+function coachProactiveOpener() {
+  const overdueMilestone = myRoadmapGoals().flatMap((goal) => goal.milestones.filter((m) => m.status !== "done").map((m) => ({ ...m, goalTitle: goal.title }))).sort((a, b) => a.month - b.month)[0];
+  if (overdueMilestone) return `Your next Roadmap milestone is "${overdueMilestone.title}" for "${overdueMilestone.goalTitle}" - how's that going?`;
+  const recentReflection = trackerState.reflectionEntries.filter((entry) => entry.user_id === currentUserId())[0];
+  if (recentReflection) return `Last time you wrote a ${recentReflection.mode === "daily" ? "daily reflection" : recentReflection.mode === "weeklyLetter" ? "weekly letter" : "reflection"} about: "${cleanText(recentReflection.content, 140)}" - want to pick up from there, or something else on your mind?`;
+  const due = dueForResurfacing()[0];
+  if (due) return `A decision you journaled a while back just resurfaced - "${cleanText(due.content, 140)}" - how does it look now?`;
+  const blueprint = latestBlueprint();
+  if (blueprint && blueprint.values.length) return `You told Discover Yourself that ${blueprint.values[0].toLowerCase()} matters most to you right now - what's on your mind today?`;
+  return defaultChatState.messages[0].text;
+}
+
+function applyCoachProactiveOpener() {
+  if (chatState.messages.length === 1 && chatState.messages[0].from === "assistant" && chatState.messages[0].text === defaultChatState.messages[0].text) {
+    const opener = coachProactiveOpener();
+    if (opener !== defaultChatState.messages[0].text) {
+      chatState.messages[0] = { from: "assistant", text: opener };
+      saveChatState();
+    }
   }
 }
 
@@ -3786,9 +4894,15 @@ const screens = {
       <div class="avatar"><img src="assets/icon-spark.png" alt=""></div>
     </header>
 
+    ${futureSelfEntryCard()}
+
     <section class="mirror-form-card">
       <p class="eyebrow">Try Future Mirror</p>
-      <h3>Explore how your choices today may influence your future.</h3>
+      <div class="mirror-example-row mode-toggle-row">
+        <button type="button" class="${futureMirrorMode === "simulator" ? "is-selected" : ""}" data-future-mirror-mode="simulator">Decision Simulator</button>
+        <button type="button" class="${futureMirrorMode === "compass" ? "is-selected" : ""}" data-future-mirror-mode="compass">Life Compass</button>
+      </div>
+      <h3>${futureMirrorMode === "compass" ? "Not sure how to even frame the choice? Explore it here." : "Explore how your choices today may influence your future."}</h3>
       ${futureMirrorDraftNotice()}
       <label>Decision question
         <textarea id="mirror-question" placeholder="Should I study tonight or play games?">${escapeHTML(futureMirrorQuestionValue())}</textarea>
@@ -3899,6 +5013,10 @@ const screens = {
       ${growthOverviewStats()}
     </section>
 
+    ${blueprintSummaryCard()}
+
+    ${resurfacingCard()}
+
     ${growthSuggestionCard()}
 
     ${growthHubSection({
@@ -3907,6 +5025,8 @@ const screens = {
       icon: "icon-learn.png",
       tone: "goals-tone",
       items: [
+        { title: "Discover Yourself", text: "Build your Personal Blueprint - the foundation for everything else here.", modal: "discoverYourself" },
+        { title: "Life Roadmap", text: "Turn a goal into concrete monthly milestones.", modal: "roadmapView" },
         { title: "Personal goals", text: "Write what you want to build.", modal: "growthGoals" },
         { title: "Vision Board", text: "Collect your direction in one place.", modal: "growthGoals" },
         { title: "Dream university", text: "Save your study direction.", modal: "growthGoals" },
@@ -3925,6 +5045,9 @@ const screens = {
       icon: "icon-checkin.png",
       tone: "reflection-tone",
       items: [
+        { title: "Daily reflection", text: "A 3-minute rotating prompt - mood, stress, growth, or procrastination.", modal: "dailyReflection" },
+        { title: "Weekly letter", text: "A short note to you, next week.", modal: "weeklyLetter" },
+        { title: "Milestone letter", text: "Write to your future self, further out.", modal: "milestoneLetter" },
         { title: "Daily Check-In", text: "Log today's mood and energy.", modal: "mood" },
         { title: "Mood tracking", text: "Review how you have been feeling.", modal: "mood" },
         { title: "Future Readiness Assessment", text: "Adulthood, decisions, money, resilience.", modal: "assessment" },
@@ -3951,6 +5074,16 @@ const screens = {
     })}
 
     ${growthHubSection({
+      title: "Career Studio",
+      subtitle: "Practice for the real thing before it counts.",
+      icon: "icon-work.png",
+      tone: "career-tone",
+      items: [
+        { title: "Career Studio", text: "Interview practice, resume builder, and job matching.", modal: "careerStudio" }
+      ]
+    })}
+
+    ${growthHubSection({
       title: "Progress",
       subtitle: "Review your growth without clutter.",
       icon: "icon-balance.png",
@@ -3961,7 +5094,8 @@ const screens = {
         { title: "Mood trend", text: "See your latest mood pattern.", modal: "growthProgress" },
         { title: "Goal progress", text: "Review saved dreams and goals.", modal: "growthProgress" },
         { title: "Challenge progress", text: "Check 7-day challenge status.", modal: "growthProgress" },
-        { title: "Receipt record", text: "Track what you paid today.", modal: "receipt" }
+        { title: "Receipt record", text: "Track what you paid today.", modal: "receipt" },
+        { title: "Knowledge Vault", text: "Everything Future Mirror knows about you, in one place.", modal: "knowledgeVault" }
       ]
     })}
   `,
@@ -4246,6 +5380,373 @@ const modals = {
       </div>
     </div>
   `,
+
+  discoverYourself: () => {
+    const session = BLUEPRINT_SESSIONS.find((item) => item.id === blueprintActiveSession) || BLUEPRINT_SESSIONS[0];
+    const existing = latestBlueprint();
+    return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="discover-yourself-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Discover Yourself</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="discover-yourself-title">${escapeHTML(session.title)}</h3>
+      <p class="muted">This builds your Personal Blueprint - the foundation Future Self, Decision Compass, Roadmap, and AI Coach all read from. Short sessions, not one long form.</p>
+      <div class="assessment-progress">
+        <span>Session ${blueprintActiveSession} of ${BLUEPRINT_SESSIONS.length}</span>
+        <i><b style="width:${Math.round((blueprintActiveSession / BLUEPRINT_SESSIONS.length) * 100)}%"></b></i>
+      </div>
+      <div class="assessment-form">
+        ${blueprintActiveSession === 1 ? `
+          <section class="assessment-item is-active">
+            <strong>1. Pick up to 3 values that matter most to you right now</strong>
+            <div class="option-grid">
+              ${BLUEPRINT_VALUE_OPTIONS.map((value) => `
+                <label class="check-option">
+                  <input type="checkbox" name="blueprint-value" value="${escapeHTML(value)}" ${blueprintDraft.values.includes(value) ? "checked" : ""}>
+                  <span>${escapeHTML(value)}</span>
+                </label>
+              `).join("")}
+            </div>
+          </section>
+          <section class="assessment-item is-active">
+            <strong>2. ${escapeHTML(BLUEPRINT_PERSONALITY_SCENARIO.question)}</strong>
+            <div class="scale-grid">
+              ${BLUEPRINT_PERSONALITY_SCENARIO.options.map((option) => `
+                <label class="scale-option">
+                  <input type="radio" name="blueprint-personality" value="${escapeHTML(option.value)}" ${blueprintDraft.personalityChoice === option.value ? "checked" : ""}>
+                  <span>${escapeHTML(option.label)}</span>
+                </label>
+              `).join("")}
+            </div>
+          </section>
+        ` : ""}
+        ${blueprintActiveSession === 2 ? `
+          <section class="assessment-item is-active">
+            <strong>1. Pick up to 3 strengths that fit you</strong>
+            <div class="option-grid">
+              ${BLUEPRINT_STRENGTH_OPTIONS.map((value) => `
+                <label class="check-option">
+                  <input type="checkbox" name="blueprint-strength" value="${escapeHTML(value)}" ${blueprintDraft.strengths.includes(value) ? "checked" : ""}>
+                  <span>${escapeHTML(value)}</span>
+                </label>
+              `).join("")}
+            </div>
+            <textarea id="blueprint-strength-other" placeholder="Anything else? (optional)">${escapeHTML(blueprintDraft.strengthsOther || "")}</textarea>
+          </section>
+          <section class="assessment-item is-active">
+            <strong>2. ${escapeHTML(BLUEPRINT_MOTIVATION_SCENARIO.question)}</strong>
+            <div class="scale-grid">
+              ${BLUEPRINT_MOTIVATION_SCENARIO.options.map((option) => `
+                <label class="scale-option">
+                  <input type="radio" name="blueprint-motivation" value="${escapeHTML(option.value)}" ${blueprintDraft.motivationChoice === option.value ? "checked" : ""}>
+                  <span>${escapeHTML(option.label)}</span>
+                </label>
+              `).join("")}
+            </div>
+          </section>
+        ` : ""}
+        ${blueprintActiveSession === 3 ? `
+          <section class="assessment-item is-active">
+            <strong>1. ${escapeHTML(BLUEPRINT_LEARNING_SCENARIO.question)}</strong>
+            <div class="scale-grid">
+              ${BLUEPRINT_LEARNING_SCENARIO.options.map((option) => `
+                <label class="scale-option">
+                  <input type="radio" name="blueprint-learning" value="${escapeHTML(option.value)}" ${blueprintDraft.learningChoice === option.value ? "checked" : ""}>
+                  <span>${escapeHTML(option.label)}</span>
+                </label>
+              `).join("")}
+            </div>
+          </section>
+          <section class="assessment-item is-active">
+            <strong>2. ${escapeHTML(BLUEPRINT_WORK_SCENARIO.question)}</strong>
+            <div class="scale-grid">
+              ${BLUEPRINT_WORK_SCENARIO.options.map((option) => `
+                <label class="scale-option">
+                  <input type="radio" name="blueprint-work" value="${escapeHTML(option.value)}" ${blueprintDraft.workChoice === option.value ? "checked" : ""}>
+                  <span>${escapeHTML(option.label)}</span>
+                </label>
+              `).join("")}
+            </div>
+          </section>
+          <section class="assessment-item is-active">
+            <strong>3. ${escapeHTML(BLUEPRINT_DECISION_SCENARIO.question)}</strong>
+            <div class="scale-grid">
+              ${BLUEPRINT_DECISION_SCENARIO.options.map((option) => `
+                <label class="scale-option">
+                  <input type="radio" name="blueprint-decision" value="${escapeHTML(option.value)}" ${blueprintDraft.decisionChoice === option.value ? "checked" : ""}>
+                  <span>${escapeHTML(option.label)}</span>
+                </label>
+              `).join("")}
+            </div>
+          </section>
+        ` : ""}
+      </div>
+      <div class="assessment-footer">
+        <button class="secondary-action" type="button" data-prev-blueprint-session ${blueprintActiveSession === 1 ? "disabled" : ""}>Back</button>
+        <button class="primary-action" type="button" data-save-blueprint-session="${blueprintActiveSession}">${blueprintActiveSession < BLUEPRINT_SESSIONS.length ? "Save & continue" : "Save Blueprint"}</button>
+      </div>
+      ${existing ? `<p class="tiny-note">Blueprint v${existing.version} saved ${escapeHTML(existing.versionedAt)}. Saving again creates a new version - your history is kept, not overwritten.</p>` : ""}
+    </div>
+  `;
+  },
+
+  futureSelfView: () => {
+    const blueprint = latestBlueprint();
+    const snapshot = latestFutureSelfSnapshot(futureSelfActiveHorizon);
+    const previous = snapshot && snapshot.previousSnapshotId
+      ? trackerState.futureSelfSnapshots.find((item) => item.id === snapshot.previousSnapshotId)
+      : null;
+    return `
+    <div class="modal-card assessment-modal future-self-modal" role="dialog" aria-modal="true" aria-labelledby="future-self-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Future Self</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="future-self-title">Not a prediction - a vivid look at where this path may lead.</h3>
+      ${!blueprint ? `
+        <p class="muted">Future Self needs your Personal Blueprint to be meaningful rather than generic.</p>
+        <button class="primary-action" type="button" data-close-and-open="discoverYourself">Start Discover Yourself</button>
+      ` : `
+        <div class="mirror-example-row">
+          ${FUTURE_SELF_HORIZONS.map((option) => `<button type="button" class="${futureSelfActiveHorizon === option.value ? "is-selected" : ""}" data-future-self-horizon="${escapeHTML(option.value)}">${escapeHTML(option.label)}</button>`).join("")}
+        </div>
+        ${isFutureSelfLoading ? `
+          <section class="mirror-loading-card">
+            <p class="eyebrow">Future Self is imagining</p>
+            <h3>Writing a scene from this path...</h3>
+            <div class="mirror-loading-dots"><i></i><i></i><i></i></div>
+          </section>
+        ` : futureSelfError ? `
+          <section class="mirror-error-card"><h3>${escapeHTML(futureSelfError)}</h3></section>
+        ` : snapshot ? `
+          <section class="future-letter-card">
+            <p class="eyebrow">${escapeHTML((FUTURE_SELF_HORIZONS.find((item) => item.value === snapshot.horizon) || {}).label || snapshot.horizon)} - based on Blueprint v${snapshot.basedOnBlueprintVersion}</p>
+            <p>${escapeHTML(snapshot.narrative)}</p>
+            <p class="tiny-note">${escapeHTML(snapshot.confidenceNote)}</p>
+          </section>
+          <div class="mirror-list-grid future-self-domains">
+            ${Object.entries(snapshot.domains).map(([key, value]) => `
+              <div><strong>${escapeHTML(key.charAt(0).toUpperCase() + key.slice(1))}</strong><p>${escapeHTML(value)}</p></div>
+            `).join("")}
+          </div>
+          ${previous ? `
+            <section class="future-reflection-list">
+              <div class="section-row"><div><p class="eyebrow">Since your last snapshot</p><h3>${escapeHTML(previous.displayTime)}</h3></div></div>
+              <p class="muted">${escapeHTML(previous.narrative)}</p>
+            </section>
+          ` : ""}
+          <button class="secondary-action compact-action" type="button" data-open="milestoneLetter">Write to this future self</button>
+        ` : `
+          <section class="mirror-empty-card"><p>Pick a horizon and generate your first snapshot.</p></section>
+        `}
+        <button class="primary-action mirror-run-action" type="button" data-generate-future-self="${escapeHTML(futureSelfActiveHorizon)}" ${isFutureSelfLoading ? "disabled" : ""}>${snapshot ? "Regenerate this snapshot" : "Generate my Future Self"}</button>
+      `}
+    </div>
+  `;
+  },
+
+  dailyReflection: () => {
+    const prompt = DAILY_REFLECTION_PROMPTS[dailyReflectionPromptIndex % DAILY_REFLECTION_PROMPTS.length];
+    return `
+    <div class="modal-card dark-modal" role="dialog" aria-modal="true" aria-labelledby="daily-reflection-title">
+      <div class="modal-top">
+        <span class="risk-pill light">Daily reflection - 3 minutes</span>
+        <button class="ghost-circle light" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="daily-reflection-title">${escapeHTML(prompt.label)}</h3>
+      <textarea id="daily-reflection-text" placeholder="A few honest sentences is enough."></textarea>
+      <button class="primary-action mint-action" type="button" data-save-daily-reflection="${escapeHTML(prompt.id)}">Save reflection</button>
+    </div>
+  `;
+  },
+
+  weeklyLetter: () => `
+    <div class="modal-card dark-modal" role="dialog" aria-modal="true" aria-labelledby="weekly-letter-title">
+      <div class="modal-top">
+        <span class="risk-pill light">Weekly letter</span>
+        <button class="ghost-circle light" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="weekly-letter-title">Write a short note to you, next week</h3>
+      <p class="muted">Lower effort than a journal entry, higher frequency than a milestone letter. It'll resurface in about 2 weeks.</p>
+      <textarea id="weekly-letter-text" placeholder="Dear next-week me, right now I'm..."></textarea>
+      <button class="primary-action mint-action" type="button" data-save-weekly-letter>Send to next week</button>
+    </div>
+  `,
+
+  milestoneLetter: () => `
+    <div class="modal-card dark-modal" role="dialog" aria-modal="true" aria-labelledby="milestone-letter-title">
+      <div class="modal-top">
+        <span class="risk-pill light">Milestone letter</span>
+        <button class="ghost-circle light" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="milestone-letter-title">Write to your future self, further out</h3>
+      <p class="muted">Lower frequency, higher emotional weight - this resurfaces in about 3 months.</p>
+      <textarea id="milestone-letter-text" placeholder="Dear future me..."></textarea>
+      <button class="primary-action mint-action" type="button" data-save-milestone-letter>Save milestone letter</button>
+    </div>
+  `,
+
+  roadmapView: () => `
+    <div class="modal-card assessment-modal future-self-modal" role="dialog" aria-modal="true" aria-labelledby="roadmap-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Life Roadmap</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="roadmap-title">Turn a goal into concrete monthly steps</h3>
+      <div class="admin-form">
+        <label>Goal<input id="roadmap-goal-title" type="text" placeholder="Example: Land a junior design role"></label>
+        <label>Horizon
+          <select id="roadmap-goal-horizon">
+            ${ROADMAP_HORIZONS.map((option) => `<option value="${escapeHTML(option.value)}">${escapeHTML(option.label)}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <button class="primary-action mirror-run-action" type="button" data-generate-roadmap ${isRoadmapLoading ? "disabled" : ""}>${isRoadmapLoading ? "Breaking it down..." : "Generate roadmap"}</button>
+      ${roadmapError ? `<p class="form-error">${escapeHTML(roadmapError)}</p>` : ""}
+      ${milestoneJustCompleted ? `
+        <section class="mirror-empty-card">
+          <p class="eyebrow">Milestone reached</p>
+          <h3>"${escapeHTML(milestoneJustCompleted.milestoneTitle)}" - want to reflect on it?</h3>
+          <textarea id="milestone-reflection-note" placeholder="Optional - what made this happen, what's next?"></textarea>
+          <button class="secondary-action compact-action" type="button" data-reflect-on-milestone data-milestone-title-value="${escapeHTML(milestoneJustCompleted.milestoneTitle)}" data-goal-title-value="${escapeHTML(milestoneJustCompleted.goalTitle)}">Save reflection</button>
+        </section>
+      ` : ""}
+      <div class="mirror-example-row mode-toggle-row">
+        <button type="button" class="${roadmapView === "timeline" ? "is-selected" : ""}" data-roadmap-view="timeline">Timeline</button>
+        <button type="button" class="${roadmapView === "calendar" ? "is-selected" : ""}" data-roadmap-view="calendar">Calendar</button>
+        <button type="button" class="${roadmapView === "longHorizon" ? "is-selected" : ""}" data-roadmap-view="longHorizon">Long-horizon</button>
+      </div>
+      <div class="future-reflection-list">
+        ${roadmapView === "calendar" ? roadmapCalendarView() : roadmapView === "longHorizon" ? roadmapLongHorizonView() : roadmapTimelineView()}
+      </div>
+    </div>
+  `,
+
+  knowledgeVault: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="knowledge-vault-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Knowledge Vault</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="knowledge-vault-title">Everything Future Mirror knows about you</h3>
+      <p class="muted">One place to see it all - nothing here is stored separately, it's the same data from each module below.</p>
+      <div class="opportunity-stat-row">
+        ${knowledgeVaultStats().map((stat) => `<span><strong>${stat.count}</strong>${escapeHTML(stat.label)}</span>`).join("")}
+      </div>
+      <div class="vault-section"><h4>Personal Blueprint</h4>${knowledgeVaultBlueprintSection()}</div>
+      <div class="vault-section"><h4>Future Self</h4>${knowledgeVaultFutureSelfSection()}</div>
+      <div class="vault-section"><h4>Reflections & Decision Journal</h4>${knowledgeVaultReflectionSection()}</div>
+      <div class="vault-section"><h4>Life Roadmap</h4>${knowledgeVaultRoadmapSection()}</div>
+      <div class="vault-section"><h4>Career Studio</h4>${knowledgeVaultCareerSection()}</div>
+      <button class="secondary-action compact-action" type="button" data-export-vault>Download my data (.txt)</button>
+    </div>
+  `,
+
+  careerStudio: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="career-studio-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Career Studio</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="career-studio-title">Practice for the real thing</h3>
+      <p class="muted">Three tools that work together - practice how you sound, write what you've done, and see which roles fit your Blueprint.</p>
+      <div class="action-stack">
+        <button class="wide-action" type="button" data-open="interviewPractice">
+          <img src="assets/icon-boundary.png" alt="">
+          <span><strong>Interview Practice</strong><small>Timed mock interviews with 3 realistic interviewer styles.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="resumeBuilder">
+          <img src="assets/icon-work.png" alt="">
+          <span><strong>Resume Builder</strong><small>Write your real experience - AI cleans up wording, never invents facts.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="jobMatching">
+          <img src="assets/icon-learn.png" alt="">
+          <span><strong>Job Matching</strong><small>See which role archetypes fit your saved Personal Blueprint.</small></span>
+        </button>
+      </div>
+    </div>
+  `,
+
+  resumeBuilder: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="resume-builder-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Resume Builder</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="resume-builder-title">Build your resume</h3>
+      <p class="muted">Write your real experience and education in your own words - Compass AI cleans up the wording and structure, without inventing anything you didn't provide.</p>
+      <div class="admin-form">
+        ${resumeBuilderView()}
+      </div>
+    </div>
+  `,
+
+  jobMatching: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="job-matching-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Job Matching</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="job-matching-title">Role fit, based on your Blueprint</h3>
+      ${jobMatchingView()}
+    </div>
+  `,
+
+  interviewPractice: () => {
+    const session = activeInterviewSession();
+    if (!session) {
+      return `
+        <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="interview-title">
+          <div class="modal-top">
+            <span class="risk-pill calm">Interview Practice</span>
+            <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+          </div>
+          <h3 id="interview-title">Pick an interviewer style</h3>
+          <p class="muted">Each persona genuinely questions differently - not one generic interviewer.</p>
+          <div class="action-stack">${interviewPersonaPicker()}</div>
+        </div>
+      `;
+    }
+    const persona = INTERVIEW_PERSONAS.find((item) => item.id === session.persona) || INTERVIEW_PERSONAS[0];
+    const isDone = Boolean(session.completedAt);
+    return `
+      <div class="modal-card assessment-modal roleplay-card" role="dialog" aria-modal="true" aria-labelledby="interview-chat-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">${escapeHTML(persona.label)}</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="interview-chat-title">Interview Practice</h3>
+        <section class="chat-room roleplay-room">
+          <div class="chat-messages">
+            ${session.transcript.map((turn) => `
+              <div class="chat-bubble ${turn.sender === "candidate" ? "is-user" : "is-ai"}">
+                <span>${turn.sender === "candidate" ? displayName() : persona.label}</span>
+                <p>${escapeHTML(turn.text)}</p>
+              </div>
+            `).join("")}
+            ${isInterviewLoading ? `<span class="typing-dot">Interviewer is thinking...</span>` : ""}
+          </div>
+          ${!isDone ? `
+            <div class="chat-input-row">
+              <input id="interview-answer-input" type="text" placeholder="Type your answer...">
+              <button class="primary-action send-action" type="button" data-send-interview-answer ${isInterviewLoading ? "disabled" : ""}>Send</button>
+            </div>
+          ` : ""}
+        </section>
+        ${interviewError ? `<p class="form-error">${escapeHTML(interviewError)}</p>` : ""}
+        ${isDone ? `
+          <div class="advice-stack">
+            <h3>Feedback on this interview</h3>
+            ${session.feedback.length ? session.feedback.map((item) => `
+              <div><strong>${escapeHTML(item.momentRef)}</strong><span>${escapeHTML(item.observation)} ${escapeHTML(item.suggestion)}</span></div>
+            `).join("") : `<div><strong>Overall</strong><span>Feedback is being generated - if this stays empty, try finishing the interview again.</span></div>`}
+          </div>
+          <button class="secondary-action" type="button" data-close>Done</button>
+        ` : ""}
+      </div>
+    `;
+  },
 
   assessmentResult: () => {
     const result = trackerState.assessment;
@@ -4944,6 +6445,7 @@ function hidePortrait() {
 
 function renderScreen(tab) {
   activeTab = tab;
+  if (tab === "compass") applyCoachProactiveOpener();
   if (tab === "simulator") {
     enterLifeSimMode();
   } else {
@@ -4970,6 +6472,25 @@ function openModal(name, payload) {
   if (name === "assessment" && !modalLayer.classList.contains("is-open")) {
     assessmentStep = 0;
     assessmentDraft = { answers: {}, freeText: "", preferences: [] };
+  }
+  if (name === "interviewPractice" && !modalLayer.classList.contains("is-open")) {
+    activeInterviewSessionId = null;
+    interviewError = "";
+  }
+  if (name === "resumeBuilder" && !modalLayer.classList.contains("is-open")) {
+    resumeError = "";
+  }
+  if (name === "roadmapView" && !modalLayer.classList.contains("is-open")) {
+    roadmapView = "timeline";
+    roadmapError = "";
+    milestoneJustCompleted = null;
+  }
+  if (name === "discoverYourself" && !modalLayer.classList.contains("is-open")) {
+    blueprintActiveSession = 1;
+    const existing = latestBlueprint();
+    blueprintDraft = existing
+      ? { values: [...existing.values], personalityChoice: existing.personalityChoice || "", strengths: [...existing.strengths], strengthsOther: existing.strengthsOther || "", motivationChoice: existing.motivationChoice || "", learningChoice: existing.learningChoice || "", workChoice: existing.workChoice || "", decisionChoice: existing.decisionChoice || "" }
+      : { values: [], personalityChoice: "", strengths: [], strengthsOther: "", motivationChoice: "", learningChoice: "", workChoice: "", decisionChoice: "" };
   }
   modalLayer.innerHTML = getModal(name, payload) || "";
   modalLayer.classList.add("is-open");
@@ -5002,8 +6523,11 @@ function speak(text) {
 
 async function requestCompassAI(question) {
   const documentChunks = retrieveDocumentChunks(question);
+  const blueprint = latestBlueprint();
   const context = {
     savedUserProfile: compassProfileForAI(),
+    personalBlueprint: blueprint ? { values: blueprint.values, strengths: blueprint.strengths, personality: blueprint.personality, motivationStyle: blueprint.motivationStyle, workStyle: blueprint.workStyle, decisionStyle: blueprint.decisionStyle } : null,
+    realSavedFacts: realGrowthFacts(),
     uploadedDocumentChunks: documentChunks
   };
   const history = chatState.messages.slice(-24).filter((message) => !message.local && message.text !== COMPASS_API_ERROR).slice(-20).map((message) => ({
@@ -5092,9 +6616,12 @@ async function runFutureMirrorSimulation() {
   isFutureMirrorLoading = true;
   renderScreen("future");
   try {
-    const reply = await requestCompassDirect(FUTURE_MIRROR_SYSTEM_PROMPT, futureMirrorPrompt(question, category, pathA, pathB));
+    const reply = await requestCompassDirect(FUTURE_MIRROR_SYSTEM_PROMPT, futureMirrorPrompt(question, category, pathA, pathB, futureMirrorMode));
     const parsed = extractJsonObject(reply);
-    const result = normalizeFutureMirrorResult(parsed || { summary: reply }, { question, category, pathA, pathB });
+    if (containsVerdictLanguage(parsed && parsed.summary) || containsVerdictLanguage(reply)) {
+      console.warn("[Future Mirror] Verdict-like language detected in AI reply - keeping generated content but flagging for review.");
+    }
+    const result = normalizeFutureMirrorResult(parsed || { summary: reply }, { question, category, pathA, pathB, mode: futureMirrorMode });
     if (!result.paths.length) {
       result.paths = [
         {
@@ -5248,6 +6775,7 @@ document.addEventListener("click", async (event) => {
   const opportunityCategoryButton = event.target.closest("[data-opportunity-category]");
   const opportunityAi = event.target.closest("[data-opportunity-ai]");
   const runFutureMirror = event.target.closest("[data-run-future-mirror]");
+  const futureMirrorModeButton = event.target.closest("[data-future-mirror-mode]");
   const mirrorExample = event.target.closest("[data-mirror-example]");
   const discussMirror = event.target.closest("[data-discuss-mirror]");
   const saveFutureDecision = event.target.closest("[data-save-future-decision]");
@@ -5262,6 +6790,24 @@ document.addEventListener("click", async (event) => {
   const readinessAi = event.target.closest("[data-readiness-ai]");
   const nextAssessment = event.target.closest("[data-next-assessment]");
   const prevAssessment = event.target.closest("[data-prev-assessment]");
+  const saveBlueprintSessionButton = event.target.closest("[data-save-blueprint-session]");
+  const prevBlueprintSession = event.target.closest("[data-prev-blueprint-session]");
+  const closeAndOpen = event.target.closest("[data-close-and-open]");
+  const futureSelfHorizonButton = event.target.closest("[data-future-self-horizon]");
+  const generateFutureSelfButton = event.target.closest("[data-generate-future-self]");
+  const saveDailyReflectionButton = event.target.closest("[data-save-daily-reflection]");
+  const saveWeeklyLetterButton = event.target.closest("[data-save-weekly-letter]");
+  const saveMilestoneLetterButton = event.target.closest("[data-save-milestone-letter]");
+  const resurfaceActionButton = event.target.closest("[data-resurface-action]");
+  const generateRoadmapButton = event.target.closest("[data-generate-roadmap]");
+  const roadmapViewButton = event.target.closest("[data-roadmap-view]");
+  const setMilestoneStatusButton = event.target.closest("[data-set-milestone-status]");
+  const startInterviewButton = event.target.closest("[data-start-interview]");
+  const sendInterviewAnswerButton = event.target.closest("[data-send-interview-answer]");
+  const saveResumeDraftButton = event.target.closest("[data-save-resume-draft]");
+  const polishResumeButton = event.target.closest("[data-polish-resume]");
+  const copyResumeButton = event.target.closest("[data-copy-resume]");
+  const exportVaultButton = event.target.closest("[data-export-vault]");
   const saveMood = event.target.closest("[data-save-mood]");
   const demoReceipt = event.target.closest("[data-demo-receipt]");
   const saveReceipt = event.target.closest("[data-save-receipt]");
@@ -5683,6 +7229,148 @@ document.addEventListener("click", async (event) => {
     renderScreen(activeTab);
     refreshStaticScreens();
     openModal("assessmentResult");
+  }
+
+  if (futureMirrorModeButton) {
+    futureMirrorMode = futureMirrorModeButton.dataset.futureMirrorMode;
+    renderScreen("future");
+  }
+
+  if (prevBlueprintSession) {
+    captureBlueprintDraft();
+    blueprintActiveSession = Math.max(1, blueprintActiveSession - 1);
+    openModal("discoverYourself");
+  }
+
+  if (saveBlueprintSessionButton) {
+    const savedVersion = saveBlueprintSession(Number(saveBlueprintSessionButton.dataset.saveBlueprintSession));
+    if (blueprintActiveSession < BLUEPRINT_SESSIONS.length) {
+      blueprintActiveSession += 1;
+      openModal("discoverYourself");
+    } else {
+      blueprintMicroInsightText = blueprintMicroInsight(savedVersion);
+      closeModal();
+      renderScreen(activeTab);
+      refreshStaticScreens();
+    }
+  }
+
+  if (closeAndOpen) {
+    openModal(closeAndOpen.dataset.closeAndOpen);
+  }
+
+  if (futureSelfHorizonButton) {
+    futureSelfActiveHorizon = futureSelfHorizonButton.dataset.futureSelfHorizon;
+    futureSelfError = "";
+    openModal("futureSelfView");
+  }
+
+  if (generateFutureSelfButton) {
+    await generateFutureSelfSnapshot(generateFutureSelfButton.dataset.generateFutureSelf);
+  }
+
+  if (saveDailyReflectionButton) {
+    const text = modalLayer.querySelector("#daily-reflection-text");
+    const content = cleanText(text ? text.value : "", 1200);
+    if (content) {
+      createReflectionEntry("daily", content, { tags: ["daily", saveDailyReflectionButton.dataset.saveDailyReflection] });
+      dailyReflectionPromptIndex += 1;
+      closeModal();
+      renderScreen(activeTab);
+      refreshStaticScreens();
+    }
+  }
+
+  if (saveWeeklyLetterButton) {
+    const text = modalLayer.querySelector("#weekly-letter-text");
+    const content = cleanText(text ? text.value : "", 1200);
+    if (content) {
+      createReflectionEntry("weeklyLetter", content);
+      closeModal();
+      renderScreen(activeTab);
+      refreshStaticScreens();
+    }
+  }
+
+  if (saveMilestoneLetterButton) {
+    const text = modalLayer.querySelector("#milestone-letter-text");
+    const content = cleanText(text ? text.value : "", 1400);
+    if (content) {
+      createReflectionEntry("milestoneLetter", content);
+      closeModal();
+      renderScreen(activeTab);
+      refreshStaticScreens();
+    }
+  }
+
+  if (resurfaceActionButton) {
+    const [id, action] = resurfaceActionButton.dataset.resurfaceAction.split(":");
+    resurfaceEntryAction(id, action);
+    renderScreen(activeTab);
+    refreshStaticScreens();
+  }
+
+  if (generateRoadmapButton) {
+    const titleInput = modalLayer.querySelector("#roadmap-goal-title");
+    const horizonInput = modalLayer.querySelector("#roadmap-goal-horizon");
+    const title = cleanText(titleInput ? titleInput.value : "", 160);
+    if (title) await generateRoadmapGoal(title, horizonInput ? horizonInput.value : "1-year");
+  }
+
+  if (roadmapViewButton) {
+    roadmapView = roadmapViewButton.dataset.roadmapView;
+    openModal("roadmapView");
+  }
+
+  if (setMilestoneStatusButton) {
+    const [goalId, milestoneId, status] = setMilestoneStatusButton.dataset.setMilestoneStatus.split(":");
+    setMilestoneStatus(goalId, milestoneId, status);
+    openModal("roadmapView");
+  }
+
+  if (event.target.closest("[data-reflect-on-milestone]")) {
+    const button = event.target.closest("[data-reflect-on-milestone]");
+    const content = `Reached a Roadmap milestone: "${button.dataset.milestoneTitleValue}" (goal: ${button.dataset.goalTitleValue}). `;
+    createReflectionEntry("milestoneLetter", content + (modalLayer.querySelector("#milestone-reflection-note") ? modalLayer.querySelector("#milestone-reflection-note").value : ""), { resurfaceDays: 30, tags: ["roadmap-milestone"] });
+    milestoneJustCompleted = null;
+    openModal("roadmapView");
+  }
+
+  if (startInterviewButton) {
+    await startInterviewSession(startInterviewButton.dataset.startInterview);
+  }
+
+  if (sendInterviewAnswerButton) {
+    const input = modalLayer.querySelector("#interview-answer-input");
+    const text = input ? input.value.trim() : "";
+    if (text) {
+      if (input) input.value = "";
+      await sendInterviewAnswer(text);
+    }
+  }
+
+  if (saveResumeDraftButton) {
+    saveResumeDraft();
+    openModal("resumeBuilder");
+  }
+
+  if (polishResumeButton) {
+    await polishResumeWithAI();
+  }
+
+  if (copyResumeButton) {
+    const resume = trackerState.careerStudio.resume;
+    if (resume && resume.polishedText && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(resume.polishedText);
+      } catch (error) {
+        console.error("[Resume Builder] Clipboard copy failed", error);
+      }
+    }
+  }
+
+  if (exportVaultButton) {
+    downloadKnowledgeVaultExport();
   }
 
   if (exploreReadinessFuture) {

@@ -2841,6 +2841,109 @@ h3 {
   font-size: 12px;
 }
 
+.modal-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.modal-action-row .primary-action,
+.modal-action-row .secondary-action {
+  width: auto;
+  flex: 1;
+}
+
+.job-match-card {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  margin-bottom: 8px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.mini-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--color-mint-soft);
+  color: var(--color-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.resume-preview-card {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.resume-preview-text {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-ink);
+}
+
+.empty-state-card {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  text-align: center;
+}
+
+.empty-state-card .primary-action {
+  margin-top: 10px;
+}
+
+.vault-section {
+  margin-top: 16px;
+}
+
+.vault-section h4 {
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.vault-entry-row,
+.vault-empty-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  margin-bottom: 6px;
+}
+
+.vault-entry-row strong {
+  flex: 0 0 auto;
+}
+
+.vault-entry-row span {
+  flex: 1 1 160px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.vault-empty-row span {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
 .dark-modal {
   background: var(--color-ink);
   color: #fff;

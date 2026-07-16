@@ -162,7 +162,7 @@ async function callGemini({ systemPrompt, messages, context }) {
       generationConfig: {
         temperature: 0.75,
         topP: 0.9,
-        maxOutputTokens: 650,
+        maxOutputTokens: 1100,
       },
     }),
   });
@@ -199,7 +199,7 @@ async function callGroq({ systemPrompt, messages, context }) {
       messages: buildChatMessages(systemPrompt, messages, context),
       temperature: 0.75,
       top_p: 0.9,
-      max_completion_tokens: 650,
+      max_completion_tokens: 1100,
     }),
   });
 
@@ -235,7 +235,7 @@ async function callOpenAI({ systemPrompt, messages, context }) {
     body: JSON.stringify({
       model: openaiModel,
       input,
-      max_output_tokens: 650,
+      max_output_tokens: 1100,
     }),
   });
 
