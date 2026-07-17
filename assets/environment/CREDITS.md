@@ -14,3 +14,10 @@
 - `tree-palm.glb`, `tree-palm-bend.glb` — from Kenney's "Nature Kit" pack (`tree_palm.glb`, `tree_palmBend.glb`), https://kenney.nl/assets/nature-kit
 
 License: CC0 1.0 (public domain). Free for personal, educational, and commercial use. Attribution to Kenney (www.kenney.nl) is appreciated but not required.
+
+## city-kit-quaternius/
+
+- `Building_Small_1.gltf`, `Building_Medium_2_001.gltf`, `Building_Large_2.gltf`, `Sidewalk_Straight_3m.gltf`, `Street_2Lane.gltf` (+ shared `.bin`/`T_*.png` texture files) — from Quaternius's "Downtown City MegaKit" (free/CC0 standard version), https://quaternius.itch.io/downtown-city-megakit
+- Real modeled+textured buildings (brick/window/trim detail) used to replace the primitive-box HDB/mall placeholders in Woodlands, per the art-direction reassessment in this session - this is the pilot district for that swap.
+
+License: CC0 1.0 Universal (public domain). Free for personal, educational, and commercial use. Attribution to Quaternius (quaternius.com) is appreciated but not required.

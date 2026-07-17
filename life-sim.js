@@ -6,27 +6,37 @@
   // University Town is far west, Changi/Airport is far east, and the
   // Chinatown/Little India/Bugis trio sits where they really do relative to
   // the rest: south, north-central, and central.
+  // Urban-planning replan (Volume 7 real-asset pass): the original compact
+  // coordinates below packed every zone within 12-20 units of its neighbors,
+  // which was fine for tiny primitive-box buildings but causes real modeled
+  // buildings (12-20 unit footprints) to overlap. Every zone was replotted
+  // with a verified minimum of ~28 world units of center-to-center clearance
+  // from every OTHER zone (not just its nearest neighbor), while preserving
+  // the existing compass geography (university stays far west, airport/
+  // Changi far east, Woodlands the northmost point, the downtown ring -
+  // marina-bay/chinatown/little-india/bugis/mall - kept as a recognizable
+  // cluster around the CBD). This roughly tripled the map's area.
   const locationZones = [
-    { id: "home", name: "Home", x: -6, z: 24, radius: 5.4 },
-    { id: "gym", name: "Gym", x: -20, z: 26, radius: 4.5 },
-    { id: "work", name: "Office", x: -6, z: -26, radius: 5 },
-    { id: "food", name: "Food Court", x: 10, z: -14, radius: 5.4 },
-    { id: "mall", name: "Shopping Mall", x: -6, z: -2, radius: 5.5 },
-    { id: "park", name: "Park", x: 10, z: 28, radius: 6.2 },
-    { id: "library", name: "Library", x: 10, z: 2, radius: 4.5 },
-    { id: "hospital", name: "Hospital", x: 26, z: -14, radius: 4.8 },
-    { id: "cafe", name: "Cafe", x: -22, z: -2, radius: 4 },
-    { id: "beach", name: "Beach", x: 28, z: -30, radius: 5 },
-    { id: "airport", name: "Airport", x: 36, z: 10, radius: 5.3 },
-    { id: "train", name: "Train Station", x: -6, z: 10, radius: 4.6 },
-    { id: "university", name: "University", x: -36, z: 0, radius: 5 },
-    { id: "marina-bay", name: "Marina Bay", x: 14, z: -26, radius: 6 },
-    { id: "chinatown", name: "Chinatown", x: -10, z: -14, radius: 5 },
-    { id: "little-india", name: "Little India", x: 10, z: 14, radius: 5 },
-    { id: "bugis", name: "Bugis", x: 24, z: 2, radius: 4.8 },
+    { id: "home", name: "Home", x: -30, z: 40, radius: 5.4 },
+    { id: "gym", name: "Gym", x: -60, z: 52, radius: 4.5 },
+    { id: "work", name: "Office", x: -25, z: -85, radius: 5 },
+    { id: "food", name: "Food Court", x: 20, z: -95, radius: 5.4 },
+    { id: "mall", name: "Shopping Mall", x: 0, z: -32, radius: 5.5 },
+    { id: "park", name: "Park", x: 13, z: 23, radius: 6.2 },
+    { id: "library", name: "Library", x: 41, z: 12, radius: 4.5 },
+    { id: "hospital", name: "Hospital", x: 80, z: -53, radius: 4.8 },
+    { id: "cafe", name: "Cafe", x: -50, z: -25, radius: 4 },
+    { id: "beach", name: "Beach", x: 75, z: -82, radius: 5 },
+    { id: "airport", name: "Airport", x: 110, z: -10, radius: 5.3 },
+    { id: "train", name: "Train Station", x: -13, z: 8, radius: 4.6 },
+    { id: "university", name: "University", x: -80, z: -5, radius: 5 },
+    { id: "marina-bay", name: "Marina Bay", x: 40, z: -61, radius: 6 },
+    { id: "chinatown", name: "Chinatown", x: 10, z: -61, radius: 5 },
+    { id: "little-india", name: "Little India", x: 25, z: -14, radius: 5 },
+    { id: "bugis", name: "Bugis", x: 50, z: -32, radius: 4.8 },
     // Woodlands sits at the true far north of real Singapore (by the
-    // Causeway to Malaysia) - placed beyond the north heartland cluster,
-    // which needed the map's north bound extended from 38 to 60 to fit it.
+    // Causeway to Malaysia) - kept at its existing position (already built),
+    // still the northmost point of the new, much larger map.
     { id: "woodlands", name: "Woodlands", x: 0, z: 50, radius: 7.5 }
   ];
 
@@ -313,15 +323,12 @@
         const speed = 7.8 + state.moveSpeed * 1.25;
         player.group.position.addScaledVector(direction, speed * state.moveSpeed * delta);
         // Bounds must cover every built zone's full extent, not just its
-        // trigger-radius center - Marina Bay's towers (z up to 34), the
-        // University Town lecture hall (x -40), and Sentosa's palms (z -34.5)
-        // previously sat outside the old (-38..38, -33..27) box, so walking
-        // toward them (or even standing still after a teleport there) got
-        // silently snapped back mid-stride the instant you moved.
-        // Extended north (was -38..38) to make room for the new Woodlands
-        // district at the far north edge of the map.
-        player.group.position.x = clamp(player.group.position.x, -44, 44);
-        player.group.position.z = clamp(player.group.position.z, -38, 60);
+        // trigger-radius center. Re-expanded for the real-asset spacing
+        // replan (locationZones/ZONE_DELTA above) - the map's usable area
+        // roughly tripled (new zone bounding box is x:[-85,115], z:[-100,57])
+        // to give real modeled buildings enough clearance from each other.
+        player.group.position.x = clamp(player.group.position.x, -88, 118);
+        player.group.position.z = clamp(player.group.position.z, -103, 60);
         const targetAngle = Math.atan2(direction.x, direction.z);
         player.group.rotation.y = lerpAngle(player.group.rotation.y, targetAngle, Math.min(1, delta * 8.5));
         state.footstepTimer -= delta * state.moveSpeed;
@@ -1082,21 +1089,33 @@
   // straight into `scene`, then repositions that whole group by a delta, so
   // every prop inside moves together without touching a single literal.
   // Deltas below are (new real-Singapore-aligned center) - (old center).
+  //
+  // Re-replan (real-asset spacing pass): recomputed as
+  // NEW_DELTA = OLD_DELTA + (NEW_ZONE_POS - OLD_ZONE_POS) for every existing
+  // entry, since OLD_DELTA already encodes (old zone pos - each function's
+  // own implicit origin) - this moves every building with its zone without
+  // needing to touch a single literal coordinate inside the build functions.
+  // chinatown/little-india/bugis are new entries here: those three functions
+  // previously used literal coordinates that WERE their real zone center (no
+  // delta needed), so their delta is simply (new zone pos - old zone pos).
   const ZONE_DELTA = {
-    home: [18, 7],
-    gym: [-11, 6],
-    work: [-24, -44],
-    food: [32, -1],
-    mall: [-24, 10],
-    park: [8, 50],
-    library: [35, 0],
-    hospital: [-4, -26],
-    cafe: [-13, 22],
-    beach: [4, 0],
-    airport: [1, 11],
-    train: [-10, 13.5],
-    university: [-2, 7],
-    "marina-bay": [-11, -58]
+    home: [-6, 23],
+    gym: [-51, 32],
+    work: [-43, -103],
+    food: [42, -82],
+    mall: [-18, -20],
+    park: [11, 45],
+    library: [66, 10],
+    hospital: [50, -65],
+    cafe: [-41, -1],
+    beach: [51, -52],
+    airport: [75, -9],
+    train: [-17, 11.5],
+    university: [-46, 2],
+    "marina-bay": [15, -93],
+    chinatown: [20, -47],
+    "little-india": [15, -28],
+    bugis: [26, -34]
   };
 
   function addZoneAt(buildFn, THREE, scene, mat, deltaKey) {
@@ -1110,12 +1129,15 @@
   }
 
   function createDistrict(THREE, scene, mat) {
-    addPlane(THREE, scene, "Soft Anime Town Ground", [0, -0.04, 11], [90, 100], mat.ground);
-    addPlane(THREE, scene, "North Residential Green", [-6, -0.02, 21], [23, 25], mat.grass);
-    addPlane(THREE, scene, "Campus Green", [-33, -0.015, -1], [18, 18], mat.grass);
-    addPlane(THREE, scene, "Park Green", [9, -0.01, 27], [22, 18], mat.park);
-    addPlane(THREE, scene, "Beach Sand", [30, 0, -31], [25, 10], mat.sand);
-    addPlane(THREE, scene, "Shallow Anime Sea", [30, 0.015, -37], [26, 8], mat.water);
+    // Ground + themed patches resized/repositioned for the real-asset
+    // spacing replan - new bounds are x:[-85,115], z:[-100,57] (roughly
+    // tripled from the original compact map).
+    addPlane(THREE, scene, "Soft Anime Town Ground", [15, -0.04, -21.5], [210, 165], mat.ground);
+    addPlane(THREE, scene, "North Residential Green", [-45, -0.02, 46], [55, 35], mat.grass);
+    addPlane(THREE, scene, "Campus Green", [-80, -0.015, -5], [26, 26], mat.grass);
+    addPlane(THREE, scene, "Park Green", [13, -0.01, 23], [24, 20], mat.park);
+    addPlane(THREE, scene, "Beach Sand", [75, 0, -82], [26, 11], mat.sand);
+    addPlane(THREE, scene, "Shallow Anime Sea", [75, 0.015, -90], [28, 9], mat.water);
 
     addRoadNetwork(THREE, scene, mat);
     addZoneAt(addHdbHome, THREE, scene, mat, "home");
@@ -1132,10 +1154,10 @@
     addZoneAt(addTrainStation, THREE, scene, mat, "train");
     addZoneAt(addUniversity, THREE, scene, mat, "university");
     addZoneAt(addMarinaBayLandmark, THREE, scene, mat, "marina-bay");
+    addZoneAt(addChinatown, THREE, scene, mat, "chinatown");
+    addZoneAt(addLittleIndia, THREE, scene, mat, "little-india");
+    addZoneAt(addBugis, THREE, scene, mat, "bugis");
     addStreetLife(THREE, scene, mat);
-    addChinatown(THREE, scene, mat);
-    addLittleIndia(THREE, scene, mat);
-    addBugis(THREE, scene, mat);
     addWoodlands(THREE, scene, mat);
     addBox(THREE, scene, "Woodlands Access Road", [0, 0.025, 34], [5.2, 0.08, 32], mat.road, true);
     for (let z = 20; z <= 56; z += 6) addBox(THREE, scene, "Road Center Line NS", [0, 0.13, z], [0.25, 0.04, 2.15], mat.roadLine, true);
@@ -1212,13 +1234,19 @@
   // generic city-wide TREE_POSITIONS scatter, lining the pedestrian mall walk
   // added in addMall(). World coordinates already account for the "mall"
   // zone's urban-planning delta of (-24, +10).
-  const ORCHARD_STREET_TREE_POSITIONS = [[-16, -12], [-12, -12], [-8, -12], [-4, -12], [0, -12], [4, -12]];
+  // Shifted by the same (+6,-30) delta as the "mall" zone in the real-asset
+  // spacing replan.
+  const ORCHARD_STREET_TREE_POSITIONS = [[-10, -42], [-6, -42], [-2, -42], [2, -42], [6, -42], [10, -42]];
 
   // Sentosa: palm trees ring the existing Beach zone (boardwalk/umbrellas/
   // bench/rock stay untouched) - upright palms mark the open sand, bent
   // palms lean in near the shoreline for variety.
-  const SENTOSA_PALM_POSITIONS = [[18, -32], [20, -25.5], [27, -25], [35, -28.5]];
-  const SENTOSA_PALM_BEND_POSITIONS = [[24, -34.5], [32, -33]];
+  // Shifted by the same (+47,-52) delta as the "beach" zone in the real-asset
+  // spacing replan (these are absolute world coordinates, not delta-adjusted
+  // by addZoneAt, since they're consumed directly by the asset-swap
+  // positions list rather than built inside addBeach()).
+  const SENTOSA_PALM_POSITIONS = [[65, -84], [67, -77.5], [74, -77], [82, -80.5]];
+  const SENTOSA_PALM_BEND_POSITIONS = [[71, -86.5], [79, -85]];
 
   async function loadDistrictAssetSamples(THREE, scene, assetManager, state) {
     if (!assetManager) return;
@@ -1229,25 +1257,25 @@
       {
         url: "assets/environment/hdb-block.glb",
         hideNamePrefixes: ["HDB Home Block A", "HDB Home Block B"],
-        position: [-6, 0, 26.2],
+        position: [-30, 0, 42.2],
         scale: [5.5, 5.5, 5.5]
       },
       {
         url: "assets/environment/office-tower.glb",
         hideNamePrefixes: ["Office Tower"],
-        position: [-6, 0, -24],
+        position: [-25, 0, -83],
         scale: [5.5, 5.5, 5.5]
       },
       {
         url: "assets/environment/library.glb",
         hideNames: ["Library Reading Hall", "Library Roof", "Library Quiet Glass"],
-        position: [10, 0, 2],
+        position: [41, 0, 12],
         scale: [2.5, 2.5, 2.5]
       },
       {
         url: "assets/environment/city-kit-commercial/mall-building.glb",
         hideNames: ["Mall Main Atrium", "Mall Glass Front", "Mall Round Atrium"],
-        position: [-6, 0, -5],
+        position: [0, 0, -35],
         scale: [6, 6, 6]
       },
       {
@@ -1268,24 +1296,24 @@
       // fronts/signage/plants stay exactly where they were.
       {
         url: "assets/environment/city-kit-commercial/orchard-shop-a.glb",
-        position: [-14, 0, -5],
+        position: [-8, 0, -35],
         scale: [6.5, 6.5, 6.5]
       },
       {
         url: "assets/environment/city-kit-commercial/orchard-shop-b.glb",
-        position: [2, 0, -5],
+        position: [8, 0, -35],
         scale: [4.2, 4.2, 4.2]
       },
       // University Town: adds a lecture hall and a hostel block near the
       // existing University zone, purely additive like Orchard Road above.
       {
         url: "assets/environment/university-lecture-hall.glb",
-        position: [-42, 0, 0],
+        position: [-86, 0, -5],
         scale: [3.5, 3.5, 3.5]
       },
       {
         url: "assets/environment/university-hostel.glb",
-        position: [-36, 0, -7],
+        position: [-80, 0, -12],
         scale: [3.2, 3.2, 3.2]
       },
       // Marina Bay / CBD: three City Kit Commercial skyscrapers cluster around
@@ -1295,17 +1323,17 @@
       // of that specific silhouette.
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
-        position: [4, 0, -32],
+        position: [30, 0, -67],
         scale: [4.9, 4.9, 4.9]
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-c.glb",
-        position: [14, 0, -24],
+        position: [40, 0, -59],
         scale: [4.4, 4.4, 4.4]
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
-        position: [24, 0, -32],
+        position: [50, 0, -67],
         scale: [3.9, 3.9, 3.9]
       },
       // Sentosa: purely additive palm trees around the existing Beach zone.
@@ -1318,6 +1346,29 @@
         url: "assets/environment/tree-palm-bend.glb",
         positions: SENTOSA_PALM_BEND_POSITIONS,
         scale: [3.0, 3.0, 3.0]
+      },
+      // Woodlands pilot: real modeled+textured buildings (Quaternius's free
+      // CC0 "Downtown City MegaKit") replacing the primitive-box HDB blocks
+      // and mall, per the art-direction reassessment in this session. Spread
+      // further apart than the boxes they replace since these models are
+      // larger and more detailed than a plain box footprint.
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.gltf",
+        hideNamePrefixes: ["Woodlands HDB Block A"],
+        position: [-11, 0, 53],
+        scale: [1, 1, 1]
+      },
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Small_1.gltf",
+        hideNamePrefixes: ["Woodlands HDB Block B"],
+        position: [-27, 0, 47],
+        scale: [1, 1, 1]
+      },
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Large_2.gltf",
+        hideNames: ["Causeway Point Mall", "Causeway Point Glass Front", "Causeway Point Roof"],
+        position: [22, 0, 48],
+        scale: [1, 1, 1]
       }
     ];
 
@@ -1367,38 +1418,48 @@
     }
   }
 
+  // Rebuilt for the real-asset spacing replan: the old cross-shaped road
+  // (two ~70-unit boxes) covered the entire old compact map, but the new
+  // zone layout spans roughly 200x157 units. Main Road NS runs along x=0
+  // (Mall and Woodlands both sit near that line); Main Road EW runs along
+  // z=-32 (the downtown-ring zones - Mall/Bugis - sit on that line), meeting
+  // at the Mall zone as a natural central hub. Every other zone gets a
+  // direct addPath connector into this spine or into a nearby zone, so the
+  // whole 18-zone map is one connected network, not scattered islands.
   function addRoadNetwork(THREE, scene, mat) {
     [
-      ["Main Road NS", [0, 0.01, -2], [6.8, 0.08, 65]],
-      ["Main Road EW", [0, 0.02, 0], [74, 0.08, 6.8]],
-      ["Residential Lane", [-20, 0.025, 8], [5.2, 0.08, 27]],
-      ["Airport Access Road", [28, 0.025, 2], [5.2, 0.08, 35]]
+      ["Main Road NS", [0, 0.01, 8], [7, 0.08, 100]],
+      ["Main Road EW", [30, 0.02, -32], [162, 0.08, 7]]
     ].forEach(([name, position, scale]) => addBox(THREE, scene, name, position, scale, mat.road, true));
 
     [
-      [0, 7, 72, 1.8],
-      [0, -7, 72, 1.8],
-      [-7, -2, 1.8, 62],
-      [7, -2, 1.8, 62],
-      [-26, 8, 1.6, 28],
-      [-14, 8, 1.6, 28],
-      [22, 2, 1.6, 36],
-      [34, 2, 1.6, 36]
-    ].forEach(([x, z, sx, sz]) => addBox(THREE, scene, "Anime Sidewalk", [x, 0.08, z], [sx, 0.12, sz], mat.sidewalk, true));
+      // North residential branch
+      [-30, 40, 0, 40],
+      [-60, 52, -30, 40],
+      // Central spine spurs
+      [-13, 8, 0, 8],
+      [13, 23, 0, 23],
+      [41, 12, 0, 12],
+      [25, -14, 0, -14],
+      // Downtown ring, hanging off Main Road EW
+      [10, -61, 10, -32],
+      [40, -61, 40, -32],
+      // East/southeast coastal chain
+      [80, -53, 80, -32],
+      [75, -82, 80, -53],
+      [110, -10, 110, -32],
+      // West cluster
+      [-80, -5, -50, -25],
+      [-50, -25, -50, -32],
+      // South cluster
+      [-25, -85, 0, -32],
+      [20, -95, -25, -85]
+    ].forEach(([x1, z1, x2, z2]) => addPath(THREE, scene, [x1, z1], [x2, z2], 1.3, mat.path));
 
-    [
-      [-30, -6, -21, -13],
-      [-15, -13, -8, -24],
-      [7, -20, 17, -13],
-      [18, -18, 25, -29],
-      [-15, 18, -9, 20],
-      [18, 12, 30, 12]
-    ].forEach(([x1, z1, x2, z2]) => addPath(THREE, scene, [x1, z1], [x2, z2], 1.15, mat.path));
-
-    for (let z = -29; z <= 28; z += 6) addBox(THREE, scene, "Road Center Line NS", [0, 0.13, z], [0.25, 0.04, 2.15], mat.roadLine, true);
-    for (let x = -34; x <= 34; x += 6) addBox(THREE, scene, "Road Center Line EW", [x, 0.14, 0], [2.15, 0.04, 0.25], mat.roadLine, true);
-    [-20, 0, 28].forEach((x) => addCrosswalk(THREE, scene, [x, -4.2], mat, "x"));
-    [-7, 7].forEach((z) => addCrosswalk(THREE, scene, [-4.2, z], mat, "z"));
+    for (let z = -35; z <= 57; z += 6) addBox(THREE, scene, "Road Center Line NS", [0, 0.13, z], [0.25, 0.04, 2.15], mat.roadLine, true);
+    for (let x = -50; x <= 110; x += 6) addBox(THREE, scene, "Road Center Line EW", [x, 0.14, -32], [2.15, 0.04, 0.25], mat.roadLine, true);
+    addCrosswalk(THREE, scene, [0, -28], mat, "x");
+    addCrosswalk(THREE, scene, [-4, -32], mat, "z");
   }
 
   function addHdbHome(THREE, scene, mat) {
@@ -1628,13 +1689,19 @@
     addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX + 4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
     addSignBoard(THREE, scene, "Woodlands Interchange Sign", "WOODLANDS", [baseX - 4.5, 4.4, baseZ - 3.6], mat.signBlue, 0xffffff);
 
-    // Causeway Point mall, right next to the interchange (as it is in reality)
+    // Causeway Point mall, right next to the interchange (as it is in reality).
+    // The visible mall volume itself is swapped for a real modeled building in
+    // loadDistrictAssetSamples() (Building_Large_2, positioned at [22,0,48]) -
+    // these boxes stay only as the hidden placeholder loadDistrictAssetSamples
+    // matches by name before the real asset finishes loading.
     addBox(THREE, scene, "Causeway Point Mall", [baseX + 12, 4.2, baseZ - 1], [10, 8.4, 8], mat.mall);
     addBox(THREE, scene, "Causeway Point Glass Front", [baseX + 12, 3.6, baseZ - 5.1], [8, 5.5, 0.18], mat.glass);
     addBox(THREE, scene, "Causeway Point Roof", [baseX + 12, 8.6, baseZ - 1], [10.8, 0.4, 8.8], mat.roofDark);
-    addSignBoard(THREE, scene, "Causeway Point Sign", "CAUSEWAY POINT", [baseX + 7.5, 6.8, baseZ - 5.3], mat.signBlue, 0xffffff);
+    addSignBoard(THREE, scene, "Causeway Point Sign", "CAUSEWAY POINT", [baseX + 11, 6.8, baseZ - 9], mat.signBlue, 0xffffff);
 
-    // Woodlands/Admiralty/Marsiling HDB heartland cluster
+    // Woodlands/Admiralty/Marsiling HDB heartland cluster. Both blocks are
+    // swapped for real modeled buildings in loadDistrictAssetSamples() (at
+    // [-11,0,53] and [-27,0,47]) - these stay only as hidden placeholders.
     addBuildingCore(THREE, scene, "Woodlands HDB Block A", [baseX - 13, 9, baseZ + 3], [6, 18, 4.6], mat.hdb, mat);
     addBuildingCore(THREE, scene, "Woodlands HDB Block B", [baseX - 19, 7.5, baseZ - 3], [5.2, 15, 4.2], mat.hdbAccent, mat);
     addFlowerBed(THREE, scene, [baseX - 13, baseZ + 8], 4, mat);
