@@ -4306,13 +4306,19 @@ textarea {
 .mirror-error-card,
 .mirror-timeline-card,
 .mirror-reflection-card,
-.mirror-integration-card {
+.mirror-integration-card,
+.future-scan-synthesis-card {
   display: grid;
   gap: 10px;
   margin-top: 14px;
   padding: 16px;
   border: 1px solid rgba(26, 26, 26, 0.06);
   background: rgba(255, 255, 255, 0.9);
+}
+
+.future-scan-synthesis-card {
+  border-radius: var(--radius-lg);
+  border-color: rgba(26, 26, 26, 0.1);
 }
 
 .mirror-error-card {
@@ -7296,6 +7302,90 @@ body.life-sim-active .lifeverse-consequence-toast {
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Future Scan (new Prep Mode inside the Mirror tab) */
+
+.mirror-example-row button.is-selected {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: #fff;
+}
+
+.future-scan-grid .wide-action.is-locked {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.future-scan-group {
+  margin-top: 18px;
+}
+
+.future-scan-group:first-of-type {
+  margin-top: 10px;
+}
+
+.future-scan-suggested {
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--color-mint-soft);
+}
+
+.future-scan-group-title {
+  margin-bottom: 0;
+}
+
+.future-scan-group-subtitle {
+  margin: 2px 0 10px;
+}
+
+.future-scan-signal-banner {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-mint-soft);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 780;
+  line-height: 1.4;
+}
+
+.future-scan-signal-banner.caution {
+  background: #ffe1df;
+}
+
+.future-scan-signal-banner.positive {
+  background: var(--color-calm);
+}
+
+.future-scan-signal-banner.mixed {
+  background: #fff1ce;
+}
+
+.scan-cost-row {
+  opacity: 0;
+  animation: bubbleIn 260ms ease both;
+}
+
+.scan-timeline-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+  margin-top: 12px;
+}
+
+.scan-timeline-card {
+  flex: 0 0 78%;
+  scroll-snap-align: start;
+  margin-top: 0;
+}
+
+@media (min-width: 480px) {
+  .scan-timeline-card {
+    flex-basis: 46%;
   }
 }
 

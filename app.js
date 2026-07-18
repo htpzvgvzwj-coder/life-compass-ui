@@ -53,6 +53,64 @@ const futureMirrorExamples = [
   "Should I join this challenge?"
 ];
 
+// Future Scan station catalog - all 10 stations are fully implemented; each
+// opens as a modal from the grid in futureScanStationGrid() (see
+// modals.futureScanStation for the per-station view dispatch). Each station
+// belongs to one of FUTURE_SCAN_GROUPS below, purely for how the grid is
+// organized - it doesn't change what a station does.
+const FUTURE_SCAN_STATIONS = [
+  { id: "identityScan", title: "Future Identity Scan", blurb: "See which future self this choice moves you toward.", group: "now" },
+  { id: "valuesCheck", title: "Values Consistency Check", blurb: "Compare this choice against the values you've already saved.", group: "now" },
+  { id: "hiddenCosts", title: "Hidden Cost Scanner", blurb: "See what this choice actually spends - sleep, focus, confidence.", group: "now" },
+  { id: "noActionFuture", title: "No-Action Future", blurb: "See where staying exactly the same leads.", group: "now" },
+  { id: "pressureTest", title: "Choice Pressure Test", blurb: "Check whether pressure, fear, or comparison is driving this.", group: "context" },
+  { id: "conflictMap", title: "Future Conflict Map", blurb: "See which of your goals are actually in tension here.", group: "context" },
+  { id: "signalRadar", title: "Future Signal Radar", blurb: "Rate how ready you feel right now - not a score, a moment check.", group: "context" },
+  { id: "pastSelfCheck", title: "Past-Self Consistency Check", blurb: "See what you chose in similar moments before.", group: "time" },
+  { id: "driftDetector", title: "Drift Detector", blurb: "See if you're slowly drifting from where you said you wanted to go.", group: "time" },
+  { id: "checkBack", title: "Check-Back", blurb: "Come back later and see if the prediction matched real life.", group: "time" }
+];
+
+const FUTURE_SCAN_GROUPS = [
+  { id: "now", title: "Right now", subtitle: "What this choice actually is." },
+  { id: "context", title: "Context check", subtitle: "Why you're choosing this, right now." },
+  { id: "time", title: "Across time", subtitle: "Past patterns, current trend, future check-in." }
+];
+
+const FUTURE_IDENTITY_OPTIONS = [
+  "Independent adult", "Confident communicator", "Financially stable person",
+  "Strong student", "Healthy and balanced person", "Someone my family can trust",
+  "Creative builder", "Future leader"
+];
+
+// Picking a pressure source is optional (unlike identity picks) - the AI can
+// also read pressure/fear/comparison straight off the raw scanContext, so a
+// user shouldn't be blocked from running this just because none of the
+// presets fit.
+const FUTURE_SCAN_PRESSURE_OPTIONS = [
+  "Peer pressure", "Family expectation", "Fear of missing out",
+  "Fear of failing", "Comparing myself to others", "Feeling rushed"
+];
+
+const FUTURE_SCAN_SIGNAL_DIMENSIONS = [
+  { id: "energy", label: "Energy" },
+  { id: "clarity", label: "Clarity" },
+  { id: "confidence", label: "Confidence" },
+  { id: "urgency", label: "Urgency" }
+];
+const FUTURE_SCAN_SIGNAL_LEVELS = ["Low", "Medium", "High"];
+
+const FUTURE_SCAN_CHECKBACK_HORIZONS = [
+  { id: "1w", label: "In 1 week", days: 7 },
+  { id: "1m", label: "In 1 month", days: 30 },
+  { id: "3m", label: "In 3 months", days: 90 }
+];
+
+// Same "augment judgment, never decide for them, never invent a memory that
+// isn't real" rules as COMPASS_SYSTEM_PROMPT/FUTURE_MIRROR_SYSTEM_PROMPT,
+// scoped to Future Scan's specific job.
+const FUTURE_SCAN_SYSTEM_PROMPT = "You are Future Scan, a module inside Compass's Future Mirror. Your job is to help the user see the truth about a real choice before they make it - not to decide for them. Ground every claim only in the scanContext and saved profile data you are given; never invent a memory, pattern, or fact that isn't actually present in what you were told. Never state or imply a recommended choice (no \"you should\", no \"the better option is\"). Be concise, concrete, and youth-friendly. Avoid clinical or diagnostic language, especially around emotional or mental state - this is not a mental health assessment.";
+
 const inspireCategories = [
   "All",
   "Entrepreneurs",
@@ -136,6 +194,12 @@ const defaultTrackerState = {
   decisions: [],
   roadmapGoals: [],
   futureSelfSnapshots: [],
+  // Future Scan ("Prep Mode" reimagined) - additive third mode inside Future
+  // Mirror, alongside Decision Simulator/Life Compass. One record per scan
+  // session accumulates every station's result rather than 10 separate
+  // arrays. Plugs into the existing reflection-resurfacing system
+  // (allReflectionLikeEntries/dueForResurfacing) as a third _source.
+  futureScans: [],
   careerStudio: {
     interviewSessions: [],
     resume: null
@@ -693,6 +757,32 @@ let isFutureMirrorLoading = false;
 let futureMirrorError = "";
 let futureMirrorDraft = null;
 let futureMirrorMode = "simulator";
+
+// Future Scan - third Future Mirror mode ("help the user see the truth before
+// they choose", not a checklist and not another open-ended chat - Compass AI
+// already covers that). Entry flow (raw input -> one AI clarifying question ->
+// scanContext) seeds every station; stations are opened as modals from the
+// grid in futureScanStationGrid(). See modals.futureScanStation.
+let futureScanStage = "entry"; // "entry" | "clarify" | "stations"
+let isFutureScanLoading = false;
+let futureScanError = "";
+let futureScanRawInput = "";
+let futureScanClarifyQuestion = "";
+let futureScanClarifyChips = [];
+let futureScanClarifyAnswer = "";
+let activeFutureScan = null; // in-progress record, same shape as a trackerState.futureScans entry
+let futureScanStationLoading = ""; // station id currently running, "" if none
+let futureScanStationError = "";
+let futureScanIdentityPicks = [];
+let futureScanPressurePicks = [];
+let futureScanPressureOtherText = "";
+let futureScanSignalPicks = {}; // { energy: "Low"|"Medium"|"High", clarity, confidence, urgency }
+let futureScanCheckBackHorizon = ""; // selected horizon id, before scheduling
+let futureScanCheckBackReportText = "";
+let isFutureScanSynthesisLoading = false;
+let futureScanSynthesisError = "";
+let futureScanSuggestedStationIds = [];
+
 let assessmentStep = 0;
 let assessmentDraft = { answers: {}, freeText: "", preferences: [] };
 
@@ -856,6 +946,7 @@ function normalizeTrackerState(state) {
     decisions: Array.isArray(state.decisions) ? state.decisions : fallback.decisions,
     roadmapGoals: Array.isArray(state.roadmapGoals) ? state.roadmapGoals : fallback.roadmapGoals,
     futureSelfSnapshots: Array.isArray(state.futureSelfSnapshots) ? state.futureSelfSnapshots : fallback.futureSelfSnapshots,
+    futureScans: Array.isArray(state.futureScans) ? state.futureScans : fallback.futureScans,
     careerStudio: {
       interviewSessions: Array.isArray(state.careerStudio && state.careerStudio.interviewSessions) ? state.careerStudio.interviewSessions : fallback.careerStudio.interviewSessions,
       resume: (state.careerStudio && state.careerStudio.resume && typeof state.careerStudio.resume === "object") ? state.careerStudio.resume : fallback.careerStudio.resume
@@ -3197,7 +3288,27 @@ function allReflectionLikeEntries() {
     tags: ["decision"],
     _source: "futureMirror"
   }));
-  return [...native, ...decisions];
+  const checkBacks = trackerState.futureScans
+    .filter((scan) => scan.user_id === currentUserId() && scan.stations && scan.stations.checkBack && scan.stations.checkBack.status === "scheduled")
+    .map((scan) => {
+      const checkBack = scan.stations.checkBack;
+      return {
+        id: `${scan.id}-checkback`,
+        user_id: scan.user_id,
+        mode: "futureScanCheckBack",
+        createdAt: checkBack.scheduledAt,
+        displayTime: checkBack.dueDisplayTime,
+        resurfaceAt: checkBack.resurfaceAt,
+        resurfacedAt: checkBack.resurfacedAt || null,
+        dismissedAt: checkBack.dismissedAt || null,
+        ignoredCount: checkBack.ignoredCount || 0,
+        content: `Check back: "${scan.scanContext.rawInput}"`,
+        tags: ["futureScan"],
+        _source: "futureScan",
+        _scanId: scan.id
+      };
+    });
+  return [...native, ...decisions, ...checkBacks];
 }
 
 function dueForResurfacing() {
@@ -3221,7 +3332,7 @@ function resurfaceEntryAction(id, action) {
         original.resurfaceAt = new Date(Date.now() + (REFLECTION_RESURFACE_DAYS[original.mode] || 30) * 86400000 * (original.ignoredCount + 1)).toISOString();
       }
     }
-  } else {
+  } else if (merged._source === "futureMirror") {
     const original = trackerState.futureMirror.saved.find((item) => item.id === id);
     if (!original) return;
     if (action === "engage") {
@@ -3232,6 +3343,20 @@ function resurfaceEntryAction(id, action) {
         original.dismissedAt = new Date().toISOString();
       } else {
         original.resurfaceAt = new Date(Date.now() + REFLECTION_RESURFACE_DAYS.decisionJournal * 86400000 * (original.ignoredCount + 1)).toISOString();
+      }
+    }
+  } else if (merged._source === "futureScan") {
+    const scan = trackerState.futureScans.find((item) => item.id === merged._scanId);
+    const checkBack = scan && scan.stations && scan.stations.checkBack;
+    if (!checkBack) return;
+    if (action === "engage") {
+      checkBack.resurfacedAt = new Date().toISOString();
+    } else {
+      checkBack.ignoredCount = (checkBack.ignoredCount || 0) + 1;
+      if (checkBack.ignoredCount >= 3) {
+        checkBack.dismissedAt = new Date().toISOString();
+      } else {
+        checkBack.resurfaceAt = new Date(Date.now() + 7 * 86400000 * (checkBack.ignoredCount + 1)).toISOString();
       }
     }
   }
@@ -3250,7 +3375,7 @@ function resurfacingCard() {
       ${due.map((entry) => `
         <article class="future-reflection-item">
           <div>
-            <strong>${escapeHTML(entry.mode === "decisionJournal" ? "A decision you journaled" : entry.mode === "weeklyLetter" ? "A letter to your past self" : entry.mode === "milestoneLetter" ? "A milestone letter" : "A daily reflection")}</strong>
+            <strong>${escapeHTML(entry.mode === "decisionJournal" ? "A decision you journaled" : entry.mode === "weeklyLetter" ? "A letter to your past self" : entry.mode === "milestoneLetter" ? "A milestone letter" : entry.mode === "futureScanCheckBack" ? "A Future Scan check-back" : "A daily reflection")}</strong>
             <p>${escapeHTML(entry.content)}</p>
             <small>${escapeHTML(entry.displayTime || "")} - how does it look now?</small>
           </div>
@@ -4871,6 +4996,271 @@ function futureMirrorDraftNotice() {
   `;
 }
 
+function futureMirrorDecisionFormSection() {
+  return `
+    <h3>${futureMirrorMode === "compass" ? "Not sure how to even frame the choice? Explore it here." : "Explore how your choices today may influence your future."}</h3>
+    ${futureMirrorDraftNotice()}
+    <label>Decision question
+      <textarea id="mirror-question" placeholder="Should I study tonight or play games?">${escapeHTML(futureMirrorQuestionValue())}</textarea>
+    </label>
+    <label>Mirror category
+      <select id="mirror-category">
+        ${futureMirrorCategories.map((category) => `<option value="${escapeHTML(category)}" ${futureMirrorCategoryValue() === category ? "selected" : ""}>${escapeHTML(category)}</option>`).join("")}
+      </select>
+    </label>
+    <div class="mirror-path-inputs">
+      <label>Path A<input id="mirror-path-a" type="text" placeholder="Example: Study tonight" value="${escapeHTML(futureMirrorDraft ? futureMirrorDraft.pathA || "" : "")}"></label>
+      <label>Path B<input id="mirror-path-b" type="text" placeholder="Example: Play games" value="${escapeHTML(futureMirrorDraft ? futureMirrorDraft.pathB || "" : "")}"></label>
+    </div>
+    <div class="mirror-example-row">
+      ${futureMirrorExamples.map((example) => `<button type="button" data-mirror-example="${escapeHTML(example)}">${escapeHTML(example)}</button>`).join("")}
+    </div>
+    <button class="primary-action mirror-run-action" type="button" data-run-future-mirror ${isFutureMirrorLoading ? "disabled" : ""}>${isFutureMirrorLoading ? "Generating..." : "Generate Future Mirror"}</button>
+  `;
+}
+
+function futureScanEntrySection() {
+  if (futureScanStage === "clarify") return futureScanClarifySection();
+  if (futureScanStage === "stations" && activeFutureScan) return futureScanStationGrid();
+
+  const recentEntries = allReflectionLikeEntries()
+    .filter((entry) => entry.user_id === currentUserId() && cleanText(entry.content, 1))
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .slice(0, 4);
+  const pastScans = myFutureScans();
+
+  return `
+    <h3>See the truth before you choose.</h3>
+    <p class="muted">Future Scan isn't a checklist - it's a set of quick, honest looks at one real choice, grounded in what you've actually saved here.</p>
+    <label>What's on your mind?
+      <textarea id="scan-raw-input" placeholder="Example: Whether to take a part-time job this year">${escapeHTML(futureScanRawInput)}</textarea>
+    </label>
+    ${recentEntries.length ? `
+      <p class="eyebrow">Or scan something you already wrote</p>
+      <div class="mirror-example-row">
+        ${recentEntries.map((entry) => `<button type="button" data-scan-from-entry="${escapeHTML(entry.id)}">${escapeHTML(cleanText(entry.content, 60))}</button>`).join("")}
+      </div>
+    ` : ""}
+    ${futureScanError ? `<p class="form-error">${escapeHTML(futureScanError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-start-future-scan ${isFutureScanLoading ? "disabled" : ""}>${isFutureScanLoading ? "Thinking..." : "Start Future Scan"}</button>
+    ${pastScans.length ? `
+      <p class="eyebrow">Or continue a past scan</p>
+      <div class="action-stack future-scan-grid">
+        ${pastScans.slice(0, 3).map((scan) => `
+          <button type="button" class="wide-action" data-open-past-scan="${escapeHTML(scan.id)}">
+            <span><strong>${escapeHTML(cleanText(scan.scanContext.rawInput, 60))}</strong><small>${Object.keys(scan.stations || {}).length} station(s) done - ${escapeHTML(new Date(scan.createdAt).toLocaleDateString([], { month: "short", day: "numeric" }))}</small></span>
+          </button>
+        `).join("")}
+      </div>
+      <button class="text-action" type="button" data-open="pastFutureScans">See all ${pastScans.length} past scan${pastScans.length === 1 ? "" : "s"}</button>
+    ` : ""}
+  `;
+}
+
+function futureScanClarifySection() {
+  return `
+    <h3>${escapeHTML(futureScanClarifyQuestion || "Let me make sure I understand.")}</h3>
+    ${futureScanClarifyChips.length ? `
+      <div class="mirror-example-row">
+        ${futureScanClarifyChips.map((chip) => `<button type="button" class="${futureScanClarifyAnswer === chip ? "is-selected" : ""}" data-scan-clarify-chip="${escapeHTML(chip)}">${escapeHTML(chip)}</button>`).join("")}
+      </div>
+    ` : ""}
+    <label>Or answer in your own words
+      <input id="scan-clarify-answer" type="text" placeholder="Type a short answer" value="${escapeHTML(futureScanClarifyAnswer)}">
+    </label>
+    ${futureScanError ? `<p class="form-error">${escapeHTML(futureScanError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-submit-future-scan-clarify ${isFutureScanLoading ? "disabled" : ""}>${isFutureScanLoading ? "Setting up your scan..." : "Continue"}</button>
+  `;
+}
+
+function futureScanStationGrid() {
+  if (!activeFutureScan) return "";
+  return `
+    <h3>Your Future Scan</h3>
+    <p class="muted">"${escapeHTML(cleanText(activeFutureScan.scanContext.rawInput, 140))}"</p>
+    ${futureScanSignalBanner()}
+    ${futureScanSynthesisCard()}
+    ${futureScanSuggestedSection()}
+    ${FUTURE_SCAN_GROUPS.map((group) => `
+      <div class="future-scan-group">
+        <p class="eyebrow future-scan-group-title">${escapeHTML(group.title)}</p>
+        <p class="tiny-note future-scan-group-subtitle">${escapeHTML(group.subtitle)}</p>
+        <div class="action-stack future-scan-grid">
+          ${FUTURE_SCAN_STATIONS.filter((station) => station.group === group.id).map((station) => {
+            const done = activeFutureScan.stations && activeFutureScan.stations[station.id];
+            return `
+              <button class="wide-action" type="button" data-open="futureScanStation" data-open-payload="${escapeHTML(station.id)}">
+                <span><strong>${escapeHTML(station.title)}</strong><small>${escapeHTML(station.blurb)}</small></span>
+                ${done ? `<span class="risk-pill calm">Done</span>` : ""}
+              </button>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `).join("")}
+    <div class="profile-actions">
+      <button class="secondary-action compact-action" type="button" data-reset-future-scan>Start a new scan</button>
+      <button class="text-action" type="button" data-open="pastFutureScans">View past scans</button>
+    </div>
+  `;
+}
+
+// Suggested stations are picked once, by the same AI call that generates the
+// clarifying question (no extra request) - the ids are saved on
+// scanContext.suggestedStationIds so they persist across reopening the scan
+// later from history. This is a shortcut row, not a replacement for the
+// grouped grid below it - the stations still appear in their normal group too.
+function futureScanSuggestedSection() {
+  if (!activeFutureScan) return "";
+  const suggestedIds = (activeFutureScan.scanContext && activeFutureScan.scanContext.suggestedStationIds) || [];
+  const suggested = FUTURE_SCAN_STATIONS.filter((station) => suggestedIds.includes(station.id));
+  if (!suggested.length) return "";
+  return `
+    <div class="future-scan-group future-scan-suggested">
+      <p class="eyebrow future-scan-group-title">Suggested for this</p>
+      <p class="tiny-note future-scan-group-subtitle">Picked for this specific situation, not a fixed default.</p>
+      <div class="action-stack future-scan-grid">
+        ${suggested.map((station) => {
+          const done = activeFutureScan.stations && activeFutureScan.stations[station.id];
+          return `
+            <button class="wide-action" type="button" data-open="futureScanStation" data-open-payload="${escapeHTML(station.id)}">
+              <span><strong>${escapeHTML(station.title)}</strong><small>${escapeHTML(station.blurb)}</small></span>
+              ${done ? `<span class="risk-pill calm">Done</span>` : ""}
+            </button>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// Synthesis is an on-demand AI call (not automatic - futureScanStationGrid()
+// re-renders on every station open/close, so firing this for free would spam
+// requests) that combines whatever stations the user has already run into
+// one coherent read. Gated behind >=3 completed stations so there's actually
+// something to synthesize; cached on activeFutureScan.synthesis and marked
+// stale (not hidden) once the set of completed stations changes.
+function futureScanSynthesisCard() {
+  if (!activeFutureScan) return "";
+  const completedIds = Object.keys(activeFutureScan.stations || {}).sort();
+  if (completedIds.length < 3) return "";
+  const synthesis = activeFutureScan.synthesis;
+  const isStale = synthesis && synthesis.basedOn !== completedIds.join(",");
+  return `
+    <div class="future-scan-synthesis-card">
+      ${synthesis ? `
+        <p class="eyebrow">Synthesis${isStale ? " - new results since this was generated" : ""}</p>
+        <p><strong>${escapeHTML(synthesis.headline)}</strong></p>
+        <p class="muted">${escapeHTML(synthesis.reading)}</p>
+      ` : `
+        <p class="eyebrow">Synthesis</p>
+        <p class="muted">You've run ${completedIds.length} stations on this situation - want the full picture instead of one at a time?</p>
+      `}
+      ${futureScanSynthesisError ? `<p class="form-error">${escapeHTML(futureScanSynthesisError)}</p>` : ""}
+      <button class="secondary-action compact-action" type="button" data-run-scan-synthesis ${isFutureScanSynthesisLoading ? "disabled" : ""}>${isFutureScanSynthesisLoading ? "Synthesizing..." : synthesis ? (isStale ? "Refresh synthesis" : "Re-run synthesis") : "Generate synthesis"}</button>
+    </div>
+  `;
+}
+
+async function runFutureScanSynthesis() {
+  if (!activeFutureScan) return;
+  const completedIds = Object.keys(activeFutureScan.stations || {}).sort();
+  if (completedIds.length < 3) return;
+  futureScanSynthesisError = "";
+  isFutureScanSynthesisLoading = true;
+  renderScreen("future");
+  try {
+    const prompt = `${scanContextText(null)} You have combined findings from ${completedIds.length} Future Scan stations the user has already run on this same situation (listed above). Write one clear, honest synthesis of what these results, taken together, suggest - where they agree, where they create tension with each other, and what that adds up to. Only build on what's already stated above, don't add new claims that weren't in any station's result. Never tell them what to choose - end by handing the decision back to them. Respond as strict JSON only: {"headline":"string","reading":"string"}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed) throw new Error("Synthesis reply was not valid JSON.");
+    const result = {
+      headline: cleanText(parsed.headline || "Here's how it all adds up.", 200),
+      reading: cleanText(parsed.reading || "", 500),
+      basedOn: completedIds.join(","),
+      generatedAt: new Date().toISOString()
+    };
+    activeFutureScan.synthesis = result;
+    const stored = trackerState.futureScans.find((item) => item.id === activeFutureScan.id);
+    if (stored) stored.synthesis = result;
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Future Scan] Synthesis failed", error);
+    futureScanSynthesisError = "The synthesis is having trouble running right now. Please try again.";
+  } finally {
+    isFutureScanSynthesisLoading = false;
+    renderScreen("future");
+  }
+}
+
+// Cross-station signal - a per-station "caution|positive|neutral" read, taken
+// straight from that station's own already-saved result (never a fresh AI
+// call), so a banner can point out when several independently-run stations
+// happen to agree. signalRadar and checkBack are deliberately excluded:
+// Signal Radar is explicitly "not a score" in its own framing, and Check-Back
+// is retrospective, not a read on the choice itself - folding either into an
+// aggregate would contradict what that station promises the user.
+function futureScanStationSignal(stationId, result) {
+  if (!result) return null;
+  switch (stationId) {
+    case "identityScan": {
+      if (!result.identities.length) return null;
+      const toward = result.identities.filter((item) => item.direction === "toward").length;
+      const away = result.identities.filter((item) => item.direction === "away").length;
+      if (away > toward) return "caution";
+      if (toward > away) return "positive";
+      return "neutral";
+    }
+    case "valuesCheck": {
+      if (!result.checks.length) return null;
+      const aligned = result.checks.filter((item) => item.alignment === "aligned").length;
+      const tension = result.checks.filter((item) => item.alignment === "tension").length;
+      if (tension > aligned) return "caution";
+      if (aligned > tension) return "positive";
+      return "neutral";
+    }
+    case "hiddenCosts":
+      return result.costs.length ? (result.costs.some((item) => item.severity >= 70) ? "caution" : "neutral") : null;
+    case "pressureTest":
+      return result.pressureLevel === "high" ? "caution" : result.pressureLevel === "low" ? "positive" : "neutral";
+    case "conflictMap": {
+      if (!result.conflicts.length) return null;
+      if (result.conflicts.some((item) => item.tension === "strong")) return "caution";
+      if (result.conflicts.some((item) => item.tension === "mild")) return "neutral";
+      return "positive";
+    }
+    case "pastSelfCheck": {
+      if (!result.patterns.length) return null;
+      const consistent = result.patterns.filter((item) => item.comparison === "consistent").length;
+      const inconsistent = result.patterns.filter((item) => item.comparison === "inconsistent").length;
+      if (inconsistent > consistent) return "caution";
+      if (consistent > inconsistent) return "positive";
+      return "neutral";
+    }
+    case "driftDetector":
+      return result.drift === "drifting" ? "caution" : result.drift === "onTrack" ? "positive" : "neutral";
+    default:
+      return null;
+  }
+}
+
+function futureScanSignalBanner() {
+  if (!activeFutureScan) return "";
+  const signals = FUTURE_SCAN_STATIONS
+    .map((station) => futureScanStationSignal(station.id, activeFutureScan.stations[station.id]))
+    .filter(Boolean);
+  if (signals.length < 3) return "";
+  const caution = signals.filter((item) => item === "caution").length;
+  const positive = signals.filter((item) => item === "positive").length;
+  if (caution >= 2 && caution > positive) {
+    return `<div class="future-scan-signal-banner caution"><strong>${caution} of ${signals.length}</strong> stations you've run are flagging caution here - might be worth a closer look before deciding.</div>`;
+  }
+  if (positive >= 2 && positive > caution) {
+    return `<div class="future-scan-signal-banner positive"><strong>${positive} of ${signals.length}</strong> stations you've run are lining up in favor of this - a consistent signal so far.</div>`;
+  }
+  return `<div class="future-scan-signal-banner mixed">The stations you've run so far are giving mixed signals - might be worth checking a couple more angles.</div>`;
+}
+
 const screens = {
   home: () => `
     ${futureMirrorHomeHero()}
@@ -4901,29 +5291,13 @@ const screens = {
       <div class="mirror-example-row mode-toggle-row">
         <button type="button" class="${futureMirrorMode === "simulator" ? "is-selected" : ""}" data-future-mirror-mode="simulator">Decision Simulator</button>
         <button type="button" class="${futureMirrorMode === "compass" ? "is-selected" : ""}" data-future-mirror-mode="compass">Life Compass</button>
+        <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">Future Scan</button>
       </div>
-      <h3>${futureMirrorMode === "compass" ? "Not sure how to even frame the choice? Explore it here." : "Explore how your choices today may influence your future."}</h3>
-      ${futureMirrorDraftNotice()}
-      <label>Decision question
-        <textarea id="mirror-question" placeholder="Should I study tonight or play games?">${escapeHTML(futureMirrorQuestionValue())}</textarea>
-      </label>
-      <label>Mirror category
-        <select id="mirror-category">
-          ${futureMirrorCategories.map((category) => `<option value="${escapeHTML(category)}" ${futureMirrorCategoryValue() === category ? "selected" : ""}>${escapeHTML(category)}</option>`).join("")}
-        </select>
-      </label>
-      <div class="mirror-path-inputs">
-        <label>Path A<input id="mirror-path-a" type="text" placeholder="Example: Study tonight" value="${escapeHTML(futureMirrorDraft ? futureMirrorDraft.pathA || "" : "")}"></label>
-        <label>Path B<input id="mirror-path-b" type="text" placeholder="Example: Play games" value="${escapeHTML(futureMirrorDraft ? futureMirrorDraft.pathB || "" : "")}"></label>
-      </div>
-      <div class="mirror-example-row">
-        ${futureMirrorExamples.map((example) => `<button type="button" data-mirror-example="${escapeHTML(example)}">${escapeHTML(example)}</button>`).join("")}
-      </div>
-      <button class="primary-action mirror-run-action" type="button" data-run-future-mirror ${isFutureMirrorLoading ? "disabled" : ""}>${isFutureMirrorLoading ? "Generating..." : "Generate Future Mirror"}</button>
+      ${futureMirrorMode === "scan" ? futureScanEntrySection() : futureMirrorDecisionFormSection()}
     </section>
 
-    ${futureMirrorResultCard()}
-    ${futureReflectionList()}
+    ${futureMirrorMode === "scan" ? "" : futureMirrorResultCard()}
+    ${futureMirrorMode === "scan" ? "" : futureReflectionList()}
   `,
 
   assess: () => `
@@ -5622,6 +5996,73 @@ const modals = {
       </div>
     </div>
   `,
+
+  futureScanStation: (stationId) => {
+    const station = FUTURE_SCAN_STATIONS.find((item) => item.id === stationId);
+    if (!station || !activeFutureScan) {
+      return `
+        <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="future-scan-station-title">
+          <div class="modal-top">
+            <span class="risk-pill calm">Future Scan</span>
+            <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+          </div>
+          <h3 id="future-scan-station-title">Start a Future Scan first</h3>
+        </div>
+      `;
+    }
+    const body = {
+      identityScan: futureScanIdentityView,
+      valuesCheck: futureScanValuesView,
+      hiddenCosts: futureScanHiddenCostsView,
+      noActionFuture: futureScanNoActionView,
+      pressureTest: futureScanPressureView,
+      conflictMap: futureScanConflictView,
+      signalRadar: futureScanSignalView,
+      pastSelfCheck: futureScanPastSelfView,
+      driftDetector: futureScanDriftView,
+      checkBack: futureScanCheckBackView
+    }[stationId];
+    return `
+      <div class="modal-card assessment-modal future-self-modal" role="dialog" aria-modal="true" aria-labelledby="future-scan-station-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Future Scan</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="future-scan-station-title">${escapeHTML(station.title)}</h3>
+        <p class="muted">${escapeHTML(station.blurb)}</p>
+        ${body ? body() : `<p class="muted">This station is coming soon.</p>`}
+      </div>
+    `;
+  },
+
+  pastFutureScans: () => {
+    const scans = myFutureScans();
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="past-scans-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Future Scan</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="past-scans-title">Your past scans</h3>
+        ${scans.length ? `
+          <div class="future-reflection-list">
+            ${scans.map((scan) => `
+              <article class="future-reflection-item">
+                <div>
+                  <strong>${escapeHTML(cleanText(scan.scanContext.rawInput, 100))}</strong>
+                  <p>${Object.keys(scan.stations || {}).length} station(s) done${scan.synthesis ? " - synthesis generated" : ""}</p>
+                  <small>${escapeHTML(new Date(scan.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</small>
+                </div>
+                <div class="profile-actions">
+                  <button class="secondary-action compact-action" type="button" data-open-past-scan="${escapeHTML(scan.id)}">Open</button>
+                </div>
+              </article>
+            `).join("")}
+          </div>
+        ` : `<p class="muted">No past scans yet.</p>`}
+      </div>
+    `;
+  },
 
   knowledgeVault: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="knowledge-vault-title">
@@ -6492,6 +6933,14 @@ function openModal(name, payload) {
       ? { values: [...existing.values], personalityChoice: existing.personalityChoice || "", strengths: [...existing.strengths], strengthsOther: existing.strengthsOther || "", motivationChoice: existing.motivationChoice || "", learningChoice: existing.learningChoice || "", workChoice: existing.workChoice || "", decisionChoice: existing.decisionChoice || "" }
       : { values: [], personalityChoice: "", strengths: [], strengthsOther: "", motivationChoice: "", learningChoice: "", workChoice: "", decisionChoice: "" };
   }
+  // futureScanStationError is a single shared var across all 10 stations (by
+  // design, so a run function's own openModal() calls during its
+  // loading/finally lifecycle don't wipe out the error they just set) - but
+  // that means it must be cleared on a genuinely fresh open, or a stale error
+  // from a previously failed station bleeds into the next station's modal.
+  if (name === "futureScanStation" && !modalLayer.classList.contains("is-open")) {
+    futureScanStationError = "";
+  }
   modalLayer.innerHTML = getModal(name, payload) || "";
   modalLayer.classList.add("is-open");
   modalLayer.setAttribute("aria-hidden", "false");
@@ -6618,10 +7067,18 @@ async function runFutureMirrorSimulation() {
   try {
     const reply = await requestCompassDirect(FUTURE_MIRROR_SYSTEM_PROMPT, futureMirrorPrompt(question, category, pathA, pathB, futureMirrorMode));
     const parsed = extractJsonObject(reply);
-    if (containsVerdictLanguage(parsed && parsed.summary) || containsVerdictLanguage(reply)) {
+    if (!parsed) {
+      // Previously fell back to normalizeFutureMirrorResult({ summary: reply }, ...),
+      // which put the raw (usually truncated/invalid) JSON text straight into
+      // the result card's summary field - looked like a broken/fake feature
+      // instead of a failed AI call. Fail loudly instead so the catch block
+      // below shows the existing retry message and nothing gets saved.
+      throw new Error("Future Mirror reply was not valid JSON.");
+    }
+    if (containsVerdictLanguage(parsed.summary) || containsVerdictLanguage(reply)) {
       console.warn("[Future Mirror] Verdict-like language detected in AI reply - keeping generated content but flagging for review.");
     }
-    const result = normalizeFutureMirrorResult(parsed || { summary: reply }, { question, category, pathA, pathB, mode: futureMirrorMode });
+    const result = normalizeFutureMirrorResult(parsed, { question, category, pathA, pathB, mode: futureMirrorMode });
     if (!result.paths.length) {
       result.paths = [
         {
@@ -6655,6 +7112,794 @@ async function runFutureMirrorSimulation() {
     renderScreen("future");
     refreshStaticScreens();
   }
+}
+
+// ---- Future Scan ---------------------------------------------------------
+
+// One-line, factual summary of a station's own already-saved result - used
+// to feed later stations what earlier ones found, so a Drift Detector run
+// after a Conflict Map doesn't contradict it. Always built from the real
+// saved result, never invented, so it stays inside the "ground everything in
+// what's actually there" rule the whole feature runs on.
+function summarizeFutureScanStationResult(stationId, result) {
+  if (!result) return "";
+  switch (stationId) {
+    case "identityScan":
+      return result.headline ? `Identity Scan found: ${result.headline}` : "";
+    case "valuesCheck": {
+      const aligned = result.checks.filter((item) => item.alignment === "aligned").map((item) => item.value);
+      const tension = result.checks.filter((item) => item.alignment === "tension").map((item) => item.value);
+      if (!aligned.length && !tension.length) return "";
+      const parts = [];
+      if (aligned.length) parts.push(`aligns with ${aligned.join(", ")}`);
+      if (tension.length) parts.push(`is in tension with ${tension.join(", ")}`);
+      return `Values Check found: this choice ${parts.join(" and ")}.`;
+    }
+    case "hiddenCosts": {
+      const top = [...result.costs].sort((a, b) => b.severity - a.severity).slice(0, 2).map((item) => item.label);
+      return top.length ? `Hidden Cost Scanner found: the biggest costs were ${top.join(", ")}.` : "";
+    }
+    case "noActionFuture":
+      return result.timeline && result.timeline["1 year"] ? `No-Action Future found: if nothing changes, in 1 year - ${result.timeline["1 year"]}` : "";
+    case "pressureTest":
+      return result.headline ? `Pressure Test found: ${result.pressureLevel} outside pressure - ${result.headline}` : "";
+    case "conflictMap":
+      return result.headline ? `Conflict Map found: ${result.headline}` : "";
+    case "signalRadar":
+      return result.headline ? `Signal Radar found: ${result.headline}` : "";
+    case "pastSelfCheck":
+      return result.headline ? `Past-Self Check found: ${result.headline}` : "";
+    case "driftDetector":
+      return result.headline ? `Drift Detector found: ${result.drift} - ${result.headline}` : "";
+    case "checkBack":
+      return result.status === "completed" && result.headline ? `Check-Back found: ${result.headline}` : "";
+    default:
+      return "";
+  }
+}
+
+function scanContextText(currentStationId) {
+  if (!activeFutureScan) return "";
+  const { rawInput, clarifyingQuestion, clarifyingAnswer } = activeFutureScan.scanContext;
+  const base = `The user's situation: "${rawInput}". Clarifying question asked: "${clarifyingQuestion}" Their answer: "${clarifyingAnswer}".`;
+  const priorFindings = FUTURE_SCAN_STATIONS
+    .filter((station) => station.id !== currentStationId)
+    .map((station) => summarizeFutureScanStationResult(station.id, activeFutureScan.stations[station.id]))
+    .filter(Boolean);
+  return priorFindings.length
+    ? `${base} Other Future Scan stations already run on this same situation (for coherence - don't just repeat these, but don't contradict them without reason): ${priorFindings.join(" ")}`
+    : base;
+}
+
+function saveFutureScanStation(stationId, result) {
+  if (!activeFutureScan) return;
+  activeFutureScan.stations = activeFutureScan.stations || {};
+  activeFutureScan.stations[stationId] = result;
+  const stored = trackerState.futureScans.find((item) => item.id === activeFutureScan.id);
+  if (stored) stored.stations = activeFutureScan.stations;
+  saveTrackerState();
+}
+
+function resetFutureScan() {
+  futureScanStage = "entry";
+  futureScanRawInput = "";
+  futureScanClarifyQuestion = "";
+  futureScanClarifyChips = [];
+  futureScanClarifyAnswer = "";
+  futureScanIdentityPicks = [];
+  futureScanPressurePicks = [];
+  futureScanPressureOtherText = "";
+  futureScanSignalPicks = {};
+  futureScanCheckBackHorizon = "";
+  futureScanCheckBackReportText = "";
+  futureScanSuggestedStationIds = [];
+  activeFutureScan = null;
+  futureScanError = "";
+  futureScanStationError = "";
+  futureScanSynthesisError = "";
+  renderScreen("future");
+}
+
+function myFutureScans() {
+  return trackerState.futureScans
+    .filter((scan) => scan.user_id === currentUserId())
+    .slice()
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+function openPastFutureScan(scanId) {
+  const scan = myFutureScans().find((item) => item.id === scanId);
+  if (!scan) return;
+  activeFutureScan = scan;
+  futureScanStage = "stations";
+  closeModal();
+  renderScreen("future");
+}
+
+async function startFutureScan(rawInputOverride) {
+  const inputEl = document.querySelector("#scan-raw-input");
+  const rawInput = cleanText(rawInputOverride || (inputEl ? inputEl.value : ""), 300);
+  if (!rawInput) {
+    futureScanError = "Tell me what's on your mind first.";
+    renderScreen("future");
+    return;
+  }
+  futureScanRawInput = rawInput;
+  futureScanError = "";
+  isFutureScanLoading = true;
+  renderScreen("future");
+  try {
+    const stationCatalogText = FUTURE_SCAN_STATIONS.map((station) => `${station.id} (${station.title}: ${station.blurb})`).join("; ");
+    const prompt = `The user is about to use Future Scan on this real situation: "${rawInput}". Saved context, if any: ${realGrowthFactsText()}. Ask exactly ONE short clarifying question that would make the scan more specific and useful (not generic small talk), plus 2 or 3 short tap-to-answer quick-reply options for that question. Also pick 1 to 3 station ids from this catalog that seem most useful to run FIRST for this specific situation (only pick ones that are genuinely relevant, not a fixed default set - it's fine to pick just 1): ${stationCatalogText}. Respond as strict JSON only: {"question":"string","chips":["string","string","string"],"suggestedStationIds":["string"]}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed || !parsed.question) throw new Error("Future Scan clarifying question was not valid JSON.");
+    futureScanClarifyQuestion = cleanText(parsed.question, 200);
+    futureScanClarifyChips = Array.isArray(parsed.chips) ? parsed.chips.slice(0, 3).map((chip) => cleanText(chip, 60)).filter(Boolean) : [];
+    const validStationIds = FUTURE_SCAN_STATIONS.map((station) => station.id);
+    futureScanSuggestedStationIds = Array.isArray(parsed.suggestedStationIds)
+      ? parsed.suggestedStationIds.filter((id) => validStationIds.includes(id)).slice(0, 3)
+      : [];
+    futureScanStage = "clarify";
+  } catch (error) {
+    console.error("[Future Scan] Clarify request failed", error);
+    futureScanError = "Future Scan is having trouble starting right now. Please try again.";
+  } finally {
+    isFutureScanLoading = false;
+    renderScreen("future");
+  }
+}
+
+async function submitFutureScanClarify(answerOverride) {
+  const inputEl = document.querySelector("#scan-clarify-answer");
+  const answer = cleanText(answerOverride || futureScanClarifyAnswer || (inputEl ? inputEl.value : ""), 200);
+  if (!answer) {
+    futureScanError = "Pick a quick reply or type a short answer.";
+    renderScreen("future");
+    return;
+  }
+  futureScanClarifyAnswer = answer;
+  futureScanError = "";
+  activeFutureScan = {
+    id: `future-scan-${Date.now()}`,
+    user_id: currentUserId(),
+    createdAt: new Date().toISOString(),
+    scanContext: {
+      rawInput: futureScanRawInput,
+      clarifyingQuestion: futureScanClarifyQuestion,
+      clarifyingAnswer: answer,
+      suggestedStationIds: futureScanSuggestedStationIds.slice()
+    },
+    stations: {},
+    synthesis: null,
+    resurfaceAt: null,
+    resurfacedAt: null,
+    dismissedAt: null,
+    ignoredCount: 0
+  };
+  trackerState.futureScans.push(activeFutureScan);
+  saveTrackerState();
+  futureScanStage = "stations";
+  renderScreen("future");
+}
+
+function futureScanIdentityView() {
+  const result = activeFutureScan.stations.identityScan;
+  return `
+    <div class="mood-choice-grid">
+      ${FUTURE_IDENTITY_OPTIONS.map((option) => `
+        <button type="button" class="mood-choice ${futureScanIdentityPicks.includes(option) ? "is-selected" : ""}" data-scan-identity-pick="${escapeHTML(option)}">${escapeHTML(option)}</button>
+      `).join("")}
+    </div>
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-identity ${futureScanStationLoading === "identityScan" ? "disabled" : ""}>${futureScanStationLoading === "identityScan" ? "Scanning..." : result ? "Re-scan" : "Run Identity Scan"}</button>
+    ${result ? `
+      <div class="future-reflection-list">
+        <p><strong>${escapeHTML(result.headline)}</strong></p>
+        <p class="muted">${escapeHTML(result.reading)}</p>
+        ${result.identities.map((item) => `<p class="tiny-note"><strong>${escapeHTML(item.name)}</strong> - ${escapeHTML(item.direction)}: ${escapeHTML(item.reason)}</p>`).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanIdentity() {
+  if (!futureScanIdentityPicks.length) {
+    futureScanStationError = "Pick at least one identity that matters to you.";
+    openModal("futureScanStation", "identityScan");
+    return;
+  }
+  futureScanStationError = "";
+  futureScanStationLoading = "identityScan";
+  openModal("futureScanStation", "identityScan");
+  const blueprint = latestBlueprint();
+  try {
+    const prompt = `${scanContextText("identityScan")} The user picked these future identities as ones they want to become: ${futureScanIdentityPicks.join(", ")}. Saved Blueprint, if any: ${blueprint ? JSON.stringify({ values: blueprint.values, strengths: blueprint.strengths, workStyle: blueprint.workStyle }) : "none saved yet"}. For each picked identity, say briefly whether their situation moves them toward, away from, or is neutral to it, and why - only using the real context given, don't invent anything not stated. Respond as strict JSON only: {"headline":"string","reading":"string","identities":[{"name":"string","direction":"toward|away|neutral","reason":"string"}]}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed) throw new Error("Identity Scan reply was not valid JSON.");
+    const result = {
+      headline: cleanText(parsed.headline || "Here's how this choice lines up with who you want to become.", 200),
+      reading: cleanText(parsed.reading || "", 400),
+      identities: Array.isArray(parsed.identities) ? parsed.identities.slice(0, 3).map((item) => ({
+        name: cleanText(item.name || "", 60),
+        direction: ["toward", "away", "neutral"].includes(item.direction) ? item.direction : "neutral",
+        reason: cleanText(item.reason || "", 200)
+      })).filter((item) => item.name) : [],
+      picks: futureScanIdentityPicks.slice(),
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("identityScan", result);
+  } catch (error) {
+    console.error("[Future Scan] Identity scan failed", error);
+    futureScanStationError = "This scan is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "identityScan");
+  }
+}
+
+function futureScanValuesView() {
+  const blueprint = latestBlueprint();
+  const result = activeFutureScan.stations.valuesCheck;
+  if (!blueprint || !Array.isArray(blueprint.values) || !blueprint.values.length) {
+    return `
+      <p class="muted">Complete your Personal Blueprint first - this check compares your choice against the values you saved there, not generic ones.</p>
+      <button class="secondary-action compact-action" type="button" data-open="discoverYourself">Start Blueprint</button>
+    `;
+  }
+  return `
+    <p class="eyebrow">Your saved values</p>
+    <div class="mirror-example-row">${blueprint.values.map((value) => `<span class="mood-chip">${escapeHTML(value)}</span>`).join("")}</div>
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-values ${futureScanStationLoading === "valuesCheck" ? "disabled" : ""}>${futureScanStationLoading === "valuesCheck" ? "Checking..." : result ? "Re-check" : "Run Values Check"}</button>
+    ${result ? `
+      <div class="future-reflection-list">
+        ${result.checks.map((item) => `<p class="tiny-note"><strong>${escapeHTML(item.value)}</strong> - ${escapeHTML(item.alignment)}: ${escapeHTML(item.reason)}</p>`).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanValues() {
+  const blueprint = latestBlueprint();
+  if (!blueprint) return;
+  futureScanStationError = "";
+  futureScanStationLoading = "valuesCheck";
+  openModal("futureScanStation", "valuesCheck");
+  try {
+    const prompt = `${scanContextText("valuesCheck")} The user's saved values, in their own words: ${blueprint.values.join(", ")}. For EACH value, say whether this choice aligns with it, creates tension with it, or is unrelated - quote back the value exactly as given, don't invent new values. Respond as strict JSON only: {"checks":[{"value":"string","alignment":"aligned|tension|unrelated","reason":"string"}]}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed || !Array.isArray(parsed.checks)) throw new Error("Values check reply was not valid JSON.");
+    const result = {
+      checks: parsed.checks.slice(0, 6).map((item) => ({
+        value: cleanText(item.value || "", 60),
+        alignment: ["aligned", "tension", "unrelated"].includes(item.alignment) ? item.alignment : "unrelated",
+        reason: cleanText(item.reason || "", 200)
+      })).filter((item) => item.value),
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("valuesCheck", result);
+  } catch (error) {
+    console.error("[Future Scan] Values check failed", error);
+    futureScanStationError = "This check is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "valuesCheck");
+  }
+}
+
+function futureScanHiddenCostsView() {
+  const result = activeFutureScan.stations.hiddenCosts;
+  return `
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-costs ${futureScanStationLoading === "hiddenCosts" ? "disabled" : ""}>${futureScanStationLoading === "hiddenCosts" ? "Scanning..." : result ? "Re-scan" : "Run Hidden Cost Scanner"}</button>
+    ${result ? `
+      <div class="struggle-map">
+        ${result.costs.map((cost, index) => `
+          <div class="struggle-row scan-cost-row" style="animation-delay:${index * 120}ms">
+            <span>${escapeHTML(cost.label)}</span>
+            <i><b style="width:${cost.severity}%"></b></i>
+            <strong>${cost.severity}</strong>
+          </div>
+        `).join("")}
+      </div>
+      <div class="future-reflection-list">
+        ${result.costs.map((cost) => `<p class="tiny-note"><strong>${escapeHTML(cost.label)}</strong>: ${escapeHTML(cost.reason)}</p>`).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanHiddenCosts() {
+  futureScanStationError = "";
+  futureScanStationLoading = "hiddenCosts";
+  openModal("futureScanStation", "hiddenCosts");
+  try {
+    const prompt = `${scanContextText("hiddenCosts")} List the hidden costs of this choice/pattern - pick 4 to 6 that are genuinely relevant from: sleep, energy, focus, confidence, future opportunity, relationships. Give each a severity 0-100 based on how much THIS specific situation costs there, and a one-sentence reason. Respond as strict JSON only: {"costs":[{"label":"string","severity":0,"reason":"string"}]}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed || !Array.isArray(parsed.costs)) throw new Error("Hidden cost reply was not valid JSON.");
+    const result = {
+      costs: parsed.costs.slice(0, 6).map((item) => ({
+        label: cleanText(item.label || "", 40),
+        severity: Math.max(0, Math.min(100, Number(item.severity) || 0)),
+        reason: cleanText(item.reason || "", 160)
+      })).filter((item) => item.label),
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("hiddenCosts", result);
+  } catch (error) {
+    console.error("[Future Scan] Hidden cost scan failed", error);
+    futureScanStationError = "This scan is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "hiddenCosts");
+  }
+}
+
+function futureScanNoActionView() {
+  const result = activeFutureScan.stations.noActionFuture;
+  return `
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-noaction ${futureScanStationLoading === "noActionFuture" ? "disabled" : ""}>${futureScanStationLoading === "noActionFuture" ? "Scanning..." : result ? "Re-scan" : "Run No-Action Future"}</button>
+    ${result ? `
+      <div class="scan-timeline-row">
+        ${["1 week", "1 month", "6 months", "1 year"].map((key) => `
+          <div class="mirror-timeline-card scan-timeline-card">
+            <p class="eyebrow">${escapeHTML(key)}</p>
+            <p>${escapeHTML(result.timeline[key] || "")}</p>
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanNoAction() {
+  futureScanStationError = "";
+  futureScanStationLoading = "noActionFuture";
+  openModal("futureScanStation", "noActionFuture");
+  try {
+    const prompt = `${scanContextText("noActionFuture")} If the user changes NOTHING and keeps doing exactly what they're doing now regarding this situation, describe what that realistically looks like at each checkpoint. Be concrete and specific to their situation, not generic. Respond as strict JSON only: {"timeline":{"1 week":"string","1 month":"string","6 months":"string","1 year":"string"}}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed || !parsed.timeline) throw new Error("No-Action Future reply was not valid JSON.");
+    const result = {
+      timeline: {
+        "1 week": cleanText(parsed.timeline["1 week"] || "", 200),
+        "1 month": cleanText(parsed.timeline["1 month"] || "", 200),
+        "6 months": cleanText(parsed.timeline["6 months"] || "", 200),
+        "1 year": cleanText(parsed.timeline["1 year"] || "", 200)
+      },
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("noActionFuture", result);
+  } catch (error) {
+    console.error("[Future Scan] No-action future failed", error);
+    futureScanStationError = "This scan is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "noActionFuture");
+  }
+}
+
+function futureScanPressureView() {
+  const result = activeFutureScan.stations.pressureTest;
+  return `
+    <div class="mood-choice-grid">
+      ${FUTURE_SCAN_PRESSURE_OPTIONS.map((option) => `
+        <button type="button" class="mood-choice ${futureScanPressurePicks.includes(option) ? "is-selected" : ""}" data-scan-pressure-pick="${escapeHTML(option)}">${escapeHTML(option)}</button>
+      `).join("")}
+    </div>
+    <div class="admin-form">
+      <label>Anything else pushing this decision? (optional)
+        <input id="scan-pressure-other" type="text" placeholder="Type a short note" value="${escapeHTML(futureScanPressureOtherText)}">
+      </label>
+    </div>
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-pressure ${futureScanStationLoading === "pressureTest" ? "disabled" : ""}>${futureScanStationLoading === "pressureTest" ? "Checking..." : result ? "Re-check" : "Run Pressure Test"}</button>
+    ${result ? `
+      <span class="risk-pill ${result.pressureLevel === "high" ? "danger" : result.pressureLevel === "medium" ? "warn" : "calm"}">${escapeHTML(result.pressureLevel)} outside pressure</span>
+      <div class="future-reflection-list">
+        <p><strong>${escapeHTML(result.headline)}</strong></p>
+        <p class="muted">${escapeHTML(result.reading)}</p>
+        ${result.sources.filter((item) => item.present).map((item) => `<p class="tiny-note"><strong>${escapeHTML(item.name)}</strong>: ${escapeHTML(item.note)}</p>`).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanPressure() {
+  const otherInput = document.querySelector("#scan-pressure-other");
+  futureScanPressureOtherText = cleanText(otherInput ? otherInput.value : futureScanPressureOtherText, 140);
+  futureScanStationError = "";
+  futureScanStationLoading = "pressureTest";
+  openModal("futureScanStation", "pressureTest");
+  try {
+    const picksText = futureScanPressurePicks.length ? futureScanPressurePicks.join(", ") : "none flagged by the user";
+    const prompt = `${scanContextText("pressureTest")} The user flagged these pressure sources as present: ${picksText}.${futureScanPressureOtherText ? ` They also noted: "${futureScanPressureOtherText}".` : ""} Based on the real situation described, assess how much external pressure, fear, or comparison (versus their own genuine reasoning) seems to be driving this choice. Only comment on sources that are actually supported by what they told you - if they flagged none and the raw context doesn't suggest pressure either, say so honestly rather than inventing pressure. Respond as strict JSON only: {"headline":"string","reading":"string","pressureLevel":"low|medium|high","sources":[{"name":"string","present":true,"note":"string"}]}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed) throw new Error("Pressure test reply was not valid JSON.");
+    const result = {
+      headline: cleanText(parsed.headline || "Here's a read on what's really driving this.", 200),
+      reading: cleanText(parsed.reading || "", 400),
+      pressureLevel: ["low", "medium", "high"].includes(parsed.pressureLevel) ? parsed.pressureLevel : "low",
+      sources: Array.isArray(parsed.sources) ? parsed.sources.slice(0, 6).map((item) => ({
+        name: cleanText(item.name || "", 60),
+        present: Boolean(item.present),
+        note: cleanText(item.note || "", 200)
+      })).filter((item) => item.name) : [],
+      picks: futureScanPressurePicks.slice(),
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("pressureTest", result);
+  } catch (error) {
+    console.error("[Future Scan] Pressure test failed", error);
+    futureScanStationError = "This check is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "pressureTest");
+  }
+}
+
+function futureScanConflictView() {
+  const goals = myRoadmapGoals();
+  const result = activeFutureScan.stations.conflictMap;
+  if (!goals.length) {
+    return `
+      <p class="muted">No Life Roadmap goals saved yet - this map compares your choice against real goals you've set, not generic ones.</p>
+      <button class="secondary-action compact-action" type="button" data-open="roadmapView">Open Life Roadmap</button>
+    `;
+  }
+  return `
+    <p class="eyebrow">Your active goals</p>
+    <div class="mirror-example-row">${goals.map((goal) => `<span class="mood-chip">${escapeHTML(goal.title)}</span>`).join("")}</div>
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-conflict ${futureScanStationLoading === "conflictMap" ? "disabled" : ""}>${futureScanStationLoading === "conflictMap" ? "Mapping..." : result ? "Re-map" : "Run Conflict Map"}</button>
+    ${result ? `
+      <div class="future-reflection-list">
+        <p><strong>${escapeHTML(result.headline)}</strong></p>
+        <p class="muted">${escapeHTML(result.reading)}</p>
+        ${result.conflicts.map((item) => `<p class="tiny-note"><span class="risk-pill ${item.tension === "strong" ? "danger" : item.tension === "mild" ? "warn" : "calm"}">${escapeHTML(item.tension)}</span> <strong>${escapeHTML(item.goal)}</strong> - ${escapeHTML(item.reason)}</p>`).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanConflict() {
+  const goals = myRoadmapGoals();
+  if (!goals.length) return;
+  futureScanStationError = "";
+  futureScanStationLoading = "conflictMap";
+  openModal("futureScanStation", "conflictMap");
+  try {
+    const goalsText = goals.map((goal) => `"${goal.title}" (${(goal.milestones || []).filter((item) => item.status !== "done").length} open milestones)`).join("; ");
+    const prompt = `${scanContextText("conflictMap")} The user's saved Life Roadmap goals: ${goalsText}. For EACH goal, say whether this choice is in strong tension, mild tension, or no tension with it, and why - quote the goal title back exactly, don't invent new goals. Respond as strict JSON only: {"headline":"string","reading":"string","conflicts":[{"goal":"string","tension":"none|mild|strong","reason":"string"}]}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed || !Array.isArray(parsed.conflicts)) throw new Error("Conflict map reply was not valid JSON.");
+    const result = {
+      headline: cleanText(parsed.headline || "Here's where this choice sits against your goals.", 200),
+      reading: cleanText(parsed.reading || "", 300),
+      conflicts: parsed.conflicts.slice(0, 8).map((item) => ({
+        goal: cleanText(item.goal || "", 80),
+        tension: ["none", "mild", "strong"].includes(item.tension) ? item.tension : "none",
+        reason: cleanText(item.reason || "", 200)
+      })).filter((item) => item.goal),
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("conflictMap", result);
+  } catch (error) {
+    console.error("[Future Scan] Conflict map failed", error);
+    futureScanStationError = "This map is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "conflictMap");
+  }
+}
+
+function futureScanSignalView() {
+  const result = activeFutureScan.stations.signalRadar;
+  return `
+    ${FUTURE_SCAN_SIGNAL_DIMENSIONS.map((dimension) => `
+      <div class="admin-form">
+        <label>${escapeHTML(dimension.label)}
+          <div class="mirror-example-row">
+            ${FUTURE_SCAN_SIGNAL_LEVELS.map((level) => `<button type="button" class="${futureScanSignalPicks[dimension.id] === level ? "is-selected" : ""}" data-scan-signal-pick="${dimension.id}:${level}">${level}</button>`).join("")}
+          </div>
+        </label>
+      </div>
+    `).join("")}
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-signal ${futureScanStationLoading === "signalRadar" ? "disabled" : ""}>${futureScanStationLoading === "signalRadar" ? "Reading..." : result ? "Re-check" : "Run Signal Radar"}</button>
+    ${result ? `
+      <div class="future-reflection-list">
+        <p><strong>${escapeHTML(result.headline)}</strong></p>
+        <p class="muted">${escapeHTML(result.reading)}</p>
+      </div>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanSignal() {
+  const picked = FUTURE_SCAN_SIGNAL_DIMENSIONS.filter((dimension) => futureScanSignalPicks[dimension.id]);
+  if (!picked.length) {
+    futureScanStationError = "Rate at least one signal below.";
+    openModal("futureScanStation", "signalRadar");
+    return;
+  }
+  futureScanStationError = "";
+  futureScanStationLoading = "signalRadar";
+  openModal("futureScanStation", "signalRadar");
+  try {
+    const signalsText = picked.map((dimension) => `${dimension.label}: ${futureScanSignalPicks[dimension.id]}`).join(", ");
+    const prompt = `${scanContextText("signalRadar")} The user just self-rated how they feel RIGHT NOW, in this moment, not as a permanent trait: ${signalsText}. Write a short, honest read of what this moment-in-time combination might mean for making this specific choice right now - this is not a score or a judgment of them as a person, just a check on timing. Respond as strict JSON only: {"headline":"string","reading":"string"}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed) throw new Error("Signal radar reply was not valid JSON.");
+    const result = {
+      headline: cleanText(parsed.headline || "Here's a read on your moment.", 200),
+      reading: cleanText(parsed.reading || "", 400),
+      signals: { ...futureScanSignalPicks },
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("signalRadar", result);
+  } catch (error) {
+    console.error("[Future Scan] Signal radar failed", error);
+    futureScanStationError = "This reading is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "signalRadar");
+  }
+}
+
+function futureScanPastSelfHistory() {
+  return allReflectionLikeEntries()
+    .filter((entry) => entry.user_id === currentUserId() && entry._source !== "futureScan" && cleanText(entry.content, 1))
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .slice(0, 6);
+}
+
+function futureScanPastSelfView() {
+  const history = futureScanPastSelfHistory();
+  const result = activeFutureScan.stations.pastSelfCheck;
+  if (history.length < 2) {
+    return `<p class="muted">Not enough history yet - keep journaling and reflecting, and this check gets sharper the more you save here.</p>`;
+  }
+  return `
+    <p class="muted">Compares this choice against ${history.length} things you've actually written before - nothing invented.</p>
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-pastself ${futureScanStationLoading === "pastSelfCheck" ? "disabled" : ""}>${futureScanStationLoading === "pastSelfCheck" ? "Comparing..." : result ? "Re-check" : "Run Past-Self Check"}</button>
+    ${result ? `
+      <div class="future-reflection-list">
+        <p><strong>${escapeHTML(result.headline)}</strong></p>
+        <p class="muted">${escapeHTML(result.reading)}</p>
+        ${result.patterns.map((item) => `<p class="tiny-note"><span class="risk-pill ${item.comparison === "consistent" ? "calm" : item.comparison === "inconsistent" ? "danger" : "light"}">${escapeHTML(item.comparison)}</span> ${escapeHTML(item.reason)}</p>`).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanPastSelf() {
+  const history = futureScanPastSelfHistory();
+  if (history.length < 2) return;
+  futureScanStationError = "";
+  futureScanStationLoading = "pastSelfCheck";
+  openModal("futureScanStation", "pastSelfCheck");
+  try {
+    const historyText = history.map((entry, index) => `${index + 1}. (${entry.displayTime || ""}) "${cleanText(entry.content, 160)}"`).join(" ");
+    const prompt = `${scanContextText("pastSelfCheck")} Things the user has actually written before, most recent first: ${historyText} Compare the CURRENT situation against these real past moments - where do they show a consistent pattern, and where does this choice seem to break from what they've said before? Only reference the entries given, never invent a past moment that isn't listed. Respond as strict JSON only: {"headline":"string","reading":"string","patterns":[{"comparison":"consistent|inconsistent|unclear","reason":"string"}]}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed || !Array.isArray(parsed.patterns)) throw new Error("Past-self check reply was not valid JSON.");
+    const result = {
+      headline: cleanText(parsed.headline || "Here's how this compares to your own history.", 200),
+      reading: cleanText(parsed.reading || "", 400),
+      patterns: parsed.patterns.slice(0, 5).map((item) => ({
+        comparison: ["consistent", "inconsistent", "unclear"].includes(item.comparison) ? item.comparison : "unclear",
+        reason: cleanText(item.reason || "", 220)
+      })).filter((item) => item.reason),
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("pastSelfCheck", result);
+  } catch (error) {
+    console.error("[Future Scan] Past-self check failed", error);
+    futureScanStationError = "This check is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "pastSelfCheck");
+  }
+}
+
+function futureScanDriftView() {
+  const blueprint = latestBlueprint();
+  const result = activeFutureScan.stations.driftDetector;
+  if (!blueprint) {
+    return `
+      <p class="muted">Complete your Personal Blueprint first - drift is measured against the direction you actually said you wanted, not a generic one.</p>
+      <button class="secondary-action compact-action" type="button" data-open="discoverYourself">Start Blueprint</button>
+    `;
+  }
+  return `
+    <p class="muted">Compares this choice against your saved values, goals, and recent reflections.</p>
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-drift ${futureScanStationLoading === "driftDetector" ? "disabled" : ""}>${futureScanStationLoading === "driftDetector" ? "Scanning..." : result ? "Re-scan" : "Run Drift Detector"}</button>
+    ${result ? `
+      <span class="risk-pill ${result.drift === "drifting" ? "danger" : result.drift === "onTrack" ? "calm" : "light"}">${escapeHTML(result.drift)}</span>
+      <div class="future-reflection-list">
+        <p><strong>${escapeHTML(result.headline)}</strong></p>
+        <p class="muted">${escapeHTML(result.reading)}</p>
+        ${result.signals.map((item) => `<p class="tiny-note"><strong>${escapeHTML(item.label)}</strong>: ${escapeHTML(item.note)}</p>`).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanDrift() {
+  const blueprint = latestBlueprint();
+  if (!blueprint) return;
+  futureScanStationError = "";
+  futureScanStationLoading = "driftDetector";
+  openModal("futureScanStation", "driftDetector");
+  try {
+    const goals = myRoadmapGoals();
+    const recentReflections = futureScanPastSelfHistory();
+    const context = [
+      `Saved values: ${blueprint.values.join(", ")}.`,
+      goals.length ? `Roadmap goals: ${goals.map((goal) => goal.title).join(", ")}.` : "No roadmap goals saved.",
+      recentReflections.length ? `Recent things they've written, most recent first: ${recentReflections.map((entry) => `"${cleanText(entry.content, 140)}"`).join(" ")}` : "No recent reflections saved."
+    ].join(" ");
+    const prompt = `${scanContextText("driftDetector")} The user's saved direction: ${context} Based ONLY on this real saved data, does the current situation suggest they're on track toward that stated direction, slowly drifting from it, or is it unclear/not enough signal? Be honest if there isn't enough real data to tell either way - don't invent a trend that isn't actually supported. Respond as strict JSON only: {"headline":"string","reading":"string","drift":"onTrack|drifting|unclear","signals":[{"label":"string","note":"string"}]}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed) throw new Error("Drift detector reply was not valid JSON.");
+    const result = {
+      headline: cleanText(parsed.headline || "Here's where this choice sits relative to your direction.", 200),
+      reading: cleanText(parsed.reading || "", 400),
+      drift: ["onTrack", "drifting", "unclear"].includes(parsed.drift) ? parsed.drift : "unclear",
+      signals: Array.isArray(parsed.signals) ? parsed.signals.slice(0, 5).map((item) => ({
+        label: cleanText(item.label || "", 60),
+        note: cleanText(item.note || "", 200)
+      })).filter((item) => item.label) : [],
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("driftDetector", result);
+  } catch (error) {
+    console.error("[Future Scan] Drift detector failed", error);
+    futureScanStationError = "This scan is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "driftDetector");
+  }
+}
+
+function futureScanCheckBackView() {
+  const result = activeFutureScan.stations.checkBack;
+  if (!result) {
+    return `
+      <p class="muted">Pick when to check back. Future Scan saves a short snapshot of where things stand now, then later asks what actually happened.</p>
+      <div class="mirror-example-row">
+        ${FUTURE_SCAN_CHECKBACK_HORIZONS.map((horizon) => `<button type="button" class="${futureScanCheckBackHorizon === horizon.id ? "is-selected" : ""}" data-scan-checkback-horizon="${horizon.id}">${escapeHTML(horizon.label)}</button>`).join("")}
+      </div>
+      ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+      <button class="primary-action mirror-run-action" type="button" data-run-scan-checkback-schedule ${futureScanStationLoading === "checkBack" ? "disabled" : ""}>${futureScanStationLoading === "checkBack" ? "Scheduling..." : "Schedule Check-Back"}</button>
+    `;
+  }
+  if (result.status === "scheduled") {
+    const due = new Date(result.resurfaceAt).getTime() <= Date.now();
+    return `
+      <p class="eyebrow">Snapshot saved ${escapeHTML(result.scheduledDisplayTime || "")}</p>
+      <p class="tiny-note">${escapeHTML(result.predictionNote)}</p>
+      <p class="muted">${due ? "It's time - what actually happened?" : `We'll check back around ${escapeHTML(result.dueDisplayTime || "")}. You can also report back early any time.`}</p>
+      <div class="admin-form">
+        <label>What actually happened?
+          <textarea id="scan-checkback-report" placeholder="Tell me what really happened">${escapeHTML(futureScanCheckBackReportText)}</textarea>
+        </label>
+      </div>
+      ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+      <button class="primary-action mirror-run-action" type="button" data-run-scan-checkback-report ${futureScanStationLoading === "checkBack" ? "disabled" : ""}>${futureScanStationLoading === "checkBack" ? "Comparing..." : "Compare with what I predicted"}</button>
+    `;
+  }
+  return `
+    <div class="future-reflection-list">
+      <p><strong>${escapeHTML(result.headline)}</strong></p>
+      <p class="muted">${escapeHTML(result.reading)}</p>
+      <p class="tiny-note">Your snapshot: ${escapeHTML(result.predictionNote)}</p>
+      <p class="tiny-note">What happened: ${escapeHTML(result.actualOutcome)}</p>
+    </div>
+    <button class="secondary-action compact-action" type="button" data-reset-scan-checkback>Schedule another check-back</button>
+  `;
+}
+
+async function scheduleFutureScanCheckBack() {
+  if (!futureScanCheckBackHorizon) {
+    futureScanStationError = "Pick when you'd like to check back.";
+    openModal("futureScanStation", "checkBack");
+    return;
+  }
+  const horizon = FUTURE_SCAN_CHECKBACK_HORIZONS.find((item) => item.id === futureScanCheckBackHorizon);
+  futureScanStationError = "";
+  futureScanStationLoading = "checkBack";
+  openModal("futureScanStation", "checkBack");
+  try {
+    const prompt = `${scanContextText("checkBack")} The user is about to wait ${horizon.label.toLowerCase()} before checking back on this. Write one short, concrete sentence capturing what they seem to expect or be hoping for right now, grounded only in what they told you - this becomes a snapshot they'll compare against reality later, so don't guess wildly beyond what's stated. Respond as strict JSON only: {"predictionNote":"string"}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed || !parsed.predictionNote) throw new Error("Check-back scheduling reply was not valid JSON.");
+    const resurfaceAt = new Date(Date.now() + horizon.days * 86400000).toISOString();
+    const result = {
+      status: "scheduled",
+      horizonId: horizon.id,
+      predictionNote: cleanText(parsed.predictionNote, 260),
+      scheduledAt: new Date().toISOString(),
+      scheduledDisplayTime: new Date().toLocaleString([], { month: "short", day: "numeric" }),
+      resurfaceAt,
+      dueDisplayTime: new Date(resurfaceAt).toLocaleString([], { month: "short", day: "numeric" }),
+      resurfacedAt: null,
+      dismissedAt: null,
+      ignoredCount: 0
+    };
+    saveFutureScanStation("checkBack", result);
+    futureScanCheckBackHorizon = "";
+  } catch (error) {
+    console.error("[Future Scan] Check-back scheduling failed", error);
+    futureScanStationError = "Scheduling is having trouble right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "checkBack");
+  }
+}
+
+async function submitFutureScanCheckBackReport() {
+  const existing = activeFutureScan.stations.checkBack;
+  if (!existing) return;
+  const textarea = document.querySelector("#scan-checkback-report");
+  const report = cleanText(textarea ? textarea.value : futureScanCheckBackReportText, 500);
+  if (!report) {
+    futureScanStationError = "Tell me what actually happened first.";
+    openModal("futureScanStation", "checkBack");
+    return;
+  }
+  futureScanCheckBackReportText = report;
+  futureScanStationError = "";
+  futureScanStationLoading = "checkBack";
+  openModal("futureScanStation", "checkBack");
+  try {
+    const prompt = `${scanContextText("checkBack")} Earlier snapshot of what the user seemed to expect: "${existing.predictionNote}". What actually happened, in their own words: "${report}". Compare the two honestly - where did reality match what they expected, and where did it differ? Be supportive but honest, not falsely encouraging. Respond as strict JSON only: {"headline":"string","reading":"string"}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed) throw new Error("Check-back comparison reply was not valid JSON.");
+    const result = {
+      ...existing,
+      status: "completed",
+      actualOutcome: report,
+      headline: cleanText(parsed.headline || "Here's how it compared.", 200),
+      reading: cleanText(parsed.reading || "", 400),
+      completedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("checkBack", result);
+    futureScanCheckBackReportText = "";
+  } catch (error) {
+    console.error("[Future Scan] Check-back comparison failed", error);
+    futureScanStationError = "This comparison is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "checkBack");
+  }
+}
+
+function resetFutureScanCheckBack() {
+  if (!activeFutureScan) return;
+  delete activeFutureScan.stations.checkBack;
+  const stored = trackerState.futureScans.find((item) => item.id === activeFutureScan.id);
+  if (stored && stored.stations) delete stored.stations.checkBack;
+  saveTrackerState();
+  futureScanCheckBackReportText = "";
+  futureScanCheckBackHorizon = "";
+  openModal("futureScanStation", "checkBack");
 }
 
 async function sendChatMessage(text) {
@@ -6776,6 +8021,29 @@ document.addEventListener("click", async (event) => {
   const opportunityAi = event.target.closest("[data-opportunity-ai]");
   const runFutureMirror = event.target.closest("[data-run-future-mirror]");
   const futureMirrorModeButton = event.target.closest("[data-future-mirror-mode]");
+  const scanFromEntry = event.target.closest("[data-scan-from-entry]");
+  const startFutureScanButton = event.target.closest("[data-start-future-scan]");
+  const scanClarifyChip = event.target.closest("[data-scan-clarify-chip]");
+  const submitFutureScanClarifyButton = event.target.closest("[data-submit-future-scan-clarify]");
+  const resetFutureScanButton = event.target.closest("[data-reset-future-scan]");
+  const scanIdentityPick = event.target.closest("[data-scan-identity-pick]");
+  const runScanIdentityButton = event.target.closest("[data-run-scan-identity]");
+  const runScanValuesButton = event.target.closest("[data-run-scan-values]");
+  const runScanCostsButton = event.target.closest("[data-run-scan-costs]");
+  const runScanNoActionButton = event.target.closest("[data-run-scan-noaction]");
+  const scanPressurePick = event.target.closest("[data-scan-pressure-pick]");
+  const runScanPressureButton = event.target.closest("[data-run-scan-pressure]");
+  const runScanConflictButton = event.target.closest("[data-run-scan-conflict]");
+  const scanSignalPick = event.target.closest("[data-scan-signal-pick]");
+  const runScanSignalButton = event.target.closest("[data-run-scan-signal]");
+  const runScanPastSelfButton = event.target.closest("[data-run-scan-pastself]");
+  const runScanDriftButton = event.target.closest("[data-run-scan-drift]");
+  const scanCheckBackHorizonButton = event.target.closest("[data-scan-checkback-horizon]");
+  const runScanCheckBackScheduleButton = event.target.closest("[data-run-scan-checkback-schedule]");
+  const runScanCheckBackReportButton = event.target.closest("[data-run-scan-checkback-report]");
+  const resetScanCheckBackButton = event.target.closest("[data-reset-scan-checkback]");
+  const runScanSynthesisButton = event.target.closest("[data-run-scan-synthesis]");
+  const openPastScanButton = event.target.closest("[data-open-past-scan]");
   const mirrorExample = event.target.closest("[data-mirror-example]");
   const discussMirror = event.target.closest("[data-discuss-mirror]");
   const saveFutureDecision = event.target.closest("[data-save-future-decision]");
@@ -7236,6 +8504,57 @@ document.addEventListener("click", async (event) => {
     renderScreen("future");
   }
 
+  if (scanFromEntry) {
+    const entry = allReflectionLikeEntries().find((item) => item.id === scanFromEntry.dataset.scanFromEntry);
+    if (entry) await startFutureScan(cleanText(entry.content, 300));
+  }
+  if (startFutureScanButton) await startFutureScan();
+  if (scanClarifyChip) {
+    futureScanClarifyAnswer = scanClarifyChip.dataset.scanClarifyChip;
+    renderScreen("future");
+  }
+  if (submitFutureScanClarifyButton) await submitFutureScanClarify();
+  if (resetFutureScanButton) resetFutureScan();
+  if (scanIdentityPick) {
+    const value = scanIdentityPick.dataset.scanIdentityPick;
+    if (futureScanIdentityPicks.includes(value)) {
+      futureScanIdentityPicks = futureScanIdentityPicks.filter((item) => item !== value);
+    } else if (futureScanIdentityPicks.length < 3) {
+      futureScanIdentityPicks = [...futureScanIdentityPicks, value];
+    }
+    openModal("futureScanStation", "identityScan");
+  }
+  if (runScanIdentityButton) await runFutureScanIdentity();
+  if (runScanValuesButton) await runFutureScanValues();
+  if (runScanCostsButton) await runFutureScanHiddenCosts();
+  if (runScanNoActionButton) await runFutureScanNoAction();
+  if (scanPressurePick) {
+    const value = scanPressurePick.dataset.scanPressurePick;
+    futureScanPressurePicks = futureScanPressurePicks.includes(value)
+      ? futureScanPressurePicks.filter((item) => item !== value)
+      : [...futureScanPressurePicks, value];
+    openModal("futureScanStation", "pressureTest");
+  }
+  if (runScanPressureButton) await runFutureScanPressure();
+  if (runScanConflictButton) await runFutureScanConflict();
+  if (scanSignalPick) {
+    const [dimensionId, level] = String(scanSignalPick.dataset.scanSignalPick).split(":");
+    futureScanSignalPicks = { ...futureScanSignalPicks, [dimensionId]: level };
+    openModal("futureScanStation", "signalRadar");
+  }
+  if (runScanSignalButton) await runFutureScanSignal();
+  if (runScanPastSelfButton) await runFutureScanPastSelf();
+  if (runScanDriftButton) await runFutureScanDrift();
+  if (scanCheckBackHorizonButton) {
+    futureScanCheckBackHorizon = scanCheckBackHorizonButton.dataset.scanCheckbackHorizon;
+    openModal("futureScanStation", "checkBack");
+  }
+  if (runScanCheckBackScheduleButton) await scheduleFutureScanCheckBack();
+  if (runScanCheckBackReportButton) await submitFutureScanCheckBackReport();
+  if (resetScanCheckBackButton) resetFutureScanCheckBack();
+  if (runScanSynthesisButton) await runFutureScanSynthesis();
+  if (openPastScanButton) openPastFutureScan(openPastScanButton.dataset.openPastScan);
+
   if (prevBlueprintSession) {
     captureBlueprintDraft();
     blueprintActiveSession = Math.max(1, blueprintActiveSession - 1);
@@ -7305,9 +8624,18 @@ document.addEventListener("click", async (event) => {
 
   if (resurfaceActionButton) {
     const [id, action] = resurfaceActionButton.dataset.resurfaceAction.split(":");
+    const resurfacedEntry = allReflectionLikeEntries().find((item) => item.id === id);
     resurfaceEntryAction(id, action);
-    renderScreen(activeTab);
-    refreshStaticScreens();
+    if (action === "engage" && resurfacedEntry && resurfacedEntry._source === "futureScan") {
+      // A resurfaced Check-Back is useless without a way back to it - jump
+      // straight into that scan's Check-Back station instead of just marking
+      // it read, so the user can actually report what happened.
+      openPastFutureScan(resurfacedEntry._scanId);
+      openModal("futureScanStation", "checkBack");
+    } else {
+      renderScreen(activeTab);
+      refreshStaticScreens();
+    }
   }
 
   if (generateRoadmapButton) {

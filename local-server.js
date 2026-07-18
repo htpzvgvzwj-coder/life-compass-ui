@@ -162,7 +162,12 @@ async function callGemini({ systemPrompt, messages, context }) {
       generationConfig: {
         temperature: 0.75,
         topP: 0.9,
-        maxOutputTokens: 1100,
+        // 1100 was too tight for Future Mirror's structured-JSON prompts
+        // (Decision Simulator/Life Compass ask for 6 scored dimensions, up
+        // to 3 paths, a 4-point timeline, a letter, 6 score categories, and
+        // reflection questions) - responses were getting cut off mid-JSON,
+        // which failed to parse and showed the raw truncated text to users.
+        maxOutputTokens: 2400,
       },
     }),
   });
@@ -199,7 +204,9 @@ async function callGroq({ systemPrompt, messages, context }) {
       messages: buildChatMessages(systemPrompt, messages, context),
       temperature: 0.75,
       top_p: 0.9,
-      max_completion_tokens: 1100,
+      // See the matching comment in callGemini() - 1100 was too tight for
+      // Future Mirror's structured-JSON prompts and was truncating replies.
+      max_completion_tokens: 2400,
     }),
   });
 
@@ -235,7 +242,9 @@ async function callOpenAI({ systemPrompt, messages, context }) {
     body: JSON.stringify({
       model: openaiModel,
       input,
-      max_output_tokens: 1100,
+      // See the matching comment in callGemini() - 1100 was too tight for
+      // Future Mirror's structured-JSON prompts and was truncating replies.
+      max_output_tokens: 2400,
     }),
   });
 
