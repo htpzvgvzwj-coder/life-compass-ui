@@ -154,6 +154,57 @@
       },
       consequence: "Reflection helped turn experience into learning.",
       reflection: "What pattern should you notice before it becomes a problem?"
+    },
+    // HDB Hub (new zone, life-sim.js/app.js): the unglamorous "adulting
+    // paperwork" side of independence that the rest of the activity list
+    // doesn't cover - none of these are fun, all of them are real, and none
+    // has a wrong answer to game toward (same "small real tradeoff" shape
+    // as every other activity here, not a puzzle with an optimal choice).
+    {
+      id: "file-taxes",
+      title: "File your taxes",
+      category: "Life Admin",
+      location: "hdb-hub",
+      durationMinutes: 90,
+      effects: {
+        finance: { money: -15, confidence: 4 },
+        needs: { stress: 8, purpose: 4 },
+        skills: { finance: 3 },
+        capability: { responsibility: 2 },
+        habits: { budgeting: 2 }
+      },
+      consequence: "Taxes got filed on time - a small cost now against a bigger problem avoided later.",
+      reflection: "What made this easier or harder than you expected?"
+    },
+    {
+      id: "check-cpf-statement",
+      title: "Check your CPF statement",
+      category: "Life Admin",
+      location: "hdb-hub",
+      durationMinutes: 20,
+      effects: {
+        needs: { stress: -4, purpose: 2 },
+        finance: { confidence: 3 },
+        skills: { finance: 1 }
+      },
+      consequence: "A quick look at the real numbers replaced vague worry with an actual picture.",
+      reflection: "Did checking change how you feel about the future, even a little?"
+    },
+    {
+      id: "apply-bto",
+      title: "Apply for a BTO flat",
+      category: "Life Admin",
+      location: "hdb-hub",
+      durationMinutes: 120,
+      effects: {
+        finance: { money: -50, confidence: 2 },
+        needs: { stress: 10, purpose: 12 },
+        skills: { finance: 2, career: 1 },
+        capability: { decisionMaking: 2, responsibility: 2 },
+        habits: { budgeting: 1 }
+      },
+      consequence: "The application is in - a real step toward an independent home, with a real wait ahead.",
+      reflection: "What does having your own place actually mean to you?"
     }
   ];
 

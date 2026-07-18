@@ -34,6 +34,27 @@
     { id: "chinatown", name: "Chinatown", x: 10, z: -61, radius: 5 },
     { id: "little-india", name: "Little India", x: 25, z: -14, radius: 5 },
     { id: "bugis", name: "Bugis", x: 50, z: -32, radius: 4.8 },
+    // Raffles Place (CBD): the downtown ring (marina-bay/chinatown/
+    // little-india/bugis/mall) already sits at the ~28-unit clearance
+    // minimum from itself, so there was no legal slot for a 6th zone at the
+    // ring's center. This is the closest position to Marina Bay found by a
+    // verified grid search that still keeps >=28 units from every other
+    // zone (margin here is ~29 units, to both Bugis and Hospital).
+    { id: "raffles-place", name: "Raffles Place", x: 78, z: -24, radius: 5.5 },
+    // Clarke Quay/Boat Quay: real-world geography has this riverside F&B
+    // strip a short walk from Raffles Place along the Singapore River -
+    // placed directly north of it (verified >=28 units from every zone,
+    // margin 29 to Raffles Place itself, the nearest).
+    { id: "clarke-quay", name: "Clarke Quay", x: 78, z: 5, radius: 5.2 },
+    // Punggol: real Singapore's northeast waterfront new town. Placed far
+    // northeast, well clear of everything (verified minimum clearance here
+    // is 63+ units, the loosest of any zone - there was ample open space in
+    // this direction, unlike the packed downtown ring).
+    { id: "punggol", name: "Punggol", x: 90, z: 70, radius: 6.5 },
+    // HDB Hub: government/adulting-services building, placed north of the
+    // Park/Library cluster (verified >=28 units from every zone, margin
+    // ~30 to Park, the nearest).
+    { id: "hdb-hub", name: "HDB Hub", x: 32, z: 46, radius: 5 },
     // Woodlands sits at the true far north of real Singapore (by the
     // Causeway to Malaysia) - kept at its existing position (already built),
     // still the northmost point of the new, much larger map.
@@ -1288,8 +1309,12 @@
     addZoneAt(addChinatown, THREE, scene, mat, "chinatown");
     addZoneAt(addLittleIndia, THREE, scene, mat, "little-india");
     addZoneAt(addBugis, THREE, scene, mat, "bugis");
+    addZoneAt(addRafflesPlace, THREE, scene, mat, "raffles-place");
+    addZoneAt(addClarkeQuay, THREE, scene, mat, "clarke-quay");
+    addZoneAt(addHdbHub, THREE, scene, mat, "hdb-hub");
     addStreetLife(THREE, scene, mat);
     addWoodlands(THREE, scene, mat);
+    addPunggol(THREE, scene, mat);
     addBox(THREE, scene, "Woodlands Access Road", [0, 0.025, 34], [5.2, 0.08, 32], mat.road, true);
     for (let z = 20; z <= 56; z += 6) addBox(THREE, scene, "Road Center Line NS", [0, 0.13, z], [0.25, 0.04, 2.15], mat.roadLine, true);
     addZones(THREE, scene, mat);
@@ -1370,7 +1395,9 @@
   // in the scene shares that exact prefix.
   const TREE_POSITIONS = [
     [-35, 18], [-18, 24], [-32, 4], [-35, -12], [-23, -23], [-4, -29], [8, -26],
-    [12, -17], [3, -17], [27, -18], [31, 21], [22, 23], [38, 6]
+    [12, -17], [3, -17], [27, -18], [31, 21], [22, 23], [38, 6],
+    [69, -18], [86, -17], [66, 1.5], [89, 1.5], [80, 75], [100, 75], [25, 43], [39, 43],
+    [-18, 34], [8, 34], [-18, 47]
   ];
 
   // Orchard Road's famous dense rain-tree canopy - noticeably denser than the
@@ -1521,6 +1548,30 @@
         position: [22, 0, 48],
         scale: [1, 1, 1]
       },
+      // Woodlands estate expansion: 12 more blocks cycling through the same
+      // 3 Quaternius files as the mall/original 2 blocks above, grouped by
+      // file into 3 "positions" (plural, clone-based) entries - safe to
+      // reuse a url already used by a singular entry above (see the
+      // Punggol/Raffles Place comment for why singular+singular is the
+      // unsafe combination, not singular+plural).
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Large_2.gltf",
+        hideNamePrefixes: ["Woodlands Estate Block C", "Woodlands Estate Block F", "Woodlands Estate Block I", "Woodlands Estate Block L"],
+        positions: [[-16, 30], [5, 30], [-2, 37], [-9, 44]],
+        scale: [1, 1, 1]
+      },
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.gltf",
+        hideNamePrefixes: ["Woodlands Estate Block D", "Woodlands Estate Block G", "Woodlands Estate Block J", "Woodlands Estate Block M"],
+        positions: [[-9, 30], [-16, 37], [5, 37], [-2, 44]],
+        scale: [1, 1, 1]
+      },
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Small_1.gltf",
+        hideNamePrefixes: ["Woodlands Estate Block E", "Woodlands Estate Block H", "Woodlands Estate Block K", "Woodlands Estate Block N"],
+        positions: [[-2, 30], [-9, 37], [-16, 44], [5, 44]],
+        scale: [1, 1, 1]
+      },
       // Real-model pass: swapping the remaining hand-built primitive-box
       // shophouses/buildings for real CC0 modeled buildings (Kenney "City Kit
       // Commercial" / "Modular Buildings" packs, kept in
@@ -1619,14 +1670,54 @@
       },
       // Real park bench (Kenney "Furniture Kit") city-wide, replacing every
       // primitive "Bench Seat"/"Bench Back" pair (Park x2, Beach x1,
-      // Woodlands x2) - same city-wide-swap pattern as the tree replacement
-      // above rather than a per-zone entry, since addBench() is one shared
-      // helper called from multiple zones.
+      // Woodlands x2, Raffles Place x2) - same city-wide-swap pattern as the
+      // tree replacement above rather than a per-zone entry, since
+      // addBench() is one shared helper called from multiple zones.
       {
         url: "assets/environment/park-bench.glb",
         hideNames: ["Bench Seat", "Bench Back"],
-        positions: [[8, 20.2], [18, 25.8], [72.3, -80.1], [0, 40.5], [5, 43]],
+        positions: [[8, 20.2], [18, 25.8], [72.3, -80.1], [0, 40.5], [5, 43], [82, -18], [70, -20], [68, 2], [87, 2], [84, 74.5], [96, 74.5], [27, 44], [37, 44], [-5, 33.5], [1, 40.5]],
         scale: [4, 2, 3]
+      },
+      // Punggol: reuses the same real HDB block model as Home, and the same
+      // mall model as Orchard Road. Both use the "positions" (plural, clone-
+      // based) form even for a single position - the singular "position"
+      // form directly repositions the ONE cached, shared scene object for a
+      // url, so two singular entries sharing a url (this reuses hdb-block.glb
+      // and mall-building.glb, each already used elsewhere via a singular
+      // entry) race to reposition the same object and only the
+      // last-resolved one actually ends up in the right place. "positions"
+      // always clones first, so it's safe to reuse a url this way no matter
+      // what order entries resolve in.
+      {
+        url: "assets/environment/hdb-block.glb",
+        hideNamePrefixes: ["Punggol HDB Block A", "Punggol HDB Block B"],
+        positions: [[78, 67], [70, 71]],
+        scale: [5.2, 5.2, 5.2]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/mall-building.glb",
+        hideNames: ["Waterway Point Mall", "Waterway Point Glass Front", "Waterway Point Roof"],
+        positions: [[101, 68]],
+        scale: [6, 6, 6]
+      },
+      // Raffles Place: two of Marina Bay's own generic City Kit Commercial
+      // skyscrapers reused for background density around the hand-built
+      // towers in addRafflesPlace() - purely additive, nothing to hide.
+      // "positions" (plural) form even for one position each, since both
+      // urls are already used once by Marina Bay's own singular entries
+      // below - see the Punggol comment above for why reusing a url via two
+      // singular entries is unsafe but two "positions" entries (or one
+      // singular + one "positions") are not.
+      {
+        url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
+        positions: [[68, -30]],
+        scale: [4.6, 4.6, 4.6]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
+        positions: [[88, -28]],
+        scale: [4.2, 4.2, 4.2]
       }
     ];
 
@@ -2039,6 +2130,133 @@
     addSignBoard(THREE, scene, "Bugis Sign", "BUGIS", [30.6, 4.4, 5.2], mat.signBlue, 0xffffff);
   }
 
+  // Raffles Place - Singapore's historic CBD/financial district. No free CC0
+  // model matches the real UOB Plaza/OCBC Centre/Republic Plaza silhouettes,
+  // so the 4 towers are hand-built with the same curtain-wall facade
+  // technique as addMarinaBayLandmark(), just taller - Raffles Place's real
+  // towers (Republic Plaza, UOB Plaza) are in fact taller than Marina Bay
+  // Sands, which this district's height (up to 32 units, vs. Marina Bay's
+  // 22) reflects. Two of Marina Bay's own generic background skyscraper
+  // GLBs are reused here for extra density in loadDistrictAssetSamples()
+  // (that's the kit's intended reuse, not a placeholder). This function uses
+  // absolute world coordinates directly (matching its zone position, no
+  // ZONE_DELTA entry) since it's a brand-new district, same as
+  // chinatown/little-india/bugis when they were first added.
+  function addRafflesPlace(THREE, scene, mat) {
+    const baseX = 78;
+    const baseZ = -24;
+
+    addPlane(THREE, scene, "Raffles Place Plaza", [baseX, 0.02, baseZ], [22, 18], mat.sidewalk);
+
+    [
+      { name: "Raffles Place Tower A", offsetX: -6, offsetZ: -4, width: 5, height: 26, depth: 5 },
+      { name: "Raffles Place Tower B", offsetX: 2, offsetZ: -6, width: 4.2, height: 32, depth: 4.2 },
+      { name: "Raffles Place Tower C", offsetX: 7, offsetZ: -2, width: 4.6, height: 22, depth: 4.6 },
+      { name: "Raffles Place Tower D", offsetX: -1, offsetZ: 3, width: 5.4, height: 18, depth: 5.4 }
+    ].forEach((tower) => {
+      addBuildingCore(
+        THREE, scene, tower.name,
+        [baseX + tower.offsetX, tower.height / 2, baseZ + tower.offsetZ],
+        [tower.width, tower.height, tower.depth],
+        mat.work, mat, "modern"
+      );
+    });
+
+    addBox(THREE, scene, "Raffles Place MRT Canopy", [baseX - 2, 1.6, baseZ + 7], [6, 0.3, 4], mat.roofDark);
+    addCylinder(THREE, scene, "Raffles Place MRT Pillar", [baseX - 4.4, 0.8, baseZ + 5.4], [0.16, 1.6, 8], mat.metal);
+    addCylinder(THREE, scene, "Raffles Place MRT Pillar", [baseX + 0.4, 0.8, baseZ + 5.4], [0.16, 1.6, 8], mat.metal);
+    addSignBoard(THREE, scene, "Raffles Place MRT Sign", "RAFFLES PLACE MRT", [baseX - 4.6, 1.9, baseZ + 8.6], mat.signBlue, 0xffffff);
+
+    addSignBoard(THREE, scene, "Raffles Place Sign", "RAFFLES PLACE", [baseX - 8, 3.4, baseZ - 8], mat.signGold, 0x151515);
+
+    addBench(THREE, scene, [baseX + 4, baseZ + 6], mat);
+    addBench(THREE, scene, [baseX - 8, baseZ + 4], mat);
+    addTree(THREE, scene, [baseX - 9, baseZ + 6], mat);
+    addTree(THREE, scene, [baseX + 8, baseZ + 7], mat);
+  }
+
+  // Clarke Quay/Boat Quay - the historic riverside F&B/nightlife strip, a
+  // short walk north of Raffles Place along the Singapore River. No CC0
+  // model matches these specific conserved shophouse facades, so this reuses
+  // the same shophouse-row treatment as addChinatown()/addLittleIndia()
+  // (own building, roof, cornice, shopfront glass, sign), recoloured for a
+  // nightlife strip, plus the district's two defining real features: the
+  // river itself and the colourful outdoor-dining umbrellas Clarke Quay is
+  // known for (Boat Quay's actual bumboats now run dinner cruises here).
+  function addClarkeQuay(THREE, scene, mat) {
+    const baseX = 78;
+    const baseZ = 5;
+
+    addPlane(THREE, scene, "Singapore River", [baseX, 0.01, baseZ + 5], [26, 6], mat.water);
+    addPlane(THREE, scene, "Clarke Quay Promenade", [baseX, 0.02, baseZ - 1], [26, 7], mat.sidewalk);
+
+    const shophouses = [
+      { name: "Clarke Quay Restaurant Rouge", x: baseX - 9, height: 6.2, color: mat.gym },
+      { name: "Clarke Quay Bar Teal", x: baseX - 4.5, height: 6.6, color: mat.hospitalAccent },
+      { name: "Clarke Quay Bar Magenta", x: baseX, height: 6.0, color: mat.mall },
+      { name: "Clarke Quay Restaurant Amber", x: baseX + 4.5, height: 6.4, color: mat.signGold }
+    ];
+    shophouses.forEach((house) => {
+      addBuildingCore(THREE, scene, house.name, [house.x, house.height / 2, baseZ - 6], [3.6, house.height, 4], house.color, mat, "shophouse");
+      addBox(THREE, scene, `${house.name} Roof`, [house.x, house.height + 0.3, baseZ - 6], [4.0, 0.4, 4.4], mat.roofDark);
+      addBox(THREE, scene, `${house.name} Shopfront Glass`, [house.x, 1.35, baseZ - 3.8], [3.0, 2.1, 0.1], mat.glass);
+    });
+
+    // Outdoor dining umbrellas along the promenade, facing the river.
+    [-7, -2, 3, 7.5].forEach((offsetX, index) => {
+      const colors = [mat.food, mat.signBlue, mat.gym, mat.hospitalAccent];
+      addCylinder(THREE, scene, "Clarke Quay Umbrella Pole", [baseX + offsetX, 1.1, baseZ + 1.5], [0.06, 2.2, 8], mat.metal);
+      addCylinder(THREE, scene, "Clarke Quay Umbrella Canopy", [baseX + offsetX, 2.3, baseZ + 1.5], [1.3, 0.2, 10], colors[index]);
+    });
+
+    // A colourful bumboat on the river - the traditional Singapore River
+    // ferry, now a dinner-cruise/tourist boat.
+    addBox(THREE, scene, "Clarke Quay Bumboat Hull", [baseX + 10, 0.32, baseZ + 5], [3.4, 0.55, 1.4], mat.signBlue);
+    addBox(THREE, scene, "Clarke Quay Bumboat Cabin", [baseX + 10, 0.85, baseZ + 5], [1.6, 0.5, 1.1], mat.signGold);
+
+    addBench(THREE, scene, [baseX - 10, baseZ - 3], mat);
+    addBench(THREE, scene, [baseX + 9, baseZ - 3], mat);
+    addTree(THREE, scene, [baseX - 12, baseZ - 3.5], mat);
+    addTree(THREE, scene, [baseX + 11, baseZ - 3.5], mat);
+    addSignBoard(THREE, scene, "Clarke Quay Sign", "CLARKE QUAY", [baseX - 11, 3.8, baseZ - 8.5], mat.signGold, 0x151515);
+  }
+
+  // HDB Hub (Toa Payoh) - Singapore's real public-housing/government-
+  // services headquarters, known for its cylindrical drum-shaped tower - a
+  // genuinely distinctive silhouette, unlike the rectangular office towers
+  // everywhere else on the map. Hand-built the same way as the ArtScience
+  // Museum nod (addArtScienceMuseum): no CC0 model matches this specific
+  // real building. Unlike every other new district this session, this one
+  // comes with its own gameplay, not just scenery - filing taxes, checking
+  // CPF, and applying for a BTO flat are real "adulting" tasks with their
+  // own lifeSimActivities["hdb-hub"] entries in app.js, the kind of
+  // bureaucratic life-admin the rest of the map doesn't cover yet.
+  function addHdbHub(THREE, scene, mat) {
+    const baseX = 32;
+    const baseZ = 46;
+
+    addPlane(THREE, scene, "HDB Hub Plaza", [baseX, 0.02, baseZ - 5], [16, 10], mat.sidewalk);
+
+    addCylinder(THREE, scene, "HDB Hub Podium", [baseX, 2, baseZ], [7, 4, 24], mat.hdb);
+    addCylinder(THREE, scene, "HDB Hub Tower", [baseX, 15, baseZ], [4.6, 22, 24], mat.hdbAccent);
+    addCylinder(THREE, scene, "HDB Hub Roof Cap", [baseX, 26.2, baseZ], [4.8, 0.4, 24], mat.roofDark);
+    // Floor-line banding for visible detail on the drum tower, instead of a
+    // flat single-tone cylinder.
+    for (let i = 0; i < 6; i++) {
+      addCylinder(THREE, scene, "HDB Hub Floor Band", [baseX, 6 + i * 3.4, baseZ], [4.65, 0.2, 24], mat.roofDark);
+    }
+
+    addBox(THREE, scene, "HDB Hub Entrance Canopy", [baseX, 4.4, baseZ - 6], [8, 0.3, 3], mat.roofDark);
+    addCylinder(THREE, scene, "HDB Hub Flagpole", [baseX - 6, 3, baseZ - 7], [0.08, 6, 8], mat.metal);
+    addBox(THREE, scene, "HDB Hub Flag", [baseX - 5.6, 5.4, baseZ - 7], [0.8, 0.5, 0.05], mat.signGold);
+
+    addSignBoard(THREE, scene, "HDB Hub Sign", "HDB HUB", [baseX - 7, 4.6, baseZ - 8.6], mat.signBlue, 0xffffff);
+    addBench(THREE, scene, [baseX - 5, baseZ - 2], mat);
+    addBench(THREE, scene, [baseX + 5, baseZ - 2], mat);
+    addTree(THREE, scene, [baseX - 7, baseZ - 3], mat);
+    addTree(THREE, scene, [baseX + 7, baseZ - 3], mat);
+  }
+
   // Woodlands - modelled from public descriptions (Wikipedia, HDB Town
   // Design Guide, URA Woodlands Regional Centre page), not map data: the
   // real town is built around an MRT/bus interchange integrated with
@@ -2075,11 +2293,49 @@
     addBuildingCore(THREE, scene, "Woodlands HDB Block B", [baseX - 19, 7.5, baseZ - 3], [5.2, 15, 4.2], mat.hdbAccent, mat, "hdb");
     addFlowerBed(THREE, scene, [baseX - 13, baseZ + 8], 4, mat);
 
-    // Woodlands Waterfront / Admiralty Park green strip
+    // Estate expansion: a real multi-block neighbourhood instead of just the
+    // 2 blocks above - 12 more, laid out as a 3x4 grid south of the
+    // interchange/mall (clear of the separate Home zone's own building
+    // footprint further southwest). Swapped for real modelled buildings in
+    // loadDistrictAssetSamples(), cycling through the same 3 Quaternius
+    // Downtown City MegaKit files as the original 2 blocks/mall above.
+    const estateGrid = [
+      { name: "Woodlands Estate Block C", x: -16, z: -20, color: mat.hdb },
+      { name: "Woodlands Estate Block D", x: -9, z: -20, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block E", x: -2, z: -20, color: mat.hdb },
+      { name: "Woodlands Estate Block F", x: 5, z: -20, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block G", x: -16, z: -13, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block H", x: -9, z: -13, color: mat.hdb },
+      { name: "Woodlands Estate Block I", x: -2, z: -13, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block J", x: 5, z: -13, color: mat.hdb },
+      { name: "Woodlands Estate Block K", x: -16, z: -6, color: mat.hdb },
+      { name: "Woodlands Estate Block L", x: -9, z: -6, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block M", x: -2, z: -6, color: mat.hdb },
+      { name: "Woodlands Estate Block N", x: 5, z: -6, color: mat.hdbAccent }
+    ];
+    estateGrid.forEach((block, index) => {
+      const height = 14 + (index % 3) * 2.5;
+      addBuildingCore(THREE, scene, block.name, [baseX + block.x, height / 2, baseZ + block.z], [5.4, height, 4.2], block.color, mat, "hdb");
+    });
+    addFlowerBed(THREE, scene, [baseX - 9, baseZ - 24], 5, mat);
+    addTree(THREE, scene, [baseX - 18, baseZ - 16], mat);
+    addTree(THREE, scene, [baseX + 8, baseZ - 16], mat);
+    addTree(THREE, scene, [baseX - 18, baseZ - 3], mat);
+
+    // Woodlands Waterfront / Admiralty Park green strip, plus a small
+    // neighbourhood playground - the "has a park" half of a real HDB town
+    // isn't just a strip of grass.
     addPlane(THREE, scene, "Woodlands Waterfront Park", [baseX + 2, -0.01, baseZ - 8], [16, 7], mat.park);
     addBench(THREE, scene, [baseX, baseZ - 9.5], mat);
     addBench(THREE, scene, [baseX + 5, baseZ - 7], mat);
+    addBench(THREE, scene, [baseX - 5, baseZ - 16.5], mat);
+    addBench(THREE, scene, [baseX + 1, baseZ - 9.5], mat);
     addDecorativeRock(THREE, scene, [baseX + 8, baseZ - 9], mat);
+    addBox(THREE, scene, "Woodlands Playground Platform", [baseX + 8, 1.0, baseZ - 6], [2.2, 0.2, 2.2], mat.signGold);
+    addCylinder(THREE, scene, "Woodlands Playground Post", [baseX + 7, 0.5, baseZ - 6.9], [0.1, 1.0, 8], mat.metal);
+    addCylinder(THREE, scene, "Woodlands Playground Post", [baseX + 9, 0.5, baseZ - 6.9], [0.1, 1.0, 8], mat.metal);
+    addBox(THREE, scene, "Woodlands Playground Roof", [baseX + 8, 1.6, baseZ - 6.9], [2.4, 0.15, 1], mat.signBlue);
+    addCylinder(THREE, scene, "Woodlands Playground Slide", [baseX + 9.3, 0.5, baseZ - 5], [0.5, 1.0, 8], mat.signBlue);
 
     // Woodlands Checkpoint - the land border crossing to Malaysia, placed at
     // the northern edge of the district as a symbolic endpoint rather than a
@@ -2088,6 +2344,49 @@
     addBox(THREE, scene, "Woodlands Checkpoint Canopy", [baseX, 4.3, baseZ + 9], [9, 0.35, 5], mat.roofDark);
     addBox(THREE, scene, "Woodlands Checkpoint Barrier", [baseX - 3.2, 0.9, baseZ + 11.2], [0.18, 0.18, 4], mat.signGold);
     addSignBoard(THREE, scene, "Woodlands Checkpoint Sign", "CHECKPOINT", [baseX - 4.4, 5.0, baseZ + 9], mat.signGold, 0x151515);
+  }
+
+  // Punggol - real Singapore's northeast waterfront new town, built around
+  // the Punggol Waterway (a landscaped canal reclaimed from Sungei Punggol)
+  // and served by the Punggol LRT rather than an MRT/bus interchange - the
+  // two features that make it read as distinct from Woodlands (whose own
+  // identity is the border checkpoint) rather than a second copy of the
+  // same HDB-town template. Reuses the same real hdb-block.glb/
+  // mall-building.glb models as Home/Orchard in loadDistrictAssetSamples()
+  // - same shared-low-poly-kit reasoning as Marina Bay's reused
+  // skyscrapers. Uses absolute world coordinates directly (matching its
+  // zone position, no ZONE_DELTA entry), same as Woodlands.
+  function addPunggol(THREE, scene, mat) {
+    const baseX = 90;
+    const baseZ = 70;
+
+    addPlane(THREE, scene, "Punggol Waterway", [baseX, 0.01, baseZ + 8], [30, 5], mat.water);
+    addPlane(THREE, scene, "Punggol Waterway Park", [baseX, -0.005, baseZ + 3], [30, 5], mat.park);
+    addBench(THREE, scene, [baseX - 6, baseZ + 4.5], mat);
+    addBench(THREE, scene, [baseX + 6, baseZ + 4.5], mat);
+    addTree(THREE, scene, [baseX - 10, baseZ + 5], mat);
+    addTree(THREE, scene, [baseX + 10, baseZ + 5], mat);
+
+    // HDB heartland cluster - swapped for real modeled buildings in
+    // loadDistrictAssetSamples() at [baseX-12,0,baseZ-3] and [baseX-20,0,baseZ+1].
+    addBuildingCore(THREE, scene, "Punggol HDB Block A", [baseX - 12, 9, baseZ - 3], [6, 18, 4.6], mat.hdb, mat, "hdb");
+    addBuildingCore(THREE, scene, "Punggol HDB Block B", [baseX - 20, 7.5, baseZ + 1], [5.2, 15, 4.2], mat.hdbAccent, mat, "hdb");
+    addFlowerBed(THREE, scene, [baseX - 12, baseZ - 8], 4, mat);
+
+    // Waterway Point mall - swapped for a real modeled building in
+    // loadDistrictAssetSamples() at [baseX+11,0,baseZ-2].
+    addBox(THREE, scene, "Waterway Point Mall", [baseX + 11, 4.2, baseZ - 2], [10, 8.4, 8], mat.mall);
+    addBox(THREE, scene, "Waterway Point Glass Front", [baseX + 11, 3.6, baseZ - 6.1], [8, 5.5, 0.18], mat.glass);
+    addBox(THREE, scene, "Waterway Point Roof", [baseX + 11, 8.6, baseZ - 2], [10.8, 0.4, 8.8], mat.roofDark);
+    addSignBoard(THREE, scene, "Waterway Point Sign", "WATERWAY POINT", [baseX + 10, 6.8, baseZ - 10], mat.signBlue, 0xffffff);
+
+    // Punggol LRT stop - an elevated light-rail platform, distinct from
+    // Woodlands' ground-level MRT/bus interchange.
+    addBox(THREE, scene, "Punggol LRT Platform", [baseX, 2.6, baseZ - 8], [8, 0.5, 3], mat.mrt);
+    addCylinder(THREE, scene, "Punggol LRT Pillar", [baseX - 3, 1.3, baseZ - 8], [0.18, 2.6, 8], mat.metal);
+    addCylinder(THREE, scene, "Punggol LRT Pillar", [baseX + 3, 1.3, baseZ - 8], [0.18, 2.6, 8], mat.metal);
+    addBox(THREE, scene, "Punggol LRT Canopy", [baseX, 3.3, baseZ - 8], [8.6, 0.3, 3.6], mat.roofDark);
+    addSignBoard(THREE, scene, "Punggol Sign", "PUNGGOL", [baseX - 4, 5.0, baseZ - 8], mat.signGold, 0x151515);
   }
 
   function addStreetLife(THREE, scene, mat) {

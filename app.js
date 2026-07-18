@@ -262,6 +262,10 @@ const lifeSimLocations = [
   { id: "chinatown", name: "Chinatown", description: "A shophouse street of red and gold, where heritage and daily life sit side by side." },
   { id: "little-india", name: "Little India", description: "A vivid, spice-scented street lined with colourful shopfronts and a small temple." },
   { id: "bugis", name: "Bugis", description: "A street market meets a modern junction - bargains, crowds, and city energy." },
+  { id: "raffles-place", name: "Raffles Place", description: "The historic CBD - banks, trading floors, and the older, taller heart of the city's economy." },
+  { id: "clarke-quay", name: "Clarke Quay", description: "A riverside strip of restored shophouses turned restaurants and bars - nightlife, socialising, and letting off steam." },
+  { id: "punggol", name: "Punggol", description: "A northeast waterfront new town built around the Punggol Waterway - modern HDB estates, a light-rail line, and quieter family life." },
+  { id: "hdb-hub", name: "HDB Hub", description: "Government and housing services - taxes, CPF, and BTO applications. The unglamorous paperwork side of being an adult." },
   { id: "woodlands", name: "Woodlands", description: "A northern regional town built around its transport hub, a big mall, HDB estates, and the checkpoint to Malaysia." }
 ];
 
