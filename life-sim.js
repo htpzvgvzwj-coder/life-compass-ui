@@ -59,21 +59,21 @@
     const scene = new THREE.Scene();
     scene.background = createSkyTexture(THREE);
     if (window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.configureAtmosphere) {
-      window.LifeVerseRenderPipeline.configureAtmosphere(THREE, scene, { fogColor: 0xd9efff, fogNear: 34, fogFar: 92 });
+      window.LifeVerseRenderPipeline.configureAtmosphere(THREE, scene, { fogColor: 0xcdd2c2, fogNear: 38, fogFar: 104 });
     } else {
-      scene.fog = new THREE.Fog(0xd9efff, 34, 92);
+      scene.fog = new THREE.Fog(0xcdd2c2, 38, 104);
     }
 
     const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 180);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     if (window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.configureRenderer) {
-      window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.72, shadows: true, maxPixelRatio: 2 });
+      window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.86, shadows: true, maxPixelRatio: 2 });
     } else {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace || renderer.outputColorSpace;
-      renderer.toneMappingExposure = 0.72;
+      renderer.toneMappingExposure = 0.86;
     }
     root.appendChild(renderer.domElement);
 
@@ -432,11 +432,14 @@
   }
 
   function createMaterials(THREE) {
-    // Volume 5's anime cel-shading direction (docs/volume5-asset-pipeline.md) was
-    // superseded by a semi-realistic "Stylized Low Poly City" PBR look - real
-    // building proportions and material roughness/metalness variation, no
-    // photoreal detail, no ray tracing/reflections/volumetric lighting, and
-    // nothing more expensive than Three.js's standard PBR lighting model.
+    // Modern-realistic Singapore direction (supersedes the earlier anime
+    // cel-shading and "Stylized Low Poly City" pastel-PBR passes, per an
+    // explicit user call overriding the Volume 05 art bible's "avoid pure
+    // photorealism" guidance for THIS map-styling pass): desaturated,
+    // real-world-plausible material colors - muted HDB paint tones, true
+    // asphalt roads, tropical (not candy) greens, marina teal water,
+    // curtain-wall glass - still nothing more expensive than Three.js's
+    // standard PBR lighting model (no ray tracing/path tracing/reflections).
     const library = window.LifeVerseAssets && window.LifeVerseAssets.createMaterialLibrary
       ? window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" })
       : null;
@@ -445,69 +448,69 @@
     const standard = (color, emissive = 0x000000, roughness = 0.68, metalness = 0.02) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness });
     const glass = (color) => new THREE.MeshPhysicalMaterial({
       color,
-      roughness: 0.22,
-      metalness: 0.04,
+      roughness: 0.2,
+      metalness: 0.06,
       transparent: true,
-      opacity: 0.78,
-      transmission: 0.08
+      opacity: 0.74,
+      transmission: 0.12
     });
     const transparent = (color, opacity = 0.28) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
 
     return {
       library,
-      grass: shared("grass", () => make(0x92d36f)),
-      ground: make(0xead8a8),
-      warmGround: make(0xf8dfad),
-      road: shared("road", () => standard(0x1c2028)),
-      roadLine: make(0xffef84, 0x332a00),
-      sidewalk: shared("concrete", () => make(0xcbbf9d)),
-      curb: shared("stone", () => make(0xe6dac0)),
-      curbWarm: make(0xf3dfad),
-      hdb: make(0xbfdfff),
-      hdbAccent: make(0xffd0d9),
-      hdbBalcony: make(0xf4ead7),
-      gym: make(0xff806f),
-      work: make(0x6fa3ff),
-      food: make(0xffc95b, 0x2c1700),
-      mall: make(0xb69cff),
-      park: make(0x43bf70),
-      library: make(0x93c7ff),
-      hospital: make(0xdcecf5),
-      hospitalAccent: make(0x7ed9ff, 0x000000, 0.22, 0.05),
-      cafe: make(0xffb678, 0x311600),
-      university: make(0xffe4a3),
-      airport: make(0xbcd1e6),
-      airportAccent: make(0x3b77d5, 0x03122a, 0.28, 0.18),
-      sand: make(0xffdc8a),
-      water: shared("water", () => standard(0x3bb8ff, 0x00476f, 0.38, 0.02)),
-      path: make(0xc9b991),
-      flowerPink: make(0xff79b4, 0x2a0012),
-      flowerYellow: make(0xffe66d, 0x2f2500),
-      flowerPurple: make(0xb28cff, 0x17002e),
-      bush: make(0x3f9f5e),
-      wood: shared("wood", () => make(0x9b6336)),
-      furniture: make(0xd48359),
-      bookRed: make(0xe65151),
-      bookBlue: make(0x4b85ff),
-      bookGreen: make(0x49c482),
-      metal: shared("metal", () => standard(0x98a4ad, 0x000000, 0.42, 0.12)),
-      equipment: shared("plastic", () => make(0x2f3545)),
+      grass: shared("grass", () => make(0x5f8f52)),
+      ground: make(0xb6ad97),
+      warmGround: make(0xcbb290),
+      road: shared("road", () => standard(0x2b2e33)),
+      roadLine: make(0xd9d4c4, 0x0a0906, 0.55),
+      sidewalk: shared("concrete", () => make(0xb2a98f)),
+      curb: shared("stone", () => make(0xa89d87)),
+      curbWarm: make(0xc9bfa2),
+      hdb: make(0xe1dccd),
+      hdbAccent: make(0x7f97a3),
+      hdbBalcony: make(0xc7c0ac),
+      gym: make(0xb85a44),
+      work: make(0x5c7a94),
+      food: make(0xc99248, 0x150c02),
+      mall: make(0xa89a83),
+      park: make(0x3f7a52),
+      library: make(0x7488a0),
+      hospital: make(0xdfe6e4),
+      hospitalAccent: make(0x4f8f96, 0x000000, 0.24, 0.06),
+      cafe: make(0xb17849, 0x180d02),
+      university: make(0xc9b587),
+      airport: make(0xa4b3bd),
+      airportAccent: make(0x3d6188, 0x020e1c, 0.3, 0.2),
+      sand: make(0xd8c184),
+      water: shared("water", () => standard(0x1f6f7a, 0x02282e, 0.34, 0.02)),
+      path: make(0xb3a682),
+      flowerPink: make(0xd97e93, 0x140006),
+      flowerYellow: make(0xd0ab4f, 0x180f00),
+      flowerPurple: make(0x8d76ab, 0x0c0016),
+      bush: make(0x3d6e45),
+      wood: shared("wood", () => make(0x8a5a34)),
+      furniture: make(0xa9724f),
+      bookRed: make(0xb84343),
+      bookBlue: make(0x3f699c),
+      bookGreen: make(0x3f9469),
+      metal: shared("metal", () => standard(0x8f98a1, 0x000000, 0.42, 0.14)),
+      equipment: shared("plastic", () => make(0x3a3f47)),
       screen: standard(0x171d2e, 0x122462),
-      poster: make(0xfff0b0),
-      signBlue: make(0x2f6dff, 0x00184b),
-      signGreen: make(0x3ac681, 0x002a10),
-      signGold: make(0xffc95b, 0x251100),
-      roofDark: make(0x404858, 0x000000, 0.5, 0.2),
-      window: standard(0xfff2a0, 0x8c6f00),
-      glass: shared("glass", () => glass(0xbfe9ff)),
-      mrt: make(0xe61d33, 0x4b0007, 0.45, 0.32),
-      rail: standard(0xdde7ef),
-      trunk: make(0x8a5227),
+      poster: make(0xe4dcc4),
+      signBlue: make(0x2f5fa8, 0x00102e),
+      signGreen: make(0x2f8a5e, 0x001c10),
+      signGold: make(0xc99a3f, 0x1c1200),
+      roofDark: make(0x3a3f47, 0x000000, 0.55, 0.15),
+      window: standard(0xf2dfa0, 0x6b5400),
+      glass: shared("glass", () => glass(0x9fc4d1)),
+      mrt: make(0xcf2030, 0x330005, 0.5, 0.24),
+      rail: standard(0xc7ccd1),
+      trunk: make(0x6b4023),
       lamp: standard(0x272b31),
-      lampGlow: standard(0xfff0a6, 0xffd36a),
-      cloud: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.78, depthWrite: false }),
+      lampGlow: standard(0xfbe6a0, 0xe0a94f),
+      cloud: new THREE.MeshBasicMaterial({ color: 0xfaf6ec, transparent: true, opacity: 0.78, depthWrite: false }),
       rain: new THREE.PointsMaterial({ color: 0xbfe9ff, size: 0.045, transparent: true, opacity: 0.0, depthWrite: false }),
-      dust: new THREE.PointsMaterial({ color: 0xfff0b8, size: 0.055, transparent: true, opacity: 0.22, depthWrite: false }),
+      dust: new THREE.PointsMaterial({ color: 0xe8dcb8, size: 0.055, transparent: true, opacity: 0.18, depthWrite: false }),
       commuter: make(0x2b315c),
       skin: make(0xffc49d),
       hair: make(0x16141a),
@@ -524,13 +527,141 @@
     canvas.height = 256;
     const ctx = canvas.getContext("2d");
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, "#9ed8ff");
-    gradient.addColorStop(0.48, "#dff4ff");
-    gradient.addColorStop(1, "#fff2cf");
+    gradient.addColorStop(0, "#4f8fc7");
+    gradient.addColorStop(0.55, "#a8cfe0");
+    gradient.addColorStop(1, "#dcd8c8");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     const texture = new THREE.CanvasTexture(canvas);
     texture.mapping = THREE.EquirectangularReflectionMapping;
+    return texture;
+  }
+
+  // Real-Singapore-detail facade texture, drawn on a 2D canvas rather than
+  // built from geometry - researched from real HDB/shophouse references
+  // (see chat), not a generic "Asian building" guess:
+  // - "shophouse": five-foot-way arcade, Peranakan ceramic-tile skirting,
+  //   decorative pilasters between window bays.
+  // - "hdb": old-style split-unit AC compressor boxes under alternating
+  //   windows, a collapsible laundry pole angled out near the corridor edge.
+  // - "modern": plain glass-curtain-wall grid, no ornamentation - office/
+  //   mall/hospital-scale commercial buildings.
+  // Cached by its own parameters so repeated calls with the same
+  // color/floors/columns/style reuse one canvas instead of redrawing.
+  const facadeTextureCache = new Map();
+  function createFacadeTexture(THREE, options) {
+    const { wallColor, floors, columns, style } = options;
+    const cacheKey = `${wallColor}:${floors}:${columns}:${style}`;
+    if (facadeTextureCache.has(cacheKey)) return facadeTextureCache.get(cacheKey);
+
+    const wall = new THREE.Color(wallColor);
+    const trim = wall.clone().multiplyScalar(0.5);
+    const trimHex = `#${trim.getHexString()}`;
+    const wallHex = `#${wall.getHexString()}`;
+    const hasArcade = style === "shophouse";
+    const isHdb = style === "hdb";
+
+    const w = 512, h = 768;
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = wallHex;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.globalAlpha = 0.06;
+    for (let i = 0; i < 40; i++) {
+      ctx.fillStyle = Math.random() > 0.5 ? "#000000" : "#ffffff";
+      ctx.fillRect(Math.random() * w, 0, 1 + Math.random() * 2, h);
+    }
+    ctx.globalAlpha = 1;
+
+    const floorH = (hasArcade ? h * 0.78 : h) / floors;
+    const startY = hasArcade ? h * 0.22 : 0;
+    const colW = w / columns;
+    const glassColors = style === "modern" ? ["#8fb3c2", "#7096a8"] : ["#bcd9e6", "#6f97a8"];
+
+    for (let f = 0; f < floors; f++) {
+      const y = startY + f * floorH;
+      ctx.fillStyle = style === "modern" ? "rgba(255,255,255,0.14)" : trimHex;
+      ctx.fillRect(0, y, w, h * 0.014);
+
+      for (let c = 0; c < columns; c++) {
+        const x = c * colW + colW * (style === "modern" ? 0.08 : 0.18);
+        const winW = colW * (style === "modern" ? 0.84 : 0.64);
+        const winH = floorH * (style === "modern" ? 0.7 : 0.5);
+        const winY = y + floorH * (style === "modern" ? 0.18 : 0.28);
+        ctx.fillStyle = "#2b2f38";
+        ctx.fillRect(x - 4, winY - 4, winW + 8, winH + 8);
+        const grad = ctx.createLinearGradient(x, winY, x, winY + winH);
+        grad.addColorStop(0, glassColors[0]);
+        grad.addColorStop(1, glassColors[1]);
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, winY, winW, winH);
+        if (style !== "modern") {
+          ctx.strokeStyle = "#2b2f38";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x + winW / 2, winY); ctx.lineTo(x + winW / 2, winY + winH);
+          ctx.moveTo(x, winY + winH / 2); ctx.lineTo(x + winW, winY + winH / 2);
+          ctx.stroke();
+          ctx.fillStyle = trimHex;
+          ctx.fillRect(x - 12, winY, 7, winH);
+          ctx.fillRect(x + winW + 5, winY, 7, winH);
+        }
+        if (isHdb && (f + c) % 2 === 0) {
+          const acY = y + floorH * 0.82;
+          ctx.fillStyle = "#8a9199";
+          ctx.fillRect(x + colW * 0.06, acY, colW * 0.42, floorH * 0.13);
+        }
+      }
+      if (isHdb) {
+        const poleX = w * 0.92, poleY = y + floorH * 0.35;
+        ctx.strokeStyle = "#6b4023";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(poleX, poleY);
+        ctx.lineTo(poleX + w * 0.09, poleY - floorH * 0.22);
+        ctx.stroke();
+        ctx.fillStyle = "#d9d4c4";
+        ctx.fillRect(poleX + w * 0.02, poleY - floorH * 0.1, w * 0.03, floorH * 0.08);
+      }
+    }
+
+    if (hasArcade) {
+      ctx.fillStyle = "#1c1f26";
+      ctx.fillRect(0, h * 0.78, w, h * 0.22);
+      for (let c = 0; c <= columns; c++) {
+        const x = c * colW;
+        ctx.fillStyle = "#e7e2d3";
+        ctx.fillRect(x - w * 0.012, h * 0.78, w * 0.024, h * 0.22);
+      }
+      for (let c = 0; c < columns; c++) {
+        const x = c * colW + colW * 0.5;
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
+        ctx.beginPath();
+        ctx.arc(x, h * 0.78, colW * 0.42, Math.PI, 0);
+        ctx.fill();
+      }
+      const tileColors = ["#c9564a", "#3f7a52", "#d9a94a", "#4a6fa5"];
+      const tileW = w / 24;
+      for (let i = 0; i < 24; i++) {
+        ctx.fillStyle = tileColors[i % tileColors.length];
+        ctx.fillRect(i * tileW, h * 0.975, tileW - 1, h * 0.025);
+      }
+      for (let c = 0; c <= columns; c++) {
+        const x = c * colW;
+        ctx.fillStyle = "rgba(0,0,0,0.12)";
+        ctx.fillRect(x - w * 0.01, startY, w * 0.02, h * 0.78 - startY);
+      }
+    }
+
+    ctx.fillStyle = "#efe6d0";
+    ctx.fillRect(0, 0, w, h * 0.012);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    facadeTextureCache.set(cacheKey, texture);
     return texture;
   }
 
@@ -588,10 +719,10 @@
       focusPulse: 0,
       timeOfDay: "morning",
       weather: "sunny",
-      skyColor: new THREE.Color(0xbfe7ff),
-      fogColor: new THREE.Color(0xd9efff),
-      targetSkyColor: new THREE.Color(0xbfe7ff),
-      targetFogColor: new THREE.Color(0xd9efff),
+      skyColor: new THREE.Color(0xa9c9dc),
+      fogColor: new THREE.Color(0xcdd2c2),
+      targetSkyColor: new THREE.Color(0xa9c9dc),
+      targetFogColor: new THREE.Color(0xcdd2c2),
       exposure: Number(renderer.toneMappingExposure || 1.08)
     };
   }
@@ -709,47 +840,47 @@
     if (minutes >= 300 && minutes < 660) {
       return {
         phase: "morning",
-        sky: 0xbfe7ff,
-        fog: 0xd9efff,
+        sky: 0xa9c9dc,
+        fog: 0xcdd2c2,
         hemi: 0.98,
         sun: 1.02,
         lamp: 0.24,
-        exposure: 0.74,
+        exposure: 0.82,
         sunPosition: [-12, 24, 12]
       };
     }
     if (minutes >= 660 && minutes < 1020) {
       return {
         phase: "afternoon",
-        sky: 0xa9dfff,
-        fog: 0xd1f3ff,
+        sky: 0x8fb8d4,
+        fog: 0xc7cfc0,
         hemi: 1.02,
         sun: 1.12,
         lamp: 0.18,
-        exposure: 0.76,
+        exposure: 0.86,
         sunPosition: [-6, 28, 6]
       };
     }
     if (minutes >= 1020 && minutes < 1170) {
       return {
         phase: "sunset",
-        sky: 0xffb980,
-        fog: 0xffd4a8,
+        sky: 0xd9925f,
+        fog: 0xd9b98a,
         hemi: 0.82,
         sun: 0.86,
         lamp: 0.78,
-        exposure: 0.72,
+        exposure: 0.78,
         sunPosition: [14, 12, -8]
       };
     }
     return {
       phase: "night",
-      sky: 0x1d2b57,
-      fog: 0x17223f,
+      sky: 0x141c33,
+      fog: 0x11182c,
       hemi: 0.5,
       sun: 0.22,
       lamp: 1.9,
-      exposure: 0.66,
+      exposure: 0.62,
       sunPosition: [8, 8, -12]
     };
   }
@@ -1179,7 +1310,19 @@
       pivot.name = `Marina Bay Tower ${index + 1} Pivot`;
       pivot.position.set(baseX + offsetX, 0, baseZ);
       pivot.rotation.z = towerLean[index];
-      addBox(THREE, pivot, `Marina Bay Tower ${index + 1}`, [0, towerHeight / 2, 0], [3.2, towerHeight, 3.2], mat.work);
+      // Glass curtain-wall facade texture on all 4 sides (a skyscraper is
+      // seen from every angle, unlike a street-front shophouse) instead of
+      // a single flat color.
+      const wallColor = `#${mat.work.color.getHexString()}`;
+      const towerTexture = createFacadeTexture(THREE, { wallColor, floors: 9, columns: 3, style: "modern" });
+      const towerMaterial = new THREE.MeshStandardMaterial({ map: towerTexture, roughness: 0.3, metalness: 0.15 });
+      const towerMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), [towerMaterial, towerMaterial, mat.roofDark, mat.work, towerMaterial, towerMaterial]);
+      towerMesh.name = `Marina Bay Tower ${index + 1}`;
+      towerMesh.position.set(0, towerHeight / 2, 0);
+      towerMesh.scale.set(3.2, towerHeight, 3.2);
+      towerMesh.castShadow = true;
+      towerMesh.receiveShadow = true;
+      pivot.add(towerMesh);
       scene.add(pivot);
     });
 
@@ -1308,6 +1451,14 @@
       // existing University zone, purely additive like Orchard Road above.
       {
         url: "assets/environment/university-lecture-hall.glb",
+        // Realism pass: this GLB and the primitive "University Main Hall" box
+        // sit only ~6 units apart and were rendering as two overlapping
+        // buildings ("purely additive" per the original Volume 5 note) - hide
+        // the primitive shell now that a real modeled lecture hall covers the
+        // same role, matching the HDB/Office/Library/Mall swap pattern. The
+        // freestanding entrance columns/lecture seats/cafe counter/bookshelf
+        // stay as an outdoor campus plaza in front of it.
+        hideNames: ["University Main Hall", "University Lecture Roof"],
         position: [-86, 0, -5],
         scale: [3.5, 3.5, 3.5]
       },
@@ -1369,10 +1520,122 @@
         hideNames: ["Causeway Point Mall", "Causeway Point Glass Front", "Causeway Point Roof"],
         position: [22, 0, 48],
         scale: [1, 1, 1]
+      },
+      // Real-model pass: swapping the remaining hand-built primitive-box
+      // shophouses/buildings for real CC0 modeled buildings (Kenney "City Kit
+      // Commercial" / "Modular Buildings" packs, kept in
+      // assets/environment/city-kit-commercial/ per the existing texture-
+      // collision-avoidance convention) - the muted-color box pass alone did
+      // not read as "realistic", only as a less garish box city. Ground-floor
+      // shopfront/canopy/signage props that AREN'T part of the hidden
+      // primitive's name prefix stay in place as added detail around the
+      // real building.
+      {
+        url: "assets/environment/city-kit-commercial/chinatown-shophouse-a.glb",
+        hideNamePrefixes: ["Chinatown Shophouse Rose"],
+        position: [3.8, 0, -65],
+        scale: [5.2, 5.2, 5.2]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/chinatown-shophouse-b.glb",
+        hideNamePrefixes: ["Chinatown Shophouse Ochre"],
+        position: [7.8, 0, -65],
+        scale: [5.2, 5.2, 5.2]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/chinatown-shophouse-c.glb",
+        hideNamePrefixes: ["Chinatown Shophouse Teal"],
+        position: [11.8, 0, -65],
+        scale: [5.2, 5.2, 5.2]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/chinatown-shophouse-d.glb",
+        hideNamePrefixes: ["Chinatown Shophouse Cream"],
+        position: [15.8, 0, -65],
+        scale: [5.2, 5.2, 5.2]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/little-india-shophouse-a.glb",
+        hideNamePrefixes: ["Little India Shophouse Blue"],
+        position: [18.8, 0, -19],
+        scale: [4.0, 4.0, 4.0]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/little-india-shophouse-b.glb",
+        hideNamePrefixes: ["Little India Shophouse Saffron"],
+        position: [22.8, 0, -19],
+        scale: [3.5, 3.5, 3.5]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/little-india-shophouse-c.glb",
+        hideNamePrefixes: ["Little India Shophouse Magenta"],
+        position: [26.8, 0, -19],
+        scale: [3.2, 3.2, 3.2]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/little-india-shophouse-d.glb",
+        hideNamePrefixes: ["Little India Shophouse Cream"],
+        position: [30.8, 0, -19],
+        scale: [2.2, 3.2, 2.2]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/bugis-shophouse-a.glb",
+        hideNamePrefixes: ["Bugis Heritage Shophouse A"],
+        position: [44, 0, -37],
+        scale: [2.6, 3.4, 2.6]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/bugis-shophouse-b.glb",
+        hideNamePrefixes: ["Bugis Heritage Shophouse B"],
+        position: [47.6, 0, -37],
+        scale: [3.2, 3.2, 3.2]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/hospital-block.glb",
+        hideNamePrefixes: ["Hospital Clean Main Wing", "Hospital Ward Tower"],
+        position: [80, 0, -52],
+        scale: [3.0, 3.0, 3.0]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/airport-terminal.glb",
+        hideNames: ["Airport Terminal", "Airport Glass Departures", "Airport Terminal Overhang"],
+        hideNamePrefixes: ["Airport Facade Mullion"],
+        position: [110, 0, -10],
+        scale: [8, 7, 8]
+      },
+      {
+        url: "assets/environment/city-kit-commercial/gym-building.glb",
+        hideNames: ["Gym Roof"],
+        hideNamePrefixes: ["Gym Fitness Studio"],
+        position: [-60, 0, 54],
+        scale: [6, 3.2, 6]
+      },
+      {
+        url: "assets/environment/cafe-building.glb",
+        hideNames: ["Cafe Roof"],
+        hideNamePrefixes: ["Cafe Cozy Shop"],
+        position: [-50, 0, -26.5],
+        scale: [2.6, 2.6, 2.6]
+      },
+      // Real park bench (Kenney "Furniture Kit") city-wide, replacing every
+      // primitive "Bench Seat"/"Bench Back" pair (Park x2, Beach x1,
+      // Woodlands x2) - same city-wide-swap pattern as the tree replacement
+      // above rather than a per-zone entry, since addBench() is one shared
+      // helper called from multiple zones.
+      {
+        url: "assets/environment/park-bench.glb",
+        hideNames: ["Bench Seat", "Bench Back"],
+        positions: [[8, 20.2], [18, 25.8], [72.3, -80.1], [0, 40.5], [5, 43]],
+        scale: [4, 2, 3]
       }
     ];
 
-    for (const swap of swaps) {
+    // Loaded in parallel rather than one-at-a-time: this list grew from ~15
+    // entries to ~30 in the real-model pass, and sequential `await` per swap
+    // made total load time (each fetch+parse ~1-1.5s) stack up to 40s+ before
+    // the last buildings appeared. Each swap is still independently
+    // try/caught so one failed/slow model can't block or break the others.
+    await Promise.all(swaps.map(async (swap) => {
       try {
         const asset = await assetManager.loadModel(swap.url, {
           toonify: true,
@@ -1380,7 +1643,7 @@
           label: swap.url
         });
         if (state && state.destroyed) return;
-        if (!asset || asset.fallback || !asset.scene) continue;
+        if (!asset || asset.fallback || !asset.scene) return;
 
         if (Array.isArray(swap.positions)) {
           swap.positions.forEach(([x, z]) => {
@@ -1415,7 +1678,7 @@
       } catch (error) {
         console.warn(`[Life Sim] Optional district asset swap failed: ${swap.url}`, error);
       }
-    }
+    }));
   }
 
   // Rebuilt for the real-asset spacing replan: the old cross-shaped road
@@ -1463,8 +1726,8 @@
   }
 
   function addHdbHome(THREE, scene, mat) {
-    addBuildingCore(THREE, scene, "HDB Home Block A", [-27, 8, 19], [6, 16, 4.5], mat.hdb, mat);
-    addBuildingCore(THREE, scene, "HDB Home Block B", [-21, 6.3, 19.4], [5, 12.6, 4], mat.hdbAccent, mat);
+    addBuildingCore(THREE, scene, "HDB Home Block A", [-27, 8, 19], [6, 16, 4.5], mat.hdb, mat, "hdb");
+    addBuildingCore(THREE, scene, "HDB Home Block B", [-21, 6.3, 19.4], [5, 12.6, 4], mat.hdbAccent, mat, "hdb");
     addBox(THREE, scene, "Home Void Deck Community Space", [-24, 1.05, 15.8], [9, 2.1, 3.5], mat.hdbBalcony);
     addBox(THREE, scene, "Home Cozy Bedroom Floor", [-25.8, 0.2, 12.4], [4.4, 0.35, 3.2], mat.warmGround);
     addBox(THREE, scene, "Home Bed", [-27, 0.72, 12.1], [1.7, 0.45, 2.1], mat.curbWarm);
@@ -1477,16 +1740,22 @@
     addFlowerBed(THREE, scene, [-28.5, 14.1], 4.2, mat);
   }
 
+  // Realism pass: a ground-floor gym unit in a taller shophouse-scale block
+  // (addBuildingCore's window grid on the upper floors) instead of a single
+  // low candy-colored box, with an entrance canopy over the mirror-wall front.
   function addGym(THREE, scene, mat) {
-    addBox(THREE, scene, "Gym Fitness Studio", [-9, 2, 22], [8, 4, 5.4], mat.gym);
-    addBox(THREE, scene, "Gym Dark Toon Roof", [-9, 4.35, 22], [8.7, 0.5, 6.1], mat.roofDark);
+    addBuildingCore(THREE, scene, "Gym Fitness Studio", [-9, 2.9, 22], [8, 5.8, 5.4], mat.gym, mat);
+    addBox(THREE, scene, "Gym Roof", [-9, 6.05, 22], [8.7, 0.4, 6.1], mat.roofDark);
     addBox(THREE, scene, "Gym Mirror Wall", [-9, 2.25, 19.18], [6.1, 2.4, 0.14], mat.glass);
+    addBox(THREE, scene, "Gym Entrance Canopy", [-9, 3.55, 19.7], [4.6, 0.14, 1.2], mat.roofDark, true);
+    addCylinder(THREE, scene, "Gym Canopy Post", [-11.1, 1.75, 20.1], [0.08, 3.5, 8], mat.metal);
+    addCylinder(THREE, scene, "Gym Canopy Post", [-6.9, 1.75, 20.1], [0.08, 3.5, 8], mat.metal);
     addTreadmill(THREE, scene, [-11.3, 19.9], mat);
     addTreadmill(THREE, scene, [-9.1, 19.9], mat);
     addBarbell(THREE, scene, [-6.5, 21.9], mat);
     addBox(THREE, scene, "Gym Yoga Mat", [-10.9, 0.22, 23.8], [1.4, 0.07, 2.0], mat.signGreen, true);
     addBox(THREE, scene, "Gym Locker Row", [-5.4, 1.4, 23.2], [0.7, 2.4, 3.2], mat.metal);
-    addSignBoard(THREE, scene, "Gym Sign", "GYM", [-11.3, 3.55, 18.8], mat.signGold, 0x151515);
+    addSignBoard(THREE, scene, "Gym Sign", "GYM", [-11.3, 3.85, 18.8], mat.signGold, 0x151515);
   }
 
   function addWorkTower(THREE, scene, mat) {
@@ -1500,9 +1769,17 @@
     addSignBoard(THREE, scene, "Office Sign", "OFFICE", [15.6, 4.15, 15.65], mat.signBlue, 0xffffff);
   }
 
+  // Realism pass: a real hawker centre is a single-story, open-air structure
+  // under a tall pitched/hip roof on columns (no walls) - not a walled box.
+  // Tiled floor + column ring + ridged roof replace the flat colored slab.
   function addFoodCourt(THREE, scene, mat) {
-    addBox(THREE, scene, "Food Court Tile Floor", [-21.5, 0.22, -15], [17, 0.44, 8.5], mat.food);
-    addBox(THREE, scene, "Food Court Warm Roof", [-21.5, 3.45, -15], [18, 0.45, 9.2], mat.signGold);
+    addBox(THREE, scene, "Food Court Tile Floor", [-21.5, 0.22, -15], [17, 0.44, 8.5], mat.sidewalk);
+    addBox(THREE, scene, "Food Court Roof", [-21.5, 3.5, -15], [18, 0.3, 9.2], mat.roofDark);
+    addBox(THREE, scene, "Food Court Roof Ridge", [-21.5, 3.9, -15], [4.2, 0.3, 9.4], mat.roofDark);
+    [-28.5, -21.5, -14.5].forEach((x) => {
+      addCylinder(THREE, scene, "Food Court Column", [x, 1.75, -19.1], [0.14, 3.5, 8], mat.metal);
+      addCylinder(THREE, scene, "Food Court Column", [x, 1.75, -10.9], [0.14, 3.5, 8], mat.metal);
+    });
     [-26, -23, -20, -17, -14].forEach((x, index) => addFoodStall(THREE, scene, [x, -18.6], ["NOODLES", "RICE", "SATAY", "LAKSA", "DRINKS"][index], mat));
     for (let x = -26; x <= -15; x += 4) {
       for (let z = -16.3; z <= -12.8; z += 2.8) addTableSet(THREE, scene, [x, z], mat);
@@ -1510,7 +1787,7 @@
     addTray(THREE, scene, [-24, -13.2], mat);
     addTray(THREE, scene, [-20, -16.3], mat);
     addTray(THREE, scene, [-16, -14.5], mat);
-    addSignBoard(THREE, scene, "Food Court Sign", "HAWKER CENTRE", [-29.3, 4.08, -19.7], mat.curbWarm, 0x111111);
+    addSignBoard(THREE, scene, "Food Court Sign", "HAWKER CENTRE", [-29.3, 4.4, -19.7], mat.curbWarm, 0x111111);
   }
 
   // Orchard Road reference points (URA urban design guidelines, Wikipedia,
@@ -1557,6 +1834,12 @@
     addFlowerBed(THREE, scene, [-4, -19.4], 5.1, mat);
     addDecorativeRock(THREE, scene, [6.3, -26.2], mat);
     addBirds(THREE, scene, [0, 4.2, -23], mat);
+    // Small tropical-park pavilion (gazebo) - a common real feature that
+    // reads better than an open lawn with just a sign and a bench.
+    addCylinder(THREE, scene, "Park Pavilion Roof", [9, 2.7, -25], [2.4, 0.2, 6], mat.roofDark);
+    [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]].forEach(([dx, dz]) => {
+      addCylinder(THREE, scene, "Park Pavilion Post", [9 + dx, 1.15, -25 + dz], [0.08, 2.3, 8], mat.wood);
+    });
     addSignBoard(THREE, scene, "Park Sign", "PARK", [-1.3, 0.85, -29.4], mat.curbWarm, 0x111111);
   }
 
@@ -1570,17 +1853,28 @@
     addSignBoard(THREE, scene, "Library Sign", "LIBRARY", [-28.6, 3.55, -1.25], mat.signBlue, 0xffffff);
   }
 
+  // Realism pass: modern Singapore hospitals read as tall white/glass blocks
+  // with a covered porte-cochere drop-off at the entrance - added a taller
+  // upper wing (addBuildingCore) and a canopy instead of one flat box.
   function addHospital(THREE, scene, mat) {
     addBox(THREE, scene, "Hospital Clean Main Wing", [30, 3.2, 12], [9, 6.4, 6], mat.hospital);
+    addBuildingCore(THREE, scene, "Hospital Ward Tower", [30, 9.5, 14], [7, 8, 4.5], mat.hospital, mat);
     addBox(THREE, scene, "Hospital Blue Entrance", [30, 1.6, 8.72], [5.8, 3.2, 0.35], mat.hospitalAccent);
+    addBox(THREE, scene, "Hospital Drop Off Canopy", [30, 3.5, 7.4], [7.4, 0.16, 2.4], mat.hospitalAccent, true);
+    addCylinder(THREE, scene, "Hospital Canopy Post", [27, 1.75, 6.6], [0.1, 3.5, 8], mat.metal);
+    addCylinder(THREE, scene, "Hospital Canopy Post", [33, 1.75, 6.6], [0.1, 3.5, 8], mat.metal);
     addBox(THREE, scene, "Hospital Reception Desk", [27.6, 0.75, 8.1], [2.4, 0.65, 0.45], mat.furniture);
     addWaitingChairs(THREE, scene, [31.4, 8.4], mat);
     addBox(THREE, scene, "Hospital Doctor Room Door", [33.4, 1.2, 10.2], [0.16, 2.1, 1.0], mat.signBlue);
     addSignBoard(THREE, scene, "Hospital Cross Sign", "+ HOSPITAL", [27.1, 4.6, 8.36], mat.hospitalAccent, 0xffffff);
   }
 
+  // Realism pass: ground-floor cafe of a small 2-story shophouse (upper
+  // windows via addBuildingCore) instead of a single flat box, with the
+  // canvas awning shading an outdoor seating area.
   function addCafe(THREE, scene, mat) {
-    addBox(THREE, scene, "Cafe Cozy Shop", [-9, 1.8, -25.5], [7.2, 3.6, 4.5], mat.cafe);
+    addBuildingCore(THREE, scene, "Cafe Cozy Shop", [-9, 2.6, -25.5], [7.2, 5.2, 4.5], mat.cafe, mat, "shophouse");
+    addBox(THREE, scene, "Cafe Roof", [-9, 5.35, -25.5], [7.6, 0.3, 4.9], mat.roofDark);
     addBox(THREE, scene, "Cafe Awning", [-9, 3.72, -27.95], [7.9, 0.35, 1.0], mat.signGold);
     addBox(THREE, scene, "Cafe Counter", [-11.2, 0.82, -27.15], [2.5, 0.72, 0.55], mat.wood);
     addTableSet(THREE, scene, [-8.4, -29.2], mat);
@@ -1597,12 +1891,22 @@
     addBench(THREE, scene, [21.3, -28.1], mat);
     addDecorativeRock(THREE, scene, [29.8, -30.4], mat);
     addCylinder(THREE, scene, "Beach Life Ring", [16.9, 1.0, -29.0], [0.45, 0.1, 24], mat.mrt, Math.PI / 2);
+    // Small Sentosa-style thatch-roof drinks kiosk beside the boardwalk.
+    addBox(THREE, scene, "Beach Kiosk Counter", [27.4, 0.7, -28.5], [1.8, 1.1, 1.0], mat.wood);
+    addCylinder(THREE, scene, "Beach Kiosk Roof", [27.4, 1.7, -28.5], [1.4, 0.6, 4], mat.signGold);
     addSignBoard(THREE, scene, "Beach Sign", "BEACH", [21.2, 0.95, -33.0], mat.curbWarm, 0x111111);
   }
 
+  // Realism pass: a modern glass-heavy terminal massing (a low, wide glass
+  // curtain wall grid + a floating overhang) closer to Changi's look than a
+  // single flat-colored box with one glass strip.
   function addAirport(THREE, scene, mat) {
     addBox(THREE, scene, "Airport Terminal", [35, 2.5, -1], [8.8, 5.0, 7.2], mat.airport);
     addBox(THREE, scene, "Airport Glass Departures", [35, 2.45, -4.78], [7.0, 2.9, 0.18], mat.glass);
+    for (let x = 31.5; x <= 38.5; x += 1.75) {
+      addBox(THREE, scene, "Airport Facade Mullion", [x, 2.45, -4.7], [0.08, 3.0, 0.1], mat.metal, true);
+    }
+    addBox(THREE, scene, "Airport Terminal Overhang", [35, 5.15, -4.9], [9.6, 0.18, 2.2], mat.roofDark, true);
     addBoxRotated(THREE, scene, "Airport Runway", [35, 0.05, -9.2], [14.5, 0.08, 3.2], mat.road, 0.1, true);
     for (let x = 30; x <= 40; x += 2.5) addBox(THREE, scene, "Airport Runway Marking", [x, 0.13, -9.2], [1.1, 0.04, 0.18], mat.curb, true);
     addWaitingChairs(THREE, scene, [32.2, -4.9], mat);
@@ -1612,9 +1916,16 @@
     addSignBoard(THREE, scene, "Airport Sign", "AIRPORT", [31.7, 4.4, -5.05], mat.signBlue, 0xffffff);
   }
 
+  // Realism pass: raised platform on support columns (Singapore's elevated
+  // MRT stations sit above street level) plus glass windscreens along the
+  // platform edge, instead of a slab sitting flush on the ground.
   function addTrainStation(THREE, scene, mat) {
     addBox(THREE, scene, "Train Station Platform", [4, 0.32, -3.5], [8.8, 0.64, 4.8], mat.mrt);
+    [-2, 2, 6, 10].forEach((x) => {
+      addCylinder(THREE, scene, "Train Station Support", [x, -0.2, -3.5], [0.16, 0.9, 8], mat.metal);
+    });
     addBox(THREE, scene, "Train Station Roof", [4, 2.35, -3.5], [9.8, 0.45, 5.6], mat.roofDark);
+    addBox(THREE, scene, "Train Platform Windscreen", [4, 1.35, -1.35], [8.6, 1.6, 0.06], mat.glass);
     addBox(THREE, scene, "Train Ticket Gates", [1.4, 0.82, -5.6], [3.2, 0.65, 0.52], mat.metal);
     addBox(THREE, scene, "Train Ticket Machine", [6.8, 1.0, -5.5], [0.8, 1.7, 0.55], mat.signBlue);
     addBox(THREE, scene, "Train Route Board", [4, 2.0, -6.0], [4.4, 1.1, 0.12], mat.screen);
@@ -1635,35 +1946,93 @@
     addSignBoard(THREE, scene, "University Sign", "UNIVERSITY", [-38.2, 3.6, -10.48], mat.curbWarm, 0x111111);
   }
 
+  // Realism pass (proof-of-concept zone): a terrace of conservation-style
+  // shophouses in varied real Chinatown restoration colors (dusty rose,
+  // ochre, teal, cream) under a shared "five-foot way" colonnade, instead of
+  // two isolated candy-colored boxes. Paifang gate keeps its vivid red/gold -
+  // that IS the real color of Chinatown's gate, not a stylization to mute.
   function addChinatown(THREE, scene, mat) {
-    addPlane(THREE, scene, "Chinatown Street Floor", [-10, 0.02, -14], [14, 9], mat.curbWarm);
-    addBuildingCore(THREE, scene, "Chinatown Shophouse Red", [-14, 3.6, -17], [4.4, 7.2, 4.2], mat.gym, mat);
-    addBuildingCore(THREE, scene, "Chinatown Shophouse Gold", [-7, 3.1, -17], [4, 6.2, 4], mat.signGold, mat);
-    addBox(THREE, scene, "Chinatown Shophouse Roof Red", [-14, 7.4, -17], [4.8, 0.4, 4.6], mat.roofDark);
-    addBox(THREE, scene, "Chinatown Shophouse Roof Gold", [-7, 6.4, -17], [4.4, 0.4, 4.4], mat.roofDark);
-    addBox(THREE, scene, "Chinatown Gate Pillar", [-12.5, 4, -10.4], [0.5, 8, 0.5], mat.signGold);
-    addBox(THREE, scene, "Chinatown Gate Pillar", [-7.5, 4, -10.4], [0.5, 8, 0.5], mat.signGold);
-    addBox(THREE, scene, "Chinatown Gate Beam", [-10, 8, -10.4], [5.6, 0.5, 0.5], mat.gym);
+    addPlane(THREE, scene, "Chinatown Street Floor", [-10, 0.02, -14], [15, 10], mat.curbWarm);
+
+    const shophouses = [
+      { name: "Chinatown Shophouse Rose", x: -16.2, height: 6.6, color: mat.gym },
+      { name: "Chinatown Shophouse Ochre", x: -12.2, height: 7.0, color: mat.signGold },
+      { name: "Chinatown Shophouse Teal", x: -8.2, height: 6.4, color: mat.hospitalAccent },
+      { name: "Chinatown Shophouse Cream", x: -4.2, height: 6.8, color: mat.hdb }
+    ];
+    shophouses.forEach((house) => {
+      // addBuildingCore's window/balcony grid faces -z (the back of this row,
+      // away from the street) - the north-facing side visible from the
+      // arcade/gate needs its own shopfront glass + signage band, recessed
+      // under the five-foot way overhang, since that's the side pedestrians
+      // (and the camera) actually see.
+      addBuildingCore(THREE, scene, house.name, [house.x, house.height / 2, -18], [3.6, house.height, 4.2], house.color, mat, "shophouse");
+      addBox(THREE, scene, `${house.name} Roof`, [house.x, house.height + 0.35, -18], [4.0, 0.5, 4.6], mat.roofDark);
+      addBox(THREE, scene, `${house.name} Cornice`, [house.x, house.height + 0.05, -18], [3.9, 0.14, 4.3], mat.hdb);
+      addBox(THREE, scene, `${house.name} Shopfront Glass`, [house.x, 1.35, -15.75], [3.0, 2.1, 0.1], mat.glass);
+      addBox(THREE, scene, `${house.name} Shopfront Sign`, [house.x, 2.65, -15.75], [3.0, 0.5, 0.12], mat.mrt);
+    });
+
+    // Five-foot way: the covered pedestrian arcade running the length of the row.
+    addBox(THREE, scene, "Chinatown Five Foot Way Roof", [-10.2, 3.1, -16.1], [15.6, 0.16, 2.0], mat.roofDark, true);
+    for (let i = 0; i < 6; i++) {
+      addCylinder(THREE, scene, "Chinatown Arcade Column", [-17.6 + i * 3.0, 1.5, -15.2], [0.14, 3.0, 8], mat.hdb);
+    }
+    for (let i = 0; i < 5; i++) {
+      addCylinder(THREE, scene, "Chinatown Lantern", [-17 + i * 3.0, 2.7, -15.6], [0.22, 0.32, 8], mat.mrt);
+    }
+
+    addBox(THREE, scene, "Chinatown Gate Pillar", [-12.5, 4, -10.4], [0.5, 8, 0.5], mat.mrt);
+    addBox(THREE, scene, "Chinatown Gate Pillar", [-7.5, 4, -10.4], [0.5, 8, 0.5], mat.mrt);
+    addBox(THREE, scene, "Chinatown Gate Beam", [-10, 8, -10.4], [5.6, 0.5, 0.5], mat.signGold);
+    addBox(THREE, scene, "Chinatown Gate Roof", [-10, 8.4, -10.4], [6.2, 0.28, 0.9], mat.roofDark);
     addFlowerBed(THREE, scene, [-16.6, -12.8], 3.2, mat);
-    addSignBoard(THREE, scene, "Chinatown Sign", "CHINATOWN", [-17, 4.2, -18.8], mat.gym, 0xffffff);
+    addSignBoard(THREE, scene, "Chinatown Sign", "CHINATOWN", [-17, 4.2, -19.6], mat.mrt, 0xffffff);
   }
 
+  // Realism pass, matching the Chinatown treatment: a terrace of shophouses
+  // under a shared five-foot way arcade (the colorful facades are authentic -
+  // Little India's shophouses really are painted in saturated blue/saffron/
+  // magenta), plus the Sri Veeramakaliamman-style temple kept at the far end.
   function addLittleIndia(THREE, scene, mat) {
-    addPlane(THREE, scene, "Little India Street Floor", [10, 0.02, 14], [14, 9], mat.curbWarm);
-    addBuildingCore(THREE, scene, "Little India Shophouse Pink", [6, 3.6, 11], [4.4, 7.2, 4.2], mat.hdbAccent, mat);
-    addBuildingCore(THREE, scene, "Little India Shophouse Purple", [13, 3.1, 11], [4, 6.2, 4], mat.mall, mat);
-    addBox(THREE, scene, "Little India Roof Pink", [6, 7.4, 11], [4.8, 0.4, 4.6], mat.roofDark);
-    addBox(THREE, scene, "Little India Roof Purple", [13, 6.4, 11], [4.4, 0.4, 4.4], mat.roofDark);
-    addBox(THREE, scene, "Little India Temple Base", [10, 1.1, 17.3], [3.2, 2.2, 3.0], mat.food);
-    addCylinder(THREE, scene, "Little India Temple Spire", [10, 3.4, 17.3], [1.1, 2.6, 4], mat.signGold);
+    addPlane(THREE, scene, "Little India Street Floor", [10, 0.02, 14], [15, 10], mat.curbWarm);
+
+    const shophouses = [
+      { name: "Little India Shophouse Blue", x: 3.8, height: 6.6, color: mat.hdbAccent },
+      { name: "Little India Shophouse Saffron", x: 7.8, height: 7.0, color: mat.signGold },
+      { name: "Little India Shophouse Magenta", x: 11.8, height: 6.4, color: mat.mall },
+      { name: "Little India Shophouse Cream", x: 15.8, height: 6.8, color: mat.hdb }
+    ];
+    shophouses.forEach((house) => {
+      addBuildingCore(THREE, scene, house.name, [house.x, house.height / 2, 9], [3.6, house.height, 4.2], house.color, mat, "shophouse");
+      addBox(THREE, scene, `${house.name} Roof`, [house.x, house.height + 0.35, 9], [4.0, 0.5, 4.6], mat.roofDark);
+      addBox(THREE, scene, `${house.name} Cornice`, [house.x, house.height + 0.05, 9], [3.9, 0.14, 4.3], mat.hdbAccent);
+      addBox(THREE, scene, `${house.name} Shopfront Glass`, [house.x, 1.35, 11.25], [3.0, 2.1, 0.1], mat.glass);
+      addBox(THREE, scene, `${house.name} Shopfront Sign`, [house.x, 2.65, 11.25], [3.0, 0.5, 0.12], mat.signGold);
+    });
+
+    addBox(THREE, scene, "Little India Five Foot Way Roof", [9.8, 3.1, 10.9], [15.6, 0.16, 2.0], mat.roofDark, true);
+    for (let i = 0; i < 6; i++) {
+      addCylinder(THREE, scene, "Little India Arcade Column", [2.4 + i * 3.0, 1.5, 11.8], [0.14, 3.0, 8], mat.hdb);
+    }
+
+    addBox(THREE, scene, "Little India Temple Base", [10, 1.1, 17.3], [3.2, 2.2, 3.0], mat.signGold);
+    addCylinder(THREE, scene, "Little India Temple Spire", [10, 3.4, 17.3], [1.1, 2.6, 4], mat.mrt);
     addFlowerBed(THREE, scene, [3.4, 9.2], 3.2, mat);
-    addSignBoard(THREE, scene, "Little India Sign", "LITTLE INDIA", [3, 4.2, 8.2], mat.hdbAccent, 0x2a0012);
+    addSignBoard(THREE, scene, "Little India Sign", "LITTLE INDIA", [3, 4.6, 8.2], mat.hdbAccent, 0x160018);
   }
 
+  // Realism pass: real Bugis mixes a modern glass mall (Bugis Junction) with
+  // a row of restored heritage shophouses (Bugis Street) - added two
+  // shophouses beside the market stalls instead of just the one mall block.
   function addBugis(THREE, scene, mat) {
-    addPlane(THREE, scene, "Bugis Street Floor", [24, 0.02, 2], [13, 9], mat.sidewalk);
+    addPlane(THREE, scene, "Bugis Street Floor", [24, 0.02, 2], [14, 10], mat.sidewalk);
     addBuildingCore(THREE, scene, "Bugis Junction Building", [28, 4.4, -1], [6, 8.8, 5], mat.mall, mat);
     addBox(THREE, scene, "Bugis Junction Glass Front", [28, 3.2, 1.6], [5.4, 4.2, 0.16], mat.glass);
+    addBuildingCore(THREE, scene, "Bugis Heritage Shophouse A", [18, 3.4, -3], [4, 6.8, 4], mat.gym, mat, "shophouse");
+    addBox(THREE, scene, "Bugis Heritage Shophouse A Roof", [18, 7.0, -3], [4.4, 0.4, 4.4], mat.roofDark);
+    addBuildingCore(THREE, scene, "Bugis Heritage Shophouse B", [21.6, 3.0, -3], [3.6, 6.0, 3.8], mat.signGold, mat, "shophouse");
+    addBox(THREE, scene, "Bugis Heritage Shophouse B Roof", [21.6, 6.2, -3], [4.0, 0.4, 4.2], mat.roofDark);
     addBox(THREE, scene, "Bugis Market Stall", [19.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
     addBox(THREE, scene, "Bugis Market Stall", [21.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
     addBox(THREE, scene, "Bugis Market Awning", [20.5, 1.9, 3.4], [5.4, 0.16, 1.6], mat.signBlue);
@@ -1702,8 +2071,8 @@
     // Woodlands/Admiralty/Marsiling HDB heartland cluster. Both blocks are
     // swapped for real modeled buildings in loadDistrictAssetSamples() (at
     // [-11,0,53] and [-27,0,47]) - these stay only as hidden placeholders.
-    addBuildingCore(THREE, scene, "Woodlands HDB Block A", [baseX - 13, 9, baseZ + 3], [6, 18, 4.6], mat.hdb, mat);
-    addBuildingCore(THREE, scene, "Woodlands HDB Block B", [baseX - 19, 7.5, baseZ - 3], [5.2, 15, 4.2], mat.hdbAccent, mat);
+    addBuildingCore(THREE, scene, "Woodlands HDB Block A", [baseX - 13, 9, baseZ + 3], [6, 18, 4.6], mat.hdb, mat, "hdb");
+    addBuildingCore(THREE, scene, "Woodlands HDB Block B", [baseX - 19, 7.5, baseZ - 3], [5.2, 15, 4.2], mat.hdbAccent, mat, "hdb");
     addFlowerBed(THREE, scene, [baseX - 13, baseZ + 8], 4, mat);
 
     // Woodlands Waterfront / Admiralty Park green strip
@@ -1889,16 +2258,31 @@
     }
   }
 
-  function addBuildingCore(THREE, scene, name, position, scale, material, mat) {
-    addBox(THREE, scene, name, position, scale, material);
+  // style: "shophouse" (five-foot way + tile skirting + pilasters),
+  // "hdb" (AC compressor boxes + laundry pole), or "modern" (plain glass
+  // curtain wall, default) - see createFacadeTexture(). The textured face
+  // replaces the old per-window box loop; real 3D balcony ledges stay for
+  // shophouse/hdb styles since they cast actual shadows a flat texture can't.
+  function addBuildingCore(THREE, scene, name, position, scale, material, mat, style = "modern") {
+    const THREE_ = THREE;
     const floors = Math.max(3, Math.round(scale[1] / 2));
     const columns = Math.max(3, Math.round(scale[0] / 1.4));
-    for (let floor = 0; floor < floors; floor++) {
-      const y = position[1] - scale[1] * 0.38 + floor * (scale[1] * 0.72 / Math.max(1, floors - 1));
-      addBox(THREE, scene, `${name} Balcony`, [position[0], y - 0.42, position[2] - scale[2] * 0.53], [scale[0] * 0.84, 0.16, 0.22], mat.hdbBalcony, true);
-      for (let col = 0; col < columns; col++) {
-        const x = position[0] - scale[0] * 0.34 + col * (scale[0] * 0.68 / Math.max(1, columns - 1));
-        addBox(THREE, scene, `${name} Window`, [x, y, position[2] - scale[2] * 0.535], [0.42, 0.58, 0.06], mat.window, true);
+    const wallColor = material && material.color ? `#${material.color.getHexString()}` : "#c9c0a8";
+    const facadeTexture = createFacadeTexture(THREE_, { wallColor, floors, columns, style });
+    facadeTexture.needsUpdate = true;
+    const facadeMaterial = new THREE_.MeshStandardMaterial({ map: facadeTexture, roughness: 0.82, metalness: 0.02 });
+    const mesh = new THREE_.Mesh(new THREE_.BoxGeometry(1, 1, 1), [material, material, material, material, material, facadeMaterial]);
+    mesh.name = name;
+    mesh.position.set(position[0], position[1], position[2]);
+    mesh.scale.set(scale[0], scale[1], scale[2]);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+
+    if (style !== "modern") {
+      for (let floor = 0; floor < floors; floor++) {
+        const y = position[1] - scale[1] * 0.38 + floor * (scale[1] * 0.72 / Math.max(1, floors - 1));
+        addBox(THREE, scene, `${name} Balcony`, [position[0], y - 0.42, position[2] - scale[2] * 0.53], [scale[0] * 0.84, 0.16, 0.22], mat.hdbBalcony, true);
       }
     }
   }

@@ -12,6 +12,15 @@
 - `city-kit-commercial/marina-skyscraper-a.glb`, `marina-skyscraper-c.glb`, `marina-skyscraper-e.glb` — from Kenney's "City Kit (Commercial)" pack (`building-skyscraper-a/c/e.glb`)
 - The Marina Bay Sands-style landmark itself (three towers + tilted "skypark" slab) is hand-built from primitives in `addMarinaBayLandmark()` in `life-sim.js`, matching the rest of the district's style - no free CC0 model of that specific silhouette exists.
 - `tree-palm.glb`, `tree-palm-bend.glb` — from Kenney's "Nature Kit" pack (`tree_palm.glb`, `tree_palmBend.glb`), https://kenney.nl/assets/nature-kit
+- `city-kit-commercial/chinatown-shophouse-a/b/c/d.glb` — from Kenney's "City Kit (Commercial)" pack (`building-a.glb`, `building-b.glb`, `building-d.glb`, `building-h.glb`)
+- `city-kit-commercial/little-india-shophouse-a/b/c/d.glb` — from Kenney's "City Kit (Commercial)" pack (`building-f.glb`, `building-e.glb`, `building-i.glb`, `building-k.glb`)
+- `city-kit-commercial/bugis-shophouse-a/b.glb` — from Kenney's "City Kit (Commercial)" pack (`building-j.glb`, `building-l.glb`)
+- `city-kit-commercial/hospital-block.glb` — from Kenney's "City Kit (Commercial)" pack (`building-m.glb`)
+- `city-kit-commercial/airport-terminal.glb` — from Kenney's "City Kit (Commercial)" pack (`low-detail-building-wide-b.glb`)
+- `city-kit-commercial/gym-building.glb` — from Kenney's "City Kit (Commercial)" pack (`low-detail-building-a.glb`)
+- `cafe-building.glb` — from Kenney's "Modular Buildings" pack (`building-sample-house-b.glb`)
+- `park-bench.glb` — from Kenney's "Furniture Kit" pack (`bench.glb`), https://kenney.nl/assets/furniture-kit
+- Real-model pass replacing the remaining hand-built primitive-box shophouses/buildings across Chinatown, Little India, Bugis, Hospital, Airport, Gym, and Cafe, plus city-wide park benches, after user feedback that the muted-color-only pass still read as "just boxes" rather than realistic.
 
 License: CC0 1.0 (public domain). Free for personal, educational, and commercial use. Attribution to Kenney (www.kenney.nl) is appreciated but not required.
 

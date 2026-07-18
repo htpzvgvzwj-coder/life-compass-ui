@@ -1,17 +1,22 @@
 (function () {
   const namespace = window.LifeVerseAssets || (window.LifeVerseAssets = {});
 
+  // Realistic-Singapore material pass: desaturated, real-world-plausible
+  // tones (muted asphalt, tropical foliage, marina teal water, curtain-wall
+  // glass) replacing the earlier pastel/candy-color anime-toy palette.
+  // debugFallback stays hot pink on purpose - it's a missing-asset flag, not
+  // a style choice.
   const materialDefinitions = {
-    road: { color: 0x242a32, roughness: 0.78, metalness: 0.02, textureSlots: ["albedo", "normal", "roughness"] },
-    grass: { color: 0x79c96a, roughness: 0.86, metalness: 0.0, textureSlots: ["albedo", "normal"] },
-    concrete: { color: 0xc9c0a8, roughness: 0.82, metalness: 0.0, textureSlots: ["albedo", "normal", "roughness"] },
-    wood: { color: 0x9b6336, roughness: 0.74, metalness: 0.0, textureSlots: ["albedo", "normal"] },
-    metal: { color: 0x98a4ad, roughness: 0.42, metalness: 0.16, textureSlots: ["albedo", "normal", "metallic", "roughness"] },
-    glass: { color: 0xbfe9ff, roughness: 0.18, metalness: 0.02, transparent: true, opacity: 0.72, textureSlots: ["albedo", "normal"] },
-    water: { color: 0x3bb8ff, roughness: 0.38, metalness: 0.0, emissive: 0x00476f, textureSlots: ["albedo", "normal", "flow"] },
-    stone: { color: 0xa89d87, roughness: 0.86, metalness: 0.0, textureSlots: ["albedo", "normal", "roughness"] },
-    plastic: { color: 0xff806f, roughness: 0.55, metalness: 0.0, textureSlots: ["albedo", "normal"] },
-    fabric: { color: 0xffd0d9, roughness: 0.92, metalness: 0.0, textureSlots: ["albedo", "normal"] },
+    road: { color: 0x2b2e33, roughness: 0.8, metalness: 0.02, textureSlots: ["albedo", "normal", "roughness"] },
+    grass: { color: 0x5f8f52, roughness: 0.88, metalness: 0.0, textureSlots: ["albedo", "normal"] },
+    concrete: { color: 0xb7ae9a, roughness: 0.84, metalness: 0.0, textureSlots: ["albedo", "normal", "roughness"] },
+    wood: { color: 0x8a5a34, roughness: 0.76, metalness: 0.0, textureSlots: ["albedo", "normal"] },
+    metal: { color: 0x8f98a1, roughness: 0.42, metalness: 0.18, textureSlots: ["albedo", "normal", "metallic", "roughness"] },
+    glass: { color: 0x9fc4d1, roughness: 0.16, metalness: 0.05, transparent: true, opacity: 0.7, textureSlots: ["albedo", "normal"] },
+    water: { color: 0x1f6f7a, roughness: 0.34, metalness: 0.0, emissive: 0x02282e, textureSlots: ["albedo", "normal", "flow"] },
+    stone: { color: 0x9d9480, roughness: 0.88, metalness: 0.0, textureSlots: ["albedo", "normal", "roughness"] },
+    plastic: { color: 0x4a4f58, roughness: 0.55, metalness: 0.0, textureSlots: ["albedo", "normal"] },
+    fabric: { color: 0xd8cfc0, roughness: 0.92, metalness: 0.0, textureSlots: ["albedo", "normal"] },
     debugFallback: { color: 0xff4f8b, roughness: 0.62, metalness: 0.0, emissive: 0x320016, textureSlots: [] }
   };
 
