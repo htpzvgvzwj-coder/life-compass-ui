@@ -226,7 +226,7 @@ const defaultTrackerState = {
 };
 
 const dailyMissions = [
-  { id: "save-rm5", title: "Save RM5 today", description: "Put aside a small amount before spending on wants.", category: "Money", is_active: true },
+  { id: "save-rm5", title: "Save S$5 today", description: "Put aside a small amount before spending on wants.", category: "Money", is_active: true },
   { id: "message-trusted", title: "Message one trusted person", description: "Send a simple check-in or ask how they are doing.", category: "Support", is_active: true },
   { id: "sleep-before-12", title: "Sleep before 12am", description: "Protect tomorrow's energy with one earlier bedtime.", category: "Health", is_active: true },
   { id: "handled-well", title: "Write one thing you handled well", description: "Name one moment you managed with effort or courage.", category: "Reflection", is_active: true },
@@ -1191,7 +1191,7 @@ function greetingWord() {
 }
 
 function formatCurrency(value) {
-  return `RM ${Number(value || 0).toFixed(2)}`;
+  return `S$${Number(value || 0).toFixed(2)}`;
 }
 
 function todaySpendTotal() {
