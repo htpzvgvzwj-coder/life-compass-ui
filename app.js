@@ -34,6 +34,7 @@ const FUTURE_MIRROR_SYSTEM_PROMPT = "You are Future Mirror inside the Compass ap
 // path, you may be approaching something like X."
 const FUTURE_SELF_SYSTEM_PROMPT = "You are the Future Self module inside Compass's Future Mirror. You write a vivid, specific, first-person, present-tense scene of what the user's future self might be living, grounded only in their real saved data. This is never a prediction - always conditional (\"if you continue,\" \"this path suggests,\" \"you may be\"), never deterministic (\"you will be\"). Prioritize a vivid narrated scene over a dry stat summary - vividness is what makes this effective, not certainty. Be honest about low confidence when the user's saved data is thin rather than fabricating specific detail to sound impressive.";
 const DETERMINISTIC_PHRASES = ["you will be", "you will have", "you'll be", "you'll have", "you are going to be", "guaranteed", "definitely will"];
+const COMMUNITY_COMPOSE_ASSIST_SYSTEM_PROMPT = "You help reword a single Community post for a youth self-growth app so it is kinder, clearer, and safer to publish. Keep the same meaning and rough length. Remove any full name, address, school schedule, phone number, or password. Do not add new claims or advice that wasn't already implied. Reply with only the reworded post text, no preamble, no quotes, no markdown.";
 const COMPASS_API_ERROR = "Sorry, Compass AI is having trouble responding right now. Please try again.";
 const COMPASS_API_URL = window.location.protocol === "file:" ? "http://localhost:5179/api/compass-chat" : "/api/compass-chat";
 
@@ -177,7 +178,6 @@ const defaultTrackerState = {
   journalEntries: [],
   challengeProgress: [],
   savedOpportunities: [],
-  communityPosts: [],
   futureMirror: {
     latest: null,
     saved: []
@@ -317,51 +317,6 @@ const opportunityItems = [
   { id: "coding-skills", category: "Learn & Earn", type: "Coding", title: "Coding beginner path", description: "Start with websites, small apps, automation, or school project tools that become portfolio work.", tags: ["coding", "technology", "portfolio"], applyUrl: "https://www.google.com/search?q=learn+coding+for+beginners+students" },
   { id: "content-creation", category: "Learn & Earn", type: "Content creation", title: "Content creation portfolio", description: "Build writing, filming, editing, and publishing skills around a topic you care about.", tags: ["content", "marketing", "creative"], applyUrl: "https://www.google.com/search?q=content+creation+skills+for+beginners" },
   { id: "entrepreneurship", category: "Learn & Earn", type: "Entrepreneurship", title: "Mini entrepreneurship project", description: "Test a small service, product, or community idea with low risk and honest feedback.", tags: ["entrepreneurship", "business", "income"], applyUrl: "https://www.google.com/search?q=student+entrepreneurship+ideas" }
-];
-
-const communityGroups = [
-  {
-    id: "study-focus",
-    title: "Study Focus",
-    description: "Share focus routines, exam pressure strategies, and realistic study blocks.",
-    members: "1.8k",
-    prompts: ["What study habit helped you this week?", "What distraction do you want to reduce?"]
-  },
-  {
-    id: "leadership",
-    title: "Leadership",
-    description: "Practice communication, confidence, teamwork, and leading without ego.",
-    members: "940",
-    prompts: ["Where can you lead by helping first?", "What responsibility are you ready to try?"]
-  },
-  {
-    id: "entrepreneurship",
-    title: "Entrepreneurship",
-    description: "Discuss small business ideas, experiments, customer learning, and responsible risk.",
-    members: "1.2k",
-    prompts: ["What small problem could you solve?", "What can you test without spending much money?"]
-  },
-  {
-    id: "mental-wellness",
-    title: "Mental Wellness",
-    description: "Anonymous support, calm check-ins, and encouragement to reach trusted people.",
-    members: "2.4k",
-    prompts: ["What helped you feel 5% steadier today?", "Who is one safe person you can contact?"]
-  },
-  {
-    id: "scholarships",
-    title: "Scholarships",
-    description: "Share scholarship preparation, essay ideas, deadlines, and interview practice.",
-    members: "860",
-    prompts: ["What scholarship requirement can you prepare early?", "What story shows your growth?"]
-  },
-  {
-    id: "career-growth",
-    title: "Career Growth",
-    description: "Explore internships, portfolios, beginner skills, and career confidence.",
-    members: "1.1k",
-    prompts: ["What skill can you prove with a small project?", "What opportunity should you apply for?"]
-  }
 ];
 
 const inspireCoverImages = {
@@ -937,7 +892,6 @@ function normalizeTrackerState(state) {
     journalEntries: Array.isArray(state.journalEntries) ? state.journalEntries : fallback.journalEntries,
     challengeProgress: Array.isArray(state.challengeProgress) ? state.challengeProgress : fallback.challengeProgress,
     savedOpportunities: Array.isArray(state.savedOpportunities) ? state.savedOpportunities : fallback.savedOpportunities,
-    communityPosts: Array.isArray(state.communityPosts) ? state.communityPosts : fallback.communityPosts,
     futureMirror: {
       ...fallback.futureMirror,
       ...(state.futureMirror || {}),
@@ -1896,6 +1850,70 @@ function homeQuickAccessGrid() {
 function lifeVerseState() {
   trackerState.lifeVerse = normalizeLifeVerseState(trackerState.lifeVerse || createDefaultLifeVerseState());
   return trackerState.lifeVerse;
+}
+
+// Community actions (posting, joining a squad, sharing a milestone) nudge the
+// user's own LifeVerse simulation - this is what makes Community feel
+// connected to the rest of the app instead of a bolted-on forum.
+function bumpCommunityTrust(amount) {
+  const state = lifeVerseState();
+  state.npcSimulation.communityTrust = window.LifeVerseGame.clamp(Number(state.npcSimulation.communityTrust || 0) + amount);
+  saveTrackerState();
+  syncCommunityProfileSnapshot();
+}
+
+async function syncCommunityProfileSnapshot() {
+  if (!hasCommunitySession()) return;
+  const client = getCommunitySupabaseClient();
+  if (!client) return;
+  const state = lifeVerseState();
+  try {
+    await client.from("profiles").update({
+      community_trust_snapshot: Math.round(state.npcSimulation.communityTrust || 0),
+      community_mood_snapshot: state.world ? state.world.communityMood : null
+    }).eq("id", communityUserId());
+  } catch (error) {
+    console.error("[Community] syncCommunityProfileSnapshot failed", error);
+  }
+}
+
+async function syncCommunityBadges() {
+  if (!hasCommunitySession()) return;
+  const client = getCommunitySupabaseClient();
+  if (!client) return;
+  const state = lifeVerseState();
+  const communityBadges = (state.progression.achievements || [])
+    .filter((achievement) => achievement.id.startsWith("community-"))
+    .map((achievement) => ({ id: achievement.id, title: achievement.title, unlockedAt: achievement.unlockedAt }));
+  try {
+    await client.from("profiles").update({ badges: communityBadges }).eq("id", communityUserId());
+  } catch (error) {
+    console.error("[Community] syncCommunityBadges failed", error);
+  }
+}
+
+// Non-ranking contribution badges (idea 9) - reuses the existing, already
+// idempotent LifeVerseGame.addAchievement. Never surfaced as a leaderboard,
+// just unordered chips on post/squad cards.
+function checkCommunityAchievements() {
+  if (!hasCommunitySession()) return;
+  const state = lifeVerseState();
+  const myId = communityUserId();
+  const myPosts = communityPostsCacheSnapshot().filter((post) => post.author_id === myId && post.status === "published");
+  const mySquadMemberships = communitySquadMembersCacheSnapshot().filter((member) => member.user_id === myId);
+  const myConnections = communityAccountabilityConnectionsSnapshot().filter((connection) => connection.status === "accepted" && (connection.requester_id === myId || connection.recipient_id === myId));
+
+  let unlockedAny = false;
+  if (myPosts.length >= 1 && window.LifeVerseGame.addAchievement(state, "community-first-post", "First Post", "Published your first Community post.")) unlockedAny = true;
+  if (myPosts.length >= 5 && window.LifeVerseGame.addAchievement(state, "community-five-posts", "Steady Voice", "Published 5 Community posts.")) unlockedAny = true;
+  if (mySquadMemberships.length >= 1 && window.LifeVerseGame.addAchievement(state, "community-squad-joined", "Joined a Squad", "Joined your first Community squad.")) unlockedAny = true;
+  if (myPosts.some((post) => post.post_type === "milestone") && window.LifeVerseGame.addAchievement(state, "community-milestone-share", "Milestone Shared", "Shared a completed roadmap milestone with the Community.")) unlockedAny = true;
+  if (myConnections.length >= 1 && window.LifeVerseGame.addAchievement(state, "community-accountability-connected", "Found an Accountability Partner", "Connected with an accountability partner in Community.")) unlockedAny = true;
+
+  if (unlockedAny) {
+    saveTrackerState();
+    syncCommunityBadges();
+  }
 }
 
 function syncLifeSimFromLifeVerse() {
@@ -4906,61 +4924,6 @@ function adminStudio() {
   `;
 }
 
-function visibleCommunityPosts() {
-  return (trackerState.communityPosts || [])
-    .filter((post) => post.user_id === currentUserId() || post.is_sample)
-    .slice(0, 8);
-}
-
-function communityCards() {
-  return communityGroups.map((group) => `
-    <article class="community-card">
-      <div class="community-card-top">
-        <span class="category-badge">${escapeHTML(group.members)} members</span>
-        <img src="assets/icon-support.png" alt="">
-      </div>
-      <h3>${escapeHTML(group.title)}</h3>
-      <p>${escapeHTML(group.description)}</p>
-      <div class="community-prompts">
-        ${(group.prompts || []).map((prompt) => `<span>${escapeHTML(prompt)}</span>`).join("")}
-      </div>
-      <div class="community-actions">
-        <button class="primary-action compact-action" type="button" data-open="communityGroup" data-open-payload="${escapeHTML(group.id)}">Open group</button>
-        <button class="secondary-action compact-action" type="button" data-growth-prompt="${escapeHTML(`Help me connect with a ${group.title} growth community safely. Ask me one question about my goal and suggest a respectful first post.`)}">Ask Compass</button>
-      </div>
-    </article>
-  `).join("");
-}
-
-function communityWall() {
-  const posts = visibleCommunityPosts();
-  return `
-    <section class="community-wall-card">
-      <div class="section-row">
-        <div>
-          <p class="eyebrow">Anonymous Support Wall</p>
-          <h3>Share pressure without exposing private details.</h3>
-        </div>
-        <button class="secondary-action compact-action" type="button" data-open="communityPost">Post</button>
-      </div>
-      <div class="community-wall-list">
-        ${posts.length ? posts.map((post) => `
-          <article>
-            <strong>${escapeHTML(post.group || "General support")}</strong>
-            <p>${escapeHTML(post.text)}</p>
-            <small>${escapeHTML(post.display_time || "Just now")}</small>
-          </article>
-        `).join("") : `
-          <article class="empty-wall">
-            <strong>No support posts yet</strong>
-            <p>Write a calm anonymous note, question, or encouragement. Do not include private details.</p>
-          </article>
-        `}
-      </div>
-    </section>
-  `;
-}
-
 function growthPartnerCard() {
   const interests = cleanText(userProfile.interests, 120) || "your interests";
   const goals = cleanText(userProfile.goals || userProfile.dreamCareer, 140) || "your current growth goal";
@@ -5543,38 +5506,11 @@ const screens = {
 
     <div class="content-rail-title"><strong>${escapeHTML(opportunityCategory === "All" ? "All opportunities" : opportunityCategory)}</strong><span>${visibleOpportunities().length} items</span></div>
     <div class="opportunity-feed">${opportunityCards()}</div>
+
+    ${communityOpportunitiesRail()}
   `,
 
-  community: () => `
-    <header class="screen-head compact-head community-head">
-      <div>
-        <p class="eyebrow">Growth Community</p>
-        <h2 class="screen-title">Find people growing in the same direction.</h2>
-        <p class="screen-subtitle">Not dating. Communities, goal groups, growth partners, and anonymous support for youth development.</p>
-      </div>
-      <div class="avatar"><img src="assets/icon-support.png" alt=""></div>
-    </header>
-
-    <section class="community-hero-card">
-      <div>
-        <p class="eyebrow">Connected growth</p>
-        <h3>Future choices are easier when support is nearby.</h3>
-        <p>Use Community to discuss goals, ask for encouragement, find accountability, and stay realistic.</p>
-      </div>
-      <div class="community-stat-row">
-        <span><strong>${communityGroups.length}</strong>Communities</span>
-        <span><strong>${visibleCommunityPosts().length}</strong>Posts</span>
-        <span><strong>${trackerState.supportContacts.filter((contact) => contact.user_id === currentUserId() || !contact.user_id).length}</strong>Trusted people</span>
-      </div>
-    </section>
-
-    ${growthPartnerCard()}
-
-    <div class="content-rail-title"><strong>Growth communities</strong><span>Goal groups</span></div>
-    <div class="community-grid">${communityCards()}</div>
-
-    ${communityWall()}
-  `,
+  community: () => (hasCommunitySession() ? communityAuthedScreen() : communityAuthGateScreen()),
 
   stories: () => `
     <header class="screen-head compact-head inspire-head">
@@ -5988,6 +5924,9 @@ const modals = {
           <h3>"${escapeHTML(milestoneJustCompleted.milestoneTitle)}" - want to reflect on it?</h3>
           <textarea id="milestone-reflection-note" placeholder="Optional - what made this happen, what's next?"></textarea>
           <button class="secondary-action compact-action" type="button" data-reflect-on-milestone data-milestone-title-value="${escapeHTML(milestoneJustCompleted.milestoneTitle)}" data-goal-title-value="${escapeHTML(milestoneJustCompleted.goalTitle)}">Save reflection</button>
+          ${hasCommunitySession()
+            ? `<button class="secondary-action compact-action" type="button" data-share-milestone-community data-milestone-title-value="${escapeHTML(milestoneJustCompleted.milestoneTitle)}" data-goal-title-value="${escapeHTML(milestoneJustCompleted.goalTitle)}">Share to Community</button>`
+            : `<button class="secondary-action compact-action" type="button" data-tab-jump="community">Sign in to Community to share this</button>`}
         </section>
       ` : ""}
       <div class="mirror-example-row mode-toggle-row">
@@ -6721,61 +6660,24 @@ const modals = {
     </div>
   `,
 
-  communityGroup: (id) => {
-    const group = communityGroups.find((item) => item.id === id) || communityGroups[0];
-    return `
-      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-group-title">
-        <div class="modal-top">
-          <span class="risk-pill calm">Growth Community</span>
-          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
-        </div>
-        <h3 id="community-group-title">${escapeHTML(group.title)}</h3>
-        <p class="muted">${escapeHTML(group.description)}</p>
-        <div class="advice-stack">
-          ${(group.prompts || []).map((prompt, index) => `
-            <div><strong>Discussion ${index + 1}</strong><span>${escapeHTML(prompt)}</span></div>
-          `).join("")}
-          <div><strong>Goal group</strong><span>Use this group to share one weekly goal, one blocker, and one realistic update.</span></div>
-          <div><strong>Safety rule</strong><span>Do not share full name, address, school schedule, passwords, payment details, or private contact information publicly.</span></div>
-        </div>
-        <div class="profile-actions">
-          <button class="primary-action" type="button" data-open="communityPost" data-open-payload="${escapeHTML(group.title)}">Write anonymous post</button>
-          <button class="secondary-action" type="button" data-growth-prompt="${escapeHTML(`Help me write a respectful first post for the ${group.title} community. Keep it safe, short, and focused on growth.`)}">Ask Compass</button>
-        </div>
-      </div>
-    `;
-  },
+  communityGroup: (id) => communityGroupModal(id),
 
-  communityPost: (groupName = "") => `
-    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-post-title">
-      <div class="modal-top">
-        <span class="risk-pill calm">Anonymous support</span>
-        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
-      </div>
-      <h3 id="community-post-title">Write a safe support wall post</h3>
-      <p class="muted">Keep it kind and anonymous. Do not include private personal details.</p>
-      <div class="admin-form">
-        <label>Community
-          <select id="community-post-group">
-            ${["General support", ...communityGroups.map((group) => group.title)].map((title) => `
-              <option value="${escapeHTML(title)}" ${groupName === title ? "selected" : ""}>${escapeHTML(title)}</option>
-            `).join("")}
-          </select>
-        </label>
-        <label>Post<textarea id="community-post-text" placeholder="Example: I am trying to study more consistently this week. What helped you start when motivation was low?"></textarea></label>
-        <p class="form-error" id="community-post-error" aria-live="polite"></p>
-      </div>
-      <button class="primary-action" type="button" data-save-community-post>Post anonymously</button>
-    </div>
-  `,
+  communityPost: (payload = "") => communityPostModal(payload),
 
-  safety: () => `
+  communityCreateSquad: () => communityCreateSquadModal(),
+
+  communityAccountabilityRequest: (targetUserId) => communityAccountabilityRequestModal(targetUserId),
+
+  communityOpportunitySubmit: () => communityOpportunitySubmitModal(),
+
+  safety: (reason = "") => `
     <div class="modal-card dark-modal" role="dialog" aria-modal="true" aria-labelledby="safety-title">
       <div class="modal-top">
         <span class="risk-pill light">Safety check</span>
         <button class="ghost-circle light" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="safety-title">Make the next move safer</h3>
+      ${reason ? `<p class="muted">${escapeHTML(reason)}</p>` : ""}
       <p>If there is immediate danger, contact local emergency services or a trusted adult now.</p>
       <div class="safety-list">
         <label><input type="checkbox" checked> Tell a trusted person where you are.</label>
@@ -8098,6 +8000,21 @@ document.addEventListener("click", async (event) => {
   const saveJournal = event.target.closest("[data-save-journal]");
   const startChallenge = event.target.closest("[data-start-challenge]");
   const saveCommunityPost = event.target.closest("[data-save-community-post]");
+  const communityAuthModeButton = event.target.closest("[data-community-auth-mode]");
+  const communitySignUpButton = event.target.closest("[data-community-sign-up]");
+  const communitySignInButton = event.target.closest("[data-community-sign-in]");
+  const communitySignOutButton = event.target.closest("[data-community-sign-out]");
+  const communityComposeAssistButton = event.target.closest("[data-community-compose-assist]");
+  const joinSquadButton = event.target.closest("[data-join-squad]");
+  const leaveSquadButton = event.target.closest("[data-leave-squad]");
+  const saveSquadButton = event.target.closest("[data-save-squad]");
+  const shareMilestoneCommunityButton = event.target.closest("[data-share-milestone-community]");
+  const saveAccountabilityOptInButton = event.target.closest("[data-save-accountability-optin]");
+  const sendAccountabilityRequestButton = event.target.closest("[data-send-accountability-request]");
+  const acceptAccountabilityRequestButton = event.target.closest("[data-accept-accountability-request]");
+  const declineAccountabilityRequestButton = event.target.closest("[data-decline-accountability-request]");
+  const saveContactHintButton = event.target.closest("[data-save-contact-hint]");
+  const saveCommunityOpportunityButton = event.target.closest("[data-save-community-opportunity]");
   const saveOpportunity = event.target.closest("[data-save-opportunity]");
   const shareOpportunity = event.target.closest("[data-share-opportunity]");
   const storyReader = event.target.closest("[data-story-id]");
@@ -8121,7 +8038,10 @@ document.addEventListener("click", async (event) => {
   const dismissSystemTutorial = event.target.closest("[data-dismiss-system-tutorial]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
 
-  if (opener) openModal(opener.dataset.open, opener.dataset.reflectionId || opener.dataset.openPayload || "");
+  if (opener) {
+    if (opener.dataset.open === "communityPost") setPendingMilestoneShare(null);
+    openModal(opener.dataset.open, opener.dataset.reflectionId || opener.dataset.openPayload || "");
+  }
   if (dismissSystemTutorial) {
     trackerState.systemTutorialsSeen[dismissSystemTutorial.dataset.dismissSystemTutorial] = true;
     saveTrackerState();
@@ -8854,24 +8774,284 @@ document.addEventListener("click", async (event) => {
     const textInput = modalLayer.querySelector("#community-post-text");
     const groupInput = modalLayer.querySelector("#community-post-group");
     const error = modalLayer.querySelector("#community-post-error");
-    const text = cleanText(textInput ? textInput.value : "", 500);
+    const text = cleanText(textInput ? textInput.value : "", 1500);
+    const squadId = groupInput ? groupInput.value : "";
     if (!text || text.length < 8) {
       if (error) error.textContent = "Write a short but clear post first.";
       return;
     }
-    trackerState.communityPosts.unshift({
-      id: `community-${Date.now()}`,
-      user_id: currentUserId(),
-      group: groupInput ? groupInput.value : "General support",
-      text,
-      created_at: new Date().toISOString(),
-      display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
-    });
-    trackerState.communityPosts = trackerState.communityPosts.slice(0, 60);
-    saveTrackerState();
-    closeModal();
+    if (error) error.textContent = "";
+    saveCommunityPost.disabled = true;
+    saveCommunityPost.textContent = "Posting...";
+    const pendingMilestone = getPendingMilestoneShare();
+    try {
+      const result = await submitCommunityPost({
+        body: text,
+        squadId,
+        postType: pendingMilestone ? "milestone" : "general",
+        relatedGoalTitle: pendingMilestone ? pendingMilestone.goalTitle : undefined,
+        relatedMilestoneTitle: pendingMilestone ? pendingMilestone.milestoneTitle : undefined,
+        themeWeek: CommunityMatching.isoWeekNumber(new Date())
+      });
+      setPendingMilestoneShare(null);
+      await refreshCommunityData();
+      closeModal();
+      if (result.status === "blocked") {
+        openModal("safety", result.reason);
+      } else {
+        bumpCommunityTrust(pendingMilestone ? 5 : 2);
+        checkCommunityAchievements();
+        renderScreen("community");
+      }
+      refreshStaticScreens();
+    } catch (err) {
+      saveCommunityPost.disabled = false;
+      saveCommunityPost.textContent = "Post";
+      if (error) error.textContent = err.message || "Could not publish your post right now.";
+    }
+  }
+
+  if (communityAuthModeButton) {
+    setCommunityAuthMode(communityAuthModeButton.dataset.communityAuthMode || "sign-in");
+    setCommunityAuthError("");
     renderScreen("community");
-    refreshStaticScreens();
+  }
+
+  if (communitySignUpButton) {
+    const emailInput = document.querySelector("#community-auth-email");
+    const passwordInput = document.querySelector("#community-auth-password");
+    const usernameInput = document.querySelector("#community-auth-username");
+    const email = cleanText(emailInput ? emailInput.value : "", 200);
+    const password = passwordInput ? passwordInput.value : "";
+    const username = usernameInput ? cleanUsername(usernameInput.value) : "";
+    if (!email || password.length < 6) {
+      setCommunityAuthError("Enter an email and a password with at least 6 characters.");
+      renderScreen("community");
+    } else {
+      setCommunityAuthBusy(true);
+      setCommunityAuthError("");
+      renderScreen("community");
+      try {
+        await communitySignUp(email, password, username);
+      } catch (err) {
+        setCommunityAuthError(err.message || "Could not create your account.");
+      } finally {
+        setCommunityAuthBusy(false);
+        renderScreen("community");
+      }
+    }
+  }
+
+  if (communitySignInButton) {
+    const emailInput = document.querySelector("#community-auth-email");
+    const passwordInput = document.querySelector("#community-auth-password");
+    const email = cleanText(emailInput ? emailInput.value : "", 200);
+    const password = passwordInput ? passwordInput.value : "";
+    if (!email || !password) {
+      setCommunityAuthError("Enter your email and password.");
+      renderScreen("community");
+    } else {
+      setCommunityAuthBusy(true);
+      setCommunityAuthError("");
+      renderScreen("community");
+      try {
+        await communitySignIn(email, password);
+      } catch (err) {
+        setCommunityAuthError(err.message || "Could not sign in.");
+      } finally {
+        setCommunityAuthBusy(false);
+        renderScreen("community");
+      }
+    }
+  }
+
+  if (communitySignOutButton) {
+    await communitySignOut();
+    renderScreen("community");
+  }
+
+  if (communityComposeAssistButton) {
+    const textInput = modalLayer.querySelector("#community-post-text");
+    const suggestionBox = modalLayer.querySelector("#community-compose-suggestion");
+    const draft = cleanText(textInput ? textInput.value : "", 1500);
+    if (draft && suggestionBox) {
+      communityComposeAssistButton.disabled = true;
+      communityComposeAssistButton.textContent = "Thinking...";
+      try {
+        const suggestion = await requestCompassDirect(COMMUNITY_COMPOSE_ASSIST_SYSTEM_PROMPT, draft);
+        suggestionBox.innerHTML = `
+          <div class="quote-block">${escapeHTML(suggestion)}</div>
+          <button class="secondary-action compact-action" type="button" data-use-community-suggestion>Use this wording</button>
+        `;
+        suggestionBox.dataset.suggestionText = suggestion;
+      } catch {
+        suggestionBox.innerHTML = `<p class="form-error">Could not get a suggestion right now.</p>`;
+      } finally {
+        communityComposeAssistButton.disabled = false;
+        communityComposeAssistButton.textContent = "Improve my wording";
+      }
+    }
+  }
+  if (event.target.closest("[data-use-community-suggestion]")) {
+    const suggestionBox = modalLayer.querySelector("#community-compose-suggestion");
+    const textInput = modalLayer.querySelector("#community-post-text");
+    if (suggestionBox && textInput && suggestionBox.dataset.suggestionText) {
+      textInput.value = suggestionBox.dataset.suggestionText;
+      suggestionBox.innerHTML = "";
+    }
+  }
+
+  if (joinSquadButton) {
+    const squadId = joinSquadButton.dataset.joinSquad;
+    const ok = await joinSquad(squadId);
+    if (ok) {
+      bumpCommunityTrust(3);
+      await refreshCommunityData();
+      checkCommunityAchievements();
+    }
+    renderScreen("community");
+    if (modalLayer.classList.contains("is-open")) openModal("communityGroup", squadId);
+  }
+  if (leaveSquadButton) {
+    const squadId = leaveSquadButton.dataset.leaveSquad;
+    await leaveSquad(squadId);
+    await refreshCommunityData();
+    renderScreen("community");
+    if (modalLayer.classList.contains("is-open")) openModal("communityGroup", squadId);
+  }
+
+  if (saveSquadButton) {
+    const titleInput = modalLayer.querySelector("#community-squad-title");
+    const descriptionInput = modalLayer.querySelector("#community-squad-description");
+    const tagsInput = modalLayer.querySelector("#community-squad-tags");
+    const error = modalLayer.querySelector("#community-squad-error");
+    const title = cleanText(titleInput ? titleInput.value : "", 80);
+    const description = cleanText(descriptionInput ? descriptionInput.value : "", 400);
+    const tags = (tagsInput ? tagsInput.value : "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean).slice(0, 6);
+    if (!title || !description) {
+      if (error) error.textContent = "Add a title and description first.";
+      return;
+    }
+    try {
+      await createSquad({ title, description, tags });
+      await refreshCommunityData();
+      closeModal();
+      renderScreen("community");
+    } catch (err) {
+      if (error) error.textContent = err.message || "Could not create that squad.";
+    }
+  }
+
+  if (shareMilestoneCommunityButton) {
+    setPendingMilestoneShare({
+      goalTitle: shareMilestoneCommunityButton.dataset.goalTitleValue || "",
+      milestoneTitle: shareMilestoneCommunityButton.dataset.milestoneTitleValue || ""
+    });
+    milestoneJustCompleted = null;
+    closeModal();
+    openModal("communityPost");
+  }
+
+  if (saveAccountabilityOptInButton) {
+    const select = document.querySelector("#accountability-goal-select");
+    const textInput = document.querySelector("#accountability-goal-text");
+    const error = document.querySelector("#accountability-optin-error");
+    let goalTitle = "";
+    let roadmapStage = "starting";
+    if (select) {
+      const goal = myRoadmapGoals().find((item) => item.id === select.value);
+      if (goal) {
+        goalTitle = goal.title;
+        roadmapStage = CommunityMatching.computeRoadmapStage(goal);
+      }
+    } else if (textInput) {
+      goalTitle = cleanText(textInput.value, 200);
+    }
+    if (!goalTitle) {
+      if (error) error.textContent = "Add a goal first.";
+      return;
+    }
+    const goalTags = CommunityMatching.extractTags(goalTitle);
+    try {
+      await saveAccountabilityOptIn({ goalTitle, roadmapStage, goalTags });
+      await refreshCommunityData();
+      renderScreen("community");
+    } catch (err) {
+      if (error) error.textContent = err.message || "Could not save your opt-in.";
+    }
+  }
+
+  if (sendAccountabilityRequestButton) {
+    const targetUserId = sendAccountabilityRequestButton.dataset.sendAccountabilityRequest;
+    const messageInput = modalLayer.querySelector("#community-accountability-message");
+    const error = modalLayer.querySelector("#community-accountability-error");
+    const message = cleanText(messageInput ? messageInput.value : "", 500);
+    if (!message || message.length < 5) {
+      if (error) error.textContent = "Write a short intro message first.";
+      return;
+    }
+    try {
+      await requestAccountabilityConnection(targetUserId, message);
+      await refreshCommunityData();
+      closeModal();
+      renderScreen("community");
+    } catch (err) {
+      if (error) error.textContent = err.message || "Could not send that request.";
+    }
+  }
+
+  if (acceptAccountabilityRequestButton) {
+    await respondAccountabilityConnection(acceptAccountabilityRequestButton.dataset.acceptAccountabilityRequest, "accepted");
+    await refreshCommunityData();
+    checkCommunityAchievements();
+    renderScreen("community");
+  }
+  if (declineAccountabilityRequestButton) {
+    await respondAccountabilityConnection(declineAccountabilityRequestButton.dataset.declineAccountabilityRequest, "declined");
+    await refreshCommunityData();
+    renderScreen("community");
+  }
+  if (saveContactHintButton) {
+    const connectionId = saveContactHintButton.dataset.saveContactHint;
+    const hintInput = document.querySelector(`[data-contact-hint-input="${connectionId}"]`);
+    const hint = cleanText(hintInput ? hintInput.value : "", 140);
+    await saveAccountabilityContactHint(connectionId, hint);
+    await refreshCommunityData();
+    renderScreen("community");
+  }
+
+  if (saveCommunityOpportunityButton) {
+    const titleInput = modalLayer.querySelector("#community-opportunity-title");
+    const descriptionInput = modalLayer.querySelector("#community-opportunity-description");
+    const linkInput = modalLayer.querySelector("#community-opportunity-link");
+    const categorySelect = modalLayer.querySelector("#community-opportunity-category");
+    const tagsInput = modalLayer.querySelector("#community-opportunity-tags");
+    const error = modalLayer.querySelector("#community-opportunity-error");
+    const title = cleanText(titleInput ? titleInput.value : "", 140);
+    const description = cleanText(descriptionInput ? descriptionInput.value : "", 800);
+    const link = (linkInput ? linkInput.value : "").trim();
+    const category = categorySelect ? categorySelect.value : "";
+    const tags = (tagsInput ? tagsInput.value : "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean).slice(0, 8);
+    if (!title || !description || !/^https?:\/\//i.test(link)) {
+      if (error) error.textContent = "Add a title, description, and a valid link (starting with http:// or https://).";
+      return;
+    }
+    saveCommunityOpportunityButton.disabled = true;
+    saveCommunityOpportunityButton.textContent = "Sharing...";
+    try {
+      const result = await submitCommunityOpportunity({ title, description, link, category, tags });
+      await refreshCommunityData();
+      closeModal();
+      if (result.status === "blocked") {
+        openModal("safety", result.reason);
+      } else {
+        renderScreen("opportunities");
+      }
+    } catch (err) {
+      saveCommunityOpportunityButton.disabled = false;
+      saveCommunityOpportunityButton.textContent = "Share";
+      if (error) error.textContent = err.message || "Could not share this opportunity right now.";
+    }
   }
 
   if (demoReceipt) {
