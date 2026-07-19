@@ -27,7 +27,6 @@ const ADMIN_PASSCODE = "STEADY-ADMIN";
 // product is built on. Tone adapts to personalBlueprint.personality/workStyle
 // in context, but never fabricates a reference that isn't in realSavedFacts.
 const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question.";
-const FUTURE_MIRROR_SYSTEM_PROMPT = "You are Future Mirror inside the Compass app. You are a decision impact simulator, not a prediction tool. Help youth compare how today's choices may shape possible future outcomes. Do not guarantee outcomes or claim to predict the future. Use language like possible outcomes, potential risks, likely impact, and possible long-term effects. Be supportive, practical, concise, and youth-friendly.";
 // Future Self module (Future Mirror bible Ch.4) - grounded in Hershfield's
 // future self-continuity research: vividness matters more than certainty
 // framing. Never phrase as "you will be X" - always "if you continue on this
@@ -38,38 +37,22 @@ const COMMUNITY_COMPOSE_ASSIST_SYSTEM_PROMPT = "You help reword a single Communi
 const COMPASS_API_ERROR = "Sorry, Compass AI is having trouble responding right now. Please try again.";
 const COMPASS_API_URL = window.location.protocol === "file:" ? "http://localhost:5179/api/compass-chat" : "/api/compass-chat";
 
-const futureMirrorCategories = [
-  "Education Mirror",
-  "Career Mirror",
-  "Financial Mirror",
-  "Lifestyle Mirror",
-  "Relationship Mirror",
-  "Growth Mirror"
-];
-
-const futureMirrorExamples = [
-  "Should I study tonight or play games?",
-  "Should I apply for this internship?",
-  "Should I save money or spend it?",
-  "Should I join this challenge?"
-];
-
 // Future Scan station catalog - all 10 stations are fully implemented; each
 // opens as a modal from the grid in futureScanStationGrid() (see
 // modals.futureScanStation for the per-station view dispatch). Each station
 // belongs to one of FUTURE_SCAN_GROUPS below, purely for how the grid is
 // organized - it doesn't change what a station does.
 const FUTURE_SCAN_STATIONS = [
-  { id: "identityScan", title: "Future Identity Scan", blurb: "See which future self this choice moves you toward.", group: "now" },
-  { id: "valuesCheck", title: "Values Consistency Check", blurb: "Compare this choice against the values you've already saved.", group: "now" },
-  { id: "hiddenCosts", title: "Hidden Cost Scanner", blurb: "See what this choice actually spends - sleep, focus, confidence.", group: "now" },
-  { id: "noActionFuture", title: "No-Action Future", blurb: "See where staying exactly the same leads.", group: "now" },
-  { id: "pressureTest", title: "Choice Pressure Test", blurb: "Check whether pressure, fear, or comparison is driving this.", group: "context" },
-  { id: "conflictMap", title: "Future Conflict Map", blurb: "See which of your goals are actually in tension here.", group: "context" },
-  { id: "signalRadar", title: "Future Signal Radar", blurb: "Rate how ready you feel right now - not a score, a moment check.", group: "context" },
-  { id: "pastSelfCheck", title: "Past-Self Consistency Check", blurb: "See what you chose in similar moments before.", group: "time" },
-  { id: "driftDetector", title: "Drift Detector", blurb: "See if you're slowly drifting from where you said you wanted to go.", group: "time" },
-  { id: "checkBack", title: "Check-Back", blurb: "Come back later and see if the prediction matched real life.", group: "time" }
+  { id: "identityScan", title: "Future Identity Scan", blurb: "See which future self this choice moves you toward.", group: "now", icon: "icon-profile.png" },
+  { id: "valuesCheck", title: "Values Consistency Check", blurb: "Compare this choice against the values you've already saved.", group: "now", icon: "icon-balance.png" },
+  { id: "hiddenCosts", title: "Hidden Cost Scanner", blurb: "See what this choice actually spends - sleep, focus, confidence.", group: "now", icon: "icon-warning.png" },
+  { id: "noActionFuture", title: "No-Action Future", blurb: "See where staying exactly the same leads.", group: "now", icon: "icon-safety.png" },
+  { id: "pressureTest", title: "Choice Pressure Test", blurb: "Check whether pressure, fear, or comparison is driving this.", group: "context", icon: "icon-boundary.png" },
+  { id: "conflictMap", title: "Future Conflict Map", blurb: "See which of your goals are actually in tension here.", group: "context", icon: "icon-decide.png" },
+  { id: "signalRadar", title: "Future Signal Radar", blurb: "Rate how ready you feel right now - not a score, a moment check.", group: "context", icon: "icon-mood.png" },
+  { id: "pastSelfCheck", title: "Past-Self Consistency Check", blurb: "See what you chose in similar moments before.", group: "time", icon: "icon-guide.png" },
+  { id: "driftDetector", title: "Drift Detector", blurb: "See if you're slowly drifting from where you said you wanted to go.", group: "time", icon: "icon-transport.png" },
+  { id: "checkBack", title: "Check-Back", blurb: "Come back later and see if the prediction matched real life.", group: "time", icon: "icon-time.png" }
 ];
 
 const FUTURE_SCAN_GROUPS = [
@@ -108,8 +91,8 @@ const FUTURE_SCAN_CHECKBACK_HORIZONS = [
 ];
 
 // Same "augment judgment, never decide for them, never invent a memory that
-// isn't real" rules as COMPASS_SYSTEM_PROMPT/FUTURE_MIRROR_SYSTEM_PROMPT,
-// scoped to Future Scan's specific job.
+// isn't real" rules as COMPASS_SYSTEM_PROMPT, scoped to Future Scan's
+// specific job.
 const FUTURE_SCAN_SYSTEM_PROMPT = "You are Future Scan, a module inside Compass's Future Mirror. Your job is to help the user see the truth about a real choice before they make it - not to decide for them. Ground every claim only in the scanContext and saved profile data you are given; never invent a memory, pattern, or fact that isn't actually present in what you were told. Never state or imply a recommended choice (no \"you should\", no \"the better option is\"). Be concise, concrete, and youth-friendly. Avoid clinical or diagnostic language, especially around emotional or mental state - this is not a mental health assessment.";
 
 // Build Mode 2.0 is a goal-based AI coach router. It must work for any youth
@@ -134,16 +117,64 @@ const BUILD_COACH_TYPES = [
   { id: "custom", name: "Custom Growth Coach", use: "any practical youth growth goal that does not fit another coach cleanly" }
 ];
 
-const BUILD_GOAL_CHIPS = [
-  "Prepare for an interview",
-  "Talk to my parents calmly",
-  "Stop procrastinating",
-  "Choose a career path",
-  "Save money",
-  "Build confidence",
-  "Apply for a scholarship",
-  "Start a small business"
+// Real-life moments (not a self-assessment, not scored) - concrete, relatable
+// situations a user can recognize themselves in and tap straight into
+// coaching. Categories mirror the subset of BUILD_COACH_TYPES that map to
+// core adult-independence gaps; Interview/Study/Entrepreneurship/Opportunity/
+// Clarity/Custom stay reachable via free-text goal entry as before.
+const BUILD_LIFE_MOMENT_CATEGORIES = [
+  { id: "independence", label: "Independence", icon: "icon-home.png" },
+  { id: "money", label: "Money", icon: "icon-money.png" },
+  { id: "communication", label: "Communication", icon: "icon-chat.png" },
+  { id: "career", label: "Career", icon: "icon-work.png" },
+  { id: "wellness", label: "Wellness", icon: "icon-health.png" },
+  { id: "relationships", label: "Relationships", icon: "icon-support.png" }
 ];
+
+const BUILD_LIFE_MOMENTS = {
+  independence: [
+    "I've never cooked a full meal for myself from scratch",
+    "I don't know how to do laundry properly, including reading care labels",
+    "I've never booked my own doctor or dentist appointment",
+    "I wouldn't know what to do if a landlord or roommate ignored a real problem",
+    "I don't have a routine that keeps my space liveable without someone reminding me"
+  ],
+  money: [
+    "I don't have a budget I actually stick to",
+    "I don't really understand how credit cards or interest work",
+    "I've never had to decide between paying a bill and something I wanted",
+    "I don't know what I'd do if I got hit with a big unexpected expense right now",
+    "I've never opened or managed my own bank account"
+  ],
+  communication: [
+    "I find it hard to say no to my parents, teachers, or friends and hold my ground",
+    "I don't know how I'd raise it if a boss or landlord treated me unfairly",
+    "I avoid conflict instead of actually addressing it",
+    "I don't know how to ask for help without feeling like a burden",
+    "I've never had to have a hard conversation with someone I depend on"
+  ],
+  career: [
+    "I don't have an updated resume",
+    "I've never done a real job interview, only imagined one",
+    "I'm not sure what I actually want to do for work",
+    "I don't know how to follow up after applying somewhere",
+    "I've never negotiated pay, hours, or anything at work"
+  ],
+  wellness: [
+    "I don't know when a symptom means 'see a doctor' versus 'wait it out'",
+    "I don't have a way to handle stress that isn't just avoiding it",
+    "I've never had to manage my own sleep or eating without someone else structuring it",
+    "I don't know what my own health coverage actually covers",
+    "I push through burnout instead of noticing it early"
+  ],
+  relationships: [
+    "I don't have an adult outside my family I could call in a real emergency",
+    "I don't know how to end a friendship or relationship that isn't good for me",
+    "I struggle to make new friends outside school or a set group",
+    "I don't know how to ask someone for real support without over-explaining",
+    "I find it hard to trust people enough to actually rely on them"
+  ]
+};
 
 const inspireCategories = [
   "All",
@@ -212,7 +243,6 @@ const defaultTrackerState = {
   challengeProgress: [],
   savedOpportunities: [],
   futureMirror: {
-    latest: null,
     saved: []
   },
   // Future Mirror upgrade (separate system from LifeVerse - no shared state,
@@ -751,10 +781,7 @@ const assessmentItems = [
 
 let activeTab = "home";
 let isCompassResponding = false;
-let isFutureMirrorLoading = false;
-let futureMirrorError = "";
-let futureMirrorDraft = null;
-let futureMirrorMode = "simulator";
+let futureMirrorMode = "scan";
 
 // Future Scan - third Future Mirror mode ("help the user see the truth before
 // they choose", not a checklist and not another open-ended chat - Compass AI
@@ -787,6 +814,7 @@ let futureScanSuggestedStationIds = [];
 let buildModeGoalInput = "";
 let isBuildModeLoading = false;
 let buildModeError = "";
+let buildMomentCategory = "independence";
 let activeBuildEntryId = null;
 let activeBuildTrainingSessionId = null;
 let isBuildTrainingLoading = false;
@@ -1164,6 +1192,28 @@ function displayName() {
 
 function cleanText(value, limit = 2000) {
   return String(value || "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, limit);
+}
+
+// Shared by every AI call site that asks for strict-JSON replies (Future
+// Scan, Build Mode, Blueprint, resume polish, roadmap generation, etc) -
+// tries a clean parse first, then falls back to extracting the outermost
+// {...} in case the model wrapped the JSON in prose/markdown.
+function extractJsonObject(text) {
+  const raw = String(text || "").trim();
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(raw.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 function compassProfileForAI() {
@@ -1878,8 +1928,7 @@ function homeQuickAccessGrid() {
     ["icon-learn.png", "Growth", "Goals, journal, mood", "growth"],
     ["icon-balance.png", "Life Sim", "Play adult-life choices", "simulator"],
     ["icon-support.png", "Community", "Groups and support", "community"],
-    ["icon-work.png", "Opportunities", "Scholarships and internships", "opportunities"],
-    ["icon-decide.png", "Build Mode", "AI coach training", "build"]
+    ["icon-work.png", "Opportunities", "Scholarships and internships", "opportunities"]
   ];
   return `
     <section class="home-quick-access">
@@ -1901,6 +1950,11 @@ function homeQuickAccessGrid() {
           <img src="assets/icon-guide.png" alt="">
           <strong>Future Scan</strong>
           <span>See the truth before you choose</span>
+        </button>
+        <button type="button" data-jump-build-mode>
+          <img src="assets/icon-decide.png" alt="">
+          <strong>Build Mode</strong>
+          <span>AI coach training</span>
         </button>
       </div>
     </section>
@@ -3062,162 +3116,6 @@ function growthHubPreviewCard() {
   `;
 }
 
-// Decision Simulator + Life Compass (Future Mirror bible Ch.6) share this one
-// prompt/engine - "mode" only changes framing copy (structured comparison vs
-// exploratory), per the bible's "one engine, two views" design. The
-// "dimensions" field is the actual multi-dimensional comparison the bible
-// asks for (money/happiness/growth/stress/opportunity-cost/family) - the AI
-// is told to surface only whichever of those are relevant, not force all six.
-const DECISION_DIMENSION_CATALOG = ["financial", "happiness/wellbeing", "growth/learning", "stress/risk", "opportunity cost", "family/relationship"];
-
-function futureMirrorPrompt(question, category, pathA, pathB, mode = "simulator") {
-  const profileFacts = realGrowthFactsText();
-  const framingLine = mode === "compass"
-    ? "This is Life Compass mode - the question may be less clearly bounded than a simple A-vs-B choice. Help the user see the shape of the choice, don't force it into a rigid verdict."
-    : "This is Decision Simulator mode - a structured comparison between named options.";
-  return `Create a Future Mirror decision impact simulation as strict JSON only. Do not include markdown. ${framingLine} The JSON shape must be:
-{
-  "question": "string",
-  "category": "string",
-  "summary": "string",
-  "dimensions": [
-    { "name": "one of: ${DECISION_DIMENSION_CATALOG.join(" | ")}", "relevantBecause": "string", "pathAScore": 0, "pathAReason": "string", "pathBScore": 0, "pathBReason": "string" }
-  ],
-  "paths": [
-    {
-      "name": "Path A",
-      "choice": "string",
-      "benefits": ["string", "string"],
-      "risks": ["string", "string"],
-      "shortTermImpact": "string",
-      "longTermImpact": "string",
-      "goalAlignmentScore": 0
-    }
-  ],
-  "timeline": {
-    "1 month": "string",
-    "6 months": "string",
-    "1 year": "string",
-    "3 years": "string"
-  },
-  "futureSelfLetter": "string",
-  "futureScore": {
-    "overall": 0,
-    "explanation": "string",
-    "categories": [
-      { "name": "Learning", "score": 0, "reason": "string" },
-      { "name": "Career", "score": 0, "reason": "string" },
-      { "name": "Finance", "score": 0, "reason": "string" },
-      { "name": "Health", "score": 0, "reason": "string" },
-      { "name": "Relationships", "score": 0, "reason": "string" },
-      { "name": "Mindset", "score": 0, "reason": "string" }
-    ]
-  },
-  "reflectionQuestions": ["string", "string", "string"]
-}
-Decision question: ${question}
-Category: ${category}
-Path A: ${pathA}
-Path B: ${pathB}
-Saved user context, if any: ${profileFacts}
-Rules: This is not prediction. Use possible outcome, potential risk, likely impact, and possible long-term effects. Include exactly two paths unless the question clearly needs a third. Scores must be 0-100 and should estimate alignment with the user's stated goals when available. For "dimensions", only include the 2-4 that are genuinely relevant to this specific decision - do not force all six in if some don't apply (e.g. a course-choice question usually doesn't need "family/relationship"). Future Self Letter should sound emotional, realistic, encouraging, and connected to the user's goals, not dramatic or guaranteed. Future Score should explain why categories increase or decrease. Hard rule, never break it: never state or imply a recommended choice ("you should," "the better option is," "I recommend") - end instead with a reflective question that hands the decision back to the user, referencing one of their Blueprint values by name if the saved context includes one. Other themes to weave in: which future feels closer to goals, which choice aligns with the person they want to become, and one small action today.`;
-}
-
-function extractJsonObject(text) {
-  const raw = String(text || "").trim();
-  try {
-    return JSON.parse(raw);
-  } catch {
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      try {
-        return JSON.parse(raw.slice(start, end + 1));
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
-}
-
-const VERDICT_PHRASES = ["you should choose", "you should pick", "you should go with", "the better option is", "the better choice is", "i recommend", "my recommendation", "the best choice is", "the best option is"];
-
-function containsVerdictLanguage(text) {
-  const lower = String(text || "").toLowerCase();
-  return VERDICT_PHRASES.some((phrase) => lower.includes(phrase));
-}
-
-function normalizeDimensions(rawDimensions) {
-  const list = Array.isArray(rawDimensions) ? rawDimensions : [];
-  return list.slice(0, 4).map((dimension) => ({
-    name: cleanText(dimension.name || "Relevant factor", 60),
-    relevantBecause: cleanText(dimension.relevantBecause || "This factor matters for this specific decision.", 220),
-    pathAScore: Math.max(0, Math.min(100, Number(dimension.pathAScore || 50))),
-    pathAReason: cleanText(dimension.pathAReason || "Score reflects how this path affects this factor.", 220),
-    pathBScore: Math.max(0, Math.min(100, Number(dimension.pathBScore || 50))),
-    pathBReason: cleanText(dimension.pathBReason || "Score reflects how this path affects this factor.", 220)
-  })).filter((dimension) => dimension.name);
-}
-
-function normalizeFutureMirrorResult(parsed, fallback) {
-  const safePaths = Array.isArray(parsed && parsed.paths) ? parsed.paths : [];
-  return {
-    id: `future-mirror-${Date.now()}`,
-    user_id: currentUserId(),
-    mode: fallback.mode || "simulator",
-    question: cleanText((parsed && parsed.question) || fallback.question, 260),
-    category: futureMirrorCategories.includes(parsed && parsed.category) ? parsed.category : fallback.category,
-    dimensions: normalizeDimensions(parsed && parsed.dimensions),
-    summary: cleanText((parsed && parsed.summary) || "Future Mirror compares possible impacts. It does not predict or guarantee outcomes.", 500),
-    paths: safePaths.slice(0, 3).map((path, index) => ({
-      name: cleanText(path.name || `Path ${String.fromCharCode(65 + index)}`, 40),
-      choice: cleanText(path.choice || (index === 0 ? fallback.pathA : fallback.pathB), 180),
-      benefits: Array.isArray(path.benefits) ? path.benefits.slice(0, 4).map((item) => cleanText(item, 180)).filter(Boolean) : ["Possible benefits depend on how consistently you act."],
-      risks: Array.isArray(path.risks) ? path.risks.slice(0, 4).map((item) => cleanText(item, 180)).filter(Boolean) : ["Potential risks should be reviewed before choosing."],
-      shortTermImpact: cleanText(path.shortTermImpact || "Possible short-term impact depends on your next action.", 260),
-      longTermImpact: cleanText(path.longTermImpact || "Possible long-term effects depend on habits, support, and timing.", 260),
-      goalAlignmentScore: Math.max(0, Math.min(100, Number(path.goalAlignmentScore || 0)))
-    })).filter((path) => path.choice),
-    timeline: {
-      "1 month": cleanText(parsed && parsed.timeline && parsed.timeline["1 month"] || "Patterns may become clearer after repeated choices.", 260),
-      "6 months": cleanText(parsed && parsed.timeline && parsed.timeline["6 months"] || "Small repeated actions may start shaping opportunities.", 260),
-      "1 year": cleanText(parsed && parsed.timeline && parsed.timeline["1 year"] || "Longer-term effects depend on consistency and support.", 260),
-      "3 years": cleanText(parsed && parsed.timeline && parsed.timeline["3 years"] || "This choice may become one part of a larger pattern, not a fixed destiny.", 260)
-    },
-    futureSelfLetter: cleanText(parsed && parsed.futureSelfLetter || "Dear me, I cannot promise exactly how life turns out, but I am proud when you choose the path that protects your growth, health, and values. Take one honest step today. It matters more than it looks.", 1200),
-    futureScore: normalizeFutureScore(parsed && parsed.futureScore),
-    reflectionQuestions: Array.isArray(parsed && parsed.reflectionQuestions) && parsed.reflectionQuestions.length
-      ? parsed.reflectionQuestions.slice(0, 4).map((item) => cleanText(item, 220)).filter(Boolean)
-      : [
-        "Which future feels closer to your goals?",
-        "Which choice aligns with the person you want to become?",
-        "What is one small action you can take today?"
-      ],
-    generated_at: new Date().toISOString(),
-    display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-  };
-}
-
-function normalizeFutureScore(score = {}) {
-  const categoryNames = ["Learning", "Career", "Finance", "Health", "Relationships", "Mindset"];
-  const sourceCategories = Array.isArray(score.categories) ? score.categories : [];
-  const categories = categoryNames.map((name) => {
-    const found = sourceCategories.find((item) => String(item.name || "").toLowerCase() === name.toLowerCase()) || {};
-    return {
-      name,
-      score: Math.max(0, Math.min(100, Number(found.score || score[name.toLowerCase()] || 50))),
-      reason: cleanText(found.reason || "This score depends on how the choice supports your habits, goals, and balance.", 220)
-    };
-  });
-  const average = Math.round(categories.reduce((sum, item) => sum + item.score, 0) / categories.length);
-  return {
-    overall: Math.max(0, Math.min(100, Number(score.overall || average))),
-    explanation: cleanText(score.explanation || "Scores rise when a choice supports learning, healthy routines, relationships, and future options. Scores fall when the choice creates avoidable risk or moves away from your goals.", 360),
-    categories
-  };
-}
-
 const FUTURE_SELF_HORIZONS = [
   { value: "1yr", label: "1 year from now" },
   { value: "3yr", label: "3 years from now" },
@@ -3895,89 +3793,11 @@ function futureSelfEntryCard() {
   const snapshot = latestFutureSelfSnapshot();
   return `
     <section class="mirror-form-card future-self-entry-card">
+      <img class="future-self-entry-icon" src="assets/icon-time.png" alt="">
       <p class="eyebrow">Future Self</p>
       <h3>${snapshot ? "See your future self again" : "Meet your future self"}</h3>
-      <p class="muted">${snapshot ? `Last generated ${escapeHTML(snapshot.displayTime)} - ${escapeHTML((FUTURE_SELF_HORIZONS.find((item) => item.value === snapshot.horizon) || {}).label || "")}.` : "A vivid, grounded scene of where your current path may lead - not a prediction."}</p>
+      <p class="muted">${snapshot ? `Last generated ${escapeHTML(snapshot.displayTime)} - ${escapeHTML((FUTURE_SELF_HORIZONS.find((item) => item.value === snapshot.horizon) || {}).label || "")}.` : "See where today's path may lead."}</p>
       <button class="secondary-action compact-action" type="button" data-open="futureSelfView">${snapshot ? "View Future Self" : "Start Future Self"}</button>
-    </section>
-  `;
-}
-
-function futureMirrorPathCards(result) {
-  return (result.paths || []).map((path) => `
-    <article class="mirror-path-card">
-      <div class="mirror-path-top">
-        <span>${escapeHTML(path.name)}</span>
-        <strong><small>Goal alignment</small>${Number(path.goalAlignmentScore || 0)}%</strong>
-      </div>
-      <h3>${escapeHTML(path.choice)}</h3>
-      <div class="mirror-score-bar"><i style="width:${Number(path.goalAlignmentScore || 0)}%"></i></div>
-      <div class="mirror-list-grid">
-        <div><strong>Possible benefits</strong><ul>${(path.benefits || []).map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul></div>
-        <div><strong>Potential risks</strong><ul>${(path.risks || []).map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul></div>
-      </div>
-      <div class="mirror-impact-grid">
-        <div><strong>Short-term impact</strong><p>${escapeHTML(path.shortTermImpact)}</p></div>
-        <div><strong>Long-term impact</strong><p>${escapeHTML(path.longTermImpact)}</p></div>
-      </div>
-    </article>
-  `).join("");
-}
-
-function futureMirrorTimeline(result) {
-  const timeline = result.timeline || {};
-  const orderedTimeline = {
-    "1 month": timeline["1 month"] || "Patterns may become clearer after repeated choices.",
-    "6 months": timeline["6 months"] || "Small repeated actions may start shaping opportunities.",
-    "1 year": timeline["1 year"] || "Longer-term effects depend on consistency and support.",
-    "3 years": timeline["3 years"] || "This choice may become one part of a larger pattern, not a fixed destiny."
-  };
-  return `
-    <section class="mirror-timeline-card">
-      <p class="eyebrow">Future Timeline</p>
-      <div class="mirror-timeline">
-        ${Object.entries(orderedTimeline).map(([label, text]) => `
-          <div class="timeline-step">
-            <span>${escapeHTML(label)}</span>
-            <p>${escapeHTML(text)}</p>
-          </div>
-        `).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function futureScoreCard(result) {
-  const score = result.futureScore || normalizeFutureScore();
-  return `
-    <section class="future-score-card">
-      <div class="future-score-top">
-        <div>
-          <p class="eyebrow">Future Score</p>
-          <h3>${Number(score.overall || 0)}/100</h3>
-        </div>
-        <div class="future-score-ring" style="--score:${Number(score.overall || 0)}"><strong>${Number(score.overall || 0)}</strong></div>
-      </div>
-      <p>${escapeHTML(score.explanation)}</p>
-      <div class="future-score-grid">
-        ${(score.categories || []).map((item) => `
-          <article>
-            <strong>${escapeHTML(item.name)} <span>${Number(item.score || 0)}</span></strong>
-            <i><b style="width:${Number(item.score || 0)}%"></b></i>
-            <p>${escapeHTML(item.reason)}</p>
-          </article>
-        `).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function futureSelfLetterCard(result) {
-  return `
-    <section class="future-letter-card">
-      <p class="eyebrow">Future Self Letter</p>
-      <h3>A note from the person you are becoming</h3>
-      <p>${escapeHTML(result.futureSelfLetter || "")}</p>
     </section>
   `;
 }
@@ -4009,118 +3829,11 @@ function futureReflectionList() {
       `).join("") : `
         <section class="empty-feature">
           <img src="assets/icon-spark.png" alt="">
-          <div><strong>No saved decisions yet</strong><p>Generate a Future Mirror, then save it for later reflection.</p></div>
+          <div><strong>No saved decisions yet</strong><p>Past Future Mirror decisions you saved will show up here.</p></div>
         </section>
       `}
     </section>
   `;
-}
-
-function futureMirrorDimensionsCard(result) {
-  const dimensions = result.dimensions || [];
-  if (!dimensions.length) return "";
-  const pathNames = (result.paths || []).map((path) => path.name);
-  return `
-    <section class="mirror-timeline-card dimensions-card">
-      <p class="eyebrow">Dimensions that matter for this decision</p>
-      ${dimensions.map((dimension) => `
-        <article>
-          <strong>${escapeHTML(dimension.name)}</strong>
-          <p class="muted tiny-note">${escapeHTML(dimension.relevantBecause)}</p>
-          <div class="mirror-list-grid">
-            <div>
-              <strong><small>${escapeHTML(pathNames[0] || "Path A")}</small> ${dimension.pathAScore}/100</strong>
-              <div class="mirror-score-bar"><i style="width:${dimension.pathAScore}%"></i></div>
-              <p>${escapeHTML(dimension.pathAReason)}</p>
-            </div>
-            <div>
-              <strong><small>${escapeHTML(pathNames[1] || "Path B")}</small> ${dimension.pathBScore}/100</strong>
-              <div class="mirror-score-bar"><i style="width:${dimension.pathBScore}%"></i></div>
-              <p>${escapeHTML(dimension.pathBReason)}</p>
-            </div>
-          </div>
-        </article>
-      `).join("")}
-    </section>
-  `;
-}
-
-function futureMirrorResultCard() {
-  const result = trackerState.futureMirror && trackerState.futureMirror.latest;
-  if (isFutureMirrorLoading) {
-    return `
-      <section class="mirror-loading-card">
-        <p class="eyebrow">Future Mirror is thinking</p>
-        <h3>Simulating possible impacts...</h3>
-        <p>Compass AI is comparing paths without predicting or guaranteeing the future.</p>
-        <div class="mirror-loading-dots"><i></i><i></i><i></i></div>
-      </section>
-    `;
-  }
-  if (futureMirrorError) {
-    return `
-      <section class="mirror-error-card">
-        <p class="eyebrow">Could not generate mirror</p>
-        <h3>${escapeHTML(futureMirrorError)}</h3>
-        <p>Check your local AI server and Groq API key, then try again.</p>
-      </section>
-    `;
-  }
-  if (!result) {
-    return `
-      <section class="mirror-empty-card">
-        <p class="eyebrow">Decision impact simulator</p>
-        <h3>Future Mirror is not a prediction tool.</h3>
-        <p>It helps you compare possible benefits, potential risks, and likely impact so your next step feels clearer.</p>
-      </section>
-    `;
-  }
-  return `
-    <section class="mirror-result-card">
-      <p class="eyebrow">${escapeHTML(result.category)} - ${escapeHTML(result.display_time)}</p>
-      <h3>${escapeHTML(result.question)}</h3>
-      <p>${escapeHTML(result.summary)}</p>
-      <p class="tiny-note">Future Mirror shows possible outcomes, not guaranteed results.</p>
-    </section>
-    <div class="mirror-path-grid">${futureMirrorPathCards(result)}</div>
-    ${futureMirrorDimensionsCard(result)}
-    ${futureMirrorTimeline(result)}
-    ${futureScoreCard(result)}
-    ${futureSelfLetterCard(result)}
-    <section class="mirror-reflection-card">
-      <p class="eyebrow">Reflection questions</p>
-      ${(result.reflectionQuestions || []).map((question) => `<h4>${escapeHTML(question)}</h4>`).join("")}
-      <button class="primary-action compact-action" type="button" data-save-future-decision>Save this decision</button>
-    </section>
-    ${futureMirrorIntegrationCard()}
-  `;
-}
-
-function futureMirrorIntegrationCard() {
-  return `
-    <section class="mirror-integration-card">
-      <p class="eyebrow">Connect this mirror</p>
-      <h3>Turn insight into growth data.</h3>
-      <div class="mirror-integration-grid">
-        <button type="button" data-discuss-mirror>Discuss with Compass AI</button>
-        <button type="button" data-open="growthGoals">Connect to Goals</button>
-        <button type="button" data-open="journal">Reflect in Journal</button>
-        <button type="button" data-open="mood">Log mood impact</button>
-        <button type="button" data-open="challengeHub">Start a Challenge</button>
-        <button type="button" data-tab-jump="opportunities">Career Planning</button>
-        <button type="button" data-tab-jump="stories">Learn from Inspire Hub</button>
-        <button type="button" data-tab-jump="community">Ask Community</button>
-        <button type="button" data-save-future-decision>Save for Future Reflection</button>
-      </div>
-    </section>
-  `;
-}
-
-function futureMirrorDiscussionPrompt() {
-  const result = trackerState.futureMirror && trackerState.futureMirror.latest;
-  if (!result) return "Help me use Future Mirror for a decision I am facing.";
-  const pathSummary = (result.paths || []).map((path) => `${path.name}: ${path.choice}, goal alignment ${path.goalAlignmentScore}%`).join(" | ");
-  return `I want to discuss my Future Mirror result. Decision: ${result.question}. Category: ${result.category}. Paths: ${pathSummary}. Reflection questions: ${(result.reflectionQuestions || []).join(" ")}. Help me choose one small action today without pretending to predict the future.`;
 }
 
 function growthCommunityPrompt() {
@@ -4452,37 +4165,6 @@ function readinessIconLabel(label) {
 function weakestReadinessCategory(result) {
   const bars = Array.isArray(result && result.domainBars) ? result.domainBars : [];
   return [...bars].sort((a, b) => Number(a.value) - Number(b.value))[0] || { label: "Financial Readiness", value: 0 };
-}
-
-function futureMirrorCategoryForReadiness(label) {
-  if (label === "Financial Readiness") return "Financial Mirror";
-  if (label === "Relationship & Communication Skills") return "Relationship Mirror";
-  if (label === "Life Direction & Purpose") return "Career Mirror";
-  if (label === "Emotional Resilience") return "Lifestyle Mirror";
-  if (label === "Independence & Responsibility") return "Growth Mirror";
-  return "Growth Mirror";
-}
-
-function futureReadinessMirrorDraft(result) {
-  const weakest = weakestReadinessCategory(result);
-  const category = weakest.label;
-  const pathMap = {
-    "Financial Readiness": ["Develop saving and planning habits", "Continue current spending habits"],
-    "Decision-Making Skills": ["Use a decision checklist before acting", "Keep choosing based on impulse or pressure"],
-    "Emotional Resilience": ["Build recovery habits and ask for support early", "Handle stress alone until it becomes heavy"],
-    "Life Direction & Purpose": ["Create a small future plan and test one step", "Wait for direction to become clear by itself"],
-    "Relationship & Communication Skills": ["Practice honest communication and boundaries", "Avoid difficult conversations"],
-    "Independence & Responsibility": ["Take ownership of one weekly responsibility", "Wait until someone else reminds me"]
-  };
-  const paths = pathMap[category] || pathMap["Decision-Making Skills"];
-  return {
-    source: "Future Readiness Assessment",
-    question: `How can I improve my ${category.toLowerCase()} after scoring ${weakest.value}/100?`,
-    category: futureMirrorCategoryForReadiness(category),
-    pathA: paths[0],
-    pathB: paths[1],
-    note: `Built from your Future Readiness Assessment. Lowest category: ${category} (${weakest.value}/100).`
-  };
 }
 
 function readinessDiscussionPrompt(result) {
@@ -5003,49 +4685,6 @@ function growthPartnerCard() {
   `;
 }
 
-function futureMirrorQuestionValue() {
-  if (futureMirrorDraft && futureMirrorDraft.question) return futureMirrorDraft.question;
-  return trackerState.futureMirror.latest ? trackerState.futureMirror.latest.question : "";
-}
-
-function futureMirrorCategoryValue() {
-  if (futureMirrorDraft && futureMirrorDraft.category) return futureMirrorDraft.category;
-  return trackerState.futureMirror.latest ? trackerState.futureMirror.latest.category : "";
-}
-
-function futureMirrorDraftNotice() {
-  if (!futureMirrorDraft) return "";
-  return `
-    <div class="support-note readiness-mirror-note">
-      <strong>${escapeHTML(futureMirrorDraft.source || "Future Readiness Assessment")}</strong>
-      <p>${escapeHTML(futureMirrorDraft.note || "Future Mirror is using your assessment result as context.")}</p>
-    </div>
-  `;
-}
-
-function futureMirrorDecisionFormSection() {
-  return `
-    <h3>${futureMirrorMode === "compass" ? "Not sure how to even frame the choice? Explore it here." : "Explore how your choices today may influence your future."}</h3>
-    ${futureMirrorDraftNotice()}
-    <label>Decision question
-      <textarea id="mirror-question" placeholder="Should I study tonight or play games?">${escapeHTML(futureMirrorQuestionValue())}</textarea>
-    </label>
-    <label>Mirror category
-      <select id="mirror-category">
-        ${futureMirrorCategories.map((category) => `<option value="${escapeHTML(category)}" ${futureMirrorCategoryValue() === category ? "selected" : ""}>${escapeHTML(category)}</option>`).join("")}
-      </select>
-    </label>
-    <div class="mirror-path-inputs">
-      <label>Path A<input id="mirror-path-a" type="text" placeholder="Example: Study tonight" value="${escapeHTML(futureMirrorDraft ? futureMirrorDraft.pathA || "" : "")}"></label>
-      <label>Path B<input id="mirror-path-b" type="text" placeholder="Example: Play games" value="${escapeHTML(futureMirrorDraft ? futureMirrorDraft.pathB || "" : "")}"></label>
-    </div>
-    <div class="mirror-example-row">
-      ${futureMirrorExamples.map((example) => `<button type="button" data-mirror-example="${escapeHTML(example)}">${escapeHTML(example)}</button>`).join("")}
-    </div>
-    <button class="primary-action mirror-run-action" type="button" data-run-future-mirror ${isFutureMirrorLoading ? "disabled" : ""}>${isFutureMirrorLoading ? "Generating..." : "Generate Future Mirror"}</button>
-  `;
-}
-
 function futureScanEntrySection() {
   if (futureScanStage === "clarify") return futureScanClarifySection();
   if (futureScanStage === "stations" && activeFutureScan) return futureScanStationGrid();
@@ -5117,6 +4756,7 @@ function futureScanStationGrid() {
             const done = activeFutureScan.stations && activeFutureScan.stations[station.id];
             return `
               <button class="wide-action" type="button" data-open="futureScanStation" data-open-payload="${escapeHTML(station.id)}">
+                <img src="assets/${escapeHTML(station.icon)}" alt="">
                 <span><strong>${escapeHTML(station.title)}</strong><small>${escapeHTML(station.blurb)}</small></span>
                 ${done ? `<span class="risk-pill calm">Done</span>` : ""}
               </button>
@@ -5151,6 +4791,7 @@ function futureScanSuggestedSection() {
           const done = activeFutureScan.stations && activeFutureScan.stations[station.id];
           return `
             <button class="wide-action" type="button" data-open="futureScanStation" data-open-payload="${escapeHTML(station.id)}">
+              <img src="assets/${escapeHTML(station.icon)}" alt="">
               <span><strong>${escapeHTML(station.title)}</strong><small>${escapeHTML(station.blurb)}</small></span>
               ${done ? `<span class="risk-pill calm">Done</span>` : ""}
             </button>
@@ -5306,7 +4947,7 @@ const screens = {
       <div>
         <p class="eyebrow">Future Mirror</p>
         <h2 class="screen-title">Your future is built by today's choices.</h2>
-        <p class="screen-subtitle">A decision impact simulator for comparing possible paths. It does not predict or guarantee outcomes.</p>
+        <p class="screen-subtitle">Compare paths before you choose.</p>
       </div>
       <div class="avatar"><img src="assets/icon-spark.png" alt=""></div>
     </header>
@@ -5314,18 +4955,20 @@ const screens = {
     ${futureSelfEntryCard()}
 
     <section class="mirror-form-card">
-      <p class="eyebrow">Try Future Mirror</p>
-      <div class="mirror-example-row mode-toggle-row">
-        <button type="button" class="${futureMirrorMode === "simulator" ? "is-selected" : ""}" data-future-mirror-mode="simulator">Decision Simulator</button>
-        <button type="button" class="${futureMirrorMode === "compass" ? "is-selected" : ""}" data-future-mirror-mode="compass">Life Compass</button>
-        <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">Future Scan</button>
-        <button type="button" class="${futureMirrorMode === "build" ? "is-selected" : ""}" data-future-mirror-mode="build">Build Mode</button>
+      <div class="home-quick-grid mirror-mode-grid">
+        <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">
+          <img src="assets/icon-guide.png" alt="">
+          <strong>Future Scan</strong>
+        </button>
+        <button type="button" class="${futureMirrorMode === "build" ? "is-selected" : ""}" data-future-mirror-mode="build">
+          <img src="assets/icon-decide.png" alt="">
+          <strong>Build Mode</strong>
+        </button>
       </div>
-      ${futureMirrorMode === "scan" ? futureScanEntrySection() : futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorDecisionFormSection()}
+      ${futureMirrorMode === "build" ? buildModeEntrySection() : futureScanEntrySection()}
     </section>
 
-    ${futureMirrorMode === "scan" || futureMirrorMode === "build" ? "" : futureMirrorResultCard()}
-    ${futureMirrorMode === "scan" || futureMirrorMode === "build" ? "" : futureReflectionList()}
+    ${savedFutureDecisions().length ? futureReflectionList() : ""}
   `,
 
   assess: () => `
@@ -5500,20 +5143,6 @@ const screens = {
         { title: "Knowledge Vault", text: "Everything Future Mirror knows about you, in one place.", modal: "knowledgeVault" }
       ]
     })}
-  `,
-
-  build: () => `
-    <header class="screen-head compact-head mirror-head">
-      <div>
-        <p class="eyebrow">Build Mode</p>
-        <h2 class="screen-title">Train for the future you want.</h2>
-        <p class="screen-subtitle">Tell Compass your goal. It will match the right AI coach and guide your practice.</p>
-      </div>
-      <div class="avatar"><img src="assets/icon-decide.png" alt=""></div>
-    </header>
-    <section class="mirror-form-card">
-      ${buildModeEntrySection()}
-    </section>
   `,
 
   simulator: () => `
@@ -7037,72 +6666,6 @@ async function requestCompassDirect(systemPrompt, userPrompt) {
   return reply;
 }
 
-async function runFutureMirrorSimulation() {
-  const questionInput = document.querySelector("#mirror-question");
-  const categoryInput = document.querySelector("#mirror-category");
-  const pathAInput = document.querySelector("#mirror-path-a");
-  const pathBInput = document.querySelector("#mirror-path-b");
-  const question = cleanText(questionInput ? questionInput.value : "", 260);
-  const category = futureMirrorCategories.includes(categoryInput ? categoryInput.value : "") ? categoryInput.value : "Growth Mirror";
-  const pathA = cleanText(pathAInput ? pathAInput.value : "", 180);
-  const pathB = cleanText(pathBInput ? pathBInput.value : "", 180);
-  futureMirrorError = "";
-  if (!question || !pathA || !pathB) {
-    futureMirrorError = "Add a decision question and at least two possible paths.";
-    renderScreen("future");
-    return;
-  }
-  isFutureMirrorLoading = true;
-  renderScreen("future");
-  try {
-    const reply = await requestCompassDirect(FUTURE_MIRROR_SYSTEM_PROMPT, futureMirrorPrompt(question, category, pathA, pathB, futureMirrorMode));
-    const parsed = extractJsonObject(reply);
-    if (!parsed) {
-      // Previously fell back to normalizeFutureMirrorResult({ summary: reply }, ...),
-      // which put the raw (usually truncated/invalid) JSON text straight into
-      // the result card's summary field - looked like a broken/fake feature
-      // instead of a failed AI call. Fail loudly instead so the catch block
-      // below shows the existing retry message and nothing gets saved.
-      throw new Error("Future Mirror reply was not valid JSON.");
-    }
-    if (containsVerdictLanguage(parsed.summary) || containsVerdictLanguage(reply)) {
-      console.warn("[Future Mirror] Verdict-like language detected in AI reply - keeping generated content but flagging for review.");
-    }
-    const result = normalizeFutureMirrorResult(parsed, { question, category, pathA, pathB, mode: futureMirrorMode });
-    if (!result.paths.length) {
-      result.paths = [
-        {
-          name: "Path A",
-          choice: pathA,
-          benefits: ["This path may support progress if you follow through consistently."],
-          risks: ["This path may still require energy, time, and support."],
-          shortTermImpact: "Possible short-term impact depends on your immediate action.",
-          longTermImpact: "Possible long-term effects depend on whether this becomes a repeated pattern.",
-          goalAlignmentScore: 50
-        },
-        {
-          name: "Path B",
-          choice: pathB,
-          benefits: ["This path may meet a different need or reduce pressure in the short term."],
-          risks: ["This path may create trade-offs if it moves you away from your goals."],
-          shortTermImpact: "Possible short-term impact depends on timing and context.",
-          longTermImpact: "Possible long-term effects depend on habit, support, and opportunity cost.",
-          goalAlignmentScore: 50
-        }
-      ];
-    }
-    trackerState.futureMirror.latest = result;
-    futureMirrorDraft = null;
-    saveTrackerState();
-  } catch (error) {
-    console.error("[Future Mirror] Request failed", error);
-    futureMirrorError = "Future Mirror is having trouble generating insights right now. Please try again.";
-  } finally {
-    isFutureMirrorLoading = false;
-    renderScreen("future");
-    refreshStaticScreens();
-  }
-}
 
 // ---- Future Scan ---------------------------------------------------------
 
@@ -7898,10 +7461,20 @@ function buildCoachCatalogText() {
   return BUILD_COACH_TYPES.map((coach) => `${coach.name}: ${coach.use}`).join("\n");
 }
 
-function buildGoalChipRow() {
+function buildLifeMomentsSection() {
+  const moments = BUILD_LIFE_MOMENTS[buildMomentCategory] || [];
   return `
+    <p class="eyebrow">Real-life moments</p>
+    <div class="category-tabs build-moment-tabs">
+      ${BUILD_LIFE_MOMENT_CATEGORIES.map((category) => `
+        <button type="button" data-build-moment-category="${escapeHTML(category.id)}" class="${category.id === buildMomentCategory ? "is-selected" : ""}">
+          <img src="assets/${escapeHTML(category.icon)}" alt="">
+          ${escapeHTML(category.label)}
+        </button>
+      `).join("")}
+    </div>
     <div class="mirror-example-row build-goal-chip-row">
-      ${BUILD_GOAL_CHIPS.map((chip) => `<button type="button" data-build-goal-chip="${escapeHTML(chip)}">${escapeHTML(chip)}</button>`).join("")}
+      ${moments.map((moment) => `<button type="button" data-build-goal-chip="${escapeHTML(moment)}">${escapeHTML(moment)}</button>`).join("")}
     </div>
   `;
 }
@@ -8108,9 +7681,9 @@ function buildModeEntrySection() {
   const entries = myBuildEntries();
   return `
     <label>What are you trying to build?
-      <textarea id="build-goal-input" placeholder="Example: I want to prepare for an interview, talk to my parents, stop procrastinating, save money, choose a career, or build confidence.">${escapeHTML(buildModeGoalInput)}</textarea>
+      <textarea id="build-goal-input" placeholder="Example: prepare for an interview, talk to my parents, save money.">${escapeHTML(buildModeGoalInput)}</textarea>
     </label>
-    ${buildGoalChipRow()}
+    ${buildLifeMomentsSection()}
     ${buildModeError ? `<p class="form-error">${escapeHTML(buildModeError)}</p>` : ""}
     <button class="primary-action mirror-run-action" type="button" data-start-build-entry ${isBuildModeLoading ? "disabled" : ""}>${isBuildModeLoading ? "Matching your coach..." : "Match My Coach"}</button>
     ${entries.length ? `
@@ -8118,6 +7691,7 @@ function buildModeEntrySection() {
       <div class="action-stack build-plan-list">
         ${entries.map((entry) => `
           <button class="wide-action" type="button" data-open-build-entry="${escapeHTML(entry.id)}">
+            <img src="assets/icon-decide.png" alt="">
             <span><strong>${escapeHTML(cleanText(entry.goal, 70))}</strong><small>${escapeHTML(entry.coachType)} - ${entry.trainingPath.length} training${entry.trainingPath.length === 1 ? "" : "s"}</small></span>
           </button>
         `).join("")}
@@ -8253,13 +7827,13 @@ async function startBuildEntry() {
   const goal = cleanText(inputEl ? inputEl.value : buildModeGoalInput, 200);
   if (!goal) {
     buildModeError = "Tell me what you want to work on first.";
-    renderScreen("build");
+    renderScreen("future");
     return;
   }
   buildModeGoalInput = goal;
   buildModeError = "";
   isBuildModeLoading = true;
-  renderScreen("build");
+  renderScreen("future");
   try {
     const prompt = `User goal: "${goal}".
 Saved real context, if any:
@@ -8306,7 +7880,7 @@ Respond as strict JSON only:
     openBuildEntry(fallbackEntry.id);
   } finally {
     isBuildModeLoading = false;
-    renderScreen("build");
+    renderScreen("future");
   }
 }
 
@@ -8559,7 +8133,7 @@ function finishBuildTrainingSession() {
   entry.nextStep = session.nextStep || entry.nextStep;
   entry.updatedAt = new Date().toISOString();
   saveTrackerState();
-  renderScreen("build");
+  renderScreen("future");
   openModal("buildEntry", entry.id);
 }
 
@@ -8680,7 +8254,6 @@ document.addEventListener("click", async (event) => {
   const inspireCategoryButton = event.target.closest("[data-inspire-category]");
   const opportunityCategoryButton = event.target.closest("[data-opportunity-category]");
   const opportunityAi = event.target.closest("[data-opportunity-ai]");
-  const runFutureMirror = event.target.closest("[data-run-future-mirror]");
   const futureMirrorModeButton = event.target.closest("[data-future-mirror-mode]");
   const scanFromEntry = event.target.closest("[data-scan-from-entry]");
   const startFutureScanButton = event.target.closest("[data-start-future-scan]");
@@ -8706,7 +8279,9 @@ document.addEventListener("click", async (event) => {
   const runScanSynthesisButton = event.target.closest("[data-run-scan-synthesis]");
   const openPastScanButton = event.target.closest("[data-open-past-scan]");
   const jumpFutureScanButton = event.target.closest("[data-jump-future-scan]");
+  const jumpBuildModeButton = event.target.closest("[data-jump-build-mode]");
   const buildGoalChipButton = event.target.closest("[data-build-goal-chip]");
+  const buildMomentCategoryButton = event.target.closest("[data-build-moment-category]");
   const startBuildEntryButton = event.target.closest("[data-start-build-entry]");
   const openBuildEntryButton = event.target.closest("[data-open-build-entry]");
   const startBuildTrainingButton = event.target.closest("[data-start-build-training]");
@@ -8714,9 +8289,6 @@ document.addEventListener("click", async (event) => {
   const sendBuildTrainingButton = event.target.closest("[data-send-build-training]");
   const buildCoachPromptButton = event.target.closest("[data-build-coach-prompt]");
   const finishBuildTrainingButton = event.target.closest("[data-finish-build-training]");
-  const mirrorExample = event.target.closest("[data-mirror-example]");
-  const discussMirror = event.target.closest("[data-discuss-mirror]");
-  const saveFutureDecision = event.target.closest("[data-save-future-decision]");
   const saveFutureReflection = event.target.closest("[data-save-future-reflection]");
   const copyCommunityPrompt = event.target.closest("[data-copy-community-prompt]");
   const clearChat = event.target.closest("[data-clear-chat]");
@@ -8944,57 +8516,6 @@ document.addEventListener("click", async (event) => {
   if (opportunityAi) {
     renderScreen("compass");
     await sendChatMessage(opportunityRecommendationPrompt());
-  }
-  if (mirrorExample) {
-    const question = document.querySelector("#mirror-question");
-    const pathA = document.querySelector("#mirror-path-a");
-    const pathB = document.querySelector("#mirror-path-b");
-    const example = mirrorExample.dataset.mirrorExample || "";
-    if (question) question.value = example;
-    if (pathA && pathB) {
-      if (example.includes("study")) {
-        pathA.value = "Study tonight";
-        pathB.value = "Play games tonight";
-      } else if (example.includes("internship")) {
-        pathA.value = "Apply for the internship";
-        pathB.value = "Wait and apply later";
-      } else if (example.includes("save")) {
-        pathA.value = "Save the money";
-        pathB.value = "Spend the money now";
-      } else if (example.includes("challenge")) {
-        pathA.value = "Join the challenge";
-        pathB.value = "Skip the challenge";
-      }
-    }
-  }
-  if (runFutureMirror) {
-    await runFutureMirrorSimulation();
-  }
-  if (discussMirror) {
-    renderScreen("compass");
-    await sendChatMessage(futureMirrorDiscussionPrompt());
-  }
-  if (saveFutureDecision) {
-    const latest = trackerState.futureMirror && trackerState.futureMirror.latest;
-    if (latest) {
-      const exists = savedFutureDecisions().some((item) => item.source_id === latest.id || item.question === latest.question);
-      if (!exists) {
-        trackerState.futureMirror.saved.unshift({
-          ...latest,
-          id: `saved-${Date.now()}`,
-          source_id: latest.id,
-          user_id: currentUserId(),
-          saved_at: new Date().toISOString(),
-          decisionMade: "",
-          whatHappened: "",
-          lesson: ""
-        });
-        trackerState.futureMirror.saved = trackerState.futureMirror.saved.slice(0, 30);
-        saveTrackerState();
-      }
-      renderScreen("future");
-      refreshStaticScreens();
-    }
   }
   if (saveFutureReflection) {
     const id = modalLayer.querySelector("#future-reflection-id") && modalLayer.querySelector("#future-reflection-id").value;
@@ -9246,9 +8767,17 @@ document.addEventListener("click", async (event) => {
     futureMirrorMode = "scan";
     renderScreen("future");
   }
+  if (jumpBuildModeButton) {
+    futureMirrorMode = "build";
+    renderScreen("future");
+  }
   if (buildGoalChipButton) {
     buildModeGoalInput = buildGoalChipButton.dataset.buildGoalChip || "";
-    renderScreen("build");
+    renderScreen("future");
+  }
+  if (buildMomentCategoryButton) {
+    buildMomentCategory = buildMomentCategoryButton.dataset.buildMomentCategory || "independence";
+    renderScreen("future");
   }
   if (startBuildEntryButton) await startBuildEntry();
   if (openBuildEntryButton) openBuildEntry(openBuildEntryButton.dataset.openBuildEntry);
@@ -9407,9 +8936,10 @@ document.addEventListener("click", async (event) => {
   if (exploreReadinessFuture) {
     const result = trackerState.assessment;
     if (result) {
-      futureMirrorDraft = futureReadinessMirrorDraft(result);
+      const weakest = weakestReadinessCategory(result);
       closeModal();
-      renderScreen("future");
+      futureMirrorMode = "scan";
+      await startFutureScan(`How can I improve my ${weakest.label.toLowerCase()} after scoring ${weakest.value}/100?`);
       refreshStaticScreens();
     }
   }

@@ -1556,6 +1556,21 @@ h3 {
   color: #fff;
 }
 
+.build-moment-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.build-moment-tabs button img {
+  width: 16px;
+  height: 16px;
+}
+
+.build-moment-tabs button.is-selected img {
+  filter: invert(1);
+}
+
 .scenario-card,
 .question-card,
 .stat-card,
@@ -4357,71 +4372,6 @@ textarea {
   animation-delay: 240ms;
 }
 
-.mirror-path-grid {
-  display: grid;
-  gap: 14px;
-  margin-top: 14px;
-}
-
-.mirror-path-card {
-  display: grid;
-  gap: 13px;
-  padding: 16px;
-  border: 1px solid rgba(26, 26, 26, 0.07);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 236, 0.9));
-}
-
-.mirror-path-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.mirror-path-top span {
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: #0d0d0d;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 900;
-}
-
-.mirror-path-top strong {
-  display: grid;
-  gap: 2px;
-  justify-items: end;
-  color: #0d0d0d;
-  font-size: 22px;
-}
-
-.mirror-path-top small {
-  color: var(--color-muted);
-  font-size: 9px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.mirror-path-card h3 {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.08;
-}
-
-.mirror-score-bar {
-  height: 9px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e8ece5;
-}
-
-.mirror-score-bar i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: #c8a96b;
-}
-
 .mirror-list-grid,
 .mirror-impact-grid {
   display: grid;
@@ -4495,25 +4445,6 @@ textarea {
   color: #0d0d0d;
 }
 
-.mirror-integration-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.mirror-integration-grid button {
-  min-height: 52px;
-  padding: 10px;
-  border: 1px solid rgba(26, 26, 26, 0.08);
-  border-radius: 18px;
-  background: #fff;
-  color: #0d0d0d;
-  font-size: 12px;
-  font-weight: 850;
-  text-align: left;
-}
-
-.future-score-card,
 .future-letter-card,
 .future-reflection-list {
   display: grid;
@@ -4770,6 +4701,32 @@ body {
   height: 24px;
 }
 
+.mirror-mode-grid button {
+  min-height: 64px;
+  align-items: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.mirror-mode-grid button.is-selected {
+  border-color: #0d0d0d;
+  background: #0d0d0d;
+}
+
+.mirror-mode-grid button.is-selected strong {
+  color: #fff;
+}
+
+.mirror-mode-grid button.is-selected img {
+  filter: invert(1);
+}
+
+.future-self-entry-icon {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 4px;
+}
+
 .community-head {
   padding: 16px;
   border-radius: 24px;
@@ -4911,8 +4868,6 @@ body {
     min-height: 96px;
   }
 
-  .mirror-path-inputs,
-  .mirror-integration-grid,
   .story-ai-action-grid,
   .today-insight-actions,
   .community-actions {
