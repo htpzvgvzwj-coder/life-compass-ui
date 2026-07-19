@@ -5,6 +5,7 @@ const path = require("path");
 const root = path.join(__dirname, "..");
 const appSource = fs.readFileSync(path.join(root, "app.js"), "utf8");
 const stylesSource = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
 const buildSection = appSource.slice(appSource.indexOf("// ---- Build Mode"), appSource.indexOf("async function sendChatMessage"));
 
@@ -51,9 +52,13 @@ assert.ok(buildSection.includes("Build coach request timed out"), "Build Mode ha
 assert.ok(buildSection.includes("if (isBuildTrainingLoading) return;"), "Build Mode prevents duplicate sends while the coach is replying");
 assert.ok(buildSection.includes("buildTrainingAdaptiveReply"), "Build Mode produces a fallback coach reply when live AI fails");
 assert.ok(buildSection.includes("session.messages.push({ sender: \"assistant\", message: fallback.reply"), "Build Mode stores fallback assistant replies instead of leaving the chat empty");
+assert.ok(buildSection.includes("pendingAi: true"), "Build Mode marks immediate coach replies for later live AI refinement");
+assert.ok(buildSection.includes("async function enhanceBuildTrainingReply"), "Build Mode can refine immediate replies with live AI later");
+assert.ok(buildSection.includes("void enhanceBuildTrainingReply"), "Build Mode starts live AI refinement without blocking the user-visible reply");
 assert.ok(buildSection.includes("Do NOT limit yourself to interview, study, or money"), "Build Mode explicitly avoids three-category limitation");
 assert.ok(appSource.includes('data-future-mirror-mode="build"'), "Build Mode appears inside the Future Mirror mode switcher");
 assert.ok(appSource.includes('futureMirrorMode === "build" ? buildModeEntrySection()'), "Future Mirror renders the Build Mode coach entry section");
+assert.ok(indexSource.includes("app.js?v=build-mode-reply-20260719-1"), "Index busts cached app.js for the Build Mode reply fix");
 
 [
   "Proof Log",

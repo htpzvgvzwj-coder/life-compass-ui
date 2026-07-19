@@ -8557,6 +8557,36 @@ function requestBuildCoachReply(prompt, timeoutMs = 6500) {
   ]).finally(() => window.clearTimeout(timeoutId));
 }
 
+async function enhanceBuildTrainingReply(entryId, sessionId, assistantCreatedAt, prompt) {
+  try {
+    const reply = await requestBuildCoachReply(prompt, 9000);
+    const parsed = extractJsonObject(reply);
+    const coachReply = cleanText(parsed && parsed.reply ? parsed.reply : reply, 900);
+    if (!coachReply) return;
+    const entry = trackerState.buildMode.entries.find((item) => item.id === entryId && item.user_id === currentUserId());
+    const session = buildTrainingSessionById(entry, sessionId);
+    if (!entry || !session || session.completedAt) return;
+    const pendingMessage = (session.messages || []).find((message) => (
+      message.sender === "assistant" &&
+      message.createdAt === assistantCreatedAt &&
+      message.pendingAi === true
+    ));
+    if (!pendingMessage) return;
+    pendingMessage.message = coachReply;
+    pendingMessage.pendingAi = false;
+    session.nextStep = cleanText(parsed && parsed.nextStep ? parsed.nextStep : session.nextStep || entry.nextStep, 220);
+    if (parsed && parsed.finished === true) session.completedAt = new Date().toISOString();
+    entry.nextStep = session.nextStep || entry.nextStep;
+    entry.updatedAt = new Date().toISOString();
+    saveTrackerState();
+    if (activeBuildEntryId === entry.id && activeBuildTrainingSessionId === session.id && modalLayer.classList.contains("is-open")) {
+      openModal("buildTraining", session.id);
+    }
+  } catch (error) {
+    console.error("[Build Mode] Live coach refinement failed; local coach reply kept.", error);
+  }
+}
+
 async function sendBuildTrainingReply(forcedText = "") {
   const entry = activeBuildEntry();
   const session = activeBuildTrainingSession();
@@ -8575,9 +8605,16 @@ async function sendBuildTrainingReply(forcedText = "") {
   buildTrainingDraft = "";
   saveTrackerState();
   buildTrainingError = "";
-  isBuildTrainingLoading = true;
-  openModal("buildTraining", session.id);
   const module = buildTrainingModuleById(entry, session.trainingId);
+  const fallback = buildTrainingAdaptiveReply(entry, session, module, text);
+  const assistantCreatedAt = new Date().toISOString();
+  session.messages.push({ sender: "assistant", message: fallback.reply, createdAt: assistantCreatedAt, pendingAi: true });
+  session.nextStep = cleanText(fallback.nextStep || session.nextStep || entry.nextStep, 220);
+  entry.nextStep = session.nextStep || entry.nextStep;
+  entry.updatedAt = new Date().toISOString();
+  saveTrackerState();
+  isBuildTrainingLoading = false;
+  openModal("buildTraining", session.id);
   try {
     const transcript = session.messages.slice(-10).map((message) => `${message.sender}: ${message.message}`).join("\n");
     const prompt = `Coach plan:
@@ -8592,28 +8629,9 @@ Conversation so far:
 ${transcript}
 
 Respond as the coach. Keep it interactive: answer directly, give one concrete improvement or next practice move, then ask at most one next question if needed. The user is allowed to change the exercise, ask for examples, add context, or move to a different training angle. Do not force the original prompt. If they ask to change direction, adapt the training to the user's real need. Do not turn this into a checklist. This is training guidance, not a formal feedback scorecard and not a proof log. Prefer strict JSON only: {"reply":"string","nextStep":"string","finished":false}. If you cannot produce JSON, still answer naturally.`;
-    const reply = await requestBuildCoachReply(prompt);
-    const parsed = extractJsonObject(reply);
-    const coachReply = cleanText(parsed && parsed.reply ? parsed.reply : reply, 900);
-    if (!coachReply) throw new Error("Training reply was empty.");
-    session.messages.push({ sender: "assistant", message: coachReply, createdAt: new Date().toISOString() });
-    session.nextStep = cleanText(parsed && parsed.nextStep ? parsed.nextStep : session.nextStep || entry.nextStep, 220);
-    if (parsed && parsed.finished === true) session.completedAt = new Date().toISOString();
-    entry.nextStep = session.nextStep || entry.nextStep;
-    entry.updatedAt = new Date().toISOString();
-    saveTrackerState();
+    void enhanceBuildTrainingReply(entry.id, session.id, assistantCreatedAt, prompt);
   } catch (error) {
-    console.error("[Build Mode] Training reply failed", error);
-    const fallback = buildTrainingAdaptiveReply(entry, session, module, text);
-    session.messages.push({ sender: "assistant", message: fallback.reply, createdAt: new Date().toISOString() });
-    session.nextStep = cleanText(fallback.nextStep || session.nextStep || entry.nextStep, 220);
-    entry.nextStep = session.nextStep || entry.nextStep;
-    entry.updatedAt = new Date().toISOString();
-    saveTrackerState();
-    buildTrainingError = "";
-  } finally {
-    isBuildTrainingLoading = false;
-    openModal("buildTraining", session.id);
+    console.error("[Build Mode] Could not start live coach refinement; local coach reply kept.", error);
   }
 }
 
