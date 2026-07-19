@@ -2030,6 +2030,36 @@ function checkCommunityAchievements() {
   }
 }
 
+// First deliberate crossing of the Future Mirror <-> LifeVerse boundary
+// ("separate system from LifeVerse - no shared state, no cross-reads" per
+// the comment near defaultTrackerState.futureMirror). Future Scan's
+// noActionFuture/hiddenCosts stations use this to ground their AI narrative
+// in a real simulated outcome instead of a purely imagined one. Always
+// clones lifeVerseState() and discards the clone after use - the user's
+// real LifeVerse save is never read-written here, only read-copied.
+function lifeVerseNoActionSnapshot(days) {
+  const clone = JSON.parse(JSON.stringify(lifeVerseState()));
+  let result = window.LifeVerseGame.dispatchLifeVerseCommand(clone, {
+    type: "FastForwardCommand",
+    actor: "future-scan",
+    payload: { days }
+  });
+  // Standalone (non-live-game) use: a scripted mid-window intervention would
+  // normally pause for the player to choose - here there's no player to ask,
+  // so auto-resolve with the first listed choice to always get a complete
+  // event instead of leaving the clone mid-decision.
+  let guard = 0;
+  while (result.pendingIntervention && guard < 5) {
+    result = window.LifeVerseGame.dispatchLifeVerseCommand(clone, {
+      type: "ResolveFastForwardInterventionCommand",
+      actor: "future-scan",
+      payload: { choiceId: result.pendingIntervention.choices[0].id }
+    });
+    guard += 1;
+  }
+  return { state: clone, event: result.event };
+}
+
 function syncLifeSimFromLifeVerse() {
   const state = lifeVerseState();
   if (!state) return;
@@ -6943,12 +6973,43 @@ async function runFutureScanValues() {
   }
 }
 
+// Maps the Hidden Cost Scanner's 6 labels onto real LifeVerse state fields.
+// betterWhenHigh: true means the field going DOWN over the simulated window
+// is the cost (e.g. sleep draining); false means the field going UP is the
+// cost (burnoutRisk rising). scaleFactor turns a raw 30-day point delta into
+// a 0-100 severity - tuned so a typical drift lands in a believable 20-70
+// band rather than always pinning to 0 or 100.
+const HIDDEN_COST_FIELD_MAP = [
+  { label: "Sleep", get: (state) => state.needs.sleep, betterWhenHigh: true },
+  { label: "Energy", get: (state) => state.needs.energy, betterWhenHigh: true },
+  { label: "Focus", get: (state) => state.mentalWellbeing.burnoutRisk, betterWhenHigh: false },
+  { label: "Confidence", get: (state) => state.mentalWellbeing.confidence, betterWhenHigh: true },
+  { label: "Future opportunity", get: (state) => state.career.readiness, betterWhenHigh: true },
+  { label: "Relationships", get: (state) => state.relationships.support, betterWhenHigh: true }
+];
+const HIDDEN_COST_SCALE_FACTOR = 2.5;
+
+function computeHiddenCostSeverities() {
+  const before = lifeVerseState();
+  const beforeValues = HIDDEN_COST_FIELD_MAP.map((field) => Number(field.get(before)) || 0);
+  const { state: after } = lifeVerseNoActionSnapshot(30);
+  return HIDDEN_COST_FIELD_MAP.map((field, index) => {
+    const afterValue = Number(field.get(after)) || 0;
+    const delta = field.betterWhenHigh ? beforeValues[index] - afterValue : afterValue - beforeValues[index];
+    return { label: field.label, severity: Math.max(0, Math.min(100, Math.round(delta * HIDDEN_COST_SCALE_FACTOR))) };
+  });
+}
+
 function futureScanHiddenCostsView() {
   const result = activeFutureScan.stations.hiddenCosts;
   return `
     ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
     <button class="primary-action mirror-run-action" type="button" data-run-scan-costs ${futureScanStationLoading === "hiddenCosts" ? "disabled" : ""}>${futureScanStationLoading === "hiddenCosts" ? "Scanning..." : result ? "Re-scan" : "Run Hidden Cost Scanner"}</button>
     ${result ? `
+      <div class="scan-simulated-title">
+        <span class="risk-pill calm">Simulated</span>
+        <small>${result.personalized ? "Based on your LifeVerse profile" : "Based on a general starting-adult simulation"}</small>
+      </div>
       <div class="struggle-map">
         ${result.costs.map((cost, index) => `
           <div class="struggle-row scan-cost-row" style="animation-delay:${index * 120}ms">
@@ -6970,16 +7031,20 @@ async function runFutureScanHiddenCosts() {
   futureScanStationLoading = "hiddenCosts";
   openModal("futureScanStation", "hiddenCosts");
   try {
-    const prompt = `${scanContextText("hiddenCosts")} List the hidden costs of this choice/pattern - pick 4 to 6 that are genuinely relevant from: sleep, energy, focus, confidence, future opportunity, relationships. Give each a severity 0-100 based on how much THIS specific situation costs there, and a one-sentence reason. Respond as strict JSON only: {"costs":[{"label":"string","severity":0,"reason":"string"}]}`;
+    const severities = computeHiddenCostSeverities();
+    const severitiesText = severities.map((item) => `${item.label}: severity ${item.severity}/100`).join("; ");
+    const prompt = `${scanContextText("hiddenCosts")}\n\nCompass's own life simulation engine computed these real severities for this user if this pattern continues for about a month: ${severitiesText}.\n\nFor EACH of these exact labels, in this exact order, write a one-sentence reason grounded in the real severity number and the user's specific real situation - do not invent a different severity, only explain why it lands there for them. Respond as strict JSON only: {"costs":[{"label":"string","reason":"string"}]}`;
     const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
     const parsed = extractJsonObject(reply);
     if (!parsed || !Array.isArray(parsed.costs)) throw new Error("Hidden cost reply was not valid JSON.");
+    const reasonByLabel = new Map(parsed.costs.map((item) => [cleanText(item.label || "", 40).toLowerCase(), cleanText(item.reason || "", 160)]));
     const result = {
-      costs: parsed.costs.slice(0, 6).map((item) => ({
-        label: cleanText(item.label || "", 40),
-        severity: Math.max(0, Math.min(100, Number(item.severity) || 0)),
-        reason: cleanText(item.reason || "", 160)
-      })).filter((item) => item.label),
+      costs: severities.map((item) => ({
+        label: item.label,
+        severity: item.severity,
+        reason: reasonByLabel.get(item.label.toLowerCase()) || "This reflects how this pattern affects that part of your life if it continues."
+      })),
+      personalized: Boolean(userProfile.characterCreated),
       generatedAt: new Date().toISOString()
     };
     saveFutureScanStation("hiddenCosts", result);
@@ -6998,8 +7063,22 @@ function futureScanNoActionView() {
     ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
     <button class="primary-action mirror-run-action" type="button" data-run-scan-noaction ${futureScanStationLoading === "noActionFuture" ? "disabled" : ""}>${futureScanStationLoading === "noActionFuture" ? "Scanning..." : result ? "Re-scan" : "Run No-Action Future"}</button>
     ${result ? `
+      <div class="scan-simulated-block">
+        <div class="scan-simulated-title">
+          <span class="risk-pill calm">Simulated</span>
+          <small>${result.personalized ? "Based on your LifeVerse profile" : "Based on a general starting-adult simulation"}</small>
+        </div>
+        <div class="scan-timeline-row">
+          ${FUTURE_SCAN_NO_ACTION_CHECKPOINTS.map(([key]) => `
+            <div class="mirror-timeline-card scan-timeline-card">
+              <p class="eyebrow">${escapeHTML(key)}</p>
+              <p>${escapeHTML((result.simulated && result.simulated[key] && result.simulated[key].summary) || "")}</p>
+            </div>
+          `).join("")}
+        </div>
+      </div>
       <div class="scan-timeline-row">
-        ${["1 week", "1 month", "6 months", "1 year"].map((key) => `
+        ${FUTURE_SCAN_NO_ACTION_CHECKPOINTS.map(([key]) => `
           <div class="mirror-timeline-card scan-timeline-card">
             <p class="eyebrow">${escapeHTML(key)}</p>
             <p>${escapeHTML(result.timeline[key] || "")}</p>
@@ -7010,12 +7089,25 @@ function futureScanNoActionView() {
   `;
 }
 
+const FUTURE_SCAN_NO_ACTION_CHECKPOINTS = [["1 week", 7], ["1 month", 30], ["6 months", 180], ["1 year", 365]];
+
 async function runFutureScanNoAction() {
   futureScanStationError = "";
   futureScanStationLoading = "noActionFuture";
   openModal("futureScanStation", "noActionFuture");
   try {
-    const prompt = `${scanContextText("noActionFuture")} If the user changes NOTHING and keeps doing exactly what they're doing now regarding this situation, describe what that realistically looks like at each checkpoint. Be concrete and specific to their situation, not generic. Respond as strict JSON only: {"timeline":{"1 week":"string","1 month":"string","6 months":"string","1 year":"string"}}`;
+    const simulated = {};
+    FUTURE_SCAN_NO_ACTION_CHECKPOINTS.forEach(([label, days]) => {
+      const { event } = lifeVerseNoActionSnapshot(days);
+      simulated[label] = {
+        summary: event ? cleanText(event.summary, 200) : "",
+        consequences: event && Array.isArray(event.consequences) ? event.consequences.slice(0, 3) : []
+      };
+    });
+    const factsBlock = FUTURE_SCAN_NO_ACTION_CHECKPOINTS
+      .map(([label]) => `${label}: ${simulated[label].consequences.join(" ") || simulated[label].summary}`)
+      .join("\n");
+    const prompt = `${scanContextText("noActionFuture")}\n\nReal simulated outcome data for this user if nothing changes, from Compass's own life simulation engine:\n${factsBlock}\n\nIf the user changes NOTHING and keeps doing exactly what they're doing now regarding this situation, describe what that realistically looks like at each checkpoint. Use the real simulated data above as the primary basis for each entry - do not contradict it, but add interpretation relevant to their specific real-life situation. Be concrete, not generic. Respond as strict JSON only: {"timeline":{"1 week":"string","1 month":"string","6 months":"string","1 year":"string"}}`;
     const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
     const parsed = extractJsonObject(reply);
     if (!parsed || !parsed.timeline) throw new Error("No-Action Future reply was not valid JSON.");
@@ -7026,6 +7118,8 @@ async function runFutureScanNoAction() {
         "6 months": cleanText(parsed.timeline["6 months"] || "", 200),
         "1 year": cleanText(parsed.timeline["1 year"] || "", 200)
       },
+      simulated,
+      personalized: Boolean(userProfile.characterCreated),
       generatedAt: new Date().toISOString()
     };
     saveFutureScanStation("noActionFuture", result);

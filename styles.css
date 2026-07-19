@@ -7371,6 +7371,24 @@ body.life-sim-active .lifeverse-consequence-toast {
   margin-top: 12px;
 }
 
+.scan-simulated-block {
+  padding-bottom: 6px;
+  border-bottom: 1px dashed rgba(13, 13, 13, 0.12);
+  margin-bottom: 4px;
+}
+
+.scan-simulated-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.scan-simulated-title small {
+  color: var(--color-muted);
+  font-size: 10px;
+}
+
 .scan-timeline-card {
   flex: 0 0 78%;
   scroll-snap-align: start;
