@@ -266,6 +266,44 @@ async function callOpenAI({ systemPrompt, messages, context }) {
   return { status: 200, payload: { reply, provider: 'openai', model: openaiModel } };
 }
 
+function providerOrder() {
+  return [provider, 'groq', 'gemini', 'openai']
+    .filter(Boolean)
+    .filter((name, index, list) => list.indexOf(name) === index);
+}
+
+function providerHasKey(name) {
+  if (name === 'openai') return Boolean(openaiApiKey);
+  if (name === 'gemini') return Boolean(geminiApiKey);
+  return Boolean(groqApiKey);
+}
+
+async function callProvider(name, args) {
+  if (name === 'openai') return callOpenAI(args);
+  if (name === 'gemini') return callGemini(args);
+  return callGroq(args);
+}
+
+async function callConfiguredProvider(args) {
+  let missingKeys = 0;
+  for (const name of providerOrder()) {
+    if (!providerHasKey(name)) {
+      missingKeys += 1;
+      console.error(`[Compass AI] ${name.toUpperCase()} API key is missing; trying next provider if available.`);
+      continue;
+    }
+    const result = await callProvider(name, args);
+    if (result.status === 200) return result;
+    console.error(`[Compass AI] ${name} provider failed; trying next provider if available.`, result.payload && result.payload.error);
+  }
+  return {
+    status: 503,
+    payload: {
+      error: missingKeys ? 'No configured AI provider key is available.' : 'All configured AI providers failed.',
+    },
+  };
+}
+
 async function handleCompassChat(req, res) {
   try {
     const body = await readJsonBody(req);
@@ -273,14 +311,7 @@ async function handleCompassChat(req, res) {
     const systemPrompt = String(body.systemPrompt || '').slice(0, 1600);
     const context = body.context ? JSON.stringify(body.context).slice(0, 8000) : '{}';
 
-    let result;
-    if (provider === 'openai') {
-      result = await callOpenAI({ systemPrompt, messages, context });
-    } else if (provider === 'gemini') {
-      result = await callGemini({ systemPrompt, messages, context });
-    } else {
-      result = await callGroq({ systemPrompt, messages, context });
-    }
+    const result = await callConfiguredProvider({ systemPrompt, messages, context });
     sendJson(res, result.status, result.payload);
   } catch (error) {
     console.error('[Compass AI] Server route failed', error);

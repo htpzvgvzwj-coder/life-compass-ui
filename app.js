@@ -112,6 +112,39 @@ const FUTURE_SCAN_CHECKBACK_HORIZONS = [
 // scoped to Future Scan's specific job.
 const FUTURE_SCAN_SYSTEM_PROMPT = "You are Future Scan, a module inside Compass's Future Mirror. Your job is to help the user see the truth about a real choice before they make it - not to decide for them. Ground every claim only in the scanContext and saved profile data you are given; never invent a memory, pattern, or fact that isn't actually present in what you were told. Never state or imply a recommended choice (no \"you should\", no \"the better option is\"). Be concise, concrete, and youth-friendly. Avoid clinical or diagnostic language, especially around emotional or mental state - this is not a mental health assessment.";
 
+// Build Mode 2.0 is a goal-based AI coach router. It must work for any youth
+// growth goal (not just interview/study/money): the app keeps the coach
+// catalog and safety boundaries, while AI dynamically chooses the coach and
+// writes the training path from the user's real goal/context.
+const BUILD_MODE_SYSTEM_PROMPT = "You are Build Mode, a goal-based AI coach router inside Compass. The user may bring ANY practical growth goal: interview, study, money, family conversation, confidence, career direction, scholarship, entrepreneurship, independence, wellness, opportunity planning, or something unusual. First match the goal to the most useful coach; if no specialist fits, use Custom Growth Coach. Then create a training path, not a proof log and not a static checklist. Keep every training step concrete, interactive, and immediately usable. Ground everything only in the user's stated goal, saved profile/context, and current training conversation. Never invent memories, traits, achievements, mood, or history. Never guarantee outcomes; use possible/likely language. Do not diagnose mental health or act as a therapist, parent, teacher, employer, or emergency service. If the user mentions danger or serious self-harm risk, respond safely and encourage contacting a trusted person or emergency support. Return strict JSON whenever JSON is requested.";
+
+const BUILD_COACH_TYPES = [
+  { id: "interview", name: "Interview Coach", use: "interviews, internships, scholarship interviews, job interviews, self-introduction, STAR stories" },
+  { id: "study", name: "Study Coach", use: "exams, revision, focus, assignment planning, active recall, procrastination around schoolwork" },
+  { id: "money", name: "Money Coach", use: "saving, spending discipline, budgeting, receipts, part-time income, independent living cost" },
+  { id: "communication", name: "Communication Coach", use: "talking to parents, teachers, friends, saying no, difficult conversations, boundaries" },
+  { id: "confidence", name: "Confidence Coach", use: "presentation fear, social confidence, fear of failure, speaking up, self-expression" },
+  { id: "career", name: "Career Coach", use: "career direction, course choices, portfolio, skills, internships, future industry exploration" },
+  { id: "wellness", name: "Wellness Coach", use: "stress, sleep, energy, burnout risk, routine reset, daily balance; not therapy or diagnosis" },
+  { id: "relationship", name: "Relationship Coach", use: "friendship conflict, peer pressure, support circle, healthy relationship boundaries" },
+  { id: "independence", name: "Independence Coach", use: "adult life, responsibility, routines, time management, family responsibility, self-management" },
+  { id: "opportunity", name: "Opportunity Coach", use: "scholarships, competitions, volunteer work, learn-and-earn, application planning" },
+  { id: "entrepreneurship", name: "Entrepreneurship Coach", use: "small business, side hustle, content creation, idea testing, early customer learning" },
+  { id: "clarity", name: "Clarity Coach", use: "unclear goals, feeling lost, choosing what to build first, exploring direction" },
+  { id: "custom", name: "Custom Growth Coach", use: "any practical youth growth goal that does not fit another coach cleanly" }
+];
+
+const BUILD_GOAL_CHIPS = [
+  "Prepare for an interview",
+  "Talk to my parents calmly",
+  "Stop procrastinating",
+  "Choose a career path",
+  "Save money",
+  "Build confidence",
+  "Apply for a scholarship",
+  "Start a small business"
+];
+
 const inspireCategories = [
   "All",
   "Entrepreneurs",
@@ -200,6 +233,12 @@ const defaultTrackerState = {
   // arrays. Plugs into the existing reflection-resurfacing system
   // (allReflectionLikeEntries/dueForResurfacing) as a third _source.
   futureScans: [],
+  // Build Mode - a goal-based coach router and training path. Multiple
+  // entries can be active at once because a user may want different coaches
+  // for different goals.
+  buildMode: {
+    entries: []
+  },
   careerStudio: {
     interviewSessions: [],
     resume: null
@@ -742,6 +781,18 @@ let isFutureScanSynthesisLoading = false;
 let futureScanSynthesisError = "";
 let futureScanSuggestedStationIds = [];
 
+// Build Mode - activeBuildEntryId tracks which coach plan is open. Training
+// sessions are stored inside each entry; the open session id is only live UI
+// state.
+let buildModeGoalInput = "";
+let isBuildModeLoading = false;
+let buildModeError = "";
+let activeBuildEntryId = null;
+let activeBuildTrainingSessionId = null;
+let isBuildTrainingLoading = false;
+let buildTrainingError = "";
+let buildTrainingDraft = "";
+
 let assessmentStep = 0;
 let assessmentDraft = { answers: {}, freeText: "", preferences: [] };
 
@@ -905,6 +956,9 @@ function normalizeTrackerState(state) {
     roadmapGoals: Array.isArray(state.roadmapGoals) ? state.roadmapGoals : fallback.roadmapGoals,
     futureSelfSnapshots: Array.isArray(state.futureSelfSnapshots) ? state.futureSelfSnapshots : fallback.futureSelfSnapshots,
     futureScans: Array.isArray(state.futureScans) ? state.futureScans : fallback.futureScans,
+    buildMode: {
+      entries: Array.isArray(state.buildMode && state.buildMode.entries) ? state.buildMode.entries : fallback.buildMode.entries
+    },
     careerStudio: {
       interviewSessions: Array.isArray(state.careerStudio && state.careerStudio.interviewSessions) ? state.careerStudio.interviewSessions : fallback.careerStudio.interviewSessions,
       resume: (state.careerStudio && state.careerStudio.resume && typeof state.careerStudio.resume === "object") ? state.careerStudio.resume : fallback.careerStudio.resume
@@ -1824,7 +1878,8 @@ function homeQuickAccessGrid() {
     ["icon-learn.png", "Growth", "Goals, journal, mood", "growth"],
     ["icon-balance.png", "Life Sim", "Play adult-life choices", "simulator"],
     ["icon-support.png", "Community", "Groups and support", "community"],
-    ["icon-work.png", "Opportunities", "Scholarships and internships", "opportunities"]
+    ["icon-work.png", "Opportunities", "Scholarships and internships", "opportunities"],
+    ["icon-decide.png", "Build Mode", "AI coach training", "build"]
   ];
   return `
     <section class="home-quick-access">
@@ -1842,6 +1897,11 @@ function homeQuickAccessGrid() {
             <span>${text}</span>
           </button>
         `).join("")}
+        <button type="button" data-jump-future-scan>
+          <img src="assets/icon-guide.png" alt="">
+          <strong>Future Scan</strong>
+          <span>See the truth before you choose</span>
+        </button>
       </div>
     </section>
   `;
@@ -5259,12 +5319,13 @@ const screens = {
         <button type="button" class="${futureMirrorMode === "simulator" ? "is-selected" : ""}" data-future-mirror-mode="simulator">Decision Simulator</button>
         <button type="button" class="${futureMirrorMode === "compass" ? "is-selected" : ""}" data-future-mirror-mode="compass">Life Compass</button>
         <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">Future Scan</button>
+        <button type="button" class="${futureMirrorMode === "build" ? "is-selected" : ""}" data-future-mirror-mode="build">Build Mode</button>
       </div>
-      ${futureMirrorMode === "scan" ? futureScanEntrySection() : futureMirrorDecisionFormSection()}
+      ${futureMirrorMode === "scan" ? futureScanEntrySection() : futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorDecisionFormSection()}
     </section>
 
-    ${futureMirrorMode === "scan" ? "" : futureMirrorResultCard()}
-    ${futureMirrorMode === "scan" ? "" : futureReflectionList()}
+    ${futureMirrorMode === "scan" || futureMirrorMode === "build" ? "" : futureMirrorResultCard()}
+    ${futureMirrorMode === "scan" || futureMirrorMode === "build" ? "" : futureReflectionList()}
   `,
 
   assess: () => `
@@ -5439,6 +5500,20 @@ const screens = {
         { title: "Knowledge Vault", text: "Everything Future Mirror knows about you, in one place.", modal: "knowledgeVault" }
       ]
     })}
+  `,
+
+  build: () => `
+    <header class="screen-head compact-head mirror-head">
+      <div>
+        <p class="eyebrow">Build Mode</p>
+        <h2 class="screen-title">Train for the future you want.</h2>
+        <p class="screen-subtitle">Tell Compass your goal. It will match the right AI coach and guide your practice.</p>
+      </div>
+      <div class="avatar"><img src="assets/icon-decide.png" alt=""></div>
+    </header>
+    <section class="mirror-form-card">
+      ${buildModeEntrySection()}
+    </section>
   `,
 
   simulator: () => `
@@ -6006,6 +6081,9 @@ const modals = {
       </div>
     `;
   },
+
+  buildEntry: (entryId) => buildEntryModal(entryId),
+  buildTraining: (sessionId) => buildTrainingModal(sessionId),
 
   knowledgeVault: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="knowledge-vault-title">
@@ -7808,6 +7886,669 @@ function resetFutureScanCheckBack() {
   openModal("futureScanStation", "checkBack");
 }
 
+// ---- Build Mode -----------------------------------------------------------
+
+function buildCoachCatalogText() {
+  return BUILD_COACH_TYPES.map((coach) => `${coach.name}: ${coach.use}`).join("\n");
+}
+
+function buildGoalChipRow() {
+  return `
+    <div class="mirror-example-row build-goal-chip-row">
+      ${BUILD_GOAL_CHIPS.map((chip) => `<button type="button" data-build-goal-chip="${escapeHTML(chip)}">${escapeHTML(chip)}</button>`).join("")}
+    </div>
+  `;
+}
+
+function buildSafeId(value, fallback) {
+  const base = cleanText(value || fallback, 80)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  return base || fallback;
+}
+
+function buildGoalTokens(value) {
+  return cleanText(value, 500)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .filter((token) => token.length > 2);
+}
+
+function localBuildCoachForGoal(goal) {
+  const goalText = cleanText(goal, 500).toLowerCase();
+  const tokens = buildGoalTokens(goalText);
+  const scored = BUILD_COACH_TYPES.map((coach) => {
+    const haystack = `${coach.id} ${coach.name} ${coach.use}`.toLowerCase();
+    const tokenScore = tokens.reduce((score, token) => score + (haystack.includes(token) ? 1 : 0), 0);
+    const phraseScore = goalText && haystack.includes(goalText) ? 3 : 0;
+    return { coach, score: tokenScore + phraseScore };
+  }).sort((a, b) => b.score - a.score);
+  return scored[0] && scored[0].score > 0
+    ? scored[0].coach
+    : BUILD_COACH_TYPES.find((coach) => coach.id === "custom");
+}
+
+function localBuildTrainingPath(goal, coach) {
+  const shortGoal = cleanText(goal, 140) || "your goal";
+  const coachName = coach && coach.name ? coach.name : "Custom Growth Coach";
+  return normalizeTrainingPath([
+    {
+      id: "clarify-real-situation",
+      title: "Clarify Your Real Situation",
+      purpose: `Make "${shortGoal}" specific enough to practice instead of staying vague.`,
+      trainingType: "coach conversation",
+      openingPrompt: `Tell me the real situation behind "${shortGoal}". What is happening now, and what result would feel successful?`,
+      coachInstructions: `${coachName} should ask one useful question at a time, identify the real barrier, and turn the answer into a practical next move.`,
+      nextStep: "Share the real situation in your own words."
+    },
+    {
+      id: "practice-one-scenario",
+      title: "Practice One Real Scenario",
+      purpose: "Turn the goal into a realistic practice conversation, decision, or planning drill.",
+      trainingType: "guided practice",
+      openingPrompt: `Let's practice one realistic moment connected to "${shortGoal}". Describe the moment you want to handle better, or ask me for an example first.`,
+      coachInstructions: `${coachName} should roleplay, give examples, or adapt the practice based on what the user asks for.`,
+      nextStep: "Choose one real situation to rehearse."
+    },
+    {
+      id: "build-next-step",
+      title: "Build the Next Step",
+      purpose: "Create one small action the user can actually do this week.",
+      trainingType: "action planning",
+      openingPrompt: `What is one small step you could take this week for "${shortGoal}"? If you are unsure, I can suggest a low-pressure first step.`,
+      coachInstructions: `${coachName} should make the plan realistic, safe, and flexible. Avoid pressure and avoid fake guarantees.`,
+      nextStep: "Pick one action small enough to complete this week."
+    }
+  ], 3);
+}
+
+function createLocalBuildEntry(goal, reason = "") {
+  const coach = localBuildCoachForGoal(goal);
+  const trainingPath = localBuildTrainingPath(goal, coach);
+  return ensureBuildEntryShape({
+    id: `build-${Date.now()}`,
+    user_id: currentUserId(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    goal,
+    coachType: coach.name,
+    coachReason: reason
+      ? `${coach.name} can still guide this goal while live AI is reconnecting.`
+      : `${coach.name} fits the words and direction in your goal.`,
+    goalSummary: cleanText(goal, 220),
+    missingContext: ["What makes this goal difficult right now?", "What would a successful result look like?"],
+    trainingPath,
+    trainingSessions: [],
+    nextStep: trainingPath[0] ? trainingPath[0].nextStep : "Start with one real situation.",
+    status: "active"
+  });
+}
+
+function normalizeTrainingModule(module, index, usedIds = new Set()) {
+  const rawTitle = cleanText(module && module.title ? module.title : `Training ${index + 1}`, 80);
+  const fallbackId = buildSafeId(rawTitle, `training-${index + 1}`);
+  const rawId = buildSafeId(module && module.id ? module.id : fallbackId, fallbackId);
+  let id = rawId;
+  let suffix = 2;
+  while (usedIds.has(id)) {
+    id = `${rawId}-${suffix}`;
+    suffix += 1;
+  }
+  usedIds.add(id);
+  return {
+    id,
+    title: rawTitle,
+    purpose: cleanText(module && module.purpose ? module.purpose : "Practice one useful step for this goal.", 220),
+    trainingType: cleanText(module && module.trainingType ? module.trainingType : "custom", 40),
+    openingPrompt: cleanText(module && module.openingPrompt ? module.openingPrompt : "Tell me what you have tried so far, and I will guide the next practice step.", 280),
+    coachInstructions: cleanText(module && module.coachInstructions ? module.coachInstructions : "Guide the user through one practical training step. Ask one question at a time.", 360),
+    nextStep: cleanText(module && module.nextStep ? module.nextStep : "Start this training when you are ready.", 180)
+  };
+}
+
+function normalizeTrainingPath(items, maxItems = 6) {
+  const usedIds = new Set();
+  return (Array.isArray(items) ? items : [])
+    .slice(0, maxItems)
+    .map((item, index) => normalizeTrainingModule(item, index, usedIds));
+}
+
+function normalizeBuildTrainingSession(session) {
+  if (!session || typeof session !== "object") return null;
+  const startedAt = Number.isNaN(new Date(session.startedAt).getTime()) ? new Date().toISOString() : session.startedAt;
+  const messages = Array.isArray(session.messages)
+    ? session.messages.map((message) => ({
+        sender: message && message.sender === "user" ? "user" : "assistant",
+        message: cleanText(message && message.message ? message.message : "", 900),
+        createdAt: message && message.createdAt ? message.createdAt : startedAt
+      })).filter((message) => message.message).slice(-40)
+    : [];
+  return {
+    id: cleanText(session.id || `build-session-${Date.now()}`, 80),
+    trainingId: cleanText(session.trainingId || "", 80),
+    title: cleanText(session.title || "Training session", 90),
+    trainingType: cleanText(session.trainingType || "custom", 40),
+    startedAt,
+    completedAt: session.completedAt || null,
+    nextStep: cleanText(session.nextStep || "Continue this training when you are ready.", 220),
+    messages: messages.length ? messages : [{ sender: "assistant", message: "Tell me where you want to continue, and I will guide the next practice step.", createdAt: startedAt }]
+  };
+}
+
+function buildDateLabel(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "recently";
+  return date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function ensureBuildEntryShape(entry) {
+  if (!entry || typeof entry !== "object") return entry;
+  entry.coachType = cleanText(entry.coachType || "Custom Growth Coach", 80);
+  entry.coachReason = cleanText(entry.coachReason || "This coach fits the goal you entered.", 220);
+  entry.goalSummary = cleanText(entry.goalSummary || entry.goal || "A practical growth goal.", 220);
+  entry.missingContext = Array.isArray(entry.missingContext) ? entry.missingContext.map((item) => cleanText(item, 120)).filter(Boolean).slice(0, 3) : [];
+  entry.trainingPath = normalizeTrainingPath(entry.trainingPath, 6);
+  if (!entry.trainingPath.length && entry.actionBridge) {
+    entry.trainingPath = normalizeTrainingPath([
+      {
+        id: "action-bridge",
+        title: "Start the first action",
+        purpose: entry.betterChoice || "Begin with the first concrete step.",
+        trainingType: "planning",
+        openingPrompt: entry.actionBridge.today || entry.actionBridge.fiveMinute || "Tell me what part feels hardest to start.",
+        coachInstructions: "Help the user turn this older saved action bridge into one practical training step.",
+        nextStep: entry.actionBridge.thisWeek || "Continue with the next small action this week."
+      }
+    ], 1);
+  }
+  entry.trainingSessions = Array.isArray(entry.trainingSessions)
+    ? entry.trainingSessions.map(normalizeBuildTrainingSession).filter(Boolean).slice(0, 30)
+    : [];
+  entry.nextStep = cleanText(entry.nextStep || (entry.trainingPath[0] && entry.trainingPath[0].nextStep) || "Choose a training to begin.", 220);
+  entry.status = entry.status || "active";
+  return entry;
+}
+
+function myBuildEntries() {
+  return trackerState.buildMode.entries
+    .map(ensureBuildEntryShape)
+    .filter((entry) => entry.user_id === currentUserId())
+    .slice()
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+function activeBuildEntry() {
+  if (!activeBuildEntryId) return null;
+  return myBuildEntries().find((entry) => entry.id === activeBuildEntryId) || null;
+}
+
+function openBuildEntry(entryId) {
+  activeBuildEntryId = entryId;
+  activeBuildTrainingSessionId = null;
+  buildTrainingError = "";
+  openModal("buildEntry", entryId);
+}
+
+function buildModeEntrySection() {
+  const entries = myBuildEntries();
+  return `
+    <label>What are you trying to build?
+      <textarea id="build-goal-input" placeholder="Example: I want to prepare for an interview, talk to my parents, stop procrastinating, save money, choose a career, or build confidence.">${escapeHTML(buildModeGoalInput)}</textarea>
+    </label>
+    ${buildGoalChipRow()}
+    ${buildModeError ? `<p class="form-error">${escapeHTML(buildModeError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-start-build-entry ${isBuildModeLoading ? "disabled" : ""}>${isBuildModeLoading ? "Matching your coach..." : "Match My Coach"}</button>
+    ${entries.length ? `
+      <p class="eyebrow">Your coach plans</p>
+      <div class="action-stack build-plan-list">
+        ${entries.map((entry) => `
+          <button class="wide-action" type="button" data-open-build-entry="${escapeHTML(entry.id)}">
+            <span><strong>${escapeHTML(cleanText(entry.goal, 70))}</strong><small>${escapeHTML(entry.coachType)} - ${entry.trainingPath.length} training${entry.trainingPath.length === 1 ? "" : "s"}</small></span>
+          </button>
+        `).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+function buildCoachCard(entry) {
+  return `
+    <section class="build-coach-card">
+      <p class="eyebrow">Matched Coach</p>
+      <h4>${escapeHTML(entry.coachType)}</h4>
+      <p>${escapeHTML(entry.coachReason)}</p>
+      <small>${escapeHTML(entry.goalSummary)}</small>
+    </section>
+  `;
+}
+
+function buildMissingContextSection(entry) {
+  if (!entry.missingContext.length) return "";
+  return `
+    <div class="future-reflection-list">
+      <p class="eyebrow">Helpful context to add later</p>
+      ${entry.missingContext.map((item) => `<p class="tiny-note">${escapeHTML(item)}</p>`).join("")}
+    </div>
+  `;
+}
+
+function buildTrainingPathSection(entry) {
+  if (!entry.trainingPath.length) return `<p class="muted">No training path was generated. Try creating a new coach plan.</p>`;
+  return `
+    <p class="eyebrow">Training Path</p>
+    <div class="build-training-grid">
+      ${entry.trainingPath.map((module, index) => `
+        <article class="build-training-card">
+          <span>${String(index + 1).padStart(2, "0")} - ${escapeHTML(module.trainingType)}</span>
+          <h4>${escapeHTML(module.title)}</h4>
+          <p>${escapeHTML(module.purpose)}</p>
+          <button class="secondary-action compact-action" type="button" data-start-build-training="${escapeHTML(module.id)}">Start training</button>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function buildTrainingSessionById(entry, sessionId) {
+  return entry && Array.isArray(entry.trainingSessions)
+    ? entry.trainingSessions.find((session) => session.id === sessionId)
+    : null;
+}
+
+function buildTrainingModuleById(entry, trainingId) {
+  return entry && Array.isArray(entry.trainingPath)
+    ? entry.trainingPath.find((module) => module.id === trainingId)
+    : null;
+}
+
+function activeBuildTrainingSession() {
+  const entry = activeBuildEntry();
+  return buildTrainingSessionById(entry, activeBuildTrainingSessionId);
+}
+
+function buildCoachFreedomPrompts() {
+  return [
+    "Ask me one question first",
+    "Give me a realistic example",
+    "Change this training to fit my situation",
+    "Make this less rigid and more practical"
+  ];
+}
+
+function buildSessionListSection(entry) {
+  const sessions = (entry.trainingSessions || []).slice(0, 5);
+  if (!sessions.length) return "";
+  return `
+    <p class="eyebrow">Recent training</p>
+    <div class="future-reflection-list">
+      ${sessions.map((session) => `
+        <article class="future-reflection-item">
+          <div>
+            <strong>${escapeHTML(session.title)}</strong>
+            <p>${escapeHTML(session.nextStep || "Continue when ready.")}</p>
+            <small>${session.completedAt ? "Completed" : "In progress"} - ${escapeHTML(buildDateLabel(session.startedAt))}</small>
+          </div>
+          <button class="secondary-action compact-action" type="button" data-open-build-training="${escapeHTML(session.id)}">Open</button>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function buildNextStepSection(entry) {
+  return `
+    <div class="future-reflection-list">
+      <p class="eyebrow">Next Step</p>
+      <p>${escapeHTML(entry.nextStep)}</p>
+    </div>
+  `;
+}
+
+function buildEntryModal(entryId) {
+  const entry = myBuildEntries().find((item) => item.id === entryId);
+  if (!entry) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="build-entry-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Build Mode</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="build-entry-title">This build isn't available.</h3>
+      </div>
+    `;
+  }
+  return `
+    <div class="modal-card assessment-modal future-self-modal" role="dialog" aria-modal="true" aria-labelledby="build-entry-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Build Mode</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="build-entry-title">${escapeHTML(cleanText(entry.goal, 80))}</h3>
+      ${buildCoachCard(entry)}
+      ${buildMissingContextSection(entry)}
+      ${buildTrainingPathSection(entry)}
+      ${buildSessionListSection(entry)}
+      ${buildNextStepSection(entry)}
+    </div>
+  `;
+}
+
+async function startBuildEntry() {
+  const inputEl = document.querySelector("#build-goal-input");
+  const goal = cleanText(inputEl ? inputEl.value : buildModeGoalInput, 200);
+  if (!goal) {
+    buildModeError = "Tell me what you want to work on first.";
+    renderScreen("build");
+    return;
+  }
+  buildModeGoalInput = goal;
+  buildModeError = "";
+  isBuildModeLoading = true;
+  renderScreen("build");
+  try {
+    const prompt = `User goal: "${goal}".
+Saved real context, if any:
+${realGrowthFactsText()}
+
+Coach catalog:
+${buildCoachCatalogText()}
+
+Match the best coach for this goal. Do NOT limit yourself to interview, study, or money; choose the coach that fits the user's actual need, or Custom Growth Coach if no specialist fits. Create a training path with 3 to 5 interactive trainings. Training modules should be things the user can actually practice with AI: roleplay, script-builder, planning drill, active recall, decision simulation, application planner, routine builder, confidence exposure, etc. Avoid proof logs, scores, badges, and generic advice.
+
+Respond as strict JSON only:
+{"coachType":"string","coachReason":"string","goalSummary":"string","missingContext":["string"],"trainingPath":[{"id":"short-kebab-id","title":"string","purpose":"string","trainingType":"string","openingPrompt":"string","coachInstructions":"string","nextStep":"string"}],"nextStep":"string"}`;
+    const reply = await requestCompassDirect(BUILD_MODE_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed || !Array.isArray(parsed.trainingPath)) throw new Error("Coach router reply was not valid JSON.");
+    const trainingPath = normalizeTrainingPath(parsed.trainingPath, 5);
+    if (!trainingPath.length) throw new Error("Coach router returned no training modules.");
+    const entry = ensureBuildEntryShape({
+      id: `build-${Date.now()}`,
+      user_id: currentUserId(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      goal,
+      coachType: cleanText(parsed.coachType || "Custom Growth Coach", 80),
+      coachReason: cleanText(parsed.coachReason || "", 240),
+      goalSummary: cleanText(parsed.goalSummary || goal, 220),
+      missingContext: Array.isArray(parsed.missingContext) ? parsed.missingContext : [],
+      trainingPath,
+      trainingSessions: [],
+      nextStep: cleanText(parsed.nextStep || trainingPath[0].nextStep, 220),
+      status: "active"
+    });
+    trackerState.buildMode.entries.push(entry);
+    saveTrackerState();
+    buildModeGoalInput = "";
+    openBuildEntry(entry.id);
+  } catch (error) {
+    console.error("[Build Mode] Coach matching failed", error);
+    const fallbackEntry = createLocalBuildEntry(goal, error && error.message ? error.message : "AI unavailable");
+    trackerState.buildMode.entries.push(fallbackEntry);
+    saveTrackerState();
+    buildModeGoalInput = "";
+    buildModeError = "";
+    openBuildEntry(fallbackEntry.id);
+  } finally {
+    isBuildModeLoading = false;
+    renderScreen("build");
+  }
+}
+
+function startBuildTraining(trainingId) {
+  const entry = activeBuildEntry();
+  if (!entry) return;
+  const module = buildTrainingModuleById(entry, trainingId);
+  if (!module) return;
+  const session = {
+    id: `build-session-${Date.now()}`,
+    trainingId: module.id,
+    title: module.title,
+    trainingType: module.trainingType,
+    startedAt: new Date().toISOString(),
+    completedAt: null,
+    nextStep: module.nextStep,
+    messages: [
+      { sender: "assistant", message: module.openingPrompt, createdAt: new Date().toISOString() }
+    ]
+  };
+  entry.trainingSessions.unshift(session);
+  entry.updatedAt = new Date().toISOString();
+  saveTrackerState();
+  activeBuildTrainingSessionId = session.id;
+  buildTrainingError = "";
+  buildTrainingDraft = "";
+  openModal("buildTraining", session.id);
+}
+
+function openBuildTraining(sessionId) {
+  const entry = activeBuildEntry();
+  if (!entry) return;
+  const session = buildTrainingSessionById(entry, sessionId);
+  if (!session) return;
+  activeBuildTrainingSessionId = session.id;
+  buildTrainingError = "";
+  buildTrainingDraft = "";
+  openModal("buildTraining", session.id);
+}
+
+function buildTrainingModal(sessionId) {
+  const entry = activeBuildEntry();
+  const session = buildTrainingSessionById(entry, sessionId);
+  if (!entry || !session) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="build-training-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Training</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="build-training-title">This training isn't available.</h3>
+      </div>
+    `;
+  }
+  const messages = (session.messages || []).filter((message) => cleanText(message && message.message, 900));
+  return `
+    <div class="modal-card assessment-modal future-self-modal build-training-modal" role="dialog" aria-modal="true" aria-labelledby="build-training-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">${escapeHTML(entry.coachType)}</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="build-training-title">${escapeHTML(session.title)}</h3>
+      <p class="muted">${escapeHTML(entry.goalSummary)}</p>
+      <section class="build-free-coach-note">
+        <strong>You are not locked into this exercise.</strong>
+        <span>Tell the coach your real situation, ask for another approach, or change direction anytime.</span>
+      </section>
+      <div class="build-training-chat">
+        ${messages.map((message) => `
+          <div class="build-training-message ${message.sender === "user" ? "is-user" : "is-ai"}">
+            <p>${escapeHTML(message.message)}</p>
+          </div>
+        `).join("")}
+        ${isBuildTrainingLoading ? `<div class="build-training-message is-ai"><p>Coach is thinking...</p></div>` : ""}
+      </div>
+      ${buildTrainingError ? `<p class="form-error">${escapeHTML(buildTrainingError)}</p>` : ""}
+      ${session.completedAt ? `<p class="tiny-note"><strong>Next:</strong> ${escapeHTML(session.nextStep || entry.nextStep)}</p>` : `
+        <div class="build-coach-prompt-row">
+          ${buildCoachFreedomPrompts().map((prompt) => `<button type="button" data-build-coach-prompt="${escapeHTML(prompt)}" ${isBuildTrainingLoading ? "disabled" : ""}>${escapeHTML(prompt)}</button>`).join("")}
+        </div>
+        <textarea id="build-training-input" placeholder="Say anything. Add context, ask a question, or tell the coach to change direction." data-build-training-draft>${escapeHTML(buildTrainingDraft)}</textarea>
+        <button class="primary-action mirror-run-action" type="button" data-send-build-training ${isBuildTrainingLoading ? "disabled" : ""}>${isBuildTrainingLoading ? "Training..." : "Send freely"}</button>
+        <p class="tiny-note">Tip: Ctrl + Enter sends without losing your text.</p>
+      `}
+      <div class="profile-actions">
+        <button class="secondary-action compact-action" type="button" data-open-build-entry="${escapeHTML(entry.id)}">Back to plan</button>
+        ${session.completedAt ? "" : `<button class="secondary-action compact-action" type="button" data-finish-build-training>Finish training</button>`}
+      </div>
+    </div>
+  `;
+}
+
+function buildTrainingSafetyReply() {
+  return {
+    reply: "I want to keep this safe. If there is immediate danger or you might hurt yourself or someone else, contact a trusted person now and use local emergency support. If this is not immediate danger, tell me what happened in one sentence and we will slow the situation down together.",
+    nextStep: "Contact a trusted person if there is any immediate risk."
+  };
+}
+
+function buildTrainingExampleFor(entry, module) {
+  const goal = cleanText(entry && entry.goal ? entry.goal : "your goal", 140);
+  const coachType = cleanText(entry && entry.coachType ? entry.coachType : "coach", 80).toLowerCase();
+  const title = cleanText(module && module.title ? module.title : "this training", 90);
+  const goalText = goal.toLowerCase();
+  if (goalText.includes("business") || coachType.includes("entrepreneur")) {
+    return `Here is a realistic example for "${goal}": instead of saying "I want to start a business", the user chooses one small test. Example: "I want to sell affordable study planners to students who keep missing deadlines. This week I will ask 5 students what they struggle with, then make one simple sample." Your turn: what customer, problem, and tiny test would fit you?`;
+  }
+  if (goalText.includes("interview") || coachType.includes("interview")) {
+    return `Here is a realistic example for "${goal}": the user prepares one STAR story instead of memorising perfect answers. Situation: group project conflict. Task: keep the team moving. Action: clarify roles and message the group. Result: submission finished on time. Your turn: what real experience could become your strongest story?`;
+  }
+  if (goalText.includes("study") || goalText.includes("exam") || coachType.includes("study")) {
+    return `Here is a realistic example for "${goal}": the user stops planning the whole subject and starts with one 25-minute active recall block. They close distractions, write what they remember, check mistakes, then repeat the weakest part. Your turn: what topic would you test yourself on first?`;
+  }
+  if (goalText.includes("money") || goalText.includes("save") || coachType.includes("money")) {
+    return `Here is a realistic example for "${goal}": the user does not try to become perfect with money. They pick one leak, like drinks or delivery food, set a weekly limit, and move a small amount into savings first. Your turn: where does money disappear fastest for you?`;
+  }
+  return `Here is a realistic example for "${goal}": the user turns "${title}" into one real situation, one small practice, and one next action. They do not try to fix everything today. They choose the first moment where the goal shows up, practise the response, then test it in real life. Your turn: what is the first real moment where this goal shows up for you?`;
+}
+
+function buildTrainingQuestionFor(entry, module) {
+  const goal = cleanText(entry && entry.goal ? entry.goal : "your goal", 140);
+  const moduleTitle = cleanText(module && module.title ? module.title : "this training", 90);
+  return `Let's make this useful for your real life. For "${goal}", what is the exact situation you want help with in "${moduleTitle}"? You can answer with one sentence, for example: who is involved, what is difficult, and what result you want.`;
+}
+
+function buildTrainingAdaptiveReply(entry, session, module, userText) {
+  const text = cleanText(userText, 900);
+  const lower = text.toLowerCase();
+  if (/(self[-\s]?harm|suicide|kill myself|hurt myself|danger|abuse|emergency)/i.test(text)) {
+    return buildTrainingSafetyReply();
+  }
+  if (lower.includes("example") || lower.includes("sample")) {
+    return {
+      reply: buildTrainingExampleFor(entry, module),
+      nextStep: "Adapt the example into your own real situation."
+    };
+  }
+  if (lower.includes("question") || lower.includes("ask me")) {
+    return {
+      reply: buildTrainingQuestionFor(entry, module),
+      nextStep: "Answer the coach question with your real context."
+    };
+  }
+  if (lower.includes("change") || lower.includes("fit") || lower.includes("less rigid") || lower.includes("different")) {
+    return {
+      reply: `Yes, we can change direction. We do not need to follow the original exercise. For "${cleanText(entry.goal, 140)}", choose the style you want now: a realistic example, a roleplay, a step-by-step plan, or help deciding what to do first. Which one would help you most?`,
+      nextStep: "Choose the training style that fits the current need."
+    };
+  }
+  return {
+    reply: `I hear you: "${text}". Let's turn that into practice. The useful move is to make it smaller and more concrete: what is one real situation, one action you can control, and one sign that the action worked? For your goal "${cleanText(entry.goal, 140)}", tell me the part that feels hardest right now, and I will coach the next step from there.`,
+    nextStep: "Name the hardest part so the coach can adapt the practice."
+  };
+}
+
+function requestBuildCoachReply(prompt, timeoutMs = 6500) {
+  let timeoutId = 0;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("Build coach request timed out.")), timeoutMs);
+  });
+  return Promise.race([
+    requestCompassDirect(BUILD_MODE_SYSTEM_PROMPT, prompt),
+    timeout
+  ]).finally(() => window.clearTimeout(timeoutId));
+}
+
+async function enhanceBuildTrainingReply(entryId, sessionId, assistantCreatedAt, prompt) {
+  try {
+    const reply = await requestBuildCoachReply(prompt, 9000);
+    const parsed = extractJsonObject(reply);
+    const coachReply = cleanText(parsed && parsed.reply ? parsed.reply : reply, 900);
+    if (!coachReply) return;
+    const entry = trackerState.buildMode.entries.find((item) => item.id === entryId && item.user_id === currentUserId());
+    const session = buildTrainingSessionById(entry, sessionId);
+    if (!entry || !session || session.completedAt) return;
+    const pendingMessage = (session.messages || []).find((message) => (
+      message.sender === "assistant" &&
+      message.createdAt === assistantCreatedAt &&
+      message.pendingAi === true
+    ));
+    if (!pendingMessage) return;
+    pendingMessage.message = coachReply;
+    pendingMessage.pendingAi = false;
+    session.nextStep = cleanText(parsed && parsed.nextStep ? parsed.nextStep : session.nextStep || entry.nextStep, 220);
+    if (parsed && parsed.finished === true) session.completedAt = new Date().toISOString();
+    entry.nextStep = session.nextStep || entry.nextStep;
+    entry.updatedAt = new Date().toISOString();
+    saveTrackerState();
+    if (activeBuildEntryId === entry.id && activeBuildTrainingSessionId === session.id && modalLayer.classList.contains("is-open")) {
+      openModal("buildTraining", session.id);
+    }
+  } catch (error) {
+    console.error("[Build Mode] Live coach refinement failed; local coach reply kept.", error);
+  }
+}
+
+async function sendBuildTrainingReply(forcedText = "") {
+  const entry = activeBuildEntry();
+  const session = activeBuildTrainingSession();
+  if (!entry || !session || session.completedAt) return;
+  if (isBuildTrainingLoading) return;
+  const input = modalLayer.querySelector("#build-training-input");
+  const rawText = forcedText || (input ? input.value : buildTrainingDraft);
+  const text = cleanText(rawText, 900);
+  if (!text) {
+    buildTrainingDraft = rawText || buildTrainingDraft;
+    buildTrainingError = "Write a reply first.";
+    openModal("buildTraining", session.id);
+    return;
+  }
+  session.messages.push({ sender: "user", message: text, createdAt: new Date().toISOString() });
+  buildTrainingDraft = "";
+  saveTrackerState();
+  buildTrainingError = "";
+  const module = buildTrainingModuleById(entry, session.trainingId);
+  const fallback = buildTrainingAdaptiveReply(entry, session, module, text);
+  const assistantCreatedAt = new Date().toISOString();
+  session.messages.push({ sender: "assistant", message: fallback.reply, createdAt: assistantCreatedAt, pendingAi: true });
+  session.nextStep = cleanText(fallback.nextStep || session.nextStep || entry.nextStep, 220);
+  entry.nextStep = session.nextStep || entry.nextStep;
+  entry.updatedAt = new Date().toISOString();
+  saveTrackerState();
+  isBuildTrainingLoading = false;
+  openModal("buildTraining", session.id);
+  try {
+    const transcript = session.messages.slice(-10).map((message) => `${message.sender}: ${message.message}`).join("\n");
+    const prompt = `Coach plan:
+Goal: ${entry.goal}
+Matched coach: ${entry.coachType}
+Goal summary: ${entry.goalSummary}
+Training title: ${session.title}
+Training type: ${session.trainingType}
+Coach instructions: ${module ? module.coachInstructions : "Guide one practical training step."}
+
+Conversation so far:
+${transcript}
+
+Respond as the coach. Keep it interactive: answer directly, give one concrete improvement or next practice move, then ask at most one next question if needed. The user is allowed to change the exercise, ask for examples, add context, or move to a different training angle. Do not force the original prompt. If they ask to change direction, adapt the training to the user's real need. Do not turn this into a checklist. This is training guidance, not a formal feedback scorecard and not a proof log. Prefer strict JSON only: {"reply":"string","nextStep":"string","finished":false}. If you cannot produce JSON, still answer naturally.`;
+    void enhanceBuildTrainingReply(entry.id, session.id, assistantCreatedAt, prompt);
+  } catch (error) {
+    console.error("[Build Mode] Could not start live coach refinement; local coach reply kept.", error);
+  }
+}
+
+function finishBuildTrainingSession() {
+  const entry = activeBuildEntry();
+  const session = activeBuildTrainingSession();
+  if (!entry || !session) return;
+  session.completedAt = new Date().toISOString();
+  entry.nextStep = session.nextStep || entry.nextStep;
+  entry.updatedAt = new Date().toISOString();
+  saveTrackerState();
+  renderScreen("build");
+  openModal("buildEntry", entry.id);
+}
+
 async function sendChatMessage(text) {
   const clean = text.trim();
   if (!clean || isCompassResponding) return;
@@ -7950,6 +8691,15 @@ document.addEventListener("click", async (event) => {
   const resetScanCheckBackButton = event.target.closest("[data-reset-scan-checkback]");
   const runScanSynthesisButton = event.target.closest("[data-run-scan-synthesis]");
   const openPastScanButton = event.target.closest("[data-open-past-scan]");
+  const jumpFutureScanButton = event.target.closest("[data-jump-future-scan]");
+  const buildGoalChipButton = event.target.closest("[data-build-goal-chip]");
+  const startBuildEntryButton = event.target.closest("[data-start-build-entry]");
+  const openBuildEntryButton = event.target.closest("[data-open-build-entry]");
+  const startBuildTrainingButton = event.target.closest("[data-start-build-training]");
+  const openBuildTrainingButton = event.target.closest("[data-open-build-training]");
+  const sendBuildTrainingButton = event.target.closest("[data-send-build-training]");
+  const buildCoachPromptButton = event.target.closest("[data-build-coach-prompt]");
+  const finishBuildTrainingButton = event.target.closest("[data-finish-build-training]");
   const mirrorExample = event.target.closest("[data-mirror-example]");
   const discussMirror = event.target.closest("[data-discuss-mirror]");
   const saveFutureDecision = event.target.closest("[data-save-future-decision]");
@@ -8478,6 +9228,21 @@ document.addEventListener("click", async (event) => {
   if (resetScanCheckBackButton) resetFutureScanCheckBack();
   if (runScanSynthesisButton) await runFutureScanSynthesis();
   if (openPastScanButton) openPastFutureScan(openPastScanButton.dataset.openPastScan);
+  if (jumpFutureScanButton) {
+    futureMirrorMode = "scan";
+    renderScreen("future");
+  }
+  if (buildGoalChipButton) {
+    buildModeGoalInput = buildGoalChipButton.dataset.buildGoalChip || "";
+    renderScreen("build");
+  }
+  if (startBuildEntryButton) await startBuildEntry();
+  if (openBuildEntryButton) openBuildEntry(openBuildEntryButton.dataset.openBuildEntry);
+  if (startBuildTrainingButton) startBuildTraining(startBuildTrainingButton.dataset.startBuildTraining);
+  if (openBuildTrainingButton) openBuildTraining(openBuildTrainingButton.dataset.openBuildTraining);
+  if (sendBuildTrainingButton) await sendBuildTrainingReply();
+  if (buildCoachPromptButton) await sendBuildTrainingReply(buildCoachPromptButton.dataset.buildCoachPrompt || "");
+  if (finishBuildTrainingButton) finishBuildTrainingSession();
 
   if (prevBlueprintSession) {
     captureBlueprintDraft();
@@ -9249,6 +10014,9 @@ document.addEventListener("click", async (event) => {
 });
 
 document.addEventListener("input", (event) => {
+  if (event.target && event.target.matches("[data-build-training-draft]")) {
+    buildTrainingDraft = event.target.value;
+  }
   if (event.target && event.target.id === "inspire-search") {
     inspireSearch = event.target.value;
     renderScreen("stories");
@@ -9270,6 +10038,15 @@ document.addEventListener("change", async (event) => {
 
 document.addEventListener("keydown", async (event) => {
   if (event.key === "Escape") closeModal();
+  if (
+    event.target &&
+    event.target.matches("[data-build-training-draft]") &&
+    event.key === "Enter" &&
+    (event.ctrlKey || event.metaKey)
+  ) {
+    event.preventDefault();
+    await sendBuildTrainingReply();
+  }
   if (event.key === "Enter" && activeTab === "compass" && document.activeElement && document.activeElement.id === "chat-input") {
     await sendChatMessage(document.activeElement.value);
   }
@@ -9295,4 +10072,3 @@ if (startupLifeVerseView) {
 }
 renderScreen(screens[startupTab] ? startupTab : "home");
 showAuthIfNeeded();
-

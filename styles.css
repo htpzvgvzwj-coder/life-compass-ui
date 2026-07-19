@@ -7422,9 +7422,168 @@ body.life-sim-active .lifeverse-consequence-toast {
   margin-top: 0;
 }
 
+/* Build Mode (goal-based AI coach training) */
+
+.build-goal-chip-row {
+  margin: 10px 0 12px;
+}
+
+.build-plan-list .wide-action small {
+  color: var(--color-muted);
+}
+
+.build-coach-card {
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid rgba(200, 169, 107, 0.32);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg, rgba(13, 13, 13, 0.96), rgba(58, 51, 39, 0.9)),
+    var(--color-ink);
+  color: var(--color-warm);
+  box-shadow: 0 18px 44px rgba(13, 13, 13, 0.18);
+}
+
+.build-coach-card h4 {
+  margin: 4px 0 8px;
+  font-size: 1.15rem;
+}
+
+.build-coach-card p,
+.build-coach-card small {
+  color: rgba(248, 246, 242, 0.78);
+}
+
+.build-training-grid {
+  display: grid;
+  gap: 12px;
+  margin: 10px 0 18px;
+}
+
+.build-training-card {
+  padding: 14px;
+  border: 1px solid var(--color-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.build-training-card span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.build-training-card h4 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.build-training-card p {
+  margin: 0 0 12px;
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+
+.build-training-modal textarea {
+  min-height: 84px;
+}
+
+.build-free-coach-note {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-mint-soft);
+  border: 1px solid rgba(17, 17, 17, 0.06);
+}
+
+.build-free-coach-note strong {
+  color: var(--color-ink);
+  font-size: 0.92rem;
+}
+
+.build-free-coach-note span {
+  color: var(--color-muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.build-training-chat {
+  display: grid;
+  gap: 10px;
+  max-height: 330px;
+  overflow-y: auto;
+  margin: 14px 0;
+  padding: 4px;
+}
+
+.build-training-message {
+  max-width: 86%;
+  padding: 11px 13px;
+  border-radius: 16px;
+  line-height: 1.45;
+}
+
+.build-training-message p {
+  margin: 0;
+}
+
+.build-training-message.is-ai {
+  justify-self: start;
+  border: 1px solid var(--color-faint);
+  background: var(--color-warm);
+}
+
+.build-training-message.is-user {
+  justify-self: end;
+  border: 1px solid rgba(200, 169, 107, 0.38);
+  background: linear-gradient(135deg, #fffaf0 0%, #eefbd5 100%);
+  color: var(--color-ink);
+  box-shadow: 0 10px 24px rgba(13, 13, 13, 0.06);
+}
+
+.build-training-message.is-user p {
+  color: var(--color-ink) !important;
+  -webkit-text-fill-color: var(--color-ink);
+  opacity: 1;
+}
+
+.build-coach-prompt-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 8px 0 10px;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.build-coach-prompt-row button {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-faint);
+  border-radius: 999px;
+  background: var(--color-warm);
+  color: var(--color-ink);
+  padding: 8px 11px;
+  font-size: 0.78rem;
+  font-weight: 750;
+  box-shadow: 0 8px 18px rgba(13, 13, 13, 0.05);
+}
+
+.build-coach-prompt-row button:disabled {
+  opacity: 0.55;
+}
+
 @media (min-width: 480px) {
   .scan-timeline-card {
     flex-basis: 46%;
   }
-}
 
+  .build-training-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
