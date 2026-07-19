@@ -176,6 +176,57 @@ const BUILD_LIFE_MOMENTS = {
   ]
 };
 
+// Real Cost of Living Calculator - deliberately separate from LifeVerse's
+// abstract game-balanced economy. Every figure here is a general real-world
+// Singapore estimate, presented as a range, not a simulation output. Reuses
+// the LifeVerse map's real district names (life-sim.js) for tone
+// consistency only - no cost data is shared with or derived from LifeVerse.
+const COST_OF_LIVING_HOUSING = [
+  { id: "family", label: "Staying with family", central: [0, 0], suburban: [0, 0] },
+  { id: "shared-room", label: "Room in a shared flat", central: [900, 1400], suburban: [700, 1100] },
+  { id: "studio", label: "Studio apartment", central: [2500, 3800], suburban: [1800, 2500] },
+  { id: "one-bedroom", label: "1-bedroom condo", central: [3500, 5000], suburban: [2500, 3200] }
+];
+const COST_OF_LIVING_DISTRICT_TIERS = [
+  { id: "central", label: "Central (Orchard Road, Marina Bay, Raffles Place, Clarke Quay)" },
+  { id: "suburban", label: "Suburban (Woodlands, Punggol, HDB Hub)" }
+];
+const COST_OF_LIVING_TRANSPORT = [
+  { id: "public", label: "Public transport (bus/MRT)", range: [120, 150] },
+  { id: "cycling", label: "Cycling or walking", range: [20, 50] },
+  { id: "car", label: "Own car or motorbike", range: [800, 1500] }
+];
+const COST_OF_LIVING_LIFESTYLE = [
+  { id: "frugal", label: "Frugal - mostly cook or hawker food", food: [300, 450], incidentals: [100, 200] },
+  { id: "moderate", label: "Moderate - a mix of cooking and eating out", food: [500, 700], incidentals: [150, 300] },
+  { id: "comfortable", label: "Comfortable - eat out often", food: [800, 1200], incidentals: [250, 450] }
+];
+const COST_OF_LIVING_UTILITIES_RANGE = [100, 180];
+const COST_OF_LIVING_PHONE_RANGE = [20, 40];
+const COST_OF_LIVING_ONE_TIME_NOTES = [
+  "Rental deposit: usually 1-2 months' rent, paid upfront.",
+  "Agent fee: often about half a month's rent if you use an agent.",
+  "Utility or wifi setup deposit or activation fee.",
+  "Basic furniture and setup if the place is unfurnished."
+];
+
+function computeCostOfLiving(draft) {
+  const housing = COST_OF_LIVING_HOUSING.find((item) => item.id === draft.housing) || COST_OF_LIVING_HOUSING[0];
+  const transport = COST_OF_LIVING_TRANSPORT.find((item) => item.id === draft.transport) || COST_OF_LIVING_TRANSPORT[0];
+  const lifestyle = COST_OF_LIVING_LIFESTYLE.find((item) => item.id === draft.lifestyle) || COST_OF_LIVING_LIFESTYLE[1];
+  const rent = housing[draft.district] || housing.central;
+  const rows = [
+    { label: "Housing", range: rent },
+    { label: "Transport", range: transport.range },
+    { label: "Food", range: lifestyle.food },
+    { label: "Utilities & wifi", range: COST_OF_LIVING_UTILITIES_RANGE },
+    { label: "Phone", range: COST_OF_LIVING_PHONE_RANGE },
+    { label: "Personal & incidentals", range: lifestyle.incidentals }
+  ];
+  const total = rows.reduce((sum, row) => [sum[0] + row.range[0], sum[1] + row.range[1]], [0, 0]);
+  return { rows, total };
+}
+
 const inspireCategories = [
   "All",
   "Entrepreneurs",
@@ -815,6 +866,8 @@ let buildModeGoalInput = "";
 let isBuildModeLoading = false;
 let buildModeError = "";
 let buildMomentCategory = "independence";
+let costOfLivingDraft = { housing: "shared-room", district: "suburban", transport: "public", lifestyle: "moderate" };
+let costOfLivingResult = null;
 let activeBuildEntryId = null;
 let activeBuildTrainingSessionId = null;
 let isBuildTrainingLoading = false;
@@ -3832,6 +3885,18 @@ function futureSelfEntryCard() {
   `;
 }
 
+function costOfLivingEntryCard() {
+  return `
+    <section class="mirror-form-card future-self-entry-card">
+      <img class="future-self-entry-icon" src="assets/icon-money.png" alt="">
+      <p class="eyebrow">Real Cost of Living</p>
+      <h3>What does independent living actually cost?</h3>
+      <p class="muted">Real Singapore estimates, not a game or a guess.</p>
+      <button class="secondary-action compact-action" type="button" data-open="costOfLiving">Calculate</button>
+    </section>
+  `;
+}
+
 function savedFutureDecisions() {
   return (trackerState.futureMirror.saved || []).filter((item) => item.user_id === currentUserId());
 }
@@ -4983,6 +5048,7 @@ const screens = {
     </header>
 
     ${futureSelfEntryCard()}
+    ${costOfLivingEntryCard()}
 
     <section class="mirror-form-card">
       <div class="home-quick-grid mirror-mode-grid">
@@ -6292,6 +6358,50 @@ const modals = {
     `;
   },
 
+  costOfLiving: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="cost-of-living-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Real Cost of Living</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="cost-of-living-title">What does independent living actually cost?</h3>
+      <p class="muted">General estimates based on typical Singapore costs - actual prices vary by exact location, timing, and personal choices. Use this as a starting point, not an exact budget.</p>
+      <div class="admin-form">
+        <label>Housing
+          <select id="col-housing">
+            ${COST_OF_LIVING_HOUSING.map((item) => `<option value="${escapeHTML(item.id)}" ${costOfLivingDraft.housing === item.id ? "selected" : ""}>${escapeHTML(item.label)}</option>`).join("")}
+          </select>
+        </label>
+        <label>Area
+          <select id="col-district">
+            ${COST_OF_LIVING_DISTRICT_TIERS.map((item) => `<option value="${escapeHTML(item.id)}" ${costOfLivingDraft.district === item.id ? "selected" : ""}>${escapeHTML(item.label)}</option>`).join("")}
+          </select>
+        </label>
+        <label>Transport
+          <select id="col-transport">
+            ${COST_OF_LIVING_TRANSPORT.map((item) => `<option value="${escapeHTML(item.id)}" ${costOfLivingDraft.transport === item.id ? "selected" : ""}>${escapeHTML(item.label)}</option>`).join("")}
+          </select>
+        </label>
+        <label>Lifestyle
+          <select id="col-lifestyle">
+            ${COST_OF_LIVING_LIFESTYLE.map((item) => `<option value="${escapeHTML(item.id)}" ${costOfLivingDraft.lifestyle === item.id ? "selected" : ""}>${escapeHTML(item.label)}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <button class="primary-action" type="button" data-calc-cost-of-living>Calculate</button>
+      ${costOfLivingResult ? `
+        <div class="future-reflection-list">
+          ${costOfLivingResult.rows.map((row) => `<p class="tiny-note"><strong>${escapeHTML(row.label)}</strong>: $${row.range[0]}-${row.range[1]}/month</p>`).join("")}
+        </div>
+        <p class="muted"><strong>Estimated total: $${costOfLivingResult.total[0]}-${costOfLivingResult.total[1]}/month</strong></p>
+        <div class="future-reflection-list">
+          <p class="eyebrow">Often forgotten one-time costs</p>
+          ${COST_OF_LIVING_ONE_TIME_NOTES.map((note) => `<p class="tiny-note">${escapeHTML(note)}</p>`).join("")}
+        </div>
+      ` : ""}
+    </div>
+  `,
+
   growthGoals: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="growth-goals-title">
       <div class="modal-top">
@@ -6574,6 +6684,9 @@ function openModal(name, payload) {
     roadmapView = "timeline";
     roadmapError = "";
     milestoneJustCompleted = null;
+  }
+  if (name === "costOfLiving" && !modalLayer.classList.contains("is-open")) {
+    costOfLivingResult = null;
   }
   if (name === "discoverYourself" && !modalLayer.classList.contains("is-open")) {
     blueprintActiveSession = 1;
@@ -8427,6 +8540,7 @@ document.addEventListener("click", async (event) => {
   const deleteContact = event.target.closest("[data-delete-contact]");
   const messageContact = event.target.closest("[data-message-contact]");
   const saveGrowthGoals = event.target.closest("[data-save-growth-goals]");
+  const calcCostOfLiving = event.target.closest("[data-calc-cost-of-living]");
   const saveJournal = event.target.closest("[data-save-journal]");
   const startChallenge = event.target.closest("[data-start-challenge]");
   const saveCommunityPost = event.target.closest("[data-save-community-post]");
@@ -9128,6 +9242,17 @@ document.addEventListener("click", async (event) => {
     closeModal();
     renderScreen(activeTab);
     refreshStaticScreens();
+  }
+
+  if (calcCostOfLiving) {
+    costOfLivingDraft = {
+      housing: modalLayer.querySelector("#col-housing").value,
+      district: modalLayer.querySelector("#col-district").value,
+      transport: modalLayer.querySelector("#col-transport").value,
+      lifestyle: modalLayer.querySelector("#col-lifestyle").value
+    };
+    costOfLivingResult = computeCostOfLiving(costOfLivingDraft);
+    openModal("costOfLiving");
   }
 
   if (saveJournal) {
