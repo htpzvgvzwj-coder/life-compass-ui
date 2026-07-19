@@ -6515,6 +6515,8 @@ const modals = {
 
   communityAccountabilityRequest: (targetUserId) => communityAccountabilityRequestModal(targetUserId),
 
+  communityMentorApply: () => communityMentorApplyModal(),
+
   communityOpportunitySubmit: () => communityOpportunitySubmitModal(),
 
   safety: (reason = "") => `
@@ -8558,6 +8560,7 @@ document.addEventListener("click", async (event) => {
   const acceptAccountabilityRequestButton = event.target.closest("[data-accept-accountability-request]");
   const declineAccountabilityRequestButton = event.target.closest("[data-decline-accountability-request]");
   const saveContactHintButton = event.target.closest("[data-save-contact-hint]");
+  const submitMentorApplicationButton = event.target.closest("[data-submit-mentor-application]");
   const saveCommunityOpportunityButton = event.target.closest("[data-save-community-opportunity]");
   const saveOpportunity = event.target.closest("[data-save-opportunity]");
   const shareOpportunity = event.target.closest("[data-share-opportunity]");
@@ -9550,6 +9553,26 @@ document.addEventListener("click", async (event) => {
     await saveAccountabilityContactHint(connectionId, hint);
     await refreshCommunityData();
     renderScreen("community");
+  }
+
+  if (submitMentorApplicationButton) {
+    const bioInput = modalLayer.querySelector("#community-mentor-bio");
+    const tagsInput = modalLayer.querySelector("#community-mentor-tags");
+    const error = modalLayer.querySelector("#community-mentor-apply-error");
+    const bio = cleanText(bioInput ? bioInput.value : "", 600);
+    const focusTags = (tagsInput ? tagsInput.value : "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean).slice(0, 6);
+    if (bio.length < 40) {
+      if (error) error.textContent = "Write a bit more about your experience first (at least 40 characters).";
+      return;
+    }
+    try {
+      await submitMentorApplication({ bio, focusTags });
+      await refreshCommunityData();
+      closeModal();
+      renderScreen("community");
+    } catch (err) {
+      if (error) error.textContent = err.message || "Could not submit your mentor application right now.";
+    }
   }
 
   if (saveCommunityOpportunityButton) {

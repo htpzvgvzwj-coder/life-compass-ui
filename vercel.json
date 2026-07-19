@@ -34,6 +34,9 @@
     },
     "api/community-opportunity.js": {
       "maxDuration": 30
+    },
+    "api/community-mentor-apply.js": {
+      "maxDuration": 30
     }
   }
 }

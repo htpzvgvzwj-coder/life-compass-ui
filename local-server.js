@@ -328,6 +328,8 @@ const COMMUNITY_POST_MODERATION_PROMPT = "You are a safety classifier for a yout
 
 const COMMUNITY_OPPORTUNITY_MODERATION_PROMPT = "You are a safety classifier for a youth self-growth app's crowdsourced opportunity board (internships, scholarships, volunteering, small jobs). Given a single submission's title and description, decide if it is safe to publish. Block submissions that: are scams, MLM/pyramid schemes, or ask for money/fees upfront; contain hate speech or sexual content; share personal identifying details like a home address or phone number that don't belong on a public listing; point to clearly malicious or unrelated links. Do NOT block ordinary legitimate opportunity listings, even informal ones (e.g. a local shop hiring, a small tutoring gig). Respond with strict JSON only, no markdown, no extra text: {\"safe\": true or false, \"reason\": \"short user-facing reason, empty string if safe\"}.";
 
+const COMMUNITY_MENTOR_MODERATION_PROMPT = "You are a safety classifier for mentor applications on a youth self-growth app called Compass. Given a single applicant bio, decide if it is safe to queue for human review. Block bios that: describe active self-harm, suicidal intent, or in-progress abuse; contain hate speech, harassment, or sexual content involving minors; share identifying details like a full name plus address, a school name plus schedule, a phone number, or passwords; contain scam links, spam, or solicitation for money/payment; make explicit claims to be a licensed professional (doctor, therapist, lawyer) that cannot be verified here. Do NOT block bios that simply describe someone's own past struggles or experience they want to mentor others through - that is the point of this feature. Respond with strict JSON only, no markdown, no extra text: {\"safe\": true or false, \"reason\": \"short user-facing reason, empty string if safe\"}.";
+
 function parseModerationReply(text) {
   const match = String(text || '').match(/\{[\s\S]*\}/);
   if (!match) return null;
@@ -536,7 +538,48 @@ async function handleCommunityOpportunity(req, res) {
   }
 }
 
-const COMMUNITY_ROUTES = new Set(['/api/community-config', '/api/community-post', '/api/community-opportunity']);
+async function handleCommunityMentorApply(req, res) {
+  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+    sendJson(res, 503, { error: 'Community is not configured yet.' });
+    return;
+  }
+  const accessToken = bearerTokenFrom(req);
+  if (!accessToken) {
+    sendJson(res, 401, { error: 'Sign in to Community to apply.' });
+    return;
+  }
+  try {
+    const user = await verifySupabaseUser(accessToken);
+    if (!user) {
+      sendJson(res, 401, { error: 'Your Community session has expired. Please sign in again.' });
+      return;
+    }
+    const body = await readJsonBody(req);
+    const bio = String(body.bio || '').trim();
+    if (bio.length < 40 || bio.length > 600) {
+      sendJson(res, 400, { error: 'Your mentor bio should be between 40 and 600 characters.' });
+      return;
+    }
+    const focusTags = Array.isArray(body.focusTags)
+      ? body.focusTags.map((tag) => String(tag || '').trim().toLowerCase()).filter(Boolean).slice(0, 6)
+      : [];
+    const moderation = await moderateText(COMMUNITY_MENTOR_MODERATION_PROMPT, bio);
+    const status = moderation.safe ? 'pending' : 'blocked';
+    const row = await insertSupabaseRow('mentor_applications', {
+      user_id: user.id,
+      bio,
+      focus_tags: focusTags,
+      status,
+      moderation_reason: moderation.safe ? null : (moderation.reason || 'This bio needs a safer rewording before it can be reviewed.'),
+    });
+    sendJson(res, 200, { application: row, status, reason: moderation.safe ? '' : row.moderation_reason });
+  } catch (error) {
+    console.error('[Community] community-mentor-apply failed', error);
+    sendJson(res, 500, { error: 'Could not submit your mentor application right now.' });
+  }
+}
+
+const COMMUNITY_ROUTES = new Set(['/api/community-config', '/api/community-post', '/api/community-opportunity', '/api/community-mentor-apply']);
 
 http
   .createServer(async (req, res) => {
@@ -563,6 +606,10 @@ http
     }
     if (url.pathname === '/api/community-opportunity' && req.method === 'POST') {
       await handleCommunityOpportunity(req, res);
+      return;
+    }
+    if (url.pathname === '/api/community-mentor-apply' && req.method === 'POST') {
+      await handleCommunityMentorApply(req, res);
       return;
     }
 

@@ -211,6 +211,60 @@ create policy "opportunities_shared_delete_own" on opportunities_shared
 create index if not exists opportunities_shared_status_created_at_idx on opportunities_shared (status, created_at desc);
 
 -- ---------------------------------------------------------------------------
+-- mentor_profiles
+-- The live, visible mentor roster. No client-reachable insert/update/delete
+-- policy at all -- a user cannot write their own way into this table no
+-- matter what they do client-side. Rows only ever land here through the
+-- owner manually promoting an approved mentor_applications row (see below).
+-- This is what makes "vetted" real given this app has no admin panel and no
+-- way to do genuine identity/background verification.
+-- ---------------------------------------------------------------------------
+create table if not exists mentor_profiles (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  bio text not null check (char_length(bio) <= 600),
+  focus_tags text[] not null default '{}',
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+alter table mentor_profiles enable row level security;
+
+create policy "mentor_profiles_select_authenticated" on mentor_profiles
+  for select to authenticated using (is_active = true);
+
+-- ---------------------------------------------------------------------------
+-- mentor_applications
+-- The intake queue. A user can see and withdraw their own pending
+-- application, but nobody can insert directly -- applications go through
+-- api/community-mentor-apply.js (verify -> AI moderate -> service-role
+-- insert), same non-bypassable shape as posts/opportunities_shared.
+--
+-- To promote an approved application (done manually by the owner in the
+-- Supabase SQL editor after actually reading the application -- there is no
+-- admin UI for this by design):
+--   update mentor_applications set status = 'approved' where id = '<application id>';
+--   insert into mentor_profiles (user_id, bio, focus_tags)
+--     select user_id, bio, focus_tags from mentor_applications where id = '<application id>';
+-- ---------------------------------------------------------------------------
+create table if not exists mentor_applications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  bio text not null check (char_length(bio) between 40 and 600),
+  focus_tags text[] not null default '{}',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'declined', 'blocked')),
+  moderation_reason text,
+  created_at timestamptz not null default now()
+);
+
+alter table mentor_applications enable row level security;
+
+create policy "mentor_applications_select_own" on mentor_applications
+  for select to authenticated using (user_id = auth.uid());
+
+create policy "mentor_applications_delete_own_pending" on mentor_applications
+  for delete to authenticated using (user_id = auth.uid() and status = 'pending');
+
+-- ---------------------------------------------------------------------------
 -- Seed data: migrate the 6 static communityGroups from app.js (lines ~322-365)
 -- into real, joinable squads. created_by is left null (system-seeded).
 -- Guarded so re-running this script never duplicates the seed rows.

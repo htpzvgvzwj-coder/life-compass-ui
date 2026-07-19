@@ -22,6 +22,8 @@
   let communityProfilesCache = [];
   let communityAccountabilityOptInsCache = [];
   let communityAccountabilityConnectionsCache = [];
+  let communityMentorProfilesCache = [];
+  let communityMyMentorApplicationsCache = [];
   let communityMyProfile = null;
   let communityDataLoading = false;
   let communityDataLoaded = false;
@@ -81,14 +83,16 @@
     if (!hasCommunitySession() || communityDataLoading) return;
     communityDataLoading = true;
     try {
-      const [squads, squadMembers, posts, opportunities, profiles, optIns, connections] = await Promise.all([
+      const [squads, squadMembers, posts, opportunities, profiles, optIns, connections, mentorProfiles, mentorApplications] = await Promise.all([
         fetchCommunityTable("squads", (q) => q.order("is_seeded", { ascending: false }).order("created_at", { ascending: true })),
         fetchCommunityTable("squad_members"),
         fetchCommunityTable("posts", (q) => q.order("created_at", { ascending: false }).limit(60)),
         fetchCommunityTable("opportunities_shared", (q) => q.order("created_at", { ascending: false }).limit(40)),
         fetchCommunityTable("profiles"),
         fetchCommunityTable("accountability_optins"),
-        fetchCommunityTable("accountability_connections")
+        fetchCommunityTable("accountability_connections"),
+        fetchCommunityTable("mentor_profiles"),
+        fetchCommunityTable("mentor_applications")
       ]);
       communitySquadsCache = squads;
       communitySquadMembersCache = squadMembers;
@@ -97,6 +101,8 @@
       communityProfilesCache = profiles;
       communityAccountabilityOptInsCache = optIns;
       communityAccountabilityConnectionsCache = connections;
+      communityMentorProfilesCache = mentorProfiles;
+      communityMyMentorApplicationsCache = mentorApplications;
       communityMyProfile = profiles.find((profile) => profile.id === communityUserId()) || null;
       communityDataLoaded = true;
       communityDataError = "";
@@ -581,6 +587,90 @@
   }
 
   // ---------------------------------------------------------------------
+  // Community mentors (roadmap item 4: extend accountability matching to
+  // vetted adult mentors, not just peers). "Vetted" here means owner-curated:
+  // mentor_profiles has no client-reachable insert/update - the only way a
+  // row lands there is the app owner manually promoting an approved
+  // mentor_applications row after actually reading it, since this app has no
+  // admin panel and no way to do genuine identity/background verification.
+  // Connecting with a mentor reuses the exact same accountability_connections
+  // table/modal/handler as peer matching - a connection request doesn't care
+  // whether the recipient is a peer or a mentor.
+  // ---------------------------------------------------------------------
+
+  function myMentorApplication() {
+    const myId = communityUserId();
+    return communityMyMentorApplicationsCache.find((entry) => entry.user_id === myId) || null;
+  }
+
+  function suggestedMentors() {
+    const mine = myAccountabilityOptIn();
+    const myId = communityUserId();
+    const pool = communityMentorProfilesCache.filter((entry) => entry.user_id !== myId);
+    if (!mine) return pool;
+    return [...pool].sort((a, b) => CommunityMatching.scoreTagOverlap(mine.goal_tags || [], b.focus_tags || []) - CommunityMatching.scoreTagOverlap(mine.goal_tags || [], a.focus_tags || []));
+  }
+
+  function communityMentorSection() {
+    const mentors = suggestedMentors();
+    const myApplication = myMentorApplication();
+    return `
+      <section class="accountability-match-card">
+        <p class="eyebrow">Community Mentors</p>
+        <h3>Find someone who has already been through it.</h3>
+        <p class="muted">Mentors are community members personally reviewed by the Compass team, not licensed professionals. Keep sensitive or urgent situations with a trusted adult or professional.</p>
+        ${mentors.length ? `
+          <div class="content-rail-title"><strong>Mentors</strong><span>${mentors.length}</span></div>
+          ${mentors.map((mentor) => `
+            <article class="accountability-match-card">
+              <strong>${escapeHTML(communityProfileFor(mentor.user_id) ? communityProfileFor(mentor.user_id).username : "Mentor")}</strong>
+              <p>${escapeHTML(mentor.bio)}</p>
+              ${mentor.focus_tags && mentor.focus_tags.length ? `<p class="muted">${mentor.focus_tags.map((tag) => escapeHTML(tag)).join(" · ")}</p>` : ""}
+              <button class="primary-action compact-action" type="button" data-open="communityAccountabilityRequest" data-open-payload="${escapeHTML(mentor.user_id)}">Request to connect</button>
+            </article>
+          `).join("")}
+        ` : `<p class="muted">No mentors yet - check back soon.</p>`}
+        ${myApplication ? `
+          <p class="muted">${myApplication.status === "pending" ? "Your mentor application is pending review."
+            : myApplication.status === "approved" ? "You're a listed Community mentor."
+            : myApplication.status === "declined" ? "Your mentor application wasn't approved this time."
+            : "Your mentor application needs changes before it can be reviewed."}</p>
+        ` : `<button class="secondary-action compact-action" type="button" data-open="communityMentorApply">Apply to become a mentor</button>`}
+      </section>
+    `;
+  }
+
+  function communityMentorApplyModal() {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-mentor-apply-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Mentor application</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="community-mentor-apply-title">Apply to become a Community mentor</h3>
+        <p class="muted">Tell us about your own experience and what you'd want to help with. Applications are reviewed by the Compass team before a mentor profile goes live - this isn't instant.</p>
+        <div class="admin-form">
+          <label>Your bio<textarea id="community-mentor-bio" maxlength="600" placeholder="Example: I spent two years figuring out budgeting and lease-signing the hard way. I'd like to help with money basics and first-apartment questions."></textarea></label>
+          <label>Focus areas (comma separated)<input id="community-mentor-tags" type="text" placeholder="budgeting, first job, moving out"></label>
+          <p class="form-error" id="community-mentor-apply-error" aria-live="polite"></p>
+        </div>
+        <button class="primary-action" type="button" data-submit-mentor-application>Submit application</button>
+      </div>
+    `;
+  }
+
+  async function submitMentorApplication({ bio, focusTags }) {
+    const response = await fetch(`${COMMUNITY_API_BASE}/api/community-mentor-apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${communityAccessToken()}` },
+      body: JSON.stringify({ bio, focusTags })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Could not submit your mentor application right now.");
+    return data;
+  }
+
+  // ---------------------------------------------------------------------
   // Crowdsourced opportunities (idea 10)
   // ---------------------------------------------------------------------
 
@@ -711,6 +801,8 @@
 
       ${accountabilityMatchCard()}
 
+      ${communityMentorSection()}
+
       ${communityWall()}
     `;
   }
@@ -737,6 +829,9 @@
   window.respondAccountabilityConnection = respondAccountabilityConnection;
   window.saveAccountabilityContactHint = saveAccountabilityContactHint;
   window.myAccountabilityOptIn = myAccountabilityOptIn;
+  window.communityMentorSection = communityMentorSection;
+  window.communityMentorApplyModal = communityMentorApplyModal;
+  window.submitMentorApplication = submitMentorApplication;
   window.communityMyProfileSnapshot = () => communityMyProfile;
   window.communityPostsCacheSnapshot = () => communityPostsCache;
   window.communitySquadMembersCacheSnapshot = () => communitySquadMembersCache;
