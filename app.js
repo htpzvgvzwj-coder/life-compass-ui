@@ -7996,11 +7996,27 @@ function buildGoalChipRow() {
   `;
 }
 
-function normalizeTrainingModule(module, index) {
+function buildSafeId(value, fallback) {
+  const base = cleanText(value || fallback, 80)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  return base || fallback;
+}
+
+function normalizeTrainingModule(module, index, usedIds = new Set()) {
   const rawTitle = cleanText(module && module.title ? module.title : `Training ${index + 1}`, 80);
-  const fallbackId = rawTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || `training-${index + 1}`;
+  const fallbackId = buildSafeId(rawTitle, `training-${index + 1}`);
+  const rawId = buildSafeId(module && module.id ? module.id : fallbackId, fallbackId);
+  let id = rawId;
+  let suffix = 2;
+  while (usedIds.has(id)) {
+    id = `${rawId}-${suffix}`;
+    suffix += 1;
+  }
+  usedIds.add(id);
   return {
-    id: cleanText(module && module.id ? module.id : fallbackId, 60),
+    id,
     title: rawTitle,
     purpose: cleanText(module && module.purpose ? module.purpose : "Practice one useful step for this goal.", 220),
     trainingType: cleanText(module && module.trainingType ? module.trainingType : "custom", 40),
@@ -8010,18 +8026,51 @@ function normalizeTrainingModule(module, index) {
   };
 }
 
+function normalizeTrainingPath(items, maxItems = 6) {
+  const usedIds = new Set();
+  return (Array.isArray(items) ? items : [])
+    .slice(0, maxItems)
+    .map((item, index) => normalizeTrainingModule(item, index, usedIds));
+}
+
+function normalizeBuildTrainingSession(session) {
+  if (!session || typeof session !== "object") return null;
+  const startedAt = Number.isNaN(new Date(session.startedAt).getTime()) ? new Date().toISOString() : session.startedAt;
+  const messages = Array.isArray(session.messages)
+    ? session.messages.map((message) => ({
+        sender: message && message.sender === "user" ? "user" : "assistant",
+        message: cleanText(message && message.message ? message.message : "", 900),
+        createdAt: message && message.createdAt ? message.createdAt : startedAt
+      })).filter((message) => message.message).slice(-40)
+    : [];
+  return {
+    id: cleanText(session.id || `build-session-${Date.now()}`, 80),
+    trainingId: cleanText(session.trainingId || "", 80),
+    title: cleanText(session.title || "Training session", 90),
+    trainingType: cleanText(session.trainingType || "custom", 40),
+    startedAt,
+    completedAt: session.completedAt || null,
+    nextStep: cleanText(session.nextStep || "Continue this training when you are ready.", 220),
+    messages: messages.length ? messages : [{ sender: "assistant", message: "Tell me where you want to continue, and I will guide the next practice step.", createdAt: startedAt }]
+  };
+}
+
+function buildDateLabel(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "recently";
+  return date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
 function ensureBuildEntryShape(entry) {
   if (!entry || typeof entry !== "object") return entry;
   entry.coachType = cleanText(entry.coachType || "Custom Growth Coach", 80);
   entry.coachReason = cleanText(entry.coachReason || "This coach fits the goal you entered.", 220);
   entry.goalSummary = cleanText(entry.goalSummary || entry.goal || "A practical growth goal.", 220);
   entry.missingContext = Array.isArray(entry.missingContext) ? entry.missingContext.map((item) => cleanText(item, 120)).filter(Boolean).slice(0, 3) : [];
-  entry.trainingPath = Array.isArray(entry.trainingPath)
-    ? entry.trainingPath.map(normalizeTrainingModule).slice(0, 6)
-    : [];
+  entry.trainingPath = normalizeTrainingPath(entry.trainingPath, 6);
   if (!entry.trainingPath.length && entry.actionBridge) {
-    entry.trainingPath = [
-      normalizeTrainingModule({
+    entry.trainingPath = normalizeTrainingPath([
+      {
         id: "action-bridge",
         title: "Start the first action",
         purpose: entry.betterChoice || "Begin with the first concrete step.",
@@ -8029,10 +8078,12 @@ function ensureBuildEntryShape(entry) {
         openingPrompt: entry.actionBridge.today || entry.actionBridge.fiveMinute || "Tell me what part feels hardest to start.",
         coachInstructions: "Help the user turn this older saved action bridge into one practical training step.",
         nextStep: entry.actionBridge.thisWeek || "Continue with the next small action this week."
-      }, 0)
-    ];
+      }
+    ], 1);
   }
-  entry.trainingSessions = Array.isArray(entry.trainingSessions) ? entry.trainingSessions : [];
+  entry.trainingSessions = Array.isArray(entry.trainingSessions)
+    ? entry.trainingSessions.map(normalizeBuildTrainingSession).filter(Boolean).slice(0, 30)
+    : [];
   entry.nextStep = cleanText(entry.nextStep || (entry.trainingPath[0] && entry.trainingPath[0].nextStep) || "Choose a training to begin.", 220);
   entry.status = entry.status || "active";
   return entry;
@@ -8146,7 +8197,7 @@ function buildSessionListSection(entry) {
           <div>
             <strong>${escapeHTML(session.title)}</strong>
             <p>${escapeHTML(session.nextStep || "Continue when ready.")}</p>
-            <small>${session.completedAt ? "Completed" : "In progress"} - ${escapeHTML(new Date(session.startedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</small>
+            <small>${session.completedAt ? "Completed" : "In progress"} - ${escapeHTML(buildDateLabel(session.startedAt))}</small>
           </div>
           <button class="secondary-action compact-action" type="button" data-open-build-training="${escapeHTML(session.id)}">Open</button>
         </article>
@@ -8220,7 +8271,7 @@ Respond as strict JSON only:
     const reply = await requestCompassDirect(BUILD_MODE_SYSTEM_PROMPT, prompt);
     const parsed = extractJsonObject(reply);
     if (!parsed || !Array.isArray(parsed.trainingPath)) throw new Error("Coach router reply was not valid JSON.");
-    const trainingPath = parsed.trainingPath.map(normalizeTrainingModule).slice(0, 5);
+    const trainingPath = normalizeTrainingPath(parsed.trainingPath, 5);
     if (!trainingPath.length) throw new Error("Coach router returned no training modules.");
     const entry = ensureBuildEntryShape({
       id: `build-${Date.now()}`,
@@ -8340,6 +8391,7 @@ async function sendBuildTrainingReply() {
     return;
   }
   session.messages.push({ sender: "user", message: text, createdAt: new Date().toISOString() });
+  saveTrackerState();
   buildTrainingError = "";
   isBuildTrainingLoading = true;
   openModal("buildTraining", session.id);

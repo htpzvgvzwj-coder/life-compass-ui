@@ -29,8 +29,13 @@ assert.ok(appSource.includes("const BUILD_COACH_TYPES"), "Build Mode defines a c
 
 assert.ok(buildSection.includes("buildCoachCatalogText"), "Build Mode sends the coach catalog to AI");
 assert.ok(buildSection.includes("trainingPath"), "Build Mode stores an AI-generated training path");
+assert.ok(buildSection.includes("normalizeTrainingPath"), "Build Mode normalizes AI training modules before saving");
+assert.ok(buildSection.includes("buildSafeId"), "Build Mode sanitizes training ids");
+assert.ok(buildSection.includes("while (usedIds.has(id))"), "Build Mode prevents duplicate training ids");
+assert.ok(buildSection.includes("normalizeBuildTrainingSession"), "Build Mode safely normalizes old saved training sessions");
 assert.ok(buildSection.includes("buildTrainingModal"), "Build Mode includes an interactive training room");
 assert.ok(buildSection.includes("sendBuildTrainingReply"), "Build Mode lets the AI coach continue the training conversation");
+assert.ok(buildSection.includes("session.messages.push({ sender: \"user\"") && buildSection.includes("saveTrackerState();"), "Build Mode saves user replies before requesting AI");
 assert.ok(buildSection.includes("Do NOT limit yourself to interview, study, or money"), "Build Mode explicitly avoids three-category limitation");
 
 [
