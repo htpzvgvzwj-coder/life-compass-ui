@@ -79,6 +79,21 @@ if ($groqApiKey -match "your_groq_api_key_here|your_|_here") {
   throw "GROQ_API_KEY still looks like a placeholder. Put your real Groq key in .env first."
 }
 
+# Community (Supabase) is optional - deploy still works without it, Community
+# just shows a "not configured yet" message until these are set in .env.
+$supabaseArgs = @()
+foreach ($supabaseKey in @("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY")) {
+  if ($envValues.ContainsKey($supabaseKey) -and $envValues[$supabaseKey] -notmatch "your_|_here") {
+    $supabaseArgs += "--env"
+    $supabaseArgs += "$supabaseKey=$($envValues[$supabaseKey])"
+  }
+}
+if ($supabaseArgs.Count -gt 0) {
+  Write-Host "Community (Supabase): configured, will be deployed."
+} else {
+  Write-Host "Community (Supabase): not configured in .env yet - deploying without it."
+}
+
 Write-Host ""
 Write-Host "Preparing Compass deployment to Vercel..."
 Write-Host "Project: Vercel will create or reuse the project in your current account"
@@ -112,7 +127,7 @@ Write-Host ""
 Write-Host "Deploying Compass to Vercel..."
 Write-Host ""
 
-$deployResult = Invoke-VercelCapture @(
+$deployResult = Invoke-VercelCapture (@(
   "vercel@latest",
   "deploy",
   "--prod",
@@ -125,7 +140,7 @@ $deployResult = Invoke-VercelCapture @(
   "GROQ_MODEL=$groqModel",
   "--env",
   "GROQ_API_KEY=$groqApiKey"
-)
+) + $supabaseArgs)
 
 $deployResult.Output | ForEach-Object { Write-Host $_ }
 

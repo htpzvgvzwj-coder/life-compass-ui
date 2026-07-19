@@ -8021,7 +8021,15 @@ function normalizeBuildTrainingSession(session) {
     ? session.messages.map((message) => ({
         sender: message && message.sender === "user" ? "user" : "assistant",
         message: cleanText(message && message.message ? message.message : "", 900),
-        createdAt: message && message.createdAt ? message.createdAt : startedAt
+        createdAt: message && message.createdAt ? message.createdAt : startedAt,
+        // pendingAi marks a message as still waiting for enhanceBuildTrainingReply()
+        // to swap in the live AI reply - it MUST survive normalization, or every
+        // render between the immediate local reply and the live reply arriving
+        // erases the flag, enhanceBuildTrainingReply's lookup then finds nothing,
+        // and the real AI reply is silently discarded (this was the actual bug:
+        // the coach looked stuck on generic canned replies even though the AI
+        // call itself was succeeding).
+        ...(message && message.pendingAi ? { pendingAi: true } : {})
       })).filter((message) => message.message).slice(-40)
     : [];
   return {
@@ -9597,7 +9605,11 @@ document.addEventListener("click", async (event) => {
       setCommunityAuthError("");
       renderScreen("community");
       try {
-        await communitySignUp(email, password, username);
+        const result = await communitySignUp(email, password, username);
+        if (!result.session) {
+          setCommunityAuthMode("sign-in");
+          setCommunityAuthError("Account created. Check your email to confirm it, then sign in here.");
+        }
       } catch (err) {
         setCommunityAuthError(err.message || "Could not create your account.");
       } finally {

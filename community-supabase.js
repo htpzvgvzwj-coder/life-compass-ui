@@ -69,21 +69,30 @@
     return communityConfigError;
   }
 
+  // Only creates a profiles row the first time - safe to call on every
+  // sign-in, and deliberately skipped at sign-up when email confirmation is
+  // required (no session yet, an unauthenticated insert would just be
+  // rejected by RLS) so it runs on the user's first real sign-in instead.
+  async function ensureCommunityProfile(client, user, fallbackUsername) {
+    const { data: existing } = await client.from("profiles").select("id").eq("id", user.id).maybeSingle();
+    if (existing) return;
+    const localUserId = typeof window.currentUserId === "function" ? window.currentUserId() : null;
+    await client.from("profiles").insert({
+      id: user.id,
+      username: String(fallbackUsername || "Member").slice(0, 24),
+      local_user_id: localUserId
+    });
+  }
+
   async function communitySignUp(email, password, username) {
     const client = await initCommunitySupabase();
     if (!client) throw new Error(communityConfigErrorMessage() || "Community sign-in is unavailable right now.");
     const { data, error } = await client.auth.signUp({ email, password });
     if (error) throw error;
     communitySession = data.session || communitySession;
-    const user = data.user || (data.session && data.session.user);
-    if (user) {
-      const localUserId = typeof window.currentUserId === "function" ? window.currentUserId() : null;
-      const fallbackName = (String(email).split("@")[0] || "Member").slice(0, 24);
-      await client.from("profiles").upsert({
-        id: user.id,
-        username: (username || fallbackName).slice(0, 24),
-        local_user_id: localUserId
-      });
+    if (data.session && data.user) {
+      const fallbackName = String(email).split("@")[0] || "Member";
+      await ensureCommunityProfile(client, data.user, username || fallbackName);
     }
     return data;
   }
@@ -94,6 +103,10 @@
     const { data, error } = await client.auth.signInWithPassword({ email, password });
     if (error) throw error;
     communitySession = data.session || communitySession;
+    if (data.session && data.user) {
+      const fallbackName = String(email).split("@")[0] || "Member";
+      await ensureCommunityProfile(client, data.user, fallbackName);
+    }
     return data;
   }
 
