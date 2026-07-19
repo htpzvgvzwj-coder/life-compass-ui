@@ -7502,12 +7502,16 @@ body.life-sim-active .lifeverse-consequence-toast {
 
 .build-training-message.is-user {
   justify-self: end;
-  background: var(--color-ink);
-  color: var(--color-warm);
+  border: 1px solid rgba(200, 169, 107, 0.38);
+  background: linear-gradient(135deg, #fffaf0 0%, #eefbd5 100%);
+  color: var(--color-ink);
+  box-shadow: 0 10px 24px rgba(13, 13, 13, 0.06);
 }
 
 .build-training-message.is-user p {
-  color: var(--color-warm);
+  color: var(--color-ink) !important;
+  -webkit-text-fill-color: var(--color-ink);
+  opacity: 1;
 }
 
 .build-coach-prompt-row {

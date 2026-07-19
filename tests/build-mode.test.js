@@ -62,5 +62,7 @@ assert.ok(stylesSource.includes(".build-training-chat"), "Build Mode has trainin
 assert.ok(stylesSource.includes(".build-free-coach-note"), "Build Mode explains that training can change direction");
 assert.ok(stylesSource.includes(".build-coach-prompt-row"), "Build Mode quick prompts are styled");
 assert.ok(stylesSource.includes(".build-training-message.is-user p"), "Build Mode keeps user message text readable");
+assert.ok(stylesSource.includes("linear-gradient(135deg, #fffaf0 0%, #eefbd5 100%)"), "Build Mode user replies use a light readable bubble");
+assert.ok(!stylesSource.includes(".build-training-message.is-user {\n  justify-self: end;\n  background: var(--color-ink);"), "Build Mode user replies must not render as black empty-looking blocks");
 
 console.log("Build Mode AI coach router tests passed.");
