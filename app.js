@@ -8006,6 +8006,83 @@ function buildSafeId(value, fallback) {
   return base || fallback;
 }
 
+function buildGoalTokens(value) {
+  return cleanText(value, 500)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .filter((token) => token.length > 2);
+}
+
+function localBuildCoachForGoal(goal) {
+  const goalText = cleanText(goal, 500).toLowerCase();
+  const tokens = buildGoalTokens(goalText);
+  const scored = BUILD_COACH_TYPES.map((coach) => {
+    const haystack = `${coach.id} ${coach.name} ${coach.use}`.toLowerCase();
+    const tokenScore = tokens.reduce((score, token) => score + (haystack.includes(token) ? 1 : 0), 0);
+    const phraseScore = goalText && haystack.includes(goalText) ? 3 : 0;
+    return { coach, score: tokenScore + phraseScore };
+  }).sort((a, b) => b.score - a.score);
+  return scored[0] && scored[0].score > 0
+    ? scored[0].coach
+    : BUILD_COACH_TYPES.find((coach) => coach.id === "custom");
+}
+
+function localBuildTrainingPath(goal, coach) {
+  const shortGoal = cleanText(goal, 140) || "your goal";
+  const coachName = coach && coach.name ? coach.name : "Custom Growth Coach";
+  return normalizeTrainingPath([
+    {
+      id: "clarify-real-situation",
+      title: "Clarify Your Real Situation",
+      purpose: `Make "${shortGoal}" specific enough to practice instead of staying vague.`,
+      trainingType: "coach conversation",
+      openingPrompt: `Tell me the real situation behind "${shortGoal}". What is happening now, and what result would feel successful?`,
+      coachInstructions: `${coachName} should ask one useful question at a time, identify the real barrier, and turn the answer into a practical next move.`,
+      nextStep: "Share the real situation in your own words."
+    },
+    {
+      id: "practice-one-scenario",
+      title: "Practice One Real Scenario",
+      purpose: "Turn the goal into a realistic practice conversation, decision, or planning drill.",
+      trainingType: "guided practice",
+      openingPrompt: `Let's practice one realistic moment connected to "${shortGoal}". Describe the moment you want to handle better, or ask me for an example first.`,
+      coachInstructions: `${coachName} should roleplay, give examples, or adapt the practice based on what the user asks for.`,
+      nextStep: "Choose one real situation to rehearse."
+    },
+    {
+      id: "build-next-step",
+      title: "Build the Next Step",
+      purpose: "Create one small action the user can actually do this week.",
+      trainingType: "action planning",
+      openingPrompt: `What is one small step you could take this week for "${shortGoal}"? If you are unsure, I can suggest a low-pressure first step.`,
+      coachInstructions: `${coachName} should make the plan realistic, safe, and flexible. Avoid pressure and avoid fake guarantees.`,
+      nextStep: "Pick one action small enough to complete this week."
+    }
+  ], 3);
+}
+
+function createLocalBuildEntry(goal, reason = "") {
+  const coach = localBuildCoachForGoal(goal);
+  const trainingPath = localBuildTrainingPath(goal, coach);
+  return ensureBuildEntryShape({
+    id: `build-${Date.now()}`,
+    user_id: currentUserId(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    goal,
+    coachType: coach.name,
+    coachReason: reason
+      ? `${coach.name} can still guide this goal while live AI is reconnecting.`
+      : `${coach.name} fits the words and direction in your goal.`,
+    goalSummary: cleanText(goal, 220),
+    missingContext: ["What makes this goal difficult right now?", "What would a successful result look like?"],
+    trainingPath,
+    trainingSessions: [],
+    nextStep: trainingPath[0] ? trainingPath[0].nextStep : "Start with one real situation.",
+    status: "active"
+  });
+}
+
 function normalizeTrainingModule(module, index, usedIds = new Set()) {
   const rawTitle = cleanText(module && module.title ? module.title : `Training ${index + 1}`, 80);
   const fallbackId = buildSafeId(rawTitle, `training-${index + 1}`);
@@ -8305,7 +8382,12 @@ Respond as strict JSON only:
     openBuildEntry(entry.id);
   } catch (error) {
     console.error("[Build Mode] Coach matching failed", error);
-    buildModeError = "Build Mode is having trouble matching a coach right now. Please try again.";
+    const fallbackEntry = createLocalBuildEntry(goal, error && error.message ? error.message : "AI unavailable");
+    trackerState.buildMode.entries.push(fallbackEntry);
+    saveTrackerState();
+    buildModeGoalInput = "";
+    buildModeError = "";
+    openBuildEntry(fallbackEntry.id);
   } finally {
     isBuildModeLoading = false;
     renderScreen("build");
@@ -8401,10 +8483,85 @@ function buildTrainingModal(sessionId) {
   `;
 }
 
+function buildTrainingSafetyReply() {
+  return {
+    reply: "I want to keep this safe. If there is immediate danger or you might hurt yourself or someone else, contact a trusted person now and use local emergency support. If this is not immediate danger, tell me what happened in one sentence and we will slow the situation down together.",
+    nextStep: "Contact a trusted person if there is any immediate risk."
+  };
+}
+
+function buildTrainingExampleFor(entry, module) {
+  const goal = cleanText(entry && entry.goal ? entry.goal : "your goal", 140);
+  const coachType = cleanText(entry && entry.coachType ? entry.coachType : "coach", 80).toLowerCase();
+  const title = cleanText(module && module.title ? module.title : "this training", 90);
+  const goalText = goal.toLowerCase();
+  if (goalText.includes("business") || coachType.includes("entrepreneur")) {
+    return `Here is a realistic example for "${goal}": instead of saying "I want to start a business", the user chooses one small test. Example: "I want to sell affordable study planners to students who keep missing deadlines. This week I will ask 5 students what they struggle with, then make one simple sample." Your turn: what customer, problem, and tiny test would fit you?`;
+  }
+  if (goalText.includes("interview") || coachType.includes("interview")) {
+    return `Here is a realistic example for "${goal}": the user prepares one STAR story instead of memorising perfect answers. Situation: group project conflict. Task: keep the team moving. Action: clarify roles and message the group. Result: submission finished on time. Your turn: what real experience could become your strongest story?`;
+  }
+  if (goalText.includes("study") || goalText.includes("exam") || coachType.includes("study")) {
+    return `Here is a realistic example for "${goal}": the user stops planning the whole subject and starts with one 25-minute active recall block. They close distractions, write what they remember, check mistakes, then repeat the weakest part. Your turn: what topic would you test yourself on first?`;
+  }
+  if (goalText.includes("money") || goalText.includes("save") || coachType.includes("money")) {
+    return `Here is a realistic example for "${goal}": the user does not try to become perfect with money. They pick one leak, like drinks or delivery food, set a weekly limit, and move a small amount into savings first. Your turn: where does money disappear fastest for you?`;
+  }
+  return `Here is a realistic example for "${goal}": the user turns "${title}" into one real situation, one small practice, and one next action. They do not try to fix everything today. They choose the first moment where the goal shows up, practise the response, then test it in real life. Your turn: what is the first real moment where this goal shows up for you?`;
+}
+
+function buildTrainingQuestionFor(entry, module) {
+  const goal = cleanText(entry && entry.goal ? entry.goal : "your goal", 140);
+  const moduleTitle = cleanText(module && module.title ? module.title : "this training", 90);
+  return `Let's make this useful for your real life. For "${goal}", what is the exact situation you want help with in "${moduleTitle}"? You can answer with one sentence, for example: who is involved, what is difficult, and what result you want.`;
+}
+
+function buildTrainingAdaptiveReply(entry, session, module, userText) {
+  const text = cleanText(userText, 900);
+  const lower = text.toLowerCase();
+  if (/(self[-\s]?harm|suicide|kill myself|hurt myself|danger|abuse|emergency)/i.test(text)) {
+    return buildTrainingSafetyReply();
+  }
+  if (lower.includes("example") || lower.includes("sample")) {
+    return {
+      reply: buildTrainingExampleFor(entry, module),
+      nextStep: "Adapt the example into your own real situation."
+    };
+  }
+  if (lower.includes("question") || lower.includes("ask me")) {
+    return {
+      reply: buildTrainingQuestionFor(entry, module),
+      nextStep: "Answer the coach question with your real context."
+    };
+  }
+  if (lower.includes("change") || lower.includes("fit") || lower.includes("less rigid") || lower.includes("different")) {
+    return {
+      reply: `Yes, we can change direction. We do not need to follow the original exercise. For "${cleanText(entry.goal, 140)}", choose the style you want now: a realistic example, a roleplay, a step-by-step plan, or help deciding what to do first. Which one would help you most?`,
+      nextStep: "Choose the training style that fits the current need."
+    };
+  }
+  return {
+    reply: `I hear you: "${text}". Let's turn that into practice. The useful move is to make it smaller and more concrete: what is one real situation, one action you can control, and one sign that the action worked? For your goal "${cleanText(entry.goal, 140)}", tell me the part that feels hardest right now, and I will coach the next step from there.`,
+    nextStep: "Name the hardest part so the coach can adapt the practice."
+  };
+}
+
+function requestBuildCoachReply(prompt, timeoutMs = 6500) {
+  let timeoutId = 0;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("Build coach request timed out.")), timeoutMs);
+  });
+  return Promise.race([
+    requestCompassDirect(BUILD_MODE_SYSTEM_PROMPT, prompt),
+    timeout
+  ]).finally(() => window.clearTimeout(timeoutId));
+}
+
 async function sendBuildTrainingReply(forcedText = "") {
   const entry = activeBuildEntry();
   const session = activeBuildTrainingSession();
   if (!entry || !session || session.completedAt) return;
+  if (isBuildTrainingLoading) return;
   const input = modalLayer.querySelector("#build-training-input");
   const rawText = forcedText || (input ? input.value : buildTrainingDraft);
   const text = cleanText(rawText, 900);
@@ -8420,8 +8577,8 @@ async function sendBuildTrainingReply(forcedText = "") {
   buildTrainingError = "";
   isBuildTrainingLoading = true;
   openModal("buildTraining", session.id);
+  const module = buildTrainingModuleById(entry, session.trainingId);
   try {
-    const module = buildTrainingModuleById(entry, session.trainingId);
     const transcript = session.messages.slice(-10).map((message) => `${message.sender}: ${message.message}`).join("\n");
     const prompt = `Coach plan:
 Goal: ${entry.goal}
@@ -8435,7 +8592,7 @@ Conversation so far:
 ${transcript}
 
 Respond as the coach. Keep it interactive: answer directly, give one concrete improvement or next practice move, then ask at most one next question if needed. The user is allowed to change the exercise, ask for examples, add context, or move to a different training angle. Do not force the original prompt. If they ask to change direction, adapt the training to the user's real need. Do not turn this into a checklist. This is training guidance, not a formal feedback scorecard and not a proof log. Prefer strict JSON only: {"reply":"string","nextStep":"string","finished":false}. If you cannot produce JSON, still answer naturally.`;
-    const reply = await requestCompassDirect(BUILD_MODE_SYSTEM_PROMPT, prompt);
+    const reply = await requestBuildCoachReply(prompt);
     const parsed = extractJsonObject(reply);
     const coachReply = cleanText(parsed && parsed.reply ? parsed.reply : reply, 900);
     if (!coachReply) throw new Error("Training reply was empty.");
@@ -8447,7 +8604,13 @@ Respond as the coach. Keep it interactive: answer directly, give one concrete im
     saveTrackerState();
   } catch (error) {
     console.error("[Build Mode] Training reply failed", error);
-    buildTrainingError = "Your coach is having trouble replying right now. Please try again.";
+    const fallback = buildTrainingAdaptiveReply(entry, session, module, text);
+    session.messages.push({ sender: "assistant", message: fallback.reply, createdAt: new Date().toISOString() });
+    session.nextStep = cleanText(fallback.nextStep || session.nextStep || entry.nextStep, 220);
+    entry.nextStep = session.nextStep || entry.nextStep;
+    entry.updatedAt = new Date().toISOString();
+    saveTrackerState();
+    buildTrainingError = "";
   } finally {
     isBuildTrainingLoading = false;
     openModal("buildTraining", session.id);

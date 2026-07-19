@@ -32,6 +32,9 @@ assert.ok(buildSection.includes("trainingPath"), "Build Mode stores an AI-genera
 assert.ok(buildSection.includes("normalizeTrainingPath"), "Build Mode normalizes AI training modules before saving");
 assert.ok(buildSection.includes("buildSafeId"), "Build Mode sanitizes training ids");
 assert.ok(buildSection.includes("while (usedIds.has(id))"), "Build Mode prevents duplicate training ids");
+assert.ok(buildSection.includes("createLocalBuildEntry"), "Build Mode can create a usable local plan if live AI matching fails");
+assert.ok(buildSection.includes("localBuildCoachForGoal"), "Build Mode local fallback still matches the user's actual goal to a coach");
+assert.ok(buildSection.includes("localBuildTrainingPath"), "Build Mode local fallback creates a playable training path");
 assert.ok(buildSection.includes("normalizeBuildTrainingSession"), "Build Mode safely normalizes old saved training sessions");
 assert.ok(buildSection.includes("buildTrainingModal"), "Build Mode includes an interactive training room");
 assert.ok(buildSection.includes("sendBuildTrainingReply"), "Build Mode lets the AI coach continue the training conversation");
@@ -43,6 +46,11 @@ assert.ok(buildSection.includes("sendBuildTrainingReply(forcedText = \"\")"), "B
 assert.ok(appSource.includes("data-build-coach-prompt"), "Build Mode includes flexible quick prompts");
 assert.ok(buildSection.includes("parsed && parsed.reply ? parsed.reply : reply"), "Build Mode can display natural AI replies when JSON parsing fails");
 assert.ok(buildSection.includes("Do not force the original prompt"), "Build Mode coach adapts instead of forcing the original exercise");
+assert.ok(buildSection.includes("requestBuildCoachReply"), "Build Mode uses a bounded AI request instead of waiting forever");
+assert.ok(buildSection.includes("Build coach request timed out"), "Build Mode has a timeout for stalled AI replies");
+assert.ok(buildSection.includes("if (isBuildTrainingLoading) return;"), "Build Mode prevents duplicate sends while the coach is replying");
+assert.ok(buildSection.includes("buildTrainingAdaptiveReply"), "Build Mode produces a fallback coach reply when live AI fails");
+assert.ok(buildSection.includes("session.messages.push({ sender: \"assistant\", message: fallback.reply"), "Build Mode stores fallback assistant replies instead of leaving the chat empty");
 assert.ok(buildSection.includes("Do NOT limit yourself to interview, study, or money"), "Build Mode explicitly avoids three-category limitation");
 assert.ok(appSource.includes('data-future-mirror-mode="build"'), "Build Mode appears inside the Future Mirror mode switcher");
 assert.ok(appSource.includes('futureMirrorMode === "build" ? buildModeEntrySection()'), "Future Mirror renders the Build Mode coach entry section");
