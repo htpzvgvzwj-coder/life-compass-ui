@@ -836,6 +836,7 @@ let activeBuildEntryId = null;
 let activeBuildTrainingSessionId = null;
 let isBuildTrainingLoading = false;
 let buildTrainingError = "";
+let buildTrainingDraft = "";
 
 let assessmentStep = 0;
 let assessmentDraft = { answers: {}, freeText: "", preferences: [] };
@@ -8187,6 +8188,15 @@ function activeBuildTrainingSession() {
   return buildTrainingSessionById(entry, activeBuildTrainingSessionId);
 }
 
+function buildCoachFreedomPrompts() {
+  return [
+    "Ask me one question first",
+    "Give me a realistic example",
+    "Change this training to fit my situation",
+    "Make this less rigid and more practical"
+  ];
+}
+
 function buildSessionListSection(entry) {
   const sessions = (entry.trainingSessions || []).slice(0, 5);
   if (!sessions.length) return "";
@@ -8324,6 +8334,7 @@ function startBuildTraining(trainingId) {
   saveTrackerState();
   activeBuildTrainingSessionId = session.id;
   buildTrainingError = "";
+  buildTrainingDraft = "";
   openModal("buildTraining", session.id);
 }
 
@@ -8334,6 +8345,7 @@ function openBuildTraining(sessionId) {
   if (!session) return;
   activeBuildTrainingSessionId = session.id;
   buildTrainingError = "";
+  buildTrainingDraft = "";
   openModal("buildTraining", session.id);
 }
 
@@ -8351,6 +8363,7 @@ function buildTrainingModal(sessionId) {
       </div>
     `;
   }
+  const messages = (session.messages || []).filter((message) => cleanText(message && message.message, 900));
   return `
     <div class="modal-card assessment-modal future-self-modal build-training-modal" role="dialog" aria-modal="true" aria-labelledby="build-training-title">
       <div class="modal-top">
@@ -8359,8 +8372,12 @@ function buildTrainingModal(sessionId) {
       </div>
       <h3 id="build-training-title">${escapeHTML(session.title)}</h3>
       <p class="muted">${escapeHTML(entry.goalSummary)}</p>
+      <section class="build-free-coach-note">
+        <strong>You are not locked into this exercise.</strong>
+        <span>Tell the coach your real situation, ask for another approach, or change direction anytime.</span>
+      </section>
       <div class="build-training-chat">
-        ${session.messages.map((message) => `
+        ${messages.map((message) => `
           <div class="build-training-message ${message.sender === "user" ? "is-user" : "is-ai"}">
             <p>${escapeHTML(message.message)}</p>
           </div>
@@ -8369,8 +8386,12 @@ function buildTrainingModal(sessionId) {
       </div>
       ${buildTrainingError ? `<p class="form-error">${escapeHTML(buildTrainingError)}</p>` : ""}
       ${session.completedAt ? `<p class="tiny-note"><strong>Next:</strong> ${escapeHTML(session.nextStep || entry.nextStep)}</p>` : `
-        <textarea id="build-training-input" placeholder="Reply to your coach here."></textarea>
-        <button class="primary-action mirror-run-action" type="button" data-send-build-training ${isBuildTrainingLoading ? "disabled" : ""}>${isBuildTrainingLoading ? "Training..." : "Send to coach"}</button>
+        <div class="build-coach-prompt-row">
+          ${buildCoachFreedomPrompts().map((prompt) => `<button type="button" data-build-coach-prompt="${escapeHTML(prompt)}" ${isBuildTrainingLoading ? "disabled" : ""}>${escapeHTML(prompt)}</button>`).join("")}
+        </div>
+        <textarea id="build-training-input" placeholder="Say anything. Add context, ask a question, or tell the coach to change direction." data-build-training-draft>${escapeHTML(buildTrainingDraft)}</textarea>
+        <button class="primary-action mirror-run-action" type="button" data-send-build-training ${isBuildTrainingLoading ? "disabled" : ""}>${isBuildTrainingLoading ? "Training..." : "Send freely"}</button>
+        <p class="tiny-note">Tip: Ctrl + Enter sends without losing your text.</p>
       `}
       <div class="profile-actions">
         <button class="secondary-action compact-action" type="button" data-open-build-entry="${escapeHTML(entry.id)}">Back to plan</button>
@@ -8380,18 +8401,21 @@ function buildTrainingModal(sessionId) {
   `;
 }
 
-async function sendBuildTrainingReply() {
+async function sendBuildTrainingReply(forcedText = "") {
   const entry = activeBuildEntry();
   const session = activeBuildTrainingSession();
   if (!entry || !session || session.completedAt) return;
   const input = modalLayer.querySelector("#build-training-input");
-  const text = cleanText(input ? input.value : "", 900);
+  const rawText = forcedText || (input ? input.value : buildTrainingDraft);
+  const text = cleanText(rawText, 900);
   if (!text) {
+    buildTrainingDraft = rawText || buildTrainingDraft;
     buildTrainingError = "Write a reply first.";
     openModal("buildTraining", session.id);
     return;
   }
   session.messages.push({ sender: "user", message: text, createdAt: new Date().toISOString() });
+  buildTrainingDraft = "";
   saveTrackerState();
   buildTrainingError = "";
   isBuildTrainingLoading = true;
@@ -8410,13 +8434,14 @@ Coach instructions: ${module ? module.coachInstructions : "Guide one practical t
 Conversation so far:
 ${transcript}
 
-Respond as the coach. Keep it interactive: answer directly, give one concrete improvement or next practice move, then ask at most one next question if needed. This is training guidance, not a formal feedback scorecard and not a proof log. Respond as strict JSON only: {"reply":"string","nextStep":"string","finished":false}`;
+Respond as the coach. Keep it interactive: answer directly, give one concrete improvement or next practice move, then ask at most one next question if needed. The user is allowed to change the exercise, ask for examples, add context, or move to a different training angle. Do not force the original prompt. If they ask to change direction, adapt the training to the user's real need. Do not turn this into a checklist. This is training guidance, not a formal feedback scorecard and not a proof log. Prefer strict JSON only: {"reply":"string","nextStep":"string","finished":false}. If you cannot produce JSON, still answer naturally.`;
     const reply = await requestCompassDirect(BUILD_MODE_SYSTEM_PROMPT, prompt);
     const parsed = extractJsonObject(reply);
-    if (!parsed || !parsed.reply) throw new Error("Training reply was not valid JSON.");
-    session.messages.push({ sender: "assistant", message: cleanText(parsed.reply, 900), createdAt: new Date().toISOString() });
-    session.nextStep = cleanText(parsed.nextStep || session.nextStep || entry.nextStep, 220);
-    if (parsed.finished === true) session.completedAt = new Date().toISOString();
+    const coachReply = cleanText(parsed && parsed.reply ? parsed.reply : reply, 900);
+    if (!coachReply) throw new Error("Training reply was empty.");
+    session.messages.push({ sender: "assistant", message: coachReply, createdAt: new Date().toISOString() });
+    session.nextStep = cleanText(parsed && parsed.nextStep ? parsed.nextStep : session.nextStep || entry.nextStep, 220);
+    if (parsed && parsed.finished === true) session.completedAt = new Date().toISOString();
     entry.nextStep = session.nextStep || entry.nextStep;
     entry.updatedAt = new Date().toISOString();
     saveTrackerState();
@@ -8590,6 +8615,7 @@ document.addEventListener("click", async (event) => {
   const startBuildTrainingButton = event.target.closest("[data-start-build-training]");
   const openBuildTrainingButton = event.target.closest("[data-open-build-training]");
   const sendBuildTrainingButton = event.target.closest("[data-send-build-training]");
+  const buildCoachPromptButton = event.target.closest("[data-build-coach-prompt]");
   const finishBuildTrainingButton = event.target.closest("[data-finish-build-training]");
   const mirrorExample = event.target.closest("[data-mirror-example]");
   const discussMirror = event.target.closest("[data-discuss-mirror]");
@@ -9114,6 +9140,7 @@ document.addEventListener("click", async (event) => {
   if (startBuildTrainingButton) startBuildTraining(startBuildTrainingButton.dataset.startBuildTraining);
   if (openBuildTrainingButton) openBuildTraining(openBuildTrainingButton.dataset.openBuildTraining);
   if (sendBuildTrainingButton) await sendBuildTrainingReply();
+  if (buildCoachPromptButton) await sendBuildTrainingReply(buildCoachPromptButton.dataset.buildCoachPrompt || "");
   if (finishBuildTrainingButton) finishBuildTrainingSession();
 
   if (prevBlueprintSession) {
@@ -9626,6 +9653,9 @@ document.addEventListener("click", async (event) => {
 });
 
 document.addEventListener("input", (event) => {
+  if (event.target && event.target.matches("[data-build-training-draft]")) {
+    buildTrainingDraft = event.target.value;
+  }
   if (event.target && event.target.id === "inspire-search") {
     inspireSearch = event.target.value;
     renderScreen("stories");
@@ -9647,6 +9677,15 @@ document.addEventListener("change", async (event) => {
 
 document.addEventListener("keydown", async (event) => {
   if (event.key === "Escape") closeModal();
+  if (
+    event.target &&
+    event.target.matches("[data-build-training-draft]") &&
+    event.key === "Enter" &&
+    (event.ctrlKey || event.metaKey)
+  ) {
+    event.preventDefault();
+    await sendBuildTrainingReply();
+  }
   if (event.key === "Enter" && activeTab === "compass" && document.activeElement && document.activeElement.id === "chat-input") {
     await sendChatMessage(document.activeElement.value);
   }

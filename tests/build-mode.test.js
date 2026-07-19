@@ -36,6 +36,13 @@ assert.ok(buildSection.includes("normalizeBuildTrainingSession"), "Build Mode sa
 assert.ok(buildSection.includes("buildTrainingModal"), "Build Mode includes an interactive training room");
 assert.ok(buildSection.includes("sendBuildTrainingReply"), "Build Mode lets the AI coach continue the training conversation");
 assert.ok(buildSection.includes("session.messages.push({ sender: \"user\"") && buildSection.includes("saveTrackerState();"), "Build Mode saves user replies before requesting AI");
+assert.ok(buildSection.includes("let buildTrainingDraft") || appSource.includes("let buildTrainingDraft"), "Build Mode preserves draft replies across modal refreshes");
+assert.ok(appSource.includes("data-build-training-draft"), "Build Mode textarea stores the live draft input");
+assert.ok(appSource.includes("matches(\"[data-build-training-draft]\")"), "Build Mode listens for draft input changes");
+assert.ok(buildSection.includes("sendBuildTrainingReply(forcedText = \"\")"), "Build Mode can send typed or quick-prompt text");
+assert.ok(appSource.includes("data-build-coach-prompt"), "Build Mode includes flexible quick prompts");
+assert.ok(buildSection.includes("parsed && parsed.reply ? parsed.reply : reply"), "Build Mode can display natural AI replies when JSON parsing fails");
+assert.ok(buildSection.includes("Do not force the original prompt"), "Build Mode coach adapts instead of forcing the original exercise");
 assert.ok(buildSection.includes("Do NOT limit yourself to interview, study, or money"), "Build Mode explicitly avoids three-category limitation");
 assert.ok(appSource.includes('data-future-mirror-mode="build"'), "Build Mode appears inside the Future Mirror mode switcher");
 assert.ok(appSource.includes('futureMirrorMode === "build" ? buildModeEntrySection()'), "Future Mirror renders the Build Mode coach entry section");
@@ -52,5 +59,8 @@ assert.ok(appSource.includes('futureMirrorMode === "build" ? buildModeEntrySecti
 
 assert.ok(stylesSource.includes(".build-coach-card"), "Build Mode has coach-card styling");
 assert.ok(stylesSource.includes(".build-training-chat"), "Build Mode has training-room chat styling");
+assert.ok(stylesSource.includes(".build-free-coach-note"), "Build Mode explains that training can change direction");
+assert.ok(stylesSource.includes(".build-coach-prompt-row"), "Build Mode quick prompts are styled");
+assert.ok(stylesSource.includes(".build-training-message.is-user p"), "Build Mode keeps user message text readable");
 
 console.log("Build Mode AI coach router tests passed.");

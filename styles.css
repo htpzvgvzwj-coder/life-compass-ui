@@ -7453,6 +7453,27 @@ body.life-sim-active .lifeverse-consequence-toast {
   min-height: 84px;
 }
 
+.build-free-coach-note {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-mint-soft);
+  border: 1px solid rgba(17, 17, 17, 0.06);
+}
+
+.build-free-coach-note strong {
+  color: var(--color-ink);
+  font-size: 0.92rem;
+}
+
+.build-free-coach-note span {
+  color: var(--color-muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
 .build-training-chat {
   display: grid;
   gap: 10px;
@@ -7483,6 +7504,35 @@ body.life-sim-active .lifeverse-consequence-toast {
   justify-self: end;
   background: var(--color-ink);
   color: var(--color-warm);
+}
+
+.build-training-message.is-user p {
+  color: var(--color-warm);
+}
+
+.build-coach-prompt-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 8px 0 10px;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.build-coach-prompt-row button {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-faint);
+  border-radius: 999px;
+  background: var(--color-warm);
+  color: var(--color-ink);
+  padding: 8px 11px;
+  font-size: 0.78rem;
+  font-weight: 750;
+  box-shadow: 0 8px 18px rgba(13, 13, 13, 0.05);
+}
+
+.build-coach-prompt-row button:disabled {
+  opacity: 0.55;
 }
 
 @media (min-width: 480px) {
