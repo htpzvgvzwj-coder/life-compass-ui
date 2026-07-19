@@ -5355,12 +5355,13 @@ const screens = {
         <button type="button" class="${futureMirrorMode === "simulator" ? "is-selected" : ""}" data-future-mirror-mode="simulator">Decision Simulator</button>
         <button type="button" class="${futureMirrorMode === "compass" ? "is-selected" : ""}" data-future-mirror-mode="compass">Life Compass</button>
         <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">Future Scan</button>
+        <button type="button" class="${futureMirrorMode === "build" ? "is-selected" : ""}" data-future-mirror-mode="build">Build Mode</button>
       </div>
-      ${futureMirrorMode === "scan" ? futureScanEntrySection() : futureMirrorDecisionFormSection()}
+      ${futureMirrorMode === "scan" ? futureScanEntrySection() : futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorDecisionFormSection()}
     </section>
 
-    ${futureMirrorMode === "scan" ? "" : futureMirrorResultCard()}
-    ${futureMirrorMode === "scan" ? "" : futureReflectionList()}
+    ${futureMirrorMode === "scan" || futureMirrorMode === "build" ? "" : futureMirrorResultCard()}
+    ${futureMirrorMode === "scan" || futureMirrorMode === "build" ? "" : futureReflectionList()}
   `,
 
   assess: () => `
