@@ -6870,6 +6870,12 @@ function hidePortrait() {
 
 function renderScreen(tab) {
   activeTab = tab;
+  // community.js/community-supabase.js load before app.js as separate
+  // <script> tags, so they can't see the `activeTab` lexical binding - they
+  // read window.activeTab instead to decide whether to re-render after an
+  // async refresh resolves. Without this mirror, window.activeTab is always
+  // undefined and those re-render checks silently never fire.
+  window.activeTab = tab;
   if (tab === "compass") applyCoachProactiveOpener();
   if (tab === "simulator") {
     enterLifeSimMode();
