@@ -840,6 +840,82 @@
       },
       consequence: "A few minutes tonight so tomorrow morning doesn't start with a mess.",
       reflection: "How different does waking up feel on the mornings you did this?"
+    },
+    // A few more genuine gaps: professional mental health care (distinct
+    // from the self-directed/peer support already modeled in
+    // lifeverse-mental-wellbeing.js), an everyday money-check habit, paid
+    // structured skill-building distinct from free hobby time, and a small
+    // civic/community gesture that doesn't require a whole pet-ownership
+    // system to feel real.
+    {
+      id: "see-a-counselor",
+      title: "See a counselor",
+      category: "Health",
+      location: "hospital",
+      durationMinutes: 60,
+      canPerform(state) {
+        return state.finance.money >= 45 || "You need at least $45 in cash for a counseling session.";
+      },
+      effects: {
+        finance: { money: -45 },
+        needs: { stress: -12, energy: -3, purpose: 4 },
+        mentalWellbeing: { resilience: 6, burnoutRisk: -8, confidence: 3, index: 5 },
+        capability: { decisionMaking: 1 }
+      },
+      consequence: "Different from talking to a friend - someone trained specifically to help you think this through.",
+      reflection: "What almost stopped you from booking this?"
+    },
+    {
+      id: "check-bank-and-set-savings-goal",
+      title: "Check your bank balance and set a savings goal",
+      category: "Finance",
+      location: "home",
+      durationMinutes: 15,
+      effects: {
+        needs: { stress: -2, purpose: 3 },
+        finance: { confidence: 3 },
+        skills: { finance: 1 },
+        habits: { budgeting: 2 }
+      },
+      consequence: "A number you actually looked at, and a target instead of a vague hope.",
+      reflection: "Is the goal realistic, or is it something you'll quietly abandon in two weeks?"
+    },
+    {
+      id: "take-a-hobby-class",
+      title: "Take a hobby class",
+      category: "Education",
+      location: "university",
+      durationMinutes: 120,
+      canPerform(state) {
+        return state.finance.money >= 40 || "You need at least $40 in cash for this class.";
+      },
+      effects: {
+        finance: { money: -40 },
+        needs: { energy: -6, social: 6, stress: -5, purpose: 6 },
+        education: { learningEfficiency: 2 },
+        mentalWellbeing: { motivation: 3, happiness: 3 },
+        skills: { learning: 2, social: 1 },
+        capability: { discipline: 1 }
+      },
+      consequence: "Paid and structured, unlike free hobby time at home - a real class with other people in it.",
+      reflection: "Would you have actually kept doing this without a scheduled class to show up to?"
+    },
+    {
+      id: "help-a-neighbour",
+      title: "Help a neighbour with something small",
+      category: "Relationship",
+      location: "home",
+      durationMinutes: 40,
+      effects: {
+        needs: { energy: -4, social: 4, purpose: 6 },
+        relationships: { network: 2, trust: 2 },
+        mentalWellbeing: { motivation: 2 }
+      },
+      after(state) {
+        state.npcSimulation.communityTrust = game.clamp(state.npcSimulation.communityTrust + 3);
+      },
+      consequence: "Small and unpaid, and it's exactly the kind of thing that makes a place feel like a community instead of just an address.",
+      reflection: "When did someone last do this for you, unasked?"
     }
   ];
 
