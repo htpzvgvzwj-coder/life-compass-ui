@@ -50,6 +50,44 @@
         reflection: "What support do you receive at home that you sometimes overlook?"
       },
       {
+        id: "have-a-hard-conversation-with-family",
+        title: "Have a hard conversation with family",
+        description: "Bring up the thing that's been sitting unspoken, instead of letting distance grow around it.",
+        durationMinutes: 60,
+        effects: {
+          needs: { stress: 4, purpose: 5 },
+          capability: { communication: 1 }
+        },
+        after(state) {
+          const outcomeScore = state.player.capability.communication + state.player.skills.social * 0.5;
+          const good = outcomeScore >= 70;
+          if (good) {
+            state.relationships.family = game.clamp(state.relationships.family + 15);
+            state.relationships.trust = game.clamp(state.relationships.trust + 8);
+            state.needs.stress = game.clamp(state.needs.stress - 6);
+          } else {
+            state.relationships.family = game.clamp(state.relationships.family + 3);
+            state.needs.stress = game.clamp(state.needs.stress + 5);
+          }
+          if (game.addEvent) {
+            game.addEvent(state, {
+              type: "relationships",
+              title: good ? "A real conversation with family" : "A tense conversation with family",
+              summary: good ? "It was hard, and it actually helped." : "It was hard, and it stayed hard - but it's said now.",
+              systems: ["Relationships"],
+              consequences: good
+                ? [`Family relationship is now ${state.relationships.family}/100.`, `Trust is now ${state.relationships.trust}/100.`]
+                : [`Family relationship only moved to ${state.relationships.family}/100.`, "Communication skill still grew a little from just doing it."],
+              reflection: good
+                ? "What made it possible to actually say this?"
+                : "What's still unsaid, even after this conversation?"
+            });
+          }
+        },
+        consequence: "Some conversations don't feel finished right after you have them - that doesn't mean they didn't matter.",
+        reflection: "How long had this actually been sitting unspoken?"
+      },
+      {
         id: "networking-chat",
         title: "Talk to someone in your field",
         description: "Build a real professional connection instead of relying only on applications.",

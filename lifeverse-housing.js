@@ -234,6 +234,46 @@
         reflection: "What would happen to this arrangement if you never had this conversation?"
       },
       {
+        id: "address-roommate-conflict",
+        title: "Address a conflict with your roommate",
+        description: "Actually say the uncomfortable thing instead of letting it build into resentment.",
+        durationMinutes: 45,
+        canPerform(state) {
+          return state.housing.hasRoommate || "You do not currently have a roommate to have this conversation with.";
+        },
+        effects: {
+          needs: { stress: 3, purpose: 4 },
+          capability: { communication: 1 }
+        },
+        after(state) {
+          const outcomeScore = state.player.capability.communication + state.player.skills.social * 0.5;
+          const good = outcomeScore >= 70;
+          if (good) {
+            state.housing.roommateRelationship = game.clamp(state.housing.roommateRelationship + 15);
+            state.needs.stress = game.clamp(state.needs.stress - 6);
+          } else {
+            state.housing.roommateRelationship = game.clamp(state.housing.roommateRelationship + 3);
+            state.needs.stress = game.clamp(state.needs.stress + 4);
+          }
+          if (game.addEvent) {
+            game.addEvent(state, {
+              type: "housing",
+              title: good ? "Cleared the air with your roommate" : "An awkward conversation with your roommate",
+              summary: good ? "It went better than you expected." : "It happened, but it was clumsy and uncomfortable.",
+              systems: ["Housing"],
+              consequences: good
+                ? [`Roommate relationship is now ${state.housing.roommateRelationship}/100.`]
+                : [`Roommate relationship only moved to ${state.housing.roommateRelationship}/100.`, "Communication skill still grew a little from just doing it."],
+              reflection: good
+                ? "What made this conversation land well?"
+                : "What would you say differently next time?"
+            });
+          }
+        },
+        consequence: "Naming the actual problem, even badly, moves it forward more than silence does.",
+        reflection: "What has staying quiet about this actually cost you?"
+      },
+      {
         id: "end-roommate-arrangement",
         title: "End the roommate arrangement",
         description: "Trade a lower monthly cost for full privacy and control over the space again.",

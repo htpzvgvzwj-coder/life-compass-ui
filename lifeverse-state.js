@@ -193,6 +193,7 @@
         experience: 0,
         reputation: 30,
         interviewPrep: 20,
+        interviewPracticeSessions: 0,
         applications: [],
         currentJob: null,
         employed: true,
@@ -528,6 +529,7 @@
     merged.career.employed = merged.career.employed !== false;
     merged.career.category = merged.career.category || null;
     merged.career.lastUnemploymentClaimDay = Math.max(0, Math.round(Number(merged.career.lastUnemploymentClaimDay) || 0));
+    merged.career.interviewPracticeSessions = Math.max(0, Math.round(Number(merged.career.interviewPracticeSessions) || 0));
     ["studyConsistency", "learningEfficiency", "credits", "qualificationProgress", "tuitionPressure", "portfolio"].forEach((key) => {
       merged.education[key] = clamp(merged.education[key]);
     });

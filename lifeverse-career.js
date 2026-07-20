@@ -83,6 +83,96 @@
         reflection: "Did you apply from preparation, pressure, or avoidance?"
       },
       {
+        id: "attend-interview",
+        title: "Attend the interview",
+        description: "Show up and make your case in person - the invitation was earned by preparation, but the outcome is decided here.",
+        durationMinutes: 120,
+        canPerform(state) {
+          return state.career.status === "Interview stage" || "You need an interview offer first - apply for a role.";
+        },
+        effects: {
+          needs: { energy: -8, stress: 8, purpose: 6 },
+          capability: { communication: 1, decisionMaking: 1 }
+        },
+        after(state) {
+          const practiceBonus = Math.min(15, (state.career.interviewPracticeSessions || 0) * 3);
+          const chance = state.career.readiness + state.career.interviewPrep + state.player.skills.career * 1.2
+            + practiceBonus
+            + (game.legalRecordPenalty ? game.legalRecordPenalty(state) : 0)
+            + (game.qualificationBonus ? game.qualificationBonus(state) : 0);
+          const hired = chance >= 90;
+          const lastApplication = (state.career.applications || [])[state.career.applications.length - 1];
+          if (hired) {
+            state.career.employed = true;
+            state.career.status = state.career.category ? `Pursuing ${CATEGORY_LABELS[state.career.category]}` : "Entry preparation";
+            state.career.reputation = game.clamp(state.career.reputation + 6);
+            state.career.readiness = game.clamp(state.career.readiness + 4);
+            if (lastApplication) lastApplication.status = "Hired";
+            if (game.addAchievement) game.addAchievement(state, "first-real-job", "Landed a Real Job", "Applied, interviewed, and got hired - a real outcome, not just a formula.");
+          } else {
+            state.career.status = state.career.category ? `Pursuing ${CATEGORY_LABELS[state.career.category]}` : "Entry preparation";
+            state.career.readiness = game.clamp(state.career.readiness + 2);
+            if (lastApplication) lastApplication.status = "Not selected";
+          }
+          if (game.addEvent) {
+            game.addEvent(state, {
+              type: "career",
+              title: hired ? "Hired!" : "Not selected this time",
+              summary: hired ? "The interview went well enough to get the offer." : "The interview happened, but the offer didn't come.",
+              systems: ["Career"],
+              consequences: hired
+                ? [`You're employed. Reputation is now ${state.career.reputation}/100.`, practiceBonus > 0 ? `Real interview practice helped - a +${practiceBonus} boost from ${state.career.interviewPracticeSessions} completed session(s).` : "No interview-practice boost this time - practicing the real tool first raises your odds."]
+                : [`Readiness is now ${state.career.readiness}/100 - a smaller gain than a full application, but not nothing.`, practiceBonus > 0 ? `Real interview practice still helped some (+${practiceBonus}), just not enough this time.` : "Practicing with the real interview-practice tool first would have raised your odds."],
+              reflection: hired
+                ? "What actually made the difference between the offer and the rejection you might have gotten?"
+                : "What would you actually do differently before the next one?"
+            });
+          }
+        },
+        consequence: "The outcome is decided here, not at the moment you applied.",
+        reflection: "How prepared did you actually feel walking in?"
+      },
+      {
+        id: "address-workplace-conflict",
+        title: "Address a conflict at work",
+        description: "Say the uncomfortable thing to a boss or coworker instead of letting it sit.",
+        durationMinutes: 45,
+        canPerform(state) {
+          return state.career.employed || "You need a job before this conversation is relevant.";
+        },
+        effects: {
+          needs: { stress: 3, purpose: 4 },
+          capability: { communication: 1 }
+        },
+        after(state) {
+          const outcomeScore = state.player.capability.communication + state.player.skills.social * 0.5;
+          const good = outcomeScore >= 70;
+          if (good) {
+            state.career.reputation = game.clamp(state.career.reputation + 8);
+            state.career.burnoutRisk = game.clamp(state.career.burnoutRisk - 5);
+          } else {
+            state.career.burnoutRisk = game.clamp(state.career.burnoutRisk + 8);
+            state.needs.stress = game.clamp(state.needs.stress + 8);
+          }
+          if (game.addEvent) {
+            game.addEvent(state, {
+              type: "career",
+              title: good ? "Handled a workplace conflict well" : "A rocky conversation at work",
+              summary: good ? "The conversation landed better than expected." : "The conversation happened, but it was uncomfortable and imperfect.",
+              systems: ["Career"],
+              consequences: good
+                ? [`Reputation is now ${state.career.reputation}/100.`, `Burnout risk eased to ${state.career.burnoutRisk}/100.`]
+                : [`Burnout risk rose to ${state.career.burnoutRisk}/100.`, "Communication skill still grew a little from just doing it."],
+              reflection: good
+                ? "What made this conversation easier than you expected?"
+                : "What would you say differently if you had to have it again?"
+            });
+          }
+        },
+        consequence: "Saying it out loud changes something, even when it doesn't go perfectly.",
+        reflection: "Was avoiding this actually protecting you, or just delaying the cost?"
+      },
+      {
         id: "work-overtime",
         title: "Accept overtime",
         description: "Earn more this week while risking recovery and wellbeing.",

@@ -3739,6 +3739,17 @@ async function finishInterviewSession(session, persona) {
     console.error("[Interview Practice] Feedback generation failed", error);
   }
   session.completedAt = new Date().toISOString();
+  syncInterviewPracticeToLifeVerse();
+}
+
+// Real Interview Practice sessions (AI-based, careerStudio) had zero
+// connection to LifeVerse's career simulation - practicing the actual skill
+// had no payoff in the sim. Mirrors bumpCommunityTrust's one-way sync
+// pattern: a plain count, not an AI-parsed score, keeps LifeVerse's own
+// formula deterministic and free of AI dependence.
+function syncInterviewPracticeToLifeVerse() {
+  const state = lifeVerseState();
+  state.career.interviewPracticeSessions = trackerState.careerStudio.interviewSessions.filter((session) => session.completedAt).length;
   saveTrackerState();
 }
 
