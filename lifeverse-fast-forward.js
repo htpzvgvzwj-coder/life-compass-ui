@@ -203,12 +203,18 @@
         state.housing.lease.evictionRisk = game.clamp(state.housing.lease.evictionRisk - 5);
       }
     }
-    // Vehicle loan missed payment - same shape as the lease block above,
-    // checked against the loan's own monthlyPayment rather than the general
+    // Vehicle loan payment - same shape as the lease block above, checked
+    // against the loan's own monthlyPayment rather than the general
     // transportation.monthlyCost (which nothing in Fast Forward actually
-    // charges today - left untouched on purpose).
+    // charges today - left untouched on purpose). Unlike rent (which was
+    // already being deducted via the pre-existing rentCost/totalCost path
+    // below), there was no existing mechanism charging the loan payment at
+    // all - the "afford" branch must actually deduct it and pay down the
+    // balance, or "financing a vehicle" would cost only the down payment
+    // and then nothing, ever.
     if (state.transportation.loan && state.transportation.loan.active) {
-      if (state.finance.money < state.transportation.loan.monthlyPayment) {
+      const loanPayment = Math.min(state.transportation.loan.monthlyPayment, state.transportation.vehicleLoanBalance);
+      if (state.finance.money < loanPayment) {
         state.transportation.loan.missedPayments += 1;
         state.transportation.loan.repossessionRisk = game.clamp(state.transportation.loan.repossessionRisk + 25);
         if (game.addEvent) {
@@ -222,7 +228,26 @@
           });
         }
       } else {
+        state.finance.money = Math.max(0, Math.round(state.finance.money - loanPayment));
+        state.finance.debt = Math.max(0, Math.round(state.finance.debt - loanPayment));
+        state.transportation.vehicleLoanBalance = Math.max(0, Math.round(state.transportation.vehicleLoanBalance - loanPayment));
         state.transportation.loan.repossessionRisk = game.clamp(state.transportation.loan.repossessionRisk - 5);
+        if (state.transportation.vehicleLoanBalance <= 0) {
+          state.transportation.loan.active = false;
+          state.transportation.monthlyCost = Math.max(0, Math.round(state.transportation.monthlyCost - 90));
+          if (game.addAchievement) game.addAchievement(state, "vehicle-loan-paid-off", "Vehicle Loan Paid Off", "Paid off a real car loan, one payment at a time.");
+          if (game.addEvent) {
+            game.addEvent(state, {
+              type: "transportation",
+              title: "Vehicle loan paid off",
+              summary: "The last payment cleared the balance.",
+              systems: ["Transportation"],
+              consequences: ["The vehicle is fully yours now - the monthly payment is gone."],
+              reflection: "What will you do with the money that used to go to this payment?"
+            });
+          }
+        }
+        if (game.recalculateCreditScore) game.recalculateCreditScore(state);
       }
     }
     // Education program dropout risk - unlike the lease/loan, tuition here
@@ -347,11 +372,18 @@
     }
     // Eviction (same deterministic seeded-roll shape as the layoff roll
     // above): only becomes possible once eviction risk has genuinely built
-    // up from repeated missed payments, not from a single bad chunk.
+    // up from repeated missed payments, not from a single bad chunk. Uses
+    // an explicit `evicted` flag rather than if/else-if against the renewal
+    // check below - with if/else-if, a chunk where risk was high enough to
+    // roll but the roll happened to miss would silently skip the renewal
+    // check too (even though nothing actually happened), permanently
+    // stalling a lease whose term had already ended.
+    let evicted = false;
     if (state.housing.lease && state.housing.lease.active && state.housing.lease.evictionRisk >= 70) {
       const evictionSeed = Math.sin(state.time.day * 63.271 + chunkDays * 2.71828) * 10000;
       const evictionRoll = evictionSeed - Math.floor(evictionSeed);
       if (evictionRoll < 0.3) {
+        evicted = true;
         state.housing.lease.active = false;
         state.housing.type = "Emergency temporary housing";
         state.housing.selectedOption = "emergency-temporary";
@@ -371,7 +403,8 @@
           });
         }
       }
-    } else if (state.housing.lease && state.housing.lease.active && state.time.day >= state.housing.lease.endsDay) {
+    }
+    if (!evicted && state.housing.lease && state.housing.lease.active && state.time.day >= state.housing.lease.endsDay) {
       // Term expiry auto-renews for now (no explicit renew/move-out choice
       // yet) but rent tracks the real local housing market pressure instead
       // of staying frozen, and it's narrated rather than a silent change.
@@ -419,11 +452,16 @@
     }
     // Dropping out - same deterministic seeded-roll shape, its own unused
     // multiplier pair, only possible once dropout risk has genuinely built
-    // up from sustained neglect.
+    // up from sustained neglect. Uses an explicit `droppedOut` flag for the
+    // same reason as the eviction/renewal pair above - a high-risk chunk
+    // whose roll happens to miss must not silently block graduation if the
+    // term also ended that same chunk.
+    let droppedOut = false;
     if (state.education.program && state.education.program.active && state.education.program.dropoutRisk >= 70) {
       const dropoutSeed = Math.sin(state.time.day * 24.899 + chunkDays * 5.926) * 10000;
       const dropoutRoll = dropoutSeed - Math.floor(dropoutSeed);
       if (dropoutRoll < 0.3) {
+        droppedOut = true;
         state.education.program.active = false;
         state.education.qualificationProgress = game.clamp(state.education.qualificationProgress - 20);
         state.education.studyConsistency = game.clamp(state.education.studyConsistency - 10);
@@ -439,7 +477,8 @@
           });
         }
       }
-    } else if (state.education.program && state.education.program.active && state.time.day >= state.education.program.endsDay) {
+    }
+    if (!droppedOut && state.education.program && state.education.program.active && state.time.day >= state.education.program.endsDay) {
       // Graduation - the term ended while the program was still active
       // (never dropped out), a real completed milestone.
       state.education.program.active = false;

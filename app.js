@@ -2868,7 +2868,7 @@ function lifeSimLocationPanel() {
       <div class="life-sim-location-card is-empty" data-sim-location-card>
         <p class="eyebrow">Explore mode</p>
         <h3>Find a glowing zone.</h3>
-        <p class="muted">Move near a recognizable place. Some locations have playable actions now; others are visual spaces for this remaster.</p>
+        <p class="muted">Move near a recognizable place. Every location has real things to do there.</p>
         <div class="sim-activity-list" data-sim-activity-list></div>
       </div>
     `;

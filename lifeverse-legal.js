@@ -110,7 +110,7 @@
   game.legalSystem = {
     id: "legal",
     title: "Legal",
-    chapter: "Chapter 13",
+    chapter: "Chapter 21",
     summary(state) {
       if (state.legal.record) return `You have a record. Risk level ${state.legal.heat}/100.`;
       return `No record. Risk level ${state.legal.heat}/100, $${state.legal.finesOwed} in fines paid so far.`;
