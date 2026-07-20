@@ -594,6 +594,163 @@
       },
       consequence: "The application is in - a real step toward an independent home, with a real wait ahead.",
       reflection: "What does having your own place actually mean to you?"
+    },
+    // Remaining map locations that had zero attached gameplay (real
+    // positioned zones on the map, but purely cosmetic set-dressing until
+    // now) - one genuine daily-life activity each, same pattern as
+    // everywhere else in this file.
+    {
+      id: "full-health-checkup",
+      title: "Get a full health checkup",
+      category: "Health",
+      location: "hospital",
+      durationMinutes: 120,
+      canPerform(state) {
+        return state.finance.money >= 60 || "You need at least $60 in cash for a full checkup.";
+      },
+      effects: {
+        finance: { money: -60 },
+        needs: { stress: -2, purpose: 3 },
+        health: { illnessRisk: -10, medicalAccess: 10, physical: 2 },
+        mentalWellbeing: { confidence: 2 }
+      },
+      consequence: "Prevention costs more up front than ignoring it - and far less than catching a problem late.",
+      reflection: "When was the last time you did this before something forced you to?"
+    },
+    {
+      id: "work-remotely-from-cafe",
+      title: "Work remotely from a cafe",
+      category: "Career",
+      location: "cafe",
+      durationMinutes: 150,
+      effects: {
+        finance: { money: -12 },
+        needs: { energy: -5, social: 4, stress: -3, purpose: 4 },
+        career: { performance: 2 },
+        mentalWellbeing: { motivation: 2 }
+      },
+      consequence: "A change of scenery cost a coffee and produced a different kind of focus than home did.",
+      reflection: "Was this about the work, or about not being alone with it?"
+    },
+    {
+      id: "attend-a-lecture",
+      title: "Sit in on a public lecture",
+      category: "Education",
+      location: "university",
+      durationMinutes: 90,
+      effects: {
+        needs: { energy: -4, purpose: 6 },
+        education: { learningEfficiency: 4, studyConsistency: 2 },
+        skills: { learning: 3 },
+        mentalWellbeing: { motivation: 2 }
+      },
+      consequence: "Free, and it stretched further than a short course - if you actually stayed for the whole thing.",
+      reflection: "What idea from this is worth following up on?"
+    },
+    {
+      id: "network-at-a-mixer",
+      title: "Network at a professional mixer",
+      category: "Career",
+      location: "marina-bay",
+      durationMinutes: 150,
+      canPerform(state) {
+        return state.finance.money >= 25 || "You need at least $25 in cash for this event.";
+      },
+      effects: {
+        finance: { money: -25 },
+        needs: { energy: -10, social: 8, stress: 4, purpose: 5 },
+        career: { readiness: 3, reputation: 4 },
+        relationships: { network: 4 },
+        capability: { communication: 1 }
+      },
+      consequence: "Small talk with strangers is uncomfortable and, occasionally, exactly how doors open.",
+      reflection: "Did you actually follow up with anyone, or just collect a business card?"
+    },
+    {
+      id: "explore-chinatown-heritage",
+      title: "Explore Chinatown's heritage streets",
+      category: "Reflection",
+      location: "chinatown",
+      durationMinutes: 90,
+      effects: {
+        finance: { money: -10 },
+        needs: { stress: -6, purpose: 5, social: 2 },
+        mentalWellbeing: { resilience: 2 },
+        relationships: { network: 1 }
+      },
+      consequence: "Slow, cheap, and grounding - a reminder that the city existed before your routine did.",
+      reflection: "What does it change to know where the people around you actually came from?"
+    },
+    {
+      id: "browse-little-india-market",
+      title: "Browse Little India's markets",
+      category: "Lifestyle",
+      location: "little-india",
+      durationMinutes: 75,
+      effects: {
+        finance: { money: -15 },
+        needs: { stress: -4, purpose: 3, social: 3 },
+        mentalWellbeing: { motivation: 1 }
+      },
+      consequence: "Spices and colour for a small price - a different rhythm than the mall's.",
+      reflection: "How often do you spend time somewhere unfamiliar on purpose?"
+    },
+    {
+      id: "bargain-hunt-at-bugis",
+      title: "Bargain hunt at Bugis Street",
+      category: "Lifestyle",
+      location: "bugis",
+      durationMinutes: 90,
+      effects: {
+        finance: { money: -18 },
+        needs: { energy: -6, stress: -3, purpose: 2 },
+        skills: { finance: 1 },
+        capability: { decisionMaking: 1 }
+      },
+      consequence: "Cheaper than the mall if you actually negotiated - more time, less certainty on price.",
+      reflection: "Did the haggling feel like a skill, or just awkward?"
+    },
+    {
+      id: "watch-the-trading-floor",
+      title: "Watch the CBD's trading-floor energy",
+      category: "Reflection",
+      location: "raffles-place",
+      durationMinutes: 45,
+      effects: {
+        needs: { stress: 2, purpose: 5 },
+        career: { readiness: 1 },
+        mentalWellbeing: { motivation: 3 }
+      },
+      consequence: "Free to watch, and it either lit a fire or made the whole pace feel exhausting.",
+      reflection: "Did this make you want more ambition, or less?"
+    },
+    {
+      id: "walk-punggol-waterway",
+      title: "Walk along Punggol Waterway",
+      category: "Health",
+      location: "punggol",
+      durationMinutes: 70,
+      effects: {
+        needs: { energy: 4, stress: -8, purpose: 3 },
+        health: { physical: 2, activity: 3 },
+        mentalWellbeing: { resilience: 2 }
+      },
+      consequence: "Free, quiet, and unhurried - the opposite of most of the rest of the day.",
+      reflection: "How much of your stress actually needs money to fix, versus just quiet?"
+    },
+    {
+      id: "cross-border-errand-run",
+      title: "Run errands at the Woodlands regional mall",
+      category: "Living",
+      location: "woodlands",
+      durationMinutes: 100,
+      effects: {
+        finance: { money: -20 },
+        needs: { energy: -6, purpose: 2 },
+        capability: { responsibility: 1, decisionMaking: 1 }
+      },
+      consequence: "Practical, unglamorous, and cheaper out here than closer to the centre of the city.",
+      reflection: "Was the trip out here worth the time it cost?"
     }
   ];
 
