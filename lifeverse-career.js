@@ -67,7 +67,8 @@
         },
         after(state) {
           const chance = state.career.readiness + state.career.interviewPrep + state.player.skills.career
-            + (game.legalRecordPenalty ? game.legalRecordPenalty(state) : 0);
+            + (game.legalRecordPenalty ? game.legalRecordPenalty(state) : 0)
+            + (game.qualificationBonus ? game.qualificationBonus(state) : 0);
           const status = chance >= 85 ? "Interview offered" : "Needs more preparation";
           state.career.applications = [
             ...(state.career.applications || []),

@@ -176,7 +176,12 @@
         taxAwareness: 20,
         lastTaxFiledDay: 0,
         totalTaxPaid: 0,
-        lastTaxOwed: 0
+        lastTaxOwed: 0,
+        creditCard: {
+          lastStatementDay: 0,
+          missedPayments: 0,
+          collectionsRisk: 0
+        }
       },
       career: {
         status: "Entry preparation",
@@ -202,7 +207,16 @@
         credits: 0,
         qualificationProgress: 0,
         tuitionPressure: 0,
-        portfolio: 12
+        portfolio: 12,
+        program: {
+          active: false,
+          termDays: 270,
+          startedDay: 0,
+          endsDay: 0,
+          tuitionPaid: 0,
+          dropoutRisk: 0,
+          completedCount: 0
+        }
       },
       housing: {
         type: "Family home / HDB room",
@@ -245,7 +259,17 @@
         ownsVehicle: false,
         vehicleMaintenance: 70,
         parkingSecured: false,
-        vehicleLoanBalance: 0
+        vehicleLoanBalance: 0,
+        loan: {
+          active: false,
+          termDays: 0,
+          startedDay: 0,
+          endsDay: 0,
+          downPayment: 0,
+          monthlyPayment: 0,
+          missedPayments: 0,
+          repossessionRisk: 0
+        }
       },
       relationships: {
         support: 55,
@@ -434,15 +458,22 @@
       finance: {
         ...mergeObject(fallback.finance, source.finance),
         investments: mergeObject(fallback.finance.investments, source.finance && source.finance.investments),
-        insurance: mergeObject(fallback.finance.insurance, source.finance && source.finance.insurance)
+        insurance: mergeObject(fallback.finance.insurance, source.finance && source.finance.insurance),
+        creditCard: mergeObject(fallback.finance.creditCard, source.finance && source.finance.creditCard)
       },
       career: mergeObject(fallback.career, source.career),
-      education: mergeObject(fallback.education, source.education),
+      education: {
+        ...mergeObject(fallback.education, source.education),
+        program: mergeObject(fallback.education.program, source.education && source.education.program)
+      },
       housing: {
         ...mergeObject(fallback.housing, source.housing),
         lease: mergeObject(fallback.housing.lease, source.housing && source.housing.lease)
       },
-      transportation: mergeObject(fallback.transportation, source.transportation),
+      transportation: {
+        ...mergeObject(fallback.transportation, source.transportation),
+        loan: mergeObject(fallback.transportation.loan, source.transportation && source.transportation.loan)
+      },
       relationships: mergeObject(fallback.relationships, source.relationships),
       health: mergeObject(fallback.health, source.health),
       mentalWellbeing: mergeObject(fallback.mentalWellbeing, source.mentalWellbeing),

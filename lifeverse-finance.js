@@ -8,11 +8,20 @@
     const savingsHealth = Math.min(1, finance.savings / 2000);
     const budgetingHabit = (state.player.habits.budgeting || 0) / 100;
     const investmentHealth = Math.min(1, (finance.investments.bonds + finance.investments.stocks + finance.investments.property) / 3000);
+    // Payment history is a genuine formula input (not a one-off edit to
+    // creditScore itself) precisely because this function fully recomputes
+    // the score from scratch on nearly every finance action and every Fast
+    // Forward chunk - a direct nudge to creditScore would just get
+    // overwritten by the next call. Folding missed statement payments in
+    // here is what makes them actually stick.
+    const missedPayments = (finance.creditCard && finance.creditCard.missedPayments) || 0;
+    const paymentHistoryPenalty = Math.min(1, missedPayments * 0.15);
     const raw = 300
       + (1 - debtRatio) * 300
       + savingsHealth * 130
       + budgetingHabit * 90
-      + investmentHealth * 50;
+      + investmentHealth * 50
+      - paymentHistoryPenalty * 100;
     finance.creditScore = Math.max(300, Math.min(850, Math.round(raw)));
     return finance.creditScore;
   }
@@ -32,12 +41,16 @@
       return `$${state.finance.money} cash, $${state.finance.savings} savings, $${state.finance.debt} debt, credit ${creditTier(state.finance.creditScore)}.`;
     },
     metrics(state) {
-      return [
+      const base = [
         ["Confidence", state.finance.confidence],
         ["Savings", state.finance.savings],
         ["Debt", state.finance.debt],
         ["Credit score", state.finance.creditScore]
       ];
+      if (state.finance.creditCard && state.finance.creditCard.collectionsRisk > 0) {
+        base.push(["Collections risk", state.finance.creditCard.collectionsRisk]);
+      }
+      return base;
     },
     actions: [
       {
@@ -261,6 +274,30 @@
         },
         consequence: "Credit score is not something you can buy directly - it moves slowly based on debt, savings, and consistent budgeting.",
         reflection: "Which single habit would most improve this score if you kept it up for a month?"
+      },
+      {
+        id: "pay-down-credit-card",
+        title: "Pay down credit card debt",
+        description: "Put extra cash toward the balance instead of just the minimum, and repair a strained payment history.",
+        durationMinutes: 20,
+        canPerform(state) {
+          if (state.finance.debt <= 0) return "You do not currently have any debt to pay down.";
+          return state.finance.money >= 50 || "You need at least $50 in cash to make a real dent.";
+        },
+        effects: {
+          needs: { stress: -3, purpose: 2 },
+          capability: { responsibility: 1 }
+        },
+        after(state) {
+          const payment = Math.min(state.finance.money, 50, state.finance.debt);
+          state.finance.money = Math.max(0, Math.round(state.finance.money - payment));
+          state.finance.debt = Math.max(0, Math.round(state.finance.debt - payment));
+          state.finance.creditCard.missedPayments = Math.max(0, state.finance.creditCard.missedPayments - 1);
+          state.finance.creditCard.collectionsRisk = game.clamp(state.finance.creditCard.collectionsRisk - 15);
+          recalculateCreditScore(state);
+        },
+        consequence: "Extra payments toward the balance now mean less interest and a cleaner payment history later.",
+        reflection: "What would it take to make this a regular habit instead of a one-off?"
       }
     ]
   };

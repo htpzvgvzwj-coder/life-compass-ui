@@ -94,6 +94,84 @@
       reflection: "Which is actually scarcer for you right now - money or time?"
     },
     {
+      id: "grocery-run",
+      title: "Do a grocery run",
+      category: "Living",
+      location: "mall",
+      durationMinutes: 50,
+      effects: {
+        finance: { money: -35 },
+        needs: { energy: -4, purpose: 2 },
+        capability: { responsibility: 1, decisionMaking: 1 }
+      },
+      consequence: "A bigger bill today, but cheaper meals for the rest of the week.",
+      reflection: "Did you plan this trip, or just wing it?"
+    },
+    {
+      id: "fix-something-at-home",
+      title: "Fix something yourself",
+      category: "Living",
+      location: "home",
+      durationMinutes: 60,
+      effects: {
+        needs: { energy: -8, stress: 3, purpose: 6 },
+        housing: { maintenance: 10 },
+        skills: { lifeManagement: 2 },
+        capability: { responsibility: 1, decisionMaking: 1 }
+      },
+      consequence: "Cost nothing but time and patience - calling someone would have cost both money and waiting.",
+      reflection: "Would you know who to call if this hadn't worked?"
+    },
+    {
+      id: "volunteer-shift",
+      title: "Volunteer for a few hours",
+      category: "Relationship",
+      location: "park",
+      durationMinutes: 150,
+      effects: {
+        needs: { energy: -10, social: 8, stress: -4, purpose: 12 },
+        relationships: { network: 3, trust: 2 },
+        mentalWellbeing: { motivation: 3 },
+        capability: { communication: 1, responsibility: 1 }
+      },
+      after(state) {
+        state.npcSimulation.communityTrust = game.clamp(state.npcSimulation.communityTrust + 4);
+      },
+      consequence: "No pay, real cost in time and energy - and a kind of purpose money doesn't buy.",
+      reflection: "What did you get out of this that a paid shift wouldn't have given you?"
+    },
+    {
+      id: "catch-up-on-news",
+      title: "Catch up on the news",
+      category: "Reflection",
+      location: "home",
+      durationMinutes: 25,
+      effects: {
+        needs: { purpose: 3, stress: 1 },
+        mentalWellbeing: { resilience: 1 },
+        skills: { finance: 1 }
+      },
+      consequence: "Cheap and quick - knowing what's happening outside your own routine.",
+      reflection: "Did this leave you more informed, or just more anxious?"
+    },
+    {
+      id: "study-group-with-peers",
+      title: "Study with a group",
+      category: "Education",
+      location: "library",
+      durationMinutes: 120,
+      effects: {
+        needs: { energy: -6, social: 6, stress: -2, purpose: 5 },
+        education: { studyConsistency: 6, learningEfficiency: 3 },
+        relationships: { friends: 3, support: 1 },
+        skills: { learning: 3, social: 1 },
+        habits: { studyConsistency: 3 },
+        capability: { communication: 1 }
+      },
+      consequence: "Slower than studying alone, some of the time, but harder to skip and easier to stay honest with.",
+      reflection: "Do you actually focus better with people around, or just feel like you should?"
+    },
+    {
       id: "do-laundry-and-chores",
       title: "Do laundry and chores",
       category: "Living",

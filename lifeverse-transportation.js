@@ -100,7 +100,8 @@
         durationMinutes: 150,
         canPerform(state) {
           if (state.transportation.ownsVehicle) return "You already own a vehicle.";
-          return state.finance.creditScore >= 580 || "You need at least a fair credit score (580+) to qualify for vehicle financing.";
+          if (state.finance.creditScore < 580) return "You need at least a fair credit score (580+) to qualify for vehicle financing.";
+          return state.finance.money >= 400 || "You need at least $400 in cash for the down payment.";
         },
         effects: {
           needs: { stress: 4, purpose: 5 },
@@ -108,6 +109,7 @@
           capability: { decisionMaking: 1 }
         },
         after(state) {
+          state.finance.money = Math.max(0, Math.round(state.finance.money - 400));
           state.finance.debt = Math.max(0, Math.round(state.finance.debt + 1800));
           state.transportation.vehicleLoanBalance = 1800;
           state.transportation.ownsVehicle = true;
@@ -115,10 +117,39 @@
           state.transportation.mode = "Own vehicle (financed)";
           state.transportation.selectedMode = "own-vehicle";
           state.transportation.monthlyCost = Math.max(0, Math.round(state.transportation.monthlyCost + 90));
+          state.transportation.loan = {
+            active: true,
+            termDays: 600,
+            startedDay: state.time.day,
+            endsDay: state.time.day + 600,
+            downPayment: 400,
+            monthlyPayment: 90,
+            missedPayments: 0,
+            repossessionRisk: 0
+          };
           if (game.recalculateCreditScore) game.recalculateCreditScore(state);
+          if (game.addAchievement) game.addAchievement(state, "first-vehicle-financed", "First Vehicle Financed", "Took on a real car loan - a down payment, a monthly payment, and a lender who expects to be paid.");
         },
-        consequence: "Financing got you a vehicle today, but the loan balance and higher monthly cost will follow you until it's paid off.",
-        reflection: "Does the flexibility this buys you outweigh carrying more debt?"
+        consequence: "A $400 down payment, $1800 financed, $90/month for the next 20 months - and a lender who now expects to be paid.",
+        reflection: "What happens if a payment gets missed?"
+      },
+      {
+        id: "negotiate-with-lender",
+        title: "Negotiate with your lender",
+        description: "Keep the relationship with the people who financed your vehicle in good standing.",
+        durationMinutes: 30,
+        canPerform(state) {
+          return state.transportation.loan.active || "You do not currently have an active vehicle loan to manage.";
+        },
+        effects: {
+          needs: { social: 2, stress: -2, purpose: 2 },
+          capability: { communication: 1 }
+        },
+        after(state) {
+          state.transportation.loan.repossessionRisk = game.clamp(state.transportation.loan.repossessionRisk - 15);
+        },
+        consequence: "A conversation before a payment problem grows is cheaper than one after.",
+        reflection: "Is this the kind of call you'd rather avoid making?"
       },
       {
         id: "maintain-vehicle",
@@ -184,6 +215,7 @@
           state.transportation.ownsVehicle = false;
           state.transportation.parkingSecured = false;
           state.transportation.vehicleLoanBalance = 0;
+          state.transportation.loan.active = false;
           state.transportation.vehicleMaintenance = 70;
           state.transportation.mode = "MRT and bus";
           state.transportation.selectedMode = "public-transport";
