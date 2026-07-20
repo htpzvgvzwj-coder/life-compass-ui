@@ -2593,7 +2593,7 @@ function lifeVerseSystemCard(system) {
       </div>
       ${lifeVerseSystemTutorialHint(system)}
       <div class="lifeverse-system-metrics">
-        ${(system.metrics || []).slice(0, 4).map(([label, value]) => `
+        ${(system.metrics || []).slice(0, 9).map(([label, value]) => `
           <span><small>${escapeHTML(label)}</small><b>${escapeHTML(value)}</b></span>
         `).join("")}
       </div>
@@ -3160,6 +3160,11 @@ let pendingTeleportLocationId = null;
 function mountLifeSim() {
   const root = document.querySelector("#life-sim-root");
   if (!root) return;
+  // Backfills interviewPracticeSessions for returning players whose real
+  // practice history predates this sync existing (it otherwise only
+  // updates when a new session finishes) - cheap and idempotent to run
+  // every time the sim is opened.
+  syncInterviewPracticeToLifeVerse();
   destroyLifeSim();
   if (!window.CompassLifeSim || typeof window.CompassLifeSim.mount !== "function") {
     root.innerHTML = `<div class="sim-canvas-fallback"><strong>3D simulator is unavailable</strong><span>Refresh the page once, then open Life Sim again.</span></div>`;
