@@ -4103,6 +4103,105 @@ textarea {
   filter: blur(0.2px);
 }
 
+.lifeverse-home-spotlight {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 20px;
+  border-radius: 24px;
+  color: #f8f6f2;
+  text-align: left;
+  cursor: pointer;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(200, 169, 107, 0.4), transparent 32%),
+    radial-gradient(circle at 8% 92%, rgba(200, 169, 107, 0.14), transparent 36%),
+    linear-gradient(135deg, #0c0c0b, #1d1a13 55%, #0a0a09);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+}
+
+.lifeverse-home-spotlight-orb {
+  position: absolute;
+  right: -30px;
+  top: -30px;
+  width: 150px;
+  height: 150px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 34% 34%, rgba(255, 255, 255, 0.9), rgba(200, 169, 107, 0.6) 36%, rgba(200, 169, 107, 0.1) 64%, transparent 70%);
+  pointer-events: none;
+}
+
+.lifeverse-home-spotlight-top {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+  max-width: 78%;
+}
+
+.lifeverse-home-spotlight-top .eyebrow {
+  color: #c8a96b;
+}
+
+.lifeverse-home-spotlight-top h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.lifeverse-home-spotlight-text {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  max-width: 82%;
+  color: rgba(248, 246, 242, 0.72);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.lifeverse-home-spotlight-stats {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.lifeverse-home-spotlight-stats span {
+  display: grid;
+  gap: 2px;
+  padding: 9px 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(248, 246, 242, 0.7);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lifeverse-home-spotlight-stats strong {
+  color: #fff;
+  font-size: 15px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.lifeverse-home-spotlight-cta {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #c8a96b;
+  color: #111;
+  font-size: 13px;
+  font-weight: 1000;
+}
+
 .future-home-copy {
   position: relative;
   z-index: 1;

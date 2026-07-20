@@ -1977,11 +1977,39 @@ function futureScoreHomeCard() {
   `;
 }
 
+// LifeVerse gets its own dedicated portal instead of sitting in the uniform
+// quick-access grid - it's the flagship feature (a full life simulation, not
+// a single tool), and a returning player has a real, live world to show
+// instead of a generic promo tile.
+function lifeVerseHomeSpotlight() {
+  const started = Boolean(userProfile.characterCreated);
+  const state = started ? lifeVerseState() : null;
+  return `
+    <section class="lifeverse-home-spotlight" data-tab-jump="simulator">
+      <div class="lifeverse-home-spotlight-orb" aria-hidden="true"></div>
+      <div class="lifeverse-home-spotlight-top">
+        <p class="eyebrow">LifeVerse</p>
+        <h2>${started ? "Your life is still running." : "Live a full adult life before you have to."}</h2>
+      </div>
+      ${started ? `
+        <div class="lifeverse-home-spotlight-stats">
+          <span><strong>Day ${state.time.day}</strong>In progress</span>
+          <span><strong>$${Math.round(state.finance.money)}</strong>Cash</span>
+          <span><strong>${state.career.employed ? "Employed" : "Unemployed"}</strong>${escapeHTML(state.career.status)}</span>
+        </div>
+        <button class="lifeverse-home-spotlight-cta" type="button" data-tab-jump="simulator">Continue your life</button>
+      ` : `
+        <p class="lifeverse-home-spotlight-text">Housing, money, a job, relationships, even the trouble you can get into - a real simulation, not a quiz.</p>
+        <button class="lifeverse-home-spotlight-cta" type="button" data-tab-jump="simulator">Start your life</button>
+      `}
+    </section>
+  `;
+}
+
 function homeQuickAccessGrid() {
   const items = [
     ["icon-chat.png", "Compass AI", "Ask, plan, reflect", "compass"],
     ["icon-learn.png", "Growth", "Goals, journal, mood", "growth"],
-    ["icon-balance.png", "Life Sim", "Play adult-life choices", "simulator"],
     ["icon-support.png", "Community", "Groups and support", "community"],
     ["icon-work.png", "Opportunities", "Scholarships and internships", "opportunities"]
   ];
@@ -5063,6 +5091,7 @@ function futureScanSignalBanner() {
 const screens = {
   home: () => `
     ${futureMirrorHomeHero()}
+    ${lifeVerseHomeSpotlight()}
     ${todayInsightCard()}
     ${futureScoreHomeCard()}
     ${homeQuickAccessGrid()}
