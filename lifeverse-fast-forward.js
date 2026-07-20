@@ -178,6 +178,31 @@
     const inflationMultiplier = 1 + (Number(state.economy.inflation || 0) / 100) * (chunkDays / 30);
     const livingCost = Math.round(chunkDays * Number(state.finance.dailyLivingCost || 18) * inflationMultiplier);
     const rentCost = Math.round((Number(state.housing.monthlyCost || 0) / 30) * chunkDays);
+    // Lease rent shortfall (bible-consistent with the crime/consequence work
+    // this session): before this chunk's lump cost deduction quietly turns
+    // an unaffordable rent into more debt, a real, felt housing consequence
+    // fires first - missing rent should cost more than money, and a lease
+    // that keeps getting missed should eventually risk eviction.
+    if (state.housing.lease && state.housing.lease.active) {
+      if (state.finance.money < rentCost) {
+        state.housing.lease.missedPayments += 1;
+        state.housing.lease.landlordRelationship = game.clamp(state.housing.lease.landlordRelationship - 15);
+        state.housing.lease.evictionRisk = game.clamp(state.housing.lease.evictionRisk + 25);
+        if (game.addEvent) {
+          game.addEvent(state, {
+            type: "housing",
+            title: "Missed a rent payment",
+            summary: "You couldn't cover rent this period.",
+            systems: ["Housing"],
+            consequences: [`Landlord relationship is now ${state.housing.lease.landlordRelationship}/100.`, `Eviction risk is now ${state.housing.lease.evictionRisk}/100.`],
+            reflection: "What would need to change before the next payment is due?"
+          });
+        }
+      } else {
+        state.housing.lease.landlordRelationship = game.clamp(state.housing.lease.landlordRelationship + 2);
+        state.housing.lease.evictionRisk = game.clamp(state.housing.lease.evictionRisk - 5);
+      }
+    }
     const commuteCost = Math.round(chunkDays * 0.65 * Number(state.transportation.costPerCommute || 4));
     const debtCost = Math.round((Number(state.finance.debt || 0) * ((Number(state.economy.interestRate || 0) + 2) / 100) / 30) * chunkDays);
     const insurance = state.finance.insurance || {};
@@ -239,6 +264,52 @@
         state.career.status = "Unemployed";
         state.career.currentJob = null;
         state.career.burnoutRisk = game.clamp(state.career.burnoutRisk - 15);
+      }
+    }
+    // Eviction (same deterministic seeded-roll shape as the layoff roll
+    // above): only becomes possible once eviction risk has genuinely built
+    // up from repeated missed payments, not from a single bad chunk.
+    if (state.housing.lease && state.housing.lease.active && state.housing.lease.evictionRisk >= 70) {
+      const evictionSeed = Math.sin(state.time.day * 63.271 + chunkDays * 2.71828) * 10000;
+      const evictionRoll = evictionSeed - Math.floor(evictionSeed);
+      if (evictionRoll < 0.3) {
+        state.housing.lease.active = false;
+        state.housing.type = "Emergency temporary housing";
+        state.housing.selectedOption = "emergency-temporary";
+        state.housing.monthlyCost = 0;
+        state.housing.stability = game.clamp(state.housing.stability - 30);
+        state.housing.comfort = game.clamp(state.housing.comfort - 25);
+        state.housing.satisfaction = game.clamp(state.housing.satisfaction - 25);
+        state.housing.affordability = game.clamp(state.housing.affordability - 15);
+        if (game.addEvent) {
+          game.addEvent(state, {
+            type: "housing",
+            title: "Evicted",
+            summary: "Missed rent finally caught up with you.",
+            systems: ["Housing"],
+            consequences: ["The lease is over. You're back to emergency temporary housing.", `Housing stability is now ${state.housing.stability}/100.`],
+            reflection: "Looking back, when was the moment this became unavoidable?"
+          });
+        }
+      }
+    } else if (state.housing.lease && state.housing.lease.active && state.time.day >= state.housing.lease.endsDay) {
+      // Term expiry auto-renews for now (no explicit renew/move-out choice
+      // yet) but rent tracks the real local housing market pressure instead
+      // of staying frozen, and it's narrated rather than a silent change.
+      const marketAdjustment = Math.round(state.housing.monthlyCost * (state.worldSimulation.housingMarketPressure - 50) * 0.002);
+      state.housing.monthlyCost = Math.max(150, state.housing.monthlyCost + marketAdjustment);
+      state.housing.lease.termDays = 180;
+      state.housing.lease.startedDay = state.time.day;
+      state.housing.lease.endsDay = state.time.day + 180;
+      if (game.addEvent) {
+        game.addEvent(state, {
+          type: "housing",
+          title: "Lease renewed",
+          summary: "Your lease term ended and renewed automatically.",
+          systems: ["Housing"],
+          consequences: [`Rent is now $${state.housing.monthlyCost}/month.`],
+          reflection: marketAdjustment > 0 ? "The market pushed your rent up - does the budget still work?" : "Rent eased slightly - what will you do with the difference?"
+        });
       }
     }
     if (game.decayLegalHeat) game.decayLegalHeat(state, chunkDays * 24);

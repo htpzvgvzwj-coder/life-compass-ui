@@ -9,7 +9,7 @@
       return `${state.housing.type} - comfort ${state.housing.comfort}/100, affordability ${state.housing.affordability}/100.`;
     },
     metrics(state) {
-      return [
+      const base = [
         ["Stability", state.housing.stability],
         ["Comfort", state.housing.comfort],
         ["Affordability", state.housing.affordability],
@@ -17,8 +17,69 @@
         ["Furniture", state.housing.furnitureLevel],
         ["Neighbourhood ties", state.housing.communityTies]
       ];
+      if (state.housing.lease && state.housing.lease.active) {
+        base.push(
+          ["Lease days left", Math.max(0, state.housing.lease.endsDay - state.time.day)],
+          ["Landlord relationship", state.housing.lease.landlordRelationship],
+          ["Eviction risk", state.housing.lease.evictionRisk]
+        );
+      }
+      return base;
     },
     actions: [
+      {
+        id: "sign-a-lease",
+        title: "Sign a lease",
+        description: "Take on a real, formal housing commitment - a deposit, a monthly rent, and a landlord who expects to be paid on time.",
+        durationMinutes: 150,
+        canPerform(state) {
+          if (state.housing.lease.active) return "You already have an active lease.";
+          return state.finance.money >= 300 || "You need at least $300 in cash to cover the deposit.";
+        },
+        effects: {
+          needs: { energy: -8, stress: 6, purpose: 10 },
+          capability: { decisionMaking: 2, responsibility: 2 }
+        },
+        after(state) {
+          state.finance.money = Math.max(0, Math.round(state.finance.money - 300));
+          state.housing.type = "Own leased apartment";
+          state.housing.selectedOption = "leased-apartment";
+          state.housing.monthlyCost = 300;
+          state.housing.lease = {
+            active: true,
+            termDays: 180,
+            startedDay: state.time.day,
+            endsDay: state.time.day + 180,
+            depositAmount: 300,
+            landlordRelationship: 60,
+            missedPayments: 0,
+            evictionRisk: 0
+          };
+          if (game.addAchievement) game.addAchievement(state, "first-lease-signed", "First Lease Signed", "Signed a real lease with its own term, deposit, and rent obligations.");
+          if (game.addMilestone) game.addMilestone(state, "Signed first lease", "Took on a formal housing commitment with real stakes.");
+        },
+        consequence: "A $300 deposit paid, $300/month due, a 180-day term, and a landlord who now expects to be paid on time.",
+        reflection: "What happens if you can't make a payment?"
+      },
+      {
+        id: "talk-to-landlord",
+        title: "Talk to your landlord",
+        description: "Keep the relationship with the person who controls your housing in good shape.",
+        durationMinutes: 30,
+        canPerform(state) {
+          return state.housing.lease.active || "You do not currently have an active lease to manage.";
+        },
+        effects: {
+          needs: { social: 3, stress: -2, purpose: 2 },
+          capability: { communication: 1 }
+        },
+        after(state) {
+          state.housing.lease.landlordRelationship = game.clamp(state.housing.lease.landlordRelationship + 10);
+          state.housing.lease.evictionRisk = game.clamp(state.housing.lease.evictionRisk - 15);
+        },
+        consequence: "A little communication before a problem grows is cheaper than fixing it after.",
+        reflection: "Is this a relationship you've been avoiding?"
+      },
       {
         id: "clean-maintain-home",
         title: "Clean and maintain home",

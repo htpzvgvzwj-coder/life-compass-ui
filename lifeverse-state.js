@@ -220,7 +220,17 @@
         hasRoommate: false,
         roommateRelationship: 0,
         communityTies: 30,
-        lastUtilityPaidDay: 0
+        lastUtilityPaidDay: 0,
+        lease: {
+          active: false,
+          termDays: 0,
+          startedDay: 0,
+          endsDay: 0,
+          depositAmount: 0,
+          landlordRelationship: 60,
+          missedPayments: 0,
+          evictionRisk: 0
+        }
       },
       transportation: {
         mode: "MRT and bus",
@@ -428,7 +438,10 @@
       },
       career: mergeObject(fallback.career, source.career),
       education: mergeObject(fallback.education, source.education),
-      housing: mergeObject(fallback.housing, source.housing),
+      housing: {
+        ...mergeObject(fallback.housing, source.housing),
+        lease: mergeObject(fallback.housing.lease, source.housing && source.housing.lease)
+      },
       transportation: mergeObject(fallback.transportation, source.transportation),
       relationships: mergeObject(fallback.relationships, source.relationships),
       health: mergeObject(fallback.health, source.health),
