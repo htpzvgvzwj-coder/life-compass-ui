@@ -343,6 +343,13 @@
           personality: { responsibility: 70, sociability: 88, optimism: 76, patience: 80, riskTolerance: 24, discipline: 58, curiosity: 46 }
         }
       ],
+      legal: {
+        heat: 0,
+        record: false,
+        finesOwed: 0,
+        detentionUntilDay: 0,
+        incidents: []
+      },
       world: {
         district: "Singapore-inspired neighbourhood",
         weather: "Clear morning",
@@ -430,6 +437,10 @@
       npcSimulation: mergeObject(fallback.npcSimulation, source.npcSimulation),
       worldSimulation: mergeObject(fallback.worldSimulation, source.worldSimulation),
       npcs: Array.isArray(source.npcs) ? source.npcs.slice(-24).map((npc) => ({ ...npc })) : fallback.npcs,
+      legal: {
+        ...mergeObject(fallback.legal, source.legal),
+        incidents: Array.isArray(source.legal && source.legal.incidents) ? source.legal.incidents.slice(-20) : fallback.legal.incidents
+      },
       world: mergeObject(fallback.world, source.world),
       progression: {
         ...fallback.progression,

@@ -14,6 +14,7 @@
       game.economySystem,
       game.npcSimulationSystem,
       game.worldSimulationSystem,
+      game.legalSystem,
       game.progressionSystem
     ].filter(Boolean);
   }
@@ -32,6 +33,9 @@
     const system = getSystem(systemId);
     const action = getSystemAction(systemId, actionId);
     if (!system || !action) return { error: "System action not found." };
+    if (game.isInDetention && game.isInDetention(state)) {
+      return { error: `You're in detention until day ${state.legal.detentionUntilDay}. Fast forward to serve the time.` };
+    }
     if (typeof action.canPerform === "function") {
       const allowed = action.canPerform(state);
       if (allowed !== true) return { error: typeof allowed === "string" ? allowed : "Action is not available yet." };

@@ -241,6 +241,16 @@
         state.career.burnoutRisk = game.clamp(state.career.burnoutRisk - 15);
       }
     }
+    if (game.decayLegalHeat) game.decayLegalHeat(state, chunkDays * 24);
+    // Detention is served passively during Fast Forward (there's no "do
+    // nothing" activity to click through it with) - career and relationships
+    // quietly erode in the background for its duration, the same way
+    // burnout-triggered layoffs above resolve automatically rather than
+    // needing a player action.
+    if (game.isInDetention && game.isInDetention(state)) {
+      state.career.readiness = game.clamp(state.career.readiness - chunkDays * 0.5);
+      state.relationships.support = game.clamp(state.relationships.support - chunkDays * 0.3);
+    }
     state.education.qualificationProgress = game.clamp(state.education.qualificationProgress + studyGrowth);
     state.education.studyConsistency = game.clamp(state.education.studyConsistency + state.player.habits.studyConsistency * 0.01 - chunkDays * 0.01);
     state.finance.confidence = game.clamp(state.finance.confidence + state.player.habits.budgeting * 0.02 - Math.max(0, state.finance.debt - state.finance.savings) * 0.002);

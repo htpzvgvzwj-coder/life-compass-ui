@@ -5481,6 +5481,44 @@ body.life-sim-active .life-sim-root canvas {
   margin-top: 10px;
 }
 
+.lifeverse-today-log {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.lifeverse-today-log-entry {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.lifeverse-today-log-entry ul {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 2px;
+}
+
+.lifeverse-today-log-entry li {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.lifeverse-today-log-reflection {
+  margin: 2px 0 0;
+  color: #c8a96b;
+  font-size: 11px;
+  font-style: italic;
+}
+
 .lifeverse-life-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -6059,6 +6097,20 @@ body.life-sim-active .lifeverse-dynamic-hud span {
   background: rgba(200, 169, 107, 0.16);
   font-size: 11px;
   font-weight: 900;
+}
+
+body.life-sim-active .lifeverse-need-pill.is-danger {
+  background: rgba(214, 68, 58, 0.32);
+  animation: lifeverseNeedPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes lifeverseNeedPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(214, 68, 58, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(214, 68, 58, 0);
+  }
 }
 
 body.life-sim-active .lifeverse-context-prompt {
@@ -6857,7 +6909,7 @@ body.life-sim-active .lifeverse-consequence-toast {
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(18px);
   pointer-events: auto;
-  animation: lifeverseToastIn 180ms ease both, lifeverseToastOut 420ms ease 3.58s forwards;
+  animation: lifeverseToastIn 180ms ease both, lifeverseToastOut 420ms ease 5.58s forwards;
 }
 
 body.life-sim-active .lifeverse-consequence-toast strong {
@@ -6867,6 +6919,27 @@ body.life-sim-active .lifeverse-consequence-toast strong {
 body.life-sim-active .lifeverse-consequence-toast span {
   color: rgba(248, 246, 242, 0.72);
   font-size: 11px;
+  line-height: 1.35;
+}
+
+body.life-sim-active .lifeverse-consequence-toast ul {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 2px;
+}
+
+body.life-sim-active .lifeverse-consequence-toast li {
+  color: rgba(248, 246, 242, 0.72);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+body.life-sim-active .lifeverse-consequence-toast .lifeverse-toast-reflection {
+  margin: 2px 0 0;
+  color: #c8a96b;
+  font-size: 11px;
+  font-style: italic;
   line-height: 1.35;
 }
 
@@ -7114,7 +7187,7 @@ body.life-sim-active .lifeverse-context-prompt {
 }
 
 body.life-sim-active .lifeverse-consequence-toast {
-  animation: lifeverseToastIn 180ms ease both, lifeverseToastOut 420ms ease 3.58s forwards, lifeverseToastGlow 2s ease-in-out infinite;
+  animation: lifeverseToastIn 180ms ease both, lifeverseToastOut 420ms ease 5.58s forwards, lifeverseToastGlow 2s ease-in-out infinite;
 }
 
 @keyframes lifeverseBreathingVignette {

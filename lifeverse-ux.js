@@ -33,13 +33,19 @@
   function getCriticalNeeds(state) {
     if (!state || !state.needs) return [];
     const checks = [
-      ["energy", "Energy", state.needs.energy, "low", 25],
-      ["health", "Health", state.health ? state.health.physical : 100, "low", 35],
-      ["stress", "Stress", state.needs.stress, "high", 75]
+      ["energy", "Energy", state.needs.energy, "low", 25, 12],
+      ["health", "Health", state.health ? state.health.physical : 100, "low", 35, 18],
+      ["stress", "Stress", state.needs.stress, "high", 75, 90]
     ];
     return checks
-      .map(([key, label, value, direction, threshold]) => ({ key, label, value: clamp(value), direction, threshold }))
-      .filter((need) => need.direction === "high" ? need.value > need.threshold : need.value < need.threshold);
+      .map(([key, label, value, direction, threshold, dangerThreshold]) => {
+        const safeValue = clamp(value);
+        const isCritical = direction === "high" ? safeValue > threshold : safeValue < threshold;
+        if (!isCritical) return null;
+        const isDanger = direction === "high" ? safeValue > dangerThreshold : safeValue < dangerThreshold;
+        return { key, label, value: safeValue, direction, threshold, severity: isDanger ? "danger" : "warning" };
+      })
+      .filter(Boolean);
   }
 
   function getPhoneApps(state) {

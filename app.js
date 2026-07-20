@@ -336,7 +336,8 @@ const defaultTrackerState = {
     },
     currentLocation: null,
     lastActivity: "",
-    consequence: "",
+    consequences: [],
+    reflection: "",
     consequenceToastUntil: 0,
     reportPromptReady: false
   },
@@ -1078,7 +1079,8 @@ function normalizeLifeSimState(state = {}) {
     },
     currentLocation: state.currentLocation || null,
     lastActivity: state.lastActivity || "",
-    consequence: state.consequence || "",
+    consequences: Array.isArray(state.consequences) ? state.consequences.filter(Boolean) : (state.consequence ? [String(state.consequence)] : []),
+    reflection: state.reflection || "",
     consequenceToastUntil: Math.max(0, Math.round(Number(state.consequenceToastUntil) || 0)),
     reportPromptReady: Boolean(state.reportPromptReady)
   };
@@ -2195,7 +2197,9 @@ function lifeVerseCriticalNeeds(state) {
   return `
     <aside class="lifeverse-dynamic-hud" aria-label="Needs warning">
       ${critical.slice(0, 3).map((need) => `
-        <span><strong>${escapeHTML(need.label)}</strong>${Math.round(need.value)}/100</span>
+        <span class="lifeverse-need-pill is-${escapeHTML(need.severity || "warning")}">
+          <strong>${escapeHTML(need.label)}</strong>${Math.round(need.value)}/100
+        </span>
       `).join("")}
     </aside>
   `;
@@ -2361,6 +2365,7 @@ function lifeVerseJournalPanel(state, view) {
         ${lifeVerseCloseOverlayButton()}
       </div>
       ${lifeVerseScheduleRail(state)}
+      ${lifeVerseTodayLog(state)}
       <div class="lifeverse-section-title"><strong>Recent traces</strong><span>${(state.traces || []).length} total</span></div>
       <div class="lifeverse-report-list">
         ${(state.traces || []).slice(-5).reverse().map((trace) => `
@@ -2372,6 +2377,30 @@ function lifeVerseJournalPanel(state, view) {
         ${report ? `<button type="button" data-lifeverse-tab="report">Read latest report</button>` : ""}
       </div>
     </section>
+  `;
+}
+
+function lifeVerseTodayLog(state) {
+  const items = (state.events || []).slice(-8).reverse();
+  if (!items.length) {
+    return `
+      <div class="lifeverse-today-log">
+        <div class="lifeverse-section-title"><strong>Today's log</strong><span>No events yet</span></div>
+        <p>Live one action to start building today's story.</p>
+      </div>
+    `;
+  }
+  return `
+    <div class="lifeverse-today-log">
+      <div class="lifeverse-section-title"><strong>Today's log</strong><span>${items.length} recent</span></div>
+      ${items.map((event) => `
+        <article class="lifeverse-today-log-entry">
+          <strong>${escapeHTML(event.title)}</strong>
+          <ul>${(event.consequences || []).map((line) => `<li>${escapeHTML(line)}</li>`).join("") || `<li>${escapeHTML(event.summary || "Something changed.")}</li>`}</ul>
+          ${event.reflection ? `<p class="lifeverse-today-log-reflection">${escapeHTML(event.reflection)}</p>` : ""}
+        </article>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -2897,33 +2926,23 @@ function lifeSimEffectText(effect = {}) {
   return labels.map(([label, value]) => `${label} ${Number(value) > 0 ? "+" : ""}${value}`).join(" | ");
 }
 
-function lifeSimLastResult() {
-  const sim = trackerState.lifeSim || {};
-  if (!sim.lastActivity && !sim.consequence) return "";
-  return `
-    <section class="life-sim-result-card">
-      <p class="eyebrow">Latest consequence</p>
-      <h3>${escapeHTML(sim.lastActivity || "30 days later")}</h3>
-      <p>${escapeHTML(sim.consequence || "Your stats changed. Keep exploring how daily choices shape your routine.")}</p>
-    </section>
-  `;
-}
-
-function markLifeVerseConsequence(lastActivity, consequence, options = {}) {
+function markLifeVerseConsequence(lastActivity, consequences, options = {}) {
   trackerState.lifeSim.lastActivity = lastActivity || "";
-  trackerState.lifeSim.consequence = consequence || "";
-  trackerState.lifeSim.consequenceToastUntil = Date.now() + 4000;
+  trackerState.lifeSim.consequences = Array.isArray(consequences) ? consequences.filter(Boolean) : (consequences ? [String(consequences)] : []);
+  trackerState.lifeSim.reflection = options.reflection || "";
+  trackerState.lifeSim.consequenceToastUntil = Date.now() + 6000;
   trackerState.lifeSim.reportPromptReady = Boolean(options.reportPromptReady);
 }
 
 function lifeVerseConsequenceToast(now = Date.now()) {
   const sim = trackerState.lifeSim || {};
-  if (!sim.consequence || Number(sim.consequenceToastUntil || 0) <= now) return "";
+  if (!(sim.consequences || []).length || Number(sim.consequenceToastUntil || 0) <= now) return "";
   return `
     <aside class="lifeverse-consequence-toast" aria-live="polite">
-      <p class="eyebrow">${sim.reportPromptReady ? "Fast Forward finished" : "Consequence recorded"}</p>
+      <p class="eyebrow">${sim.reportPromptReady ? "Fast Forward finished" : "What just happened"}</p>
       <strong>${escapeHTML(sim.lastActivity || "LifeVerse update")}</strong>
-      <span>${escapeHTML(sim.consequence)}</span>
+      <ul>${sim.consequences.map((line) => `<li>${escapeHTML(line)}</li>`).join("")}</ul>
+      ${sim.reflection ? `<p class="lifeverse-toast-reflection">${escapeHTML(sim.reflection)}</p>` : ""}
       ${sim.reportPromptReady ? `<button type="button" data-lifeverse-tab="report">View Life Report</button>` : ""}
     </aside>
   `;
@@ -3002,7 +3021,7 @@ function performLifeVerseActivity(activityId) {
     trackerState.lifeVerse = result.state;
     trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence(result.activity.title, result.event.summary);
+    markLifeVerseConsequence(result.activity.title, result.event.consequences, { reflection: result.event.reflection });
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   }
   return result;
@@ -3019,7 +3038,7 @@ function performLifeVerseSystemAction(systemId, actionId) {
     trackerState.lifeVerse = result.state;
     trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence(result.action.title, result.event.summary);
+    markLifeVerseConsequence(result.action.title, result.event.consequences, { reflection: result.event.reflection });
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   } else if (result && result.error) {
     markLifeVerseConsequence("Action unavailable", result.error);
@@ -3047,7 +3066,7 @@ function fastForwardLifeVerse(days = 30) {
     }
     trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence(`${days} Days Later`, result.event.summary, { reportPromptReady: true });
+    markLifeVerseConsequence(`${days} Days Later`, result.event.consequences, { reflection: result.event.reflection, reportPromptReady: true });
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   }
   return result;
@@ -3064,7 +3083,7 @@ function resolveLifeVerseIntervention(choiceId) {
     trackerState.lifeVerse = result.state;
     trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence("Decision made", result.event.summary, { reportPromptReady: true });
+    markLifeVerseConsequence("Decision made", result.event.consequences, { reflection: result.event.reflection, reportPromptReady: true });
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   }
   return result;
@@ -3089,7 +3108,8 @@ function resetLifeVerse() {
   trackerState.lifeVerse = engine && engine.reset ? engine.reset({ profile: userProfile }) : createDefaultLifeVerseState();
   syncLifeSimFromLifeVerse();
   trackerState.lifeSim.lastActivity = "";
-  trackerState.lifeSim.consequence = "";
+  trackerState.lifeSim.consequences = [];
+  trackerState.lifeSim.reflection = "";
   trackerState.lifeSim.consequenceToastUntil = 0;
   trackerState.lifeSim.reportPromptReady = false;
 }
