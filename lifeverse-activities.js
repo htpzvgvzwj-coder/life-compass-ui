@@ -751,6 +751,95 @@
       },
       consequence: "Practical, unglamorous, and cheaper out here than closer to the centre of the city.",
       reflection: "Was the trip out here worth the time it cost?"
+    },
+    // Ordinary daily-life verbs that were still missing: unwinding at home,
+    // reading, phone/social media habits, a free/light exercise option
+    // distinct from the gym, keeping in touch quickly, and closing out the
+    // day - same shape as every other activity in this file.
+    {
+      id: "watch-tv-and-relax",
+      title: "Watch something and unwind",
+      category: "Living",
+      location: "home",
+      durationMinutes: 90,
+      effects: {
+        needs: { energy: 3, stress: -8, purpose: -2 },
+        mentalWellbeing: { motivation: -1 }
+      },
+      consequence: "Real rest, but ninety minutes that didn't move anything else forward.",
+      reflection: "Did you choose this, or did it just happen because it was easy?"
+    },
+    {
+      id: "read-a-book",
+      title: "Read a book",
+      category: "Reflection",
+      location: "home",
+      durationMinutes: 60,
+      effects: {
+        needs: { stress: -5, purpose: 5 },
+        skills: { learning: 2 },
+        mentalWellbeing: { resilience: 2, motivation: 1 },
+        habits: { reflection: 1 }
+      },
+      consequence: "Slower than a video, and it stayed with you longer.",
+      reflection: "What idea from this will still matter next week?"
+    },
+    {
+      id: "check-phone-and-social-media",
+      title: "Check your phone and social media",
+      category: "Living",
+      location: "home",
+      durationMinutes: 20,
+      effects: {
+        needs: { stress: -1, social: 3, purpose: -1 },
+        mentalWellbeing: { loneliness: -2, motivation: -1 }
+      },
+      consequence: "A quick hit of connection, and a little comparison that came with it.",
+      reflection: "Did you feel better or worse after, and did that surprise you?"
+    },
+    {
+      id: "go-for-a-run",
+      title: "Go for a run",
+      category: "Health",
+      location: "park",
+      durationMinutes: 45,
+      effects: {
+        needs: { energy: -6, stress: -7, hygiene: -6 },
+        health: { physical: 5, activity: 6 },
+        mentalWellbeing: { motivation: 3, resilience: 2 },
+        habits: { exercise: 4 },
+        capability: { discipline: 1 }
+      },
+      consequence: "Free, and it cost nothing but the energy and the getting-yourself-out-the-door part.",
+      reflection: "What's usually the actual obstacle - the run, or starting it?"
+    },
+    {
+      id: "text-a-friend",
+      title: "Text a friend to check in",
+      category: "Relationship",
+      location: "home",
+      durationMinutes: 15,
+      effects: {
+        needs: { social: 5, stress: -2, purpose: 2 },
+        relationships: { friends: 4, support: 1 },
+        capability: { communication: 1 }
+      },
+      consequence: "Small and quick, but it's the small quick ones that keep a friendship from going quiet.",
+      reflection: "Who have you been meaning to text back?"
+    },
+    {
+      id: "tidy-up-before-bed",
+      title: "Tidy up before bed",
+      category: "Living",
+      location: "home",
+      durationMinutes: 20,
+      effects: {
+        needs: { energy: -3, stress: -3, hygiene: 4 },
+        housing: { comfort: 3 },
+        capability: { responsibility: 1 }
+      },
+      consequence: "A few minutes tonight so tomorrow morning doesn't start with a mess.",
+      reflection: "How different does waking up feel on the mornings you did this?"
     }
   ];
 
