@@ -32,6 +32,34 @@
       reflection: "Was rest avoidance or genuine recovery today?"
     },
     {
+      id: "go-to-bed-on-time",
+      title: "Go to bed on time",
+      category: "Health",
+      location: "home",
+      durationMinutes: 20,
+      effects: {
+        needs: { sleep: 10, stress: -3 },
+        health: { sleepQuality: 4 },
+        habits: { sleepRoutine: 3 }
+      },
+      consequence: "Nothing happened tonight - which is exactly the point of a boring, consistent bedtime.",
+      reflection: "What did you give up to make this happen?"
+    },
+    {
+      id: "stay-up-late",
+      title: "Stay up late anyway",
+      category: "Living",
+      location: "home",
+      durationMinutes: 90,
+      effects: {
+        needs: { sleep: -14, stress: -4, purpose: 2 },
+        mentalWellbeing: { motivation: 1 },
+        habits: { sleepRoutine: -2 }
+      },
+      consequence: "Felt worth it in the moment - tomorrow morning will decide if it actually was.",
+      reflection: "What were you actually avoiding by staying up?"
+    },
+    {
       id: "study-block",
       title: "Focused study block",
       category: "Education",
@@ -279,6 +307,22 @@
       reflection: "How long had it actually been since the last one?"
     },
     {
+      id: "host-friends-at-home",
+      title: "Host friends at home",
+      category: "Relationship",
+      location: "home",
+      durationMinutes: 150,
+      effects: {
+        finance: { money: -25 },
+        needs: { energy: -8, social: 14, stress: -5, purpose: 4 },
+        relationships: { friends: 6, support: 3 },
+        housing: { satisfaction: 3 },
+        capability: { communication: 1 }
+      },
+      consequence: "Cheaper than going out, and it made the place feel more like a home people actually visit.",
+      reflection: "What made this feel different from meeting somewhere else?"
+    },
+    {
       id: "shopping",
       title: "Buy something you want",
       category: "Lifestyle",
@@ -291,6 +335,53 @@
       },
       consequence: "Shopping gave short-term relief, but reduced financial flexibility.",
       reflection: "Was this a need, a reward, or pressure?"
+    },
+    {
+      id: "get-a-haircut",
+      title: "Get a haircut",
+      category: "Health",
+      location: "mall",
+      durationMinutes: 45,
+      effects: {
+        finance: { money: -20 },
+        needs: { hygiene: 8, stress: -3, purpose: 2 },
+        mentalWellbeing: { motivation: 2 }
+      },
+      consequence: "A small, recurring cost of looking after yourself in public.",
+      reflection: "Did you put this off longer than you meant to?"
+    },
+    {
+      id: "weekend-trip-to-the-beach",
+      title: "Take a weekend trip to the beach",
+      category: "Health",
+      location: "beach",
+      durationMinutes: 240,
+      effects: {
+        finance: { money: -15 },
+        needs: { energy: 10, stress: -14, purpose: 6, social: 4 },
+        health: { physical: 2 },
+        mentalWellbeing: { resilience: 3, motivation: 3 }
+      },
+      consequence: "A real break, not a scrolling break - it cost a chunk of the day and a little money, and it worked.",
+      reflection: "How often do you actually let yourself do this?"
+    },
+    {
+      id: "take-a-short-getaway",
+      title: "Take a short getaway",
+      category: "Health",
+      location: "airport",
+      durationMinutes: 480,
+      effects: {
+        finance: { money: -120 },
+        needs: { energy: 16, stress: -20, purpose: 8 },
+        mentalWellbeing: { resilience: 5, motivation: 4 },
+        relationships: { support: 2 }
+      },
+      canPerform(state) {
+        return state.finance.money >= 120 || "You need at least $120 in cash for a short trip.";
+      },
+      consequence: "Real distance from routine, for a real price - a full day and a real dent in the budget.",
+      reflection: "Did you need to get away, or were you avoiding something at home?"
     },
     // Everyday boundary-crossing choices (lifeverse-legal.js): probabilistic,
     // accumulating consequences rather than a guaranteed catch every time -
@@ -539,6 +630,10 @@
     }
     if (activity.id === "work-shift" && !state.career.employed) {
       return { error: "You do not currently have a job - search for work before you can take a shift." };
+    }
+    if (typeof activity.canPerform === "function") {
+      const allowed = activity.canPerform(state);
+      if (allowed !== true) return { error: typeof allowed === "string" ? allowed : "This is not available yet." };
     }
 
     const before = game.getTimeSnapshot(state);
