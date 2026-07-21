@@ -486,17 +486,21 @@
       ? window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" })
       : null;
     const shared = (key, fallback) => library && library.get ? library.get(key) : fallback();
-    // Every "make()" material (every building wall/structure color in the
-    // game) picks up the same tiled Concrete034 normal+roughness maps for
-    // real surface micro-detail, while keeping its own distinct hue via
-    // `color` (which tints the otherwise-neutral map rather than fighting a
-    // photographed color) - addBuildingCore() only puts a facade texture on
-    // a building's front face, so this is what fixes the other 5 flat faces
-    // on every single building at once instead of one texture assignment
-    // per building type.
-    const wallNormal = loadPbrTexture(THREE, "Concrete034", "NormalGL", 2.4, 2.4);
-    const wallRoughness = loadPbrTexture(THREE, "Concrete034", "Roughness", 2.4, 2.4);
-    const make = (color, emissive = 0x000000, roughness = 0.7, metalness = 0.03) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness, normalMap: wallNormal, roughnessMap: wallRoughness, normalScale: new THREE.Vector2(0.4, 0.4) });
+    // Realistic-style pivot, Phase 5: every "make()" material (every building
+    // wall/structure color in the game) now carries real photographic
+    // PaintedPlaster017 Color+NormalGL+Roughness maps - not just normal/
+    // roughness bump-under-flat-color like the first material pass, actual
+    // photographed painted-concrete albedo tinted by `color` - since Objaverse
+    // (and every free/loginless CC0 kit checked) has nothing building-shaped
+    // to source real geometry from, this is the achievable version of "make
+    // buildings look real": real material, not new geometry. addBuildingCore()
+    // only ever put a texture on a building's front face via its canvas-drawn
+    // window facade, so this is what fixes the other 5 flat faces on every
+    // single building at once instead of one texture assignment per type.
+    const wallColorMap = loadPbrTexture(THREE, "PaintedPlaster017", "Color", 2.4, 2.4);
+    const wallNormal = loadPbrTexture(THREE, "PaintedPlaster017", "NormalGL", 2.4, 2.4);
+    const wallRoughness = loadPbrTexture(THREE, "PaintedPlaster017", "Roughness", 2.4, 2.4);
+    const make = (color, emissive = 0x000000, roughness = 0.7, metalness = 0.03) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness, map: wallColorMap, normalMap: wallNormal, roughnessMap: wallRoughness, normalScale: new THREE.Vector2(0.4, 0.4) });
     const standard = (color, emissive = 0x000000, roughness = 0.68, metalness = 0.02) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness });
     const glass = (color) => new THREE.MeshPhysicalMaterial({
       color,
