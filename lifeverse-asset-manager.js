@@ -161,9 +161,28 @@
       return promise;
     }
 
+    // Realistic-style pivot: Objaverse scans arrive at wildly inconsistent
+    // native scales (unlike a single hand-modeled kit, where one eyeballed
+    // multiplier could cover ~30 buildings). Given a real-world target height
+    // in meters, measure the model's actual bounding-box height post-rotation
+    // and derive the uniform scale factor that hits it exactly - replaces the
+    // "type in a scale multiplier and squint at it" pattern used for every
+    // existing city-kit swap in life-sim.js's loadDistrictAssetSamples().
+    function normalizeToHeight(model, targetMeters) {
+      if (!model || typeof model.traverse !== "function" || typeof targetMeters !== "number" || !(targetMeters > 0)) return model;
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      if (!(size.y > 0) || !Number.isFinite(size.y)) return model;
+      const factor = targetMeters / size.y;
+      if (Number.isFinite(factor) && factor > 0) model.scale.setScalar(factor);
+      return model;
+    }
+
     function prepareModel(model, config = {}) {
       applyTransform(model, config);
       if (!model || typeof model.traverse !== "function") return model;
+      if (typeof config.targetHeightMeters === "number") normalizeToHeight(model, config.targetHeightMeters);
       model.traverse((node) => {
         if (!node || !node.isMesh) return;
         node.castShadow = true;
@@ -340,6 +359,7 @@
       registerLazy,
       loadLazy,
       prepareModel,
+      normalizeToHeight,
       createMissingAsset,
       createDebugPanel,
       tickDebugFrame,

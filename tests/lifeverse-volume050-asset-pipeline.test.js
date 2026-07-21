@@ -179,7 +179,13 @@ assert.ok(manager.registerPrefab("prop:test", { url: "assets/props/test.glb" }),
   assert.ok(appSource.includes("lifeverse-asset-manager.js"), "asset manager is loaded before Life Sim");
   assert.ok(appSource.includes("lifeverse-render-pipeline.js"), "render pipeline is loaded before Life Sim");
   assert.ok(simSource.includes("createAssetManager"), "Life Sim creates a centralized asset manager");
-  assert.ok(simSource.includes("assetManager.instantiatePrefab"), "Life Sim production prefabs load through Asset Manager");
+  // Realistic-style pivot: the old environment/locationModels manifest fields
+  // (and the instantiatePrefab() call sites that read them) were dropped -
+  // they pointed at files that never existed and weren't the live asset-swap
+  // mechanism anyway. assetManager.loadModel() is what actually loads real
+  // GLBs today, for both the character (loadCharacterAsset()) and district
+  // prop/building swaps (loadDistrictAssetSamples()).
+  assert.ok(simSource.includes("assetManager.loadModel"), "Life Sim loads real GLB assets through the centralized Asset Manager");
   assert.ok(!simSource.includes("new THREE.GLTFLoader"), "Life Sim no longer creates GLTF loaders directly");
 
   console.log("LifeVerse Volume 5.0 asset pipeline tests passed.");

@@ -241,7 +241,8 @@ const defaultTrackerState = {
   },
   careerStudio: {
     interviewSessions: [],
-    resume: null
+    resume: null,
+    portfolio: null
   },
   lifeVerse: createDefaultLifeVerseState(),
   lifeSim: {
@@ -1007,7 +1008,8 @@ function normalizeTrackerState(state) {
     },
     careerStudio: {
       interviewSessions: Array.isArray(state.careerStudio && state.careerStudio.interviewSessions) ? state.careerStudio.interviewSessions : fallback.careerStudio.interviewSessions,
-      resume: (state.careerStudio && state.careerStudio.resume && typeof state.careerStudio.resume === "object") ? state.careerStudio.resume : fallback.careerStudio.resume
+      resume: (state.careerStudio && state.careerStudio.resume && typeof state.careerStudio.resume === "object") ? state.careerStudio.resume : fallback.careerStudio.resume,
+      portfolio: (state.careerStudio && state.careerStudio.portfolio && typeof state.careerStudio.portfolio === "object") ? state.careerStudio.portfolio : fallback.careerStudio.portfolio
     },
     lifeVerse: normalizeLifeVerseState(state.lifeVerse || fallback.lifeVerse),
     lifeSim: normalizeLifeSimState(state.lifeSim || fallback.lifeSim),
@@ -1520,6 +1522,7 @@ function knowledgeVaultRoadmapSection() {
 function knowledgeVaultCareerSection() {
   const sessions = trackerState.careerStudio.interviewSessions;
   const resume = trackerState.careerStudio.resume;
+  const portfolio = trackerState.careerStudio.portfolio;
   const rows = [];
   if (sessions.length) {
     const done = sessions.filter((s) => s.completedAt).length;
@@ -1527,6 +1530,9 @@ function knowledgeVaultCareerSection() {
   }
   if (resume && resume.polishedText) {
     rows.push(`<div class="vault-entry-row"><strong>Resume</strong><span>Last updated ${escapeHTML(new Date(resume.updatedAt).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }))}</span><button class="text-action" type="button" data-open="careerStudio">View</button></div>`);
+  }
+  if (portfolio && portfolio.polishedText) {
+    rows.push(`<div class="vault-entry-row"><strong>Portfolio</strong><span>Last updated ${escapeHTML(new Date(portfolio.updatedAt).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }))}</span><button class="text-action" type="button" data-open="careerStudio">View</button></div>`);
   }
   if (!rows.length) {
     return `<div class="vault-empty-row"><span>No Career Studio activity yet.</span><button class="secondary-action compact-action" type="button" data-open="careerStudio">Start</button></div>`;
@@ -1550,7 +1556,8 @@ function knowledgeVaultExportText() {
   lines.push("CAREER STUDIO");
   const sessions = trackerState.careerStudio.interviewSessions;
   const resume = trackerState.careerStudio.resume;
-  lines.push(`Interview sessions: ${sessions.length}${resume && resume.polishedText ? "\nResume: saved" : ""}`, "");
+  const portfolio = trackerState.careerStudio.portfolio;
+  lines.push(`Interview sessions: ${sessions.length}${resume && resume.polishedText ? "\nResume: saved" : ""}${portfolio && portfolio.polishedText ? "\nPortfolio: saved" : ""}`, "");
   return lines.join("\n");
 }
 
@@ -1797,6 +1804,29 @@ function futureMirrorHomeHero() {
         <h2>Your future is built by today's choices.</h2>
         <p>Explore how your choices today may influence your future.</p>
         <button class="primary-action mint-action" type="button" data-tab-jump="future">Try Future Mirror</button>
+      </div>
+    </header>
+  `;
+}
+
+function lifeSimHomeHero() {
+  const verse = lifeVerseState();
+  const day = verse ? Math.max(1, Math.round(Number(verse.time.day) || 1)) : 1;
+  const started = day > 1;
+  const money = verse ? formatCurrency(verse.finance.money) : null;
+  const mood = verse ? clampStat(Math.round((Number(verse.needs.purpose) + Number(verse.relationships.support) + Number(verse.mentalWellbeing.motivation)) / 3)) : null;
+  return `
+    <header class="life-sim-home-hero">
+      <div class="life-sim-hero-skyline" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="life-sim-hero-copy">
+        <p class="eyebrow"><span class="life-sim-live-dot" aria-hidden="true"></span>Life Sim</p>
+        <h2>${started ? "Your life is waiting." : "Live a whole life."}</h2>
+        <p>${started
+          ? `Day ${day} in Singapore &middot; ${money}${mood !== null ? ` &middot; Mood ${mood}` : ""}. Pick up right where you left off.`
+          : "Career, money, health, relationships - a realistic 3D Singapore life, shaped entirely by you."}</p>
+        <button class="primary-action life-sim-cta" type="button" data-tab-jump="simulator">${started ? "Continue Life Sim" : "Enter Life Sim"}</button>
       </div>
     </header>
   `;
@@ -3308,11 +3338,70 @@ async function generateFutureSelfSnapshot(horizon) {
 // here rather than done silently.
 const REFLECTION_RESURFACE_DAYS = { daily: 30, weeklyLetter: 14, decisionJournal: 90, milestoneLetter: 90 };
 const DAILY_REFLECTION_PROMPTS = [
-  { id: "mood", label: "How would you describe your mood today, and why?" },
-  { id: "stress", label: "What's taking up the most mental space right now?" },
-  { id: "growth", label: "What's one thing you did today that your future self would thank you for?" },
-  { id: "procrastination", label: "What did you put off today, and what made it easy to avoid?" }
+  { id: "mood", label: "How would you describe your mood today, and why?", emoji: "🎭", starters: ["Honestly, today felt...", "My mood shifted when...", "I'm feeling this way because..."] },
+  { id: "stress", label: "What's taking up the most mental space right now?", emoji: "🧠", starters: ["The thing I can't stop thinking about is...", "I keep worrying that...", "It would help if..."] },
+  { id: "growth", label: "What's one thing you did today that your future self would thank you for?", emoji: "🌱", starters: ["I'm proud that I...", "Future me will thank me for...", "A small win today was..."] },
+  { id: "procrastination", label: "What did you put off today, and what made it easy to avoid?", emoji: "⏳", starters: ["I kept avoiding...", "It was easy to put off because...", "Next time I'll..."] }
 ];
+
+// Consecutive-day streak shared by Mood check-in and Daily Reflection - both
+// are meant to feel like a habit loop, not a form, so both read this the
+// same way: streak counts backward from today if there's already an entry
+// today, otherwise from yesterday (so a missed today doesn't erase yesterday's
+// run - it just flags the streak as "at risk" via checkedInToday: false).
+function consecutiveDayStreak(entries, getDate) {
+  const days = new Set((entries || []).map((entry) => new Date(getDate(entry)).toDateString()));
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const checkedInToday = days.has(today.toDateString());
+  const cursor = checkedInToday ? new Date(today) : yesterday;
+  let streak = 0;
+  while (days.has(cursor.toDateString())) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return { streak, checkedInToday };
+}
+
+function moodCheckInStreak() {
+  const entries = (trackerState.mood.entries || []).filter((entry) => entry.user_id === currentUserId() || !entry.user_id);
+  return consecutiveDayStreak(entries, (entry) => entry.created_at);
+}
+
+function reflectionCheckInStreak() {
+  const entries = (trackerState.reflectionEntries || []).filter((entry) => entry.user_id === currentUserId() && Array.isArray(entry.tags) && entry.tags.includes("daily"));
+  return consecutiveDayStreak(entries, (entry) => entry.createdAt);
+}
+
+function streakChipHTML(streakInfo, noun) {
+  if (streakInfo.streak <= 0) return `<span class="streak-chip is-fresh">🌟 Start your ${noun} streak today</span>`;
+  if (!streakInfo.checkedInToday) return `<span class="streak-chip is-at-risk">⚠️ ${streakInfo.streak}-day ${noun} streak - keep it alive today</span>`;
+  return `<span class="streak-chip is-active">🔥 ${streakInfo.streak}-day ${noun} streak</span>`;
+}
+
+function energyLabel(score) {
+  if (score < 25) return "Running on empty";
+  if (score < 50) return "Low battery";
+  if (score < 75) return "Holding steady";
+  return "Fully charged";
+}
+
+function energyEmoji(score) {
+  if (score < 25) return "🪫";
+  if (score < 50) return "🔋";
+  if (score < 75) return "⚡";
+  return "✨";
+}
+
+function triggerCheckInCelebration(message) {
+  const toast = document.createElement("div");
+  toast.className = "checkin-celebrate-toast";
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  window.setTimeout(() => toast.classList.add("is-leaving"), 1500);
+  window.setTimeout(() => toast.remove(), 1900);
+}
 
 function createReflectionEntry(mode, content, options = {}) {
   const now = new Date();
@@ -3454,6 +3543,7 @@ function resurfacingCard() {
 }
 
 let dailyReflectionPromptIndex = 0;
+let dailyReflectionDraft = "";
 
 // Life Roadmap (Future Mirror bible Ch.7) - one data model, three views
 // (timeline/calendar/long-horizon) rather than three separate features with
@@ -3804,6 +3894,92 @@ function resumeBuilderView() {
       <div class="resume-preview-card">
         <div class="modal-action-row"><strong>Preview</strong><button class="secondary-action compact-action" type="button" data-copy-resume>Copy text</button></div>
         <pre class="resume-preview-text">${escapeHTML(resume.polishedText)}</pre>
+      </div>
+    ` : ""}
+  `;
+}
+
+// Career Studio - Portfolio Builder. Same trust model as the Resume Builder:
+// the user writes their real projects/work in plain language, AI only
+// organizes and polishes wording into a LinkedIn-style profile narrative
+// (headline, about, experience, projects, skills) - it never invents roles,
+// projects, or links that were not provided. No public page or hosting -
+// this app has no backend/multi-user layer to safely serve one, so the
+// output stays a preview/copy-text document like the resume.
+let isPortfolioLoading = false;
+let portfolioError = "";
+
+function savePortfolioDraft() {
+  const existing = trackerState.careerStudio.portfolio || {};
+  const fullNameInput = modalLayer.querySelector("#portfolio-full-name");
+  const headlineInput = modalLayer.querySelector("#portfolio-headline");
+  const aboutInput = modalLayer.querySelector("#portfolio-about");
+  const experienceInput = modalLayer.querySelector("#portfolio-experience");
+  const projectsInput = modalLayer.querySelector("#portfolio-projects");
+  const skillsInput = modalLayer.querySelector("#portfolio-skills");
+  const linksInput = modalLayer.querySelector("#portfolio-links");
+  const portfolio = {
+    fullName: fullNameInput ? fullNameInput.value.trim().slice(0, 80) : (existing.fullName || ""),
+    headline: headlineInput ? headlineInput.value.trim().slice(0, 120) : (existing.headline || ""),
+    rawAbout: aboutInput ? aboutInput.value.trim().slice(0, 1500) : (existing.rawAbout || ""),
+    rawExperience: experienceInput ? experienceInput.value.trim().slice(0, 3000) : (existing.rawExperience || ""),
+    rawProjects: projectsInput ? projectsInput.value.trim().slice(0, 3000) : (existing.rawProjects || ""),
+    rawSkills: skillsInput ? skillsInput.value.trim().slice(0, 500) : (existing.rawSkills || ""),
+    rawLinks: linksInput ? linksInput.value.trim().slice(0, 500) : (existing.rawLinks || ""),
+    polishedText: existing.polishedText || "",
+    updatedAt: new Date().toISOString()
+  };
+  trackerState.careerStudio.portfolio = portfolio;
+  saveTrackerState();
+  return portfolio;
+}
+
+async function polishPortfolioWithAI() {
+  const portfolio = savePortfolioDraft();
+  if (!portfolio.headline && !portfolio.rawAbout && !portfolio.rawExperience && !portfolio.rawProjects) {
+    portfolioError = "Add a headline, an about note, experience, or a project first - there's nothing to polish yet.";
+    openModal("portfolioBuilder");
+    return;
+  }
+  isPortfolioLoading = true;
+  portfolioError = "";
+  openModal("portfolioBuilder");
+  try {
+    const systemPrompt = "You are a professional personal-brand writer who builds LinkedIn-style portfolio profiles. Write clean, honest content using only the facts given - never invent employers, dates, titles, projects, achievements, or links that were not provided. Use confident, specific, plain language. Plain text only, no markdown symbols like ** or #.";
+    const userPrompt = `Candidate facts:\nName: ${portfolio.fullName || "(not given)"}\nHeadline: ${portfolio.headline || "(not given)"}\nAbout (raw notes):\n${portfolio.rawAbout || "(none provided)"}\nExperience (raw notes):\n${portfolio.rawExperience || "(none provided)"}\nProjects / work samples (raw notes):\n${portfolio.rawProjects || "(none provided)"}\nSkills (raw notes):\n${portfolio.rawSkills || "(none provided)"}\nLinks (raw notes, list as given - do not invent or guess URLs):\n${portfolio.rawLinks || "(none provided)"}\n\nOther real saved context about this person, for tone/emphasis only - do not invent portfolio content from it:\n${realGrowthFactsText()}\n\nWrite a plain-text LinkedIn-style portfolio profile with sections in this order: NAME/HEADLINE, ABOUT (3-4 sentences, first person, confident), EXPERIENCE (bullet points per role using dashes), PROJECTS (bullet points, what it is and what they did), SKILLS, LINKS (only if provided).`;
+    const reply = await requestCompassDirect(systemPrompt, userPrompt);
+    portfolio.polishedText = cleanText(reply, 4500);
+    portfolio.updatedAt = new Date().toISOString();
+    trackerState.careerStudio.portfolio = portfolio;
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Portfolio Builder] Polish failed", error);
+    portfolioError = "Couldn't polish the portfolio right now. Please try again.";
+  } finally {
+    isPortfolioLoading = false;
+    openModal("portfolioBuilder");
+  }
+}
+
+function portfolioBuilderView() {
+  const portfolio = trackerState.careerStudio.portfolio || {};
+  return `
+    <label>Full name<input type="text" id="portfolio-full-name" value="${escapeHTML(portfolio.fullName || "")}" placeholder="Your name"></label>
+    <label>Headline<input type="text" id="portfolio-headline" value="${escapeHTML(portfolio.headline || "")}" placeholder="e.g. Aspiring UX Designer | Video editor"></label>
+    <label>About you (plain language)<textarea id="portfolio-about" rows="3" placeholder="e.g. Design student who likes turning messy ideas into simple interfaces, currently building a portfolio of app redesigns">${escapeHTML(portfolio.rawAbout || "")}</textarea></label>
+    <label>Experience (roles, dates, what you did)<textarea id="portfolio-experience" rows="3" placeholder="e.g. Freelance video editor, 2024-now, edited 12 short videos for local small businesses">${escapeHTML(portfolio.rawExperience || "")}</textarea></label>
+    <label>Projects / work samples<textarea id="portfolio-projects" rows="3" placeholder="e.g. Redesigned a mock food-delivery app in Figma as a personal project - focused on simplifying checkout">${escapeHTML(portfolio.rawProjects || "")}</textarea></label>
+    <label>Skills (comma separated)<input type="text" id="portfolio-skills" value="${escapeHTML(portfolio.rawSkills || "")}" placeholder="e.g. Figma, video editing, Canva"></label>
+    <label>Links (optional, comma separated)<input type="text" id="portfolio-links" value="${escapeHTML(portfolio.rawLinks || "")}" placeholder="e.g. behance.net/yourname, github.com/yourname"></label>
+    ${portfolioError ? `<p class="form-error">${escapeHTML(portfolioError)}</p>` : ""}
+    <div class="modal-action-row">
+      <button class="secondary-action compact-action" type="button" data-save-portfolio-draft>Save draft</button>
+      <button class="primary-action compact-action" type="button" data-polish-portfolio ${isPortfolioLoading ? "disabled" : ""}>${isPortfolioLoading ? "Polishing..." : "Polish with AI"}</button>
+    </div>
+    ${portfolio.polishedText ? `
+      <div class="resume-preview-card portfolio-preview-card">
+        <div class="modal-action-row"><strong>Preview</strong><button class="secondary-action compact-action" type="button" data-copy-portfolio>Copy text</button></div>
+        <pre class="resume-preview-text">${escapeHTML(portfolio.polishedText)}</pre>
       </div>
     ` : ""}
   `;
@@ -5328,6 +5504,7 @@ function futureScanSignalBanner() {
 const screens = {
   home: () => `
     ${futureMirrorHomeHero()}
+    ${lifeSimHomeHero()}
     ${todayInsightCard()}
     ${futureScoreHomeCard()}
     ${homeQuickAccessGrid()}
@@ -5518,7 +5695,7 @@ const screens = {
       icon: "icon-work.png",
       tone: "career-tone",
       items: [
-        { title: "Career Studio", text: "Interview practice, resume builder, and job matching.", modal: "careerStudio" }
+        { title: "Career Studio", text: "Interview practice, resume builder, portfolio builder, and job matching.", modal: "careerStudio" }
       ]
     })}
 
@@ -5555,7 +5732,7 @@ const screens = {
 
   simulator: () => `
     <section class="life-sim-game" data-life-sim-game>
-      <div id="life-sim-root" class="life-sim-root" aria-label="Anime-style 3D Singapore adult-life simulator"></div>
+      <div id="life-sim-root" class="life-sim-root" aria-label="Realistic 3D Singapore adult-life simulator"></div>
 
       <div class="life-sim-rotate" aria-hidden="true">
         <strong>Rotate your phone</strong>
@@ -5586,6 +5763,8 @@ const screens = {
       <div class="sim-look-pad" data-sim-look-pad aria-hidden="true">
         <span>Drag to rotate</span>
       </div>
+
+      <button class="asset-credits-tag" type="button" data-open="assetCredits">Asset Credits</button>
     </section>
   `,
 
@@ -5722,6 +5901,27 @@ const screens = {
     <button class="secondary-action signout-action" type="button" data-sign-out>Sign out</button>
   `
 };
+
+// Asset Credits (realistic-style pivot, Phase 1) - CC0 Objaverse assets need
+// no attribution at all, but CC-BY/CC-BY-SA/CC-BY-NC ones legally require
+// crediting the specific creator, so this can't just be one hardcoded corner
+// line - it has to be generated from the manifest's real license/author
+// fields, not hand-maintained, or it silently goes stale the moment a new
+// asset is added via tools/objaverse_fetch.py.
+let objaverseCreditsEntries = null;
+
+async function loadObjaverseCredits() {
+  if (objaverseCreditsEntries) return objaverseCreditsEntries;
+  try {
+    const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
+    const manifest = await response.json();
+    objaverseCreditsEntries = (manifest.objaverseAssets || []).filter((entry) => entry.license && entry.license !== "cc0");
+  } catch (error) {
+    console.error("[Asset Credits] Failed to load manifest", error);
+    objaverseCreditsEntries = [];
+  }
+  return objaverseCreditsEntries;
+}
 
 const modals = {
   username: () => `
@@ -6007,8 +6207,13 @@ const modals = {
         <span class="risk-pill light">Daily reflection - 3 minutes</span>
         <button class="ghost-circle light" type="button" data-close aria-label="Close">x</button>
       </div>
-      <h3 id="daily-reflection-title">${escapeHTML(prompt.label)}</h3>
-      <textarea id="daily-reflection-text" placeholder="A few honest sentences is enough."></textarea>
+      ${streakChipHTML(reflectionCheckInStreak(), "reflection")}
+      <h3 id="daily-reflection-title"><span aria-hidden="true">${prompt.emoji}</span> ${escapeHTML(prompt.label)}</h3>
+      <p class="reflection-stuck-label">Stuck? Tap one to start:</p>
+      <div class="reflection-starter-row">
+        ${prompt.starters.map((starter) => `<button type="button" class="reflection-starter-chip" data-reflection-starter="${escapeHTML(starter)}">${escapeHTML(starter)}</button>`).join("")}
+      </div>
+      <textarea id="daily-reflection-text" placeholder="A few honest sentences is enough.">${escapeHTML(dailyReflectionDraft)}</textarea>
       <button class="primary-action mint-action" type="button" data-save-daily-reflection="${escapeHTML(prompt.id)}">Save reflection</button>
     </div>
   `;
@@ -6173,7 +6378,7 @@ const modals = {
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="career-studio-title">Practice for the real thing</h3>
-      <p class="muted">Three tools that work together - practice how you sound, write what you've done, and see which roles fit your Blueprint.</p>
+      <p class="muted">Four tools that work together - practice how you sound, write what you've done, build a profile, and see which roles fit your Blueprint.</p>
       <div class="action-stack">
         <button class="wide-action" type="button" data-open="interviewPractice">
           <img src="assets/icon-boundary.png" alt="">
@@ -6182,6 +6387,10 @@ const modals = {
         <button class="wide-action" type="button" data-open="resumeBuilder">
           <img src="assets/icon-work.png" alt="">
           <span><strong>Resume Builder</strong><small>Write your real experience - AI cleans up wording, never invents facts.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="portfolioBuilder">
+          <img src="assets/icon-spark.png" alt="">
+          <span><strong>Portfolio Builder</strong><small>A LinkedIn-style profile - about, projects, and skills, written from what you give it.</small></span>
         </button>
         <button class="wide-action" type="button" data-open="jobMatching">
           <img src="assets/icon-learn.png" alt="">
@@ -6201,6 +6410,20 @@ const modals = {
       <p class="muted">Write your real experience and education in your own words - Compass AI cleans up the wording and structure, without inventing anything you didn't provide.</p>
       <div class="admin-form">
         ${resumeBuilderView()}
+      </div>
+    </div>
+  `,
+
+  portfolioBuilder: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="portfolio-builder-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Portfolio Builder</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="portfolio-builder-title">Build your portfolio</h3>
+      <p class="muted">Write your real about, experience, and projects in your own words - Compass AI organizes it into a LinkedIn-style profile, without inventing anything you didn't provide.</p>
+      <div class="admin-form">
+        ${portfolioBuilderView()}
       </div>
     </div>
   `,
@@ -6335,25 +6558,39 @@ const modals = {
     `;
   },
 
-  mood: () => `
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mood-title">
+  mood: () => {
+    const moodTiles = [
+      { label: "Calm", emoji: "😌", tone: "calm" },
+      { label: "Okay", emoji: "🙂", tone: "okay" },
+      { label: "Tired", emoji: "😴", tone: "tired" },
+      { label: "Stressed", emoji: "😣", tone: "stressed" }
+    ];
+    const score = Number(trackerState.mood.score) || 0;
+    return `
+    <div class="modal-card mood-modal" role="dialog" aria-modal="true" aria-labelledby="mood-title">
       <div class="modal-top">
         <span class="risk-pill calm">Mood tracker</span>
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="mood-title">How are you feeling today?</h3>
-      <div class="mood-choice-grid">
-        ${["Calm", "Okay", "Tired", "Stressed"].map((label) => `
-          <button class="mood-choice ${trackerState.mood.label === label ? "is-selected" : ""}" type="button" data-mood-choice="${label}">
-            <img src="assets/icon-mood.png" alt=""><span>${label}</span>
+      ${streakChipHTML(moodCheckInStreak(), "check-in")}
+      <div class="mood-emoji-grid">
+        ${moodTiles.map((tile) => `
+          <button class="mood-choice mood-tone-${tile.tone} ${trackerState.mood.label === tile.label ? "is-selected" : ""}" type="button" data-mood-choice="${tile.label}">
+            <span class="mood-emoji" aria-hidden="true">${tile.emoji}</span><span>${tile.label}</span>
           </button>
         `).join("")}
       </div>
-      <div class="slider-row"><span>Energy</span><input id="mood-score" type="range" min="0" max="100" value="${trackerState.mood.score}"></div>
-      <textarea id="mood-note" aria-label="Mood note">${escapeHTML(trackerState.mood.note)}</textarea>
+      <div class="mood-energy-card">
+        <div class="mood-energy-head"><span>Energy</span><strong id="mood-score-emoji">${energyEmoji(score)}</strong></div>
+        <input id="mood-score" type="range" min="0" max="100" value="${score}">
+        <p id="mood-score-label" class="mood-energy-caption">${energyLabel(score)}</p>
+      </div>
+      <textarea id="mood-note" aria-label="Mood note" placeholder="Anything you want to add? (optional)">${escapeHTML(trackerState.mood.note)}</textarea>
       <button class="primary-action" type="button" data-save-mood>Save mood</button>
     </div>
-  `,
+  `;
+  },
 
   receipt: () => `
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
@@ -6543,7 +6780,7 @@ const modals = {
           ["icon-stories.png", "Inspire Hub", "Read successful people stories and use AI Reflection to apply lessons realistically."],
           ["icon-support.png", "Community", "Join growth communities, goal groups, partner matching, and anonymous support."],
           ["icon-work.png", "Opportunity Hub", "Explore scholarships, internships, competitions, volunteering, and learn-and-earn resources."],
-          ["icon-balance.png", "Life Sim", "Play the anime-style adult-life simulator, choose daily activities, and fast-forward consequences."],
+          ["icon-balance.png", "Life Sim", "Play the realistic 3D adult-life simulator, choose daily activities, and fast-forward consequences."],
           ["icon-chat.png", "Compass AI", "Discuss decisions, story lessons, reality checks, and action plans."],
           ["icon-support.png", "Support Circle", "Save trusted people for moments when decisions feel heavy."],
           ["icon-settings.png", "Profile", "Manage account, guide, permissions, and admin tools."],
@@ -6766,6 +7003,47 @@ const modals = {
       <div class="badge-grid">${badgeCards()}</div>
     </div>
   `,
+
+  assetCredits: () => {
+    if (objaverseCreditsEntries === null) {
+      loadObjaverseCredits().then(() => {
+        if (modalLayer.classList.contains("is-open")) openModal("assetCredits");
+      });
+      return `
+        <div class="modal-card asset-credits-modal" role="dialog" aria-modal="true" aria-labelledby="asset-credits-title">
+          <div class="modal-top">
+            <span class="risk-pill calm">Asset Credits</span>
+            <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+          </div>
+          <h3 id="asset-credits-title">3D asset credits</h3>
+          <p class="muted">Loading...</p>
+        </div>
+      `;
+    }
+    return `
+      <div class="modal-card asset-credits-modal" role="dialog" aria-modal="true" aria-labelledby="asset-credits-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Asset Credits</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="asset-credits-title">3D asset credits</h3>
+        <p class="muted">Real-world 3D objects sourced from Objaverse (Creative Commons-licensed Sketchfab uploads). CC0 pieces need no credit; everything below is CC-BY / CC-BY-SA / CC-BY-NC, which does.</p>
+        ${objaverseCreditsEntries.length ? `
+          <div class="asset-credits-list">
+            ${objaverseCreditsEntries.map((entry) => `
+              <div class="asset-credits-row">
+                <div>
+                  <strong>${escapeHTML(entry.label || entry.category || "3D asset")}</strong>
+                  <span>by ${escapeHTML(entry.author || "unknown")} - ${escapeHTML((entry.license || "").toUpperCase())}</span>
+                </div>
+                ${entry.sourceUrl ? `<button class="text-action" type="button" data-open-link="${escapeHTML(entry.sourceUrl)}">Source</button>` : ""}
+              </div>
+            `).join("")}
+          </div>
+        ` : `<p class="muted">No attribution-required assets in use right now.</p>`}
+      </div>
+    `;
+  },
 
   growthProgress: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="growth-progress-title">
@@ -7002,6 +7280,9 @@ function openModal(name, payload) {
   }
   if (name === "resumeBuilder" && !modalLayer.classList.contains("is-open")) {
     resumeError = "";
+  }
+  if (name === "portfolioBuilder" && !modalLayer.classList.contains("is-open")) {
+    portfolioError = "";
   }
   if (name === "roadmapView" && !modalLayer.classList.contains("is-open")) {
     roadmapView = "timeline";
@@ -8805,6 +9086,7 @@ document.addEventListener("click", async (event) => {
   const copyCommunityPrompt = event.target.closest("[data-copy-community-prompt]");
   const clearChat = event.target.closest("[data-clear-chat]");
   const moodChoice = event.target.closest("[data-mood-choice]");
+  const reflectionStarter = event.target.closest("[data-reflection-starter]");
   const sendChat = event.target.closest("[data-send-chat]");
   const voiceChat = event.target.closest("[data-voice-chat]");
   const submitAssessment = event.target.closest("[data-submit-assessment]");
@@ -8829,6 +9111,9 @@ document.addEventListener("click", async (event) => {
   const saveResumeDraftButton = event.target.closest("[data-save-resume-draft]");
   const polishResumeButton = event.target.closest("[data-polish-resume]");
   const copyResumeButton = event.target.closest("[data-copy-resume]");
+  const savePortfolioDraftButton = event.target.closest("[data-save-portfolio-draft]");
+  const polishPortfolioButton = event.target.closest("[data-polish-portfolio]");
+  const copyPortfolioButton = event.target.closest("[data-copy-portfolio]");
   const exportVaultButton = event.target.closest("[data-export-vault]");
   const saveMood = event.target.closest("[data-save-mood]");
   const demoReceipt = event.target.closest("[data-demo-receipt]");
@@ -9225,6 +9510,17 @@ document.addEventListener("click", async (event) => {
     modalLayer.querySelectorAll("[data-mood-choice]").forEach((button) => button.classList.toggle("is-selected", button === moodChoice));
   }
 
+  if (reflectionStarter) {
+    const textarea = modalLayer.querySelector("#daily-reflection-text");
+    if (textarea) {
+      const starter = reflectionStarter.dataset.reflectionStarter;
+      textarea.value = textarea.value.trim() ? `${textarea.value.trim()}\n${starter} ` : `${starter} `;
+      dailyReflectionDraft = textarea.value;
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    }
+  }
+
   if (nextAssessment) {
     captureAssessmentDraft();
     assessmentStep = Math.min(assessmentItems.length + 1, assessmentStep + 1);
@@ -9363,9 +9659,12 @@ document.addEventListener("click", async (event) => {
     if (content) {
       createReflectionEntry("daily", content, { tags: ["daily", saveDailyReflectionButton.dataset.saveDailyReflection] });
       dailyReflectionPromptIndex += 1;
+      dailyReflectionDraft = "";
       closeModal();
       renderScreen(activeTab);
       refreshStaticScreens();
+      const newStreak = reflectionCheckInStreak().streak;
+      triggerCheckInCelebration(newStreak > 1 ? `🌱 Saved! ${newStreak}-day reflection streak` : "🌱 Reflection saved");
     }
   }
 
@@ -9466,6 +9765,26 @@ document.addEventListener("click", async (event) => {
     }
   }
 
+  if (savePortfolioDraftButton) {
+    savePortfolioDraft();
+    openModal("portfolioBuilder");
+  }
+
+  if (polishPortfolioButton) {
+    await polishPortfolioWithAI();
+  }
+
+  if (copyPortfolioButton) {
+    const portfolio = trackerState.careerStudio.portfolio;
+    if (portfolio && portfolio.polishedText && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(portfolio.polishedText);
+      } catch (error) {
+        console.error("[Portfolio Builder] Clipboard copy failed", error);
+      }
+    }
+  }
+
   if (exportVaultButton) {
     downloadKnowledgeVaultExport();
   }
@@ -9542,6 +9861,8 @@ document.addEventListener("click", async (event) => {
     closeModal();
     renderScreen(activeTab);
     refreshStaticScreens();
+    const newStreak = moodCheckInStreak().streak;
+    triggerCheckInCelebration(newStreak > 1 ? `🔥 Logged! ${newStreak}-day streak` : "✅ Mood logged for today");
   }
 
   if (saveAiProfile) {
@@ -9837,6 +10158,9 @@ document.addEventListener("input", (event) => {
   if (event.target && event.target.matches("[data-build-training-draft]")) {
     buildTrainingDraft = event.target.value;
   }
+  if (event.target && event.target.id === "daily-reflection-text") {
+    dailyReflectionDraft = event.target.value;
+  }
   if (event.target && event.target.id === "inspire-search") {
     inspireSearch = event.target.value;
     renderScreen("stories");
@@ -9845,6 +10169,13 @@ document.addEventListener("input", (event) => {
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
     }
+  }
+  if (event.target && event.target.id === "mood-score") {
+    const score = Number(event.target.value) || 0;
+    const emoji = modalLayer.querySelector("#mood-score-emoji");
+    const label = modalLayer.querySelector("#mood-score-label");
+    if (emoji) emoji.textContent = energyEmoji(score);
+    if (label) label.textContent = energyLabel(score);
   }
 });
 

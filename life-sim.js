@@ -115,7 +115,7 @@
       footstepTimer: 0,
       isMoving: false,
       mixers: [],
-      productionAssetsLoaded: false,
+      realCharacterLoaded: false,
       assetManager: null,
       assetDebug: null,
       cameraPosition: new THREE.Vector3(-19, 8, 0),
@@ -166,42 +166,25 @@
       if (Number.isFinite(yawOverride)) state.yaw = yawOverride;
     }
     scene.add(player.group);
-    loadProductionAssets(THREE, scene, materials, player, state, root, state.assetManager).then((loaded) => {
+    createDistrict(THREE, scene, materials);
+    loadDistrictAssetSamples(THREE, scene, state.assetManager, state);
+    addRoadDetailProps(THREE, scene, state.assetManager, state);
+    loadCharacterAsset(THREE, state.assetManager, player, state, root).then((loaded) => {
       if (state.destroyed) return;
-      state.productionAssetsLoaded = loaded;
-      if (!loaded) {
-        createDistrict(THREE, scene, materials);
-        setAssetStatus(root, "Stylized remastered district active.", "success");
-        window.setTimeout(() => clearAssetStatus(root), 2600);
-        loadDistrictAssetSamples(THREE, scene, state.assetManager, state);
-      }
-      registerPresentationObjects(scene, state.presentation);
+      state.realCharacterLoaded = loaded;
     });
+    registerPresentationObjects(scene, state.presentation);
 
     const clock = new THREE.Clock();
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(root);
     resize();
 
-    // The Volume 5 anime cel-shading pass (docs/volume5-asset-pipeline.md) was
-    // superseded by a semi-realistic "Stylized Low Poly City" PBR direction -
-    // the outline pipeline stays intact below (?cel=1 still re-enables it for
-    // comparison) but is now opt-in rather than the default.
-    const celOutlineEnabled = new URLSearchParams(location.search).get("cel") === "1";
-    if (celOutlineEnabled && window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.createOutlinePipeline) {
-      window.LifeVerseRenderPipeline.createOutlinePipeline(THREE, renderer, scene, camera, {
-        width: Math.max(320, root.clientWidth || window.innerWidth || 320),
-        height: Math.max(240, root.clientHeight || window.innerHeight || 240)
-      }).then((outline) => {
-        if (state.destroyed) {
-          outline.dispose();
-          return;
-        }
-        state.outline = outline;
-      }).catch((error) => {
-        console.warn("[LifeVerse] Cel outline pipeline unavailable, falling back to plain render.", error);
-      });
-    }
+    // The Volume 5 anime cel-shading outline pass (docs/volume5-asset-pipeline.md)
+    // is retired for good as of the realistic-style pivot - it's no longer even
+    // an opt-in ?cel=1 toggle, since state.outline is always undefined now and
+    // the guarded `if (state.outline)` call sites below (resize/render/destroy)
+    // are simply permanent no-ops.
 
     const keydown = (event) => {
       if (isTyping(event.target)) return;
@@ -288,7 +271,6 @@
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      if (state.outline) state.outline.setSize(width, height);
     }
 
     function animate() {
@@ -302,8 +284,7 @@
       if (state.assetDebug) state.assetDebug.update();
       updateCamera(player.group.position, delta, elapsed);
       updateZone(player.group.position);
-      if (state.outline) state.outline.render();
-      else renderer.render(scene, camera);
+      renderer.render(scene, camera);
       requestAnimationFrame(animate);
     }
 
@@ -445,7 +426,6 @@
         host.removeEventListener("click", clickFeedback);
         if (state.presentation) state.presentation.audio.destroy();
         if (state.assetManager) state.assetManager.dispose();
-        if (state.outline) state.outline.dispose();
         renderer.dispose();
         root.innerHTML = "";
       }
@@ -1104,50 +1084,40 @@
     window.setTimeout(() => host.classList.remove("is-lifeverse-action-feedback"), 520);
   }
 
-  async function loadProductionAssets(THREE, scene, mat, player, state, root, assetManager) {
+  // Realistic-style pivot, Phase 2: this used to be loadProductionAssets(),
+  // which gated character AND environment/locationModels loading behind the
+  // same manifest.enabled flag, and the call site only ran createDistrict()/
+  // loadDistrictAssetSamples() (the world's roads/buildings/ground) when this
+  // returned false - meaning a real character with nothing else populated
+  // would have loaded into a completely empty scene. environment/
+  // locationModels pointed at files that never existed and aren't the live
+  // asset-swap mechanism anyway (loadDistrictAssetSamples() is), so that path
+  // is dropped entirely: this now only ever handles the character, and the
+  // call site always builds the district regardless of whether a real
+  // character was available.
+  async function loadCharacterAsset(THREE, assetManager, player, state, root) {
     if (!assetManager) return false;
     try {
       const manifest = await assetManager.loadManifest("assets/life-sim/asset-manifest.json");
-      if (!manifest || !manifest.enabled) return false;
+      if (!manifest || !manifest.enabled || !manifest.character || !manifest.character.url) return false;
       const loaderReady = await assetManager.ensureGltfLoader();
       if (!loaderReady) {
-        setAssetStatus(root, "Production assets are enabled, but GLTFLoader did not load. Check the GLTFLoader script in index.html.", "error");
+        setAssetStatus(root, "Realistic character is enabled, but GLTFLoader did not load. Check the GLTFLoader script in index.html.", "error");
         return false;
       }
-
-      setAssetStatus(root, "Loading production 3D assets...", "loading");
-
-      let loadedCount = 0;
-      if (manifest.environment && manifest.environment.url) {
-        const environment = await assetManager.instantiatePrefab("environment:main", scene, manifest.environment);
-        if (environment && !environment.fallback) loadedCount += 1;
+      setAssetStatus(root, "Loading realistic character...", "loading");
+      const character = await assetManager.loadModel(manifest.character.url, manifest.character);
+      if (!character || character.fallback) {
+        setAssetStatus(root, "Realistic character could not load. Using the fallback rig.", "error");
+        return false;
       }
-
-      const locations = Array.isArray(manifest.locationModels) ? manifest.locationModels : [];
-      for (const location of locations) {
-        if (!location || !location.url) continue;
-        const loaded = await assetManager.instantiatePrefab(`location:${location.id || location.label || location.url}`, scene, location);
-        if (loaded && !loaded.fallback) loadedCount += 1;
-      }
-
-      if (manifest.character && manifest.character.url) {
-        const character = await assetManager.loadModel(manifest.character.url, manifest.character);
-        if (character && !character.fallback) {
-          await installCharacterAsset(THREE, assetManager, player, character, manifest.character, state, mat);
-          loadedCount += 1;
-        }
-      }
-
-      addZones(THREE, scene, mat);
-      if (loadedCount > 0) {
-        setAssetStatus(root, "Production asset mode active", "success");
-        window.setTimeout(() => clearAssetStatus(root), 2600);
-        return true;
-      }
-      return false;
+      await installCharacterAsset(THREE, assetManager, player, character, manifest.character, state);
+      setAssetStatus(root, "Realistic character active.", "success");
+      window.setTimeout(() => clearAssetStatus(root), 2600);
+      return true;
     } catch (error) {
-      console.warn("[Life Sim] Production asset loading failed:", error);
-      setAssetStatus(root, "Production assets could not load. Check file paths in assets/life-sim/asset-manifest.json.", "error");
+      console.warn("[Life Sim] Character asset loading failed:", error);
+      setAssetStatus(root, "Realistic character could not load. Using the fallback rig.", "error");
       return false;
     }
   }
@@ -1780,40 +1750,180 @@
   // at the Mall zone as a natural central hub. Every other zone gets a
   // direct addPath connector into this spine or into a nearby zone, so the
   // whole 18-zone map is one connected network, not scattered islands.
+  // Shared with addRoadDetailProps() (realistic-style pivot, Phase 3) so
+  // Objaverse street-furniture props line up with the actual rendered road
+  // geometry instead of a second, hand-copied coordinate list drifting out
+  // of sync with this one.
+  const ROAD_MAIN_SEGMENTS = [
+    { x1: 0, z1: -42, x2: 0, z2: 58, width: 7 },
+    { x1: -51, z1: -32, x2: 111, z2: -32, width: 7 }
+  ];
+  const ROAD_CONNECTOR_PATHS = [
+    // North residential branch
+    [-30, 40, 0, 40],
+    [-60, 52, -30, 40],
+    // Central spine spurs
+    [-13, 8, 0, 8],
+    [13, 23, 0, 23],
+    [41, 12, 0, 12],
+    [25, -14, 0, -14],
+    // Downtown ring, hanging off Main Road EW
+    [10, -61, 10, -32],
+    [40, -61, 40, -32],
+    // East/southeast coastal chain
+    [80, -53, 80, -32],
+    [75, -82, 80, -53],
+    [110, -10, 110, -32],
+    // West cluster
+    [-80, -5, -50, -25],
+    [-50, -25, -50, -32],
+    // South cluster
+    [-25, -85, 0, -32],
+    [20, -95, -25, -85]
+  ];
+
   function addRoadNetwork(THREE, scene, mat) {
     [
       ["Main Road NS", [0, 0.01, 8], [7, 0.08, 100]],
       ["Main Road EW", [30, 0.02, -32], [162, 0.08, 7]]
     ].forEach(([name, position, scale]) => addBox(THREE, scene, name, position, scale, mat.road, true));
 
-    [
-      // North residential branch
-      [-30, 40, 0, 40],
-      [-60, 52, -30, 40],
-      // Central spine spurs
-      [-13, 8, 0, 8],
-      [13, 23, 0, 23],
-      [41, 12, 0, 12],
-      [25, -14, 0, -14],
-      // Downtown ring, hanging off Main Road EW
-      [10, -61, 10, -32],
-      [40, -61, 40, -32],
-      // East/southeast coastal chain
-      [80, -53, 80, -32],
-      [75, -82, 80, -53],
-      [110, -10, 110, -32],
-      // West cluster
-      [-80, -5, -50, -25],
-      [-50, -25, -50, -32],
-      // South cluster
-      [-25, -85, 0, -32],
-      [20, -95, -25, -85]
-    ].forEach(([x1, z1, x2, z2]) => addPath(THREE, scene, [x1, z1], [x2, z2], 1.3, mat.path));
+    ROAD_CONNECTOR_PATHS.forEach(([x1, z1, x2, z2]) => addPath(THREE, scene, [x1, z1], [x2, z2], 1.3, mat.path));
 
     for (let z = -35; z <= 57; z += 6) addBox(THREE, scene, "Road Center Line NS", [0, 0.13, z], [0.25, 0.04, 2.15], mat.roadLine, true);
     for (let x = -50; x <= 110; x += 6) addBox(THREE, scene, "Road Center Line EW", [x, 0.14, -32], [2.15, 0.04, 0.25], mat.roadLine, true);
     addCrosswalk(THREE, scene, [0, -28], mat, "x");
     addCrosswalk(THREE, scene, [-4, -32], mat, "z");
+  }
+
+  function segmentPoint(x1, z1, x2, z2, t) {
+    return [x1 + (x2 - x1) * t, z1 + (z2 - z1) * t];
+  }
+
+  function segmentPerpendicularOffset(x1, z1, x2, z2, distance) {
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const length = Math.hypot(dx, dz) || 1;
+    return [(-dz / length) * distance, (dx / length) * distance];
+  }
+
+  function sampleSegmentPoints(x1, z1, x2, z2, spacing) {
+    const length = Math.hypot(x2 - x1, z2 - z1);
+    const count = Math.max(1, Math.floor(length / spacing));
+    const points = [];
+    for (let i = 1; i < count; i += 1) points.push(segmentPoint(x1, z1, x2, z2, i / count));
+    return points;
+  }
+
+  // Realistic-style pivot, Phase 3: places real Objaverse street-furniture
+  // along the same road topology addRoadNetwork() renders (ROAD_MAIN_SEGMENTS
+  // + ROAD_CONNECTOR_PATHS above), using each manifest entry's
+  // targetHeightMeters (via assetManager's normalizeToHeight) for correct
+  // real-world scale. The drivable road SURFACE itself stays the existing
+  // primitive PBR-textured geometry - Objaverse's LVIS index has no road/
+  // pavement/asphalt/tile category at all (checked all 1156 categories), so
+  // there is nothing to swap the surface itself to. This is deliberately
+  // props-only, per the plan's flagged fallback for that gap.
+  async function addRoadDetailProps(THREE, scene, assetManager, state) {
+    if (!assetManager) return;
+    const ready = await assetManager.ensureGltfLoader();
+    if (!ready || (state && state.destroyed)) return;
+
+    let manifest;
+    try {
+      const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
+      manifest = await response.json();
+    } catch (error) {
+      console.warn("[Life Sim] Could not load asset manifest for road props:", error);
+      return;
+    }
+
+    const byCategory = {};
+    (manifest.objaverseAssets || []).forEach((entry) => {
+      (byCategory[entry.category] = byCategory[entry.category] || []).push(entry);
+    });
+
+    const loadedByUrl = new Map();
+    async function loadedAsset(entry) {
+      if (loadedByUrl.has(entry.url)) return loadedByUrl.get(entry.url);
+      const promise = assetManager.loadModel(entry.url, {
+        id: entry.id,
+        label: entry.label,
+        targetHeightMeters: entry.targetHeightMeters
+      });
+      loadedByUrl.set(entry.url, promise);
+      return promise;
+    }
+
+    async function place(entry, position, rotationY = 0) {
+      if (!entry || (state && state.destroyed)) return;
+      const asset = await loadedAsset(entry);
+      if (!asset || asset.fallback || !asset.scene) return;
+      const instance = asset.scene.clone(true);
+      instance.position.set(position[0], position[1] || 0, position[2]);
+      instance.rotation.y = rotationY;
+      scene.add(instance);
+    }
+
+    const roundRobin = {};
+    function nextEntry(...categories) {
+      for (const category of categories) {
+        const list = byCategory[category];
+        if (list && list.length) {
+          roundRobin[category] = (roundRobin[category] || 0) + 1;
+          return list[(roundRobin[category] - 1) % list.length];
+        }
+      }
+      return null;
+    }
+
+    const allSegments = [
+      ...ROAD_MAIN_SEGMENTS,
+      ...ROAD_CONNECTOR_PATHS.map(([x1, z1, x2, z2]) => ({ x1, z1, x2, z2, width: 1.3 }))
+    ];
+
+    // Streetlights and telephone poles down opposite sidewalks of every
+    // segment - real streets have both, and alternating sides reads as a
+    // planned street rather than one row of identical clutter.
+    for (const segment of allSegments) {
+      if (state && state.destroyed) return;
+      const sidewalkDistance = segment.width / 2 + 1.4;
+      const [lightDx, lightDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, sidewalkDistance);
+      const [poleDx, poleDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, -sidewalkDistance);
+      const lightPoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 20);
+      for (const [px, pz] of lightPoints) {
+        await place(nextEntry("lamppost", "streetlight"), [px + lightDx, 0, pz + lightDz]);
+      }
+      const polePoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 30);
+      for (const [px, pz] of polePoints) {
+        await place(nextEntry("telephone_pole"), [px + poleDx, 0, pz + poleDz]);
+      }
+    }
+
+    // Benches, trash cans, and manholes only along the two main spine roads -
+    // keeps the busiest, most-walked stretch feeling detailed without
+    // scattering the same handful of props across all 17 segments.
+    for (const segment of ROAD_MAIN_SEGMENTS) {
+      if (state && state.destroyed) return;
+      const sidewalkDistance = segment.width / 2 + 2.4;
+      const [sideDx, sideDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, sidewalkDistance);
+      const benchPoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 40);
+      for (const [px, pz] of benchPoints) {
+        await place(nextEntry("bench"), [px + sideDx, 0, pz + sideDz]);
+        await place(nextEntry("trash_can"), [px + sideDx * 1.4, 0, pz + sideDz * 1.4]);
+      }
+      const manholePoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 25);
+      for (const [px, pz] of manholePoints) {
+        await place(nextEntry("manhole"), [px, 0.02, pz], Math.random() * Math.PI * 2);
+      }
+    }
+
+    // Stop signs and a couple of traffic cones at the busiest junctions only
+    // - one per real-world intersection, not swept across every segment.
+    await place(nextEntry("stop_sign"), [0 + 4.5, 0, 8 + 4.5]);
+    await place(nextEntry("stop_sign"), [30 - 4.5, 0, -32 - 4.5], Math.PI);
+    await place(nextEntry("cone"), [6, 0, -30]);
+    await place(nextEntry("cone"), [7.4, 0, -30.6]);
   }
 
   function addHdbHome(THREE, scene, mat) {

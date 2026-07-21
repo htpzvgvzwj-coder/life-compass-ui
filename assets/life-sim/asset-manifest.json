@@ -1,98 +1,122 @@
 {
   "enabled": false,
-  "qualityTarget": "anime-open-world-mobile",
+  "qualityTarget": "realistic-singapore-mobile",
   "notes": [
-    "Set enabled to true after adding licensed optimized GLB files.",
-    "Export Unity Asset Store or Mixamo assets to GLB/GLTF for the Vercel WebGL runtime.",
+    "Realistic-style pivot (2026-07-21): assets come from Objaverse (CC-licensed",
+    "Sketchfab uploads), fetched + license-filtered via tools/objaverse_fetch.py -",
+    "see objaverseAssets below for the real, populated entries with license/author.",
+    "The old environment/locationModels/prefabs fields (Unity-Asset-Store-shaped,",
+    "pointed at files that never existed) have been removed entirely - they were",
+    "never the live asset-swap mechanism anyway (life-sim.js's",
+    "loadDistrictAssetSamples() is, and always runs regardless of this manifest).",
+    "",
+    "character (Phase 2 finding): Objaverse's whole 'person' LVIS category is",
+    "only 78 objects, almost all static scans/art busts, not rigged game",
+    "characters. Exactly one license-eligible candidate had 2+ baked animations",
+    "(12, in fact) - but they were VTuber calibration/gesture clips (Head",
+    "Calibration, Dance, Explain1/2, Surprised), zero locomotion, so it can't",
+    "drive idle/walk/run for this game. Objaverse is not a good source for this",
+    "specific asset. Mixamo (free, Adobe, purpose-built for idle/walk/run/jump/",
+    "sit/eat/exercise rigged clips) is the standard fit here, but requires a",
+    "manual download through their web app (no scriptable API, login-gated) -",
+    "a human needs to pick a character + clips and drop the exported GLBs into",
+    "assets/characters/ + assets/characters/animations/ before this can be",
+    "populated for real. Left null below until that happens; the live game",
+    "keeps using the primitive capsule/sphere rig (createPlayer() in",
+    "life-sim.js) in the meantime - loadCharacterAsset() just returns false",
+    "when character is null, no crash, no broken state.",
+    "",
     "Keep total first-load model + texture size under 45MB for mobile."
   ],
-  "environment": {
-    "id": "singapore-district",
-    "url": "assets/environment/singapore-district.glb",
-    "position": [0, 0, 0],
-    "rotation": [0, 0, 0],
-    "scale": [1, 1, 1],
-    "toonify": true
-  },
-  "locationModels": [
+  "character": null,
+  "objaverseAssets": [
     {
-      "id": "home",
-      "label": "HDB Home",
-      "url": "assets/environment/hdb-block.glb",
-      "position": [-18, 0, 12],
-      "scale": [1, 1, 1],
-      "toonify": true
+      "id": "bench:91e9a8ae",
+      "uid": "91e9a8aea88f42e6b8fd6505dec761c4",
+      "url": "assets/props/objaverse/91e9a8aea88f42e6b8fd6505dec761c4.glb",
+      "label": "Bench",
+      "category": "bench",
+      "license": "by",
+      "author": "flaremedia",
+      "sourceUrl": "https://sketchfab.com/3d-models/91e9a8aea88f42e6b8fd6505dec761c4",
+      "targetHeightMeters": 0.9
     },
     {
-      "id": "mrt",
-      "label": "MRT Entrance",
-      "url": "assets/environment/mrt-entrance.glb",
-      "position": [4.8, 0, -4.8],
-      "scale": [1, 1, 1],
-      "toonify": true
+      "id": "bench:9ef388cd",
+      "uid": "9ef388cd9cb947f48957a497e8b8184a",
+      "url": "assets/props/objaverse/9ef388cd9cb947f48957a497e8b8184a.glb",
+      "label": "uvbancexpo",
+      "category": "bench",
+      "license": "by",
+      "author": "Giriga",
+      "sourceUrl": "https://sketchfab.com/3d-models/9ef388cd9cb947f48957a497e8b8184a",
+      "targetHeightMeters": 0.9
     },
     {
-      "id": "food",
-      "label": "Food Court",
-      "url": "assets/environment/food-court.glb",
-      "position": [-17, 0, -12],
-      "scale": [1, 1, 1],
-      "toonify": true
+      "id": "manhole:4111d35b",
+      "uid": "4111d35b8f1b424eae75881d6dc94b91",
+      "url": "assets/props/objaverse/4111d35b8f1b424eae75881d6dc94b91.glb",
+      "label": "Japanese Manhole",
+      "category": "manhole",
+      "license": "by",
+      "author": "beauvais.remi",
+      "sourceUrl": "https://sketchfab.com/3d-models/4111d35b8f1b424eae75881d6dc94b91",
+      "targetHeightMeters": 0.02
     },
     {
-      "id": "mall",
-      "label": "Shopping Mall",
-      "url": "assets/environment/mall.glb",
-      "position": [16, 0, -12],
-      "scale": [1, 1, 1],
-      "toonify": true
+      "id": "stop_sign:bf8cfacb",
+      "uid": "bf8cfacb09b14ab7afbd7890cf1b2d21",
+      "url": "assets/props/objaverse/bf8cfacb09b14ab7afbd7890cf1b2d21.glb",
+      "label": "Senyal Stop - Simple",
+      "category": "stop_sign",
+      "license": "by-nc-sa",
+      "author": "dimoni",
+      "sourceUrl": "https://sketchfab.com/3d-models/bf8cfacb09b14ab7afbd7890cf1b2d21",
+      "targetHeightMeters": 2.1
     },
     {
-      "id": "park",
-      "label": "Park",
-      "url": "assets/environment/park.glb",
-      "position": [1, 0, -20],
-      "scale": [1, 1, 1],
-      "toonify": true
+      "id": "trash_can:1f124d5d",
+      "uid": "1f124d5de6364378bb937d5bf7c9da6d",
+      "url": "assets/props/objaverse/1f124d5de6364378bb937d5bf7c9da6d.glb",
+      "label": "Realistic Trash Can Damaged (LOWPOLY) Free",
+      "category": "trash_can",
+      "license": "by",
+      "author": "3DCarlbon",
+      "sourceUrl": "https://sketchfab.com/3d-models/1f124d5de6364378bb937d5bf7c9da6d",
+      "targetHeightMeters": 0.85
     },
     {
-      "id": "cbd",
-      "label": "CBD Skyline",
-      "url": "assets/environment/cbd-skyline.glb",
-      "position": [0, 0, 36],
-      "scale": [1, 1, 1],
-      "toonify": true
+      "id": "cone:41db138b",
+      "uid": "41db138b35db45cf97624669f03b89fd",
+      "url": "assets/props/objaverse/41db138b35db45cf97624669f03b89fd.glb",
+      "label": "Traffic Cone",
+      "category": "cone",
+      "license": "by-sa",
+      "author": "lowpolybrain",
+      "sourceUrl": "https://sketchfab.com/3d-models/41db138b35db45cf97624669f03b89fd",
+      "targetHeightMeters": 0.7
+    },
+    {
+      "id": "lamppost:796e4312",
+      "uid": "796e4312613e427ab8b8c3c51d6aa834",
+      "url": "assets/props/objaverse/796e4312613e427ab8b8c3c51d6aa834.glb",
+      "label": "Lamp Post 1",
+      "category": "lamppost",
+      "license": "by",
+      "author": "omiyaio",
+      "sourceUrl": "https://sketchfab.com/3d-models/796e4312613e427ab8b8c3c51d6aa834",
+      "targetHeightMeters": 4.0
+    },
+    {
+      "id": "telephone_pole:a5ed4c7a",
+      "uid": "a5ed4c7a97b640de882058e071488164",
+      "url": "assets/props/objaverse/a5ed4c7a97b640de882058e071488164.glb",
+      "label": "Telephone pole",
+      "category": "telephone_pole",
+      "license": "by",
+      "author": "Kawaii.panzer",
+      "sourceUrl": "https://sketchfab.com/3d-models/a5ed4c7a97b640de882058e071488164",
+      "targetHeightMeters": 9.0
     }
-  ],
-  "character": {
-    "id": "anime-youth-character",
-    "url": "assets/characters/anime-youth-character.glb",
-    "position": [0, 0, 0],
-    "rotation": [0, 3.14159, 0],
-    "scale": [1, 1, 1],
-    "toonify": true,
-    "animationMap": {
-      "idle": ["idle", "stand", "breathing"],
-      "walk": ["walk", "walking"],
-      "run": ["run", "jog"],
-      "jump": ["jump"],
-      "eat": ["eat", "sitting"],
-      "sit": ["sit", "sitting"],
-      "exercise": ["exercise", "workout"]
-    },
-    "extraAnimationFiles": {
-      "idle": "assets/characters/animations/idle.glb",
-      "walk": "assets/characters/animations/walk.glb",
-      "run": "assets/characters/animations/run.glb",
-      "jump": "assets/characters/animations/jump.glb",
-      "eat": "assets/characters/animations/eat.glb",
-      "sit": "assets/characters/animations/sit.glb",
-      "exercise": "assets/characters/animations/exercise.glb"
-    }
-  },
-  "prefabs": [
-    { "id": "prop:bench", "url": "assets/props/bench.glb", "material": "wood" },
-    { "id": "prop:street-lamp", "url": "assets/props/street-lamp.glb", "material": "metal" },
-    { "id": "prop:food-table", "url": "assets/props/food-table.glb", "material": "plastic" }
   ]
 }
