@@ -25,6 +25,18 @@
   "functions": {
     "api/compass-chat.js": {
       "maxDuration": 30
+    },
+    "api/community-config.js": {
+      "maxDuration": 10
+    },
+    "api/community-post.js": {
+      "maxDuration": 30
+    },
+    "api/community-opportunity.js": {
+      "maxDuration": 30
+    },
+    "api/community-mentor-apply.js": {
+      "maxDuration": 30
     }
   }
 }

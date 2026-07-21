@@ -14,6 +14,7 @@
       game.economySystem,
       game.npcSimulationSystem,
       game.worldSimulationSystem,
+      game.legalSystem,
       game.progressionSystem
     ].filter(Boolean);
   }
@@ -32,6 +33,9 @@
     const system = getSystem(systemId);
     const action = getSystemAction(systemId, actionId);
     if (!system || !action) return { error: "System action not found." };
+    if (game.isInDetention && game.isInDetention(state)) {
+      return { error: `You're in detention until day ${state.legal.detentionUntilDay}. Fast forward to serve the time.` };
+    }
     if (typeof action.canPerform === "function") {
       const allowed = action.canPerform(state);
       if (allowed !== true) return { error: typeof allowed === "string" ? allowed : "Action is not available yet." };
@@ -54,7 +58,15 @@
         memory: action.consequence
       });
     }
+    const eventsBeforeAfterHook = (state.events || []).length;
     if (typeof action.after === "function") action.after(state, action);
+    // Captured by reference immediately, not by index - state.events is
+    // capped (slice(-120)) so an absolute index taken before the hook ran
+    // would silently point at the wrong entry (or go out of bounds) once
+    // the array is full and starts shifting.
+    const customEvent = (state.events || []).length > eventsBeforeAfterHook
+      ? state.events[state.events.length - 1]
+      : null;
     if (game.updateProgressionFromDecision) {
       game.updateProgressionFromDecision(state, action, { systemId: system.id, systemTitle: system.title });
     }
@@ -72,7 +84,7 @@
     };
     state.schedule = [...(state.schedule || []), scheduleEntry].slice(-40);
 
-    const event = game.addEvent(state, {
+    let event = game.addEvent(state, {
       type: system.id,
       title: action.title,
       summary: action.consequence,
@@ -93,6 +105,13 @@
       reflection: action.reflection,
       occurredAt: after.stamp
     });
+    // If action.after() fired its own outcome-specific event (e.g. "hired"
+    // vs "not selected", a good conversation vs a rocky one), that's the
+    // one that actually matters - it becomes the primary result event
+    // instead of the generic wrap-up above, same fix already applied to
+    // performActivity() in lifeverse-activities.js for the legal system's
+    // caught/not-caught reveal.
+    if (customEvent) event = customEvent;
     return { state, system, action, event, scheduleEntry };
   }
 

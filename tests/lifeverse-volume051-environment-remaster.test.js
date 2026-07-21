@@ -115,7 +115,12 @@ assert.ok(!simulatorSection.includes("lifeVerseReportPanel"), "environment remas
 
 const state = game.createInitialState({ profile: { username: "Environment Tester" } });
 game.installLifeVerseArchitecture(state);
-assert.strictEqual(game.getAvailableActivities(state, { locationId: "library" }).length, 0, "new visual locations do not add new gameplay activities");
+// Library started as a visual-only location at the time of the Volume 5.1
+// remaster (hence the original "0 activities" assertion here), but was later
+// given a real activity (study-group-with-peers) as part of deliberately
+// expanding gameplay into previously-decorative locations - this assertion
+// now documents that intentional expansion instead of the old scaffold gap.
+assert.ok(game.getAvailableActivities(state, { locationId: "library" }).length > 0, "library now has a real gameplay activity (study-group-with-peers)");
 assert.ok(game.getAvailableActivities(state, { locationId: "home" }).length > 0, "existing gameplay locations remain playable");
 
 console.log("LifeVerse Volume 5.1 environment remaster tests passed.");

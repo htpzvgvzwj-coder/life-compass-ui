@@ -178,6 +178,135 @@
     const inflationMultiplier = 1 + (Number(state.economy.inflation || 0) / 100) * (chunkDays / 30);
     const livingCost = Math.round(chunkDays * Number(state.finance.dailyLivingCost || 18) * inflationMultiplier);
     const rentCost = Math.round((Number(state.housing.monthlyCost || 0) / 30) * chunkDays);
+    // Lease rent shortfall (bible-consistent with the crime/consequence work
+    // this session): before this chunk's lump cost deduction quietly turns
+    // an unaffordable rent into more debt, a real, felt housing consequence
+    // fires first - missing rent should cost more than money, and a lease
+    // that keeps getting missed should eventually risk eviction.
+    if (state.housing.lease && state.housing.lease.active) {
+      if (state.finance.money < rentCost) {
+        state.housing.lease.missedPayments += 1;
+        state.housing.lease.landlordRelationship = game.clamp(state.housing.lease.landlordRelationship - 15);
+        state.housing.lease.evictionRisk = game.clamp(state.housing.lease.evictionRisk + 25);
+        if (game.addEvent) {
+          game.addEvent(state, {
+            type: "housing",
+            title: "Missed a rent payment",
+            summary: "You couldn't cover rent this period.",
+            systems: ["Housing"],
+            consequences: [`Landlord relationship is now ${state.housing.lease.landlordRelationship}/100.`, `Eviction risk is now ${state.housing.lease.evictionRisk}/100.`],
+            reflection: "What would need to change before the next payment is due?"
+          });
+        }
+      } else {
+        state.housing.lease.landlordRelationship = game.clamp(state.housing.lease.landlordRelationship + 2);
+        state.housing.lease.evictionRisk = game.clamp(state.housing.lease.evictionRisk - 5);
+      }
+    }
+    // Vehicle loan payment - same shape as the lease block above, checked
+    // against the loan's own monthlyPayment rather than the general
+    // transportation.monthlyCost (which nothing in Fast Forward actually
+    // charges today - left untouched on purpose). Unlike rent (which was
+    // already being deducted via the pre-existing rentCost/totalCost path
+    // below), there was no existing mechanism charging the loan payment at
+    // all - the "afford" branch must actually deduct it and pay down the
+    // balance, or "financing a vehicle" would cost only the down payment
+    // and then nothing, ever.
+    if (state.transportation.loan && state.transportation.loan.active) {
+      const loanPayment = Math.min(state.transportation.loan.monthlyPayment, state.transportation.vehicleLoanBalance);
+      if (state.finance.money < loanPayment) {
+        state.transportation.loan.missedPayments += 1;
+        state.transportation.loan.repossessionRisk = game.clamp(state.transportation.loan.repossessionRisk + 25);
+        if (game.addEvent) {
+          game.addEvent(state, {
+            type: "transportation",
+            title: "Missed a vehicle loan payment",
+            summary: "You couldn't cover the vehicle payment this period.",
+            systems: ["Transportation"],
+            consequences: [`Repossession risk is now ${state.transportation.loan.repossessionRisk}/100.`],
+            reflection: "What would need to change before the next payment is due?"
+          });
+        }
+      } else {
+        state.finance.money = Math.max(0, Math.round(state.finance.money - loanPayment));
+        state.finance.debt = Math.max(0, Math.round(state.finance.debt - loanPayment));
+        state.transportation.vehicleLoanBalance = Math.max(0, Math.round(state.transportation.vehicleLoanBalance - loanPayment));
+        state.transportation.loan.repossessionRisk = game.clamp(state.transportation.loan.repossessionRisk - 5);
+        if (state.transportation.vehicleLoanBalance <= 0) {
+          state.transportation.loan.active = false;
+          state.transportation.monthlyCost = Math.max(0, Math.round(state.transportation.monthlyCost - 90));
+          if (game.addAchievement) game.addAchievement(state, "vehicle-loan-paid-off", "Vehicle Loan Paid Off", "Paid off a real car loan, one payment at a time.");
+          if (game.addEvent) {
+            game.addEvent(state, {
+              type: "transportation",
+              title: "Vehicle loan paid off",
+              summary: "The last payment cleared the balance.",
+              systems: ["Transportation"],
+              consequences: ["The vehicle is fully yours now - the monthly payment is gone."],
+              reflection: "What will you do with the money that used to go to this payment?"
+            });
+          }
+        }
+        if (game.recalculateCreditScore) game.recalculateCreditScore(state);
+      }
+    }
+    // Education program dropout risk - unlike the lease/loan, tuition here
+    // is paid once in full at enrollment, so the risk driver is neglecting
+    // coursework (studyConsistency staying low) rather than a missed
+    // payment.
+    if (state.education.program && state.education.program.active) {
+      if (state.education.studyConsistency < 25) {
+        state.education.program.dropoutRisk = game.clamp(state.education.program.dropoutRisk + chunkDays * 3);
+      } else {
+        state.education.program.dropoutRisk = game.clamp(state.education.program.dropoutRisk - chunkDays * 1.5);
+      }
+      if (state.education.program.dropoutRisk >= 50 && state.education.program.dropoutRisk - chunkDays * 3 < 50 && game.addEvent) {
+        game.addEvent(state, {
+          type: "education",
+          title: "Falling behind on coursework",
+          summary: "Study consistency has been too low for too long.",
+          systems: ["Education"],
+          consequences: [`Dropout risk is now ${state.education.program.dropoutRisk}/100.`],
+          reflection: "What would it take to get back on track before the term ends?"
+        });
+      }
+    }
+    // Credit card statement due - a separate obligation layered on top of
+    // the existing general debtCost/debtGrowth interest accrual below (not
+    // a second interest charge), gated by an explicit 30-day due-date rather
+    // than checked every chunk like rent/loan. Counted as elapsed cycles
+    // (not a single point-in-time check) so a single long Fast Forward span
+    // still processes every statement that would have come due along the
+    // way, not just the last one - capped at 6 cycles per call so an
+    // extreme multi-year jump can't spam dozens of events at once.
+    const creditCard = state.finance.creditCard;
+    if (creditCard && state.finance.debt > 0) {
+      const dayAfterChunk = state.time.day + chunkDays;
+      const cyclesElapsed = Math.min(6, Math.floor((dayAfterChunk - creditCard.lastStatementDay) / 30));
+      for (let cycle = 0; cycle < cyclesElapsed; cycle++) {
+        const minimumPayment = Math.max(30, Math.round(state.finance.debt * 0.03));
+        if (state.finance.money < minimumPayment) {
+          creditCard.missedPayments += 1;
+          creditCard.collectionsRisk = game.clamp(creditCard.collectionsRisk + 20);
+          if (game.addEvent) {
+            game.addEvent(state, {
+              type: "finance",
+              title: "Missed a credit card statement",
+              summary: "You couldn't cover the minimum payment this cycle.",
+              systems: ["Finance"],
+              consequences: [`Collections risk is now ${creditCard.collectionsRisk}/100.`],
+              reflection: "What would need to change before the next statement is due?"
+            });
+          }
+        } else {
+          state.finance.money = Math.max(0, Math.round(state.finance.money - minimumPayment));
+          state.finance.debt = Math.max(0, Math.round(state.finance.debt - minimumPayment));
+          creditCard.collectionsRisk = game.clamp(creditCard.collectionsRisk - 10);
+        }
+        creditCard.lastStatementDay += 30;
+      }
+      if (cyclesElapsed > 0 && game.recalculateCreditScore) game.recalculateCreditScore(state);
+    }
     const commuteCost = Math.round(chunkDays * 0.65 * Number(state.transportation.costPerCommute || 4));
     const debtCost = Math.round((Number(state.finance.debt || 0) * ((Number(state.economy.interestRate || 0) + 2) / 100) / 30) * chunkDays);
     const insurance = state.finance.insurance || {};
@@ -240,6 +369,168 @@
         state.career.currentJob = null;
         state.career.burnoutRisk = game.clamp(state.career.burnoutRisk - 15);
       }
+    }
+    // Eviction (same deterministic seeded-roll shape as the layoff roll
+    // above): only becomes possible once eviction risk has genuinely built
+    // up from repeated missed payments, not from a single bad chunk. Uses
+    // an explicit `evicted` flag rather than if/else-if against the renewal
+    // check below - with if/else-if, a chunk where risk was high enough to
+    // roll but the roll happened to miss would silently skip the renewal
+    // check too (even though nothing actually happened), permanently
+    // stalling a lease whose term had already ended.
+    let evicted = false;
+    if (state.housing.lease && state.housing.lease.active && state.housing.lease.evictionRisk >= 70) {
+      const evictionSeed = Math.sin(state.time.day * 63.271 + chunkDays * 2.71828) * 10000;
+      const evictionRoll = evictionSeed - Math.floor(evictionSeed);
+      if (evictionRoll < 0.3) {
+        evicted = true;
+        state.housing.lease.active = false;
+        state.housing.type = "Emergency temporary housing";
+        state.housing.selectedOption = "emergency-temporary";
+        state.housing.monthlyCost = 0;
+        state.housing.stability = game.clamp(state.housing.stability - 30);
+        state.housing.comfort = game.clamp(state.housing.comfort - 25);
+        state.housing.satisfaction = game.clamp(state.housing.satisfaction - 25);
+        state.housing.affordability = game.clamp(state.housing.affordability - 15);
+        if (game.addEvent) {
+          game.addEvent(state, {
+            type: "housing",
+            title: "Evicted",
+            summary: "Missed rent finally caught up with you.",
+            systems: ["Housing"],
+            consequences: ["The lease is over. You're back to emergency temporary housing.", `Housing stability is now ${state.housing.stability}/100.`],
+            reflection: "Looking back, when was the moment this became unavoidable?"
+          });
+        }
+      }
+    }
+    if (!evicted && state.housing.lease && state.housing.lease.active && state.time.day >= state.housing.lease.endsDay) {
+      // Term expiry auto-renews for now (no explicit renew/move-out choice
+      // yet) but rent tracks the real local housing market pressure instead
+      // of staying frozen, and it's narrated rather than a silent change.
+      const marketAdjustment = Math.round(state.housing.monthlyCost * (state.worldSimulation.housingMarketPressure - 50) * 0.002);
+      state.housing.monthlyCost = Math.max(150, state.housing.monthlyCost + marketAdjustment);
+      state.housing.lease.termDays = 180;
+      state.housing.lease.startedDay = state.time.day;
+      state.housing.lease.endsDay = state.time.day + 180;
+      if (game.addEvent) {
+        game.addEvent(state, {
+          type: "housing",
+          title: "Lease renewed",
+          summary: "Your lease term ended and renewed automatically.",
+          systems: ["Housing"],
+          consequences: [`Rent is now $${state.housing.monthlyCost}/month.`],
+          reflection: marketAdjustment > 0 ? "The market pushed your rent up - does the budget still work?" : "Rent eased slightly - what will you do with the difference?"
+        });
+      }
+    }
+    // Repossession - same deterministic seeded-roll shape as eviction, with
+    // its own unused multiplier pair, only possible once missed vehicle
+    // payments have genuinely built up real risk.
+    if (state.transportation.loan && state.transportation.loan.active && state.transportation.loan.repossessionRisk >= 70) {
+      const repoSeed = Math.sin(state.time.day * 81.443 + chunkDays * 1.61803) * 10000;
+      const repoRoll = repoSeed - Math.floor(repoSeed);
+      if (repoRoll < 0.3) {
+        state.transportation.loan.active = false;
+        state.transportation.ownsVehicle = false;
+        state.transportation.vehicleLoanBalance = 0;
+        state.transportation.monthlyCost = Math.max(0, Math.round(state.transportation.monthlyCost - 90));
+        state.transportation.mode = "MRT and bus";
+        state.transportation.selectedMode = "public-transport";
+        if (game.recalculateCreditScore) game.recalculateCreditScore(state);
+        if (game.addEvent) {
+          game.addEvent(state, {
+            type: "transportation",
+            title: "Vehicle repossessed",
+            summary: "Missed payments finally caught up with the loan.",
+            systems: ["Transportation"],
+            consequences: ["The vehicle is gone, but the debt isn't - you're back on public transport."],
+            reflection: "Looking back, when was the moment this became unavoidable?"
+          });
+        }
+      }
+    }
+    // Dropping out - same deterministic seeded-roll shape, its own unused
+    // multiplier pair, only possible once dropout risk has genuinely built
+    // up from sustained neglect. Uses an explicit `droppedOut` flag for the
+    // same reason as the eviction/renewal pair above - a high-risk chunk
+    // whose roll happens to miss must not silently block graduation if the
+    // term also ended that same chunk.
+    let droppedOut = false;
+    if (state.education.program && state.education.program.active && state.education.program.dropoutRisk >= 70) {
+      const dropoutSeed = Math.sin(state.time.day * 24.899 + chunkDays * 5.926) * 10000;
+      const dropoutRoll = dropoutSeed - Math.floor(dropoutSeed);
+      if (dropoutRoll < 0.3) {
+        droppedOut = true;
+        state.education.program.active = false;
+        state.education.qualificationProgress = game.clamp(state.education.qualificationProgress - 20);
+        state.education.studyConsistency = game.clamp(state.education.studyConsistency - 10);
+        state.education.path = "Dropped out of a formal program";
+        if (game.addEvent) {
+          game.addEvent(state, {
+            type: "education",
+            title: "Dropped out",
+            summary: "Sustained neglect of coursework finally ended the program.",
+            systems: ["Education"],
+            consequences: ["The program is over without a qualification.", `Qualification progress is now ${state.education.qualificationProgress}/100.`],
+            reflection: "Looking back, when was the moment this became unavoidable?"
+          });
+        }
+      }
+    }
+    if (!droppedOut && state.education.program && state.education.program.active && state.time.day >= state.education.program.endsDay) {
+      // Graduation - the term ended while the program was still active
+      // (never dropped out), a real completed milestone.
+      state.education.program.active = false;
+      state.education.program.completedCount = (state.education.program.completedCount || 0) + 1;
+      state.education.qualificationProgress = game.clamp(state.education.qualificationProgress + 30);
+      state.education.path = "Graduated from a formal program";
+      if (game.addAchievement) game.addAchievement(state, "graduated-program", "Graduated", "Completed a real qualification program, tuition and term and all.");
+      if (game.addMilestone) game.addMilestone(state, "Graduated a program", "Finished what was started - a real qualification, not just progress.");
+      if (game.addEvent) {
+        game.addEvent(state, {
+          type: "education",
+          title: "Graduated",
+          summary: "The program term ended and you finished it.",
+          systems: ["Education"],
+          consequences: [`Qualification progress is now ${state.education.qualificationProgress}/100.`],
+          reflection: "What did finishing this actually change about what's possible next?"
+        });
+      }
+    }
+    // Sent to collections - same deterministic seeded-roll shape, its own
+    // unused multiplier pair, only possible once missed statements have
+    // genuinely built up real risk.
+    if (state.finance.creditCard && state.finance.creditCard.collectionsRisk >= 70) {
+      const collectionsSeed = Math.sin(state.time.day * 38.017 + chunkDays * 9.42477) * 10000;
+      const collectionsRoll = collectionsSeed - Math.floor(collectionsSeed);
+      if (collectionsRoll < 0.3) {
+        const collectionsFee = 120;
+        state.finance.debt = Math.max(0, Math.round(state.finance.debt + collectionsFee));
+        state.finance.confidence = game.clamp(state.finance.confidence - 15);
+        state.finance.creditCard.collectionsRisk = game.clamp(state.finance.creditCard.collectionsRisk - 30);
+        if (game.recalculateCreditScore) game.recalculateCreditScore(state);
+        if (game.addEvent) {
+          game.addEvent(state, {
+            type: "finance",
+            title: "Sent to collections",
+            summary: "Missed statements finally caught up with the account.",
+            systems: ["Finance"],
+            consequences: [`A $${collectionsFee} collections fee was added to the debt.`, `Debt is now $${state.finance.debt}.`],
+            reflection: "Looking back, when was the moment this became unavoidable?"
+          });
+        }
+      }
+    }
+    if (game.decayLegalHeat) game.decayLegalHeat(state, chunkDays * 24);
+    // Detention is served passively during Fast Forward (there's no "do
+    // nothing" activity to click through it with) - career and relationships
+    // quietly erode in the background for its duration, the same way
+    // burnout-triggered layoffs above resolve automatically rather than
+    // needing a player action.
+    if (game.isInDetention && game.isInDetention(state)) {
+      state.career.readiness = game.clamp(state.career.readiness - chunkDays * 0.5);
+      state.relationships.support = game.clamp(state.relationships.support - chunkDays * 0.3);
     }
     state.education.qualificationProgress = game.clamp(state.education.qualificationProgress + studyGrowth);
     state.education.studyConsistency = game.clamp(state.education.studyConsistency + state.player.habits.studyConsistency * 0.01 - chunkDays * 0.01);

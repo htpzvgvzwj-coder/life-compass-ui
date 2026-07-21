@@ -9,8 +9,40 @@
     });
   }
 
+  // Danger thresholds mirror lifeverse-ux.js's getCriticalNeeds tiers (energy
+  // low<25/health low<35/stress high>75 is the "warning" tier shown in the
+  // HUD) - these are the tighter "it's actually gotten bad" tier, used only
+  // to detect a one-time crossing so neglect produces a real, dynamic life
+  // event through the normal consequence pipeline instead of a silent clamp.
+  const NEED_DANGER_TIERS = [
+    { key: "energy", label: "Energy", direction: "low", threshold: 12 },
+    { key: "hunger", label: "Hunger", direction: "low", threshold: 15 },
+    { key: "sleep", label: "Sleep", direction: "low", threshold: 15 },
+    { key: "stress", label: "Stress", direction: "high", threshold: 90 }
+  ];
+
+  function notifyNeedCrossings(state, before) {
+    if (!game.addEvent) return;
+    NEED_DANGER_TIERS.forEach((tier) => {
+      const beforeValue = Number(before[tier.key] || 0);
+      const afterValue = Number(state.needs[tier.key] || 0);
+      const wasDanger = tier.direction === "high" ? beforeValue > tier.threshold : beforeValue < tier.threshold;
+      const isDanger = tier.direction === "high" ? afterValue > tier.threshold : afterValue < tier.threshold;
+      if (wasDanger || !isDanger) return;
+      game.addEvent(state, {
+        type: "needs-warning",
+        title: `${tier.label} is at a breaking point`,
+        summary: `${tier.label} was neglected for too long.`,
+        systems: ["Needs"],
+        consequences: [`${tier.label} dropped to ${Math.round(afterValue)}/100.`, "Left here, this will start costing you elsewhere."],
+        reflection: `What would it take to fix ${tier.label.toLowerCase()} before it gets worse?`
+      });
+    });
+  }
+
   function decayNeeds(state, minutes) {
     const hours = Math.max(0, Number(minutes || 0) / 60);
+    const before = { ...state.needs };
     applyDelta(state.needs, {
       energy: -hours * 2.1,
       hunger: -hours * 2.8,
@@ -20,6 +52,8 @@
     });
     if (state.needs.energy < 35) state.needs.stress = game.clamp(state.needs.stress + 2);
     if (state.needs.hunger < 30) state.needs.energy = game.clamp(state.needs.energy - 2);
+    notifyNeedCrossings(state, before);
+    if (game.decayLegalHeat) game.decayLegalHeat(state, hours);
     return state.needs;
   }
 

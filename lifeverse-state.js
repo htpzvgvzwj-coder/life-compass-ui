@@ -176,7 +176,12 @@
         taxAwareness: 20,
         lastTaxFiledDay: 0,
         totalTaxPaid: 0,
-        lastTaxOwed: 0
+        lastTaxOwed: 0,
+        creditCard: {
+          lastStatementDay: 0,
+          missedPayments: 0,
+          collectionsRisk: 0
+        }
       },
       career: {
         status: "Entry preparation",
@@ -188,6 +193,7 @@
         experience: 0,
         reputation: 30,
         interviewPrep: 20,
+        interviewPracticeSessions: 0,
         applications: [],
         currentJob: null,
         employed: true,
@@ -202,7 +208,16 @@
         credits: 0,
         qualificationProgress: 0,
         tuitionPressure: 0,
-        portfolio: 12
+        portfolio: 12,
+        program: {
+          active: false,
+          termDays: 270,
+          startedDay: 0,
+          endsDay: 0,
+          tuitionPaid: 0,
+          dropoutRisk: 0,
+          completedCount: 0
+        }
       },
       housing: {
         type: "Family home / HDB room",
@@ -220,7 +235,17 @@
         hasRoommate: false,
         roommateRelationship: 0,
         communityTies: 30,
-        lastUtilityPaidDay: 0
+        lastUtilityPaidDay: 0,
+        lease: {
+          active: false,
+          termDays: 0,
+          startedDay: 0,
+          endsDay: 0,
+          depositAmount: 0,
+          landlordRelationship: 60,
+          missedPayments: 0,
+          evictionRisk: 0
+        }
       },
       transportation: {
         mode: "MRT and bus",
@@ -235,7 +260,17 @@
         ownsVehicle: false,
         vehicleMaintenance: 70,
         parkingSecured: false,
-        vehicleLoanBalance: 0
+        vehicleLoanBalance: 0,
+        loan: {
+          active: false,
+          termDays: 0,
+          startedDay: 0,
+          endsDay: 0,
+          downPayment: 0,
+          monthlyPayment: 0,
+          missedPayments: 0,
+          repossessionRisk: 0
+        }
       },
       relationships: {
         support: 55,
@@ -343,6 +378,13 @@
           personality: { responsibility: 70, sociability: 88, optimism: 76, patience: 80, riskTolerance: 24, discipline: 58, curiosity: 46 }
         }
       ],
+      legal: {
+        heat: 0,
+        record: false,
+        finesOwed: 0,
+        detentionUntilDay: 0,
+        incidents: []
+      },
       world: {
         district: "Singapore-inspired neighbourhood",
         weather: "Clear morning",
@@ -417,12 +459,22 @@
       finance: {
         ...mergeObject(fallback.finance, source.finance),
         investments: mergeObject(fallback.finance.investments, source.finance && source.finance.investments),
-        insurance: mergeObject(fallback.finance.insurance, source.finance && source.finance.insurance)
+        insurance: mergeObject(fallback.finance.insurance, source.finance && source.finance.insurance),
+        creditCard: mergeObject(fallback.finance.creditCard, source.finance && source.finance.creditCard)
       },
       career: mergeObject(fallback.career, source.career),
-      education: mergeObject(fallback.education, source.education),
-      housing: mergeObject(fallback.housing, source.housing),
-      transportation: mergeObject(fallback.transportation, source.transportation),
+      education: {
+        ...mergeObject(fallback.education, source.education),
+        program: mergeObject(fallback.education.program, source.education && source.education.program)
+      },
+      housing: {
+        ...mergeObject(fallback.housing, source.housing),
+        lease: mergeObject(fallback.housing.lease, source.housing && source.housing.lease)
+      },
+      transportation: {
+        ...mergeObject(fallback.transportation, source.transportation),
+        loan: mergeObject(fallback.transportation.loan, source.transportation && source.transportation.loan)
+      },
       relationships: mergeObject(fallback.relationships, source.relationships),
       health: mergeObject(fallback.health, source.health),
       mentalWellbeing: mergeObject(fallback.mentalWellbeing, source.mentalWellbeing),
@@ -430,6 +482,10 @@
       npcSimulation: mergeObject(fallback.npcSimulation, source.npcSimulation),
       worldSimulation: mergeObject(fallback.worldSimulation, source.worldSimulation),
       npcs: Array.isArray(source.npcs) ? source.npcs.slice(-24).map((npc) => ({ ...npc })) : fallback.npcs,
+      legal: {
+        ...mergeObject(fallback.legal, source.legal),
+        incidents: Array.isArray(source.legal && source.legal.incidents) ? source.legal.incidents.slice(-20) : fallback.legal.incidents
+      },
       world: mergeObject(fallback.world, source.world),
       progression: {
         ...fallback.progression,
@@ -473,6 +529,7 @@
     merged.career.employed = merged.career.employed !== false;
     merged.career.category = merged.career.category || null;
     merged.career.lastUnemploymentClaimDay = Math.max(0, Math.round(Number(merged.career.lastUnemploymentClaimDay) || 0));
+    merged.career.interviewPracticeSessions = Math.max(0, Math.round(Number(merged.career.interviewPracticeSessions) || 0));
     ["studyConsistency", "learningEfficiency", "credits", "qualificationProgress", "tuitionPressure", "portfolio"].forEach((key) => {
       merged.education[key] = clamp(merged.education[key]);
     });

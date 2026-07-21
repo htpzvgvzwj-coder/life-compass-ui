@@ -27,31 +27,15 @@ const ADMIN_PASSCODE = "STEADY-ADMIN";
 // product is built on. Tone adapts to personalBlueprint.personality/workStyle
 // in context, but never fabricates a reference that isn't in realSavedFacts.
 const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question.";
-const FUTURE_MIRROR_SYSTEM_PROMPT = "You are Future Mirror inside the Compass app. You are a decision impact simulator, not a prediction tool. Help youth compare how today's choices may shape possible future outcomes. Do not guarantee outcomes or claim to predict the future. Use language like possible outcomes, potential risks, likely impact, and possible long-term effects. Be supportive, practical, concise, and youth-friendly.";
 // Future Self module (Future Mirror bible Ch.4) - grounded in Hershfield's
 // future self-continuity research: vividness matters more than certainty
 // framing. Never phrase as "you will be X" - always "if you continue on this
 // path, you may be approaching something like X."
 const FUTURE_SELF_SYSTEM_PROMPT = "You are the Future Self module inside Compass's Future Mirror. You write a vivid, specific, first-person, present-tense scene of what the user's future self might be living, grounded only in their real saved data. This is never a prediction - always conditional (\"if you continue,\" \"this path suggests,\" \"you may be\"), never deterministic (\"you will be\"). Prioritize a vivid narrated scene over a dry stat summary - vividness is what makes this effective, not certainty. Be honest about low confidence when the user's saved data is thin rather than fabricating specific detail to sound impressive.";
 const DETERMINISTIC_PHRASES = ["you will be", "you will have", "you'll be", "you'll have", "you are going to be", "guaranteed", "definitely will"];
+const COMMUNITY_COMPOSE_ASSIST_SYSTEM_PROMPT = "You help reword a single Community post for a youth self-growth app so it is kinder, clearer, and safer to publish. Keep the same meaning and rough length. Remove any full name, address, school schedule, phone number, or password. Do not add new claims or advice that wasn't already implied. Reply with only the reworded post text, no preamble, no quotes, no markdown.";
 const COMPASS_API_ERROR = "Sorry, Compass AI is having trouble responding right now. Please try again.";
 const COMPASS_API_URL = window.location.protocol === "file:" ? "http://localhost:5179/api/compass-chat" : "/api/compass-chat";
-
-const futureMirrorCategories = [
-  "Education Mirror",
-  "Career Mirror",
-  "Financial Mirror",
-  "Lifestyle Mirror",
-  "Relationship Mirror",
-  "Growth Mirror"
-];
-
-const futureMirrorExamples = [
-  "Should I study tonight or play games?",
-  "Should I apply for this internship?",
-  "Should I save money or spend it?",
-  "Should I join this challenge?"
-];
 
 // Future Scan station catalog - all 10 stations are fully implemented; each
 // opens as a modal from the grid in futureScanStationGrid() (see
@@ -59,16 +43,16 @@ const futureMirrorExamples = [
 // belongs to one of FUTURE_SCAN_GROUPS below, purely for how the grid is
 // organized - it doesn't change what a station does.
 const FUTURE_SCAN_STATIONS = [
-  { id: "identityScan", title: "Future Identity Scan", blurb: "See which future self this choice moves you toward.", group: "now" },
-  { id: "valuesCheck", title: "Values Consistency Check", blurb: "Compare this choice against the values you've already saved.", group: "now" },
-  { id: "hiddenCosts", title: "Hidden Cost Scanner", blurb: "See what this choice actually spends - sleep, focus, confidence.", group: "now" },
-  { id: "noActionFuture", title: "No-Action Future", blurb: "See where staying exactly the same leads.", group: "now" },
-  { id: "pressureTest", title: "Choice Pressure Test", blurb: "Check whether pressure, fear, or comparison is driving this.", group: "context" },
-  { id: "conflictMap", title: "Future Conflict Map", blurb: "See which of your goals are actually in tension here.", group: "context" },
-  { id: "signalRadar", title: "Future Signal Radar", blurb: "Rate how ready you feel right now - not a score, a moment check.", group: "context" },
-  { id: "pastSelfCheck", title: "Past-Self Consistency Check", blurb: "See what you chose in similar moments before.", group: "time" },
-  { id: "driftDetector", title: "Drift Detector", blurb: "See if you're slowly drifting from where you said you wanted to go.", group: "time" },
-  { id: "checkBack", title: "Check-Back", blurb: "Come back later and see if the prediction matched real life.", group: "time" }
+  { id: "identityScan", title: "Future Identity Scan", blurb: "See which future self this choice moves you toward.", group: "now", icon: "icon-profile.png" },
+  { id: "valuesCheck", title: "Values Consistency Check", blurb: "Compare this choice against the values you've already saved.", group: "now", icon: "icon-balance.png" },
+  { id: "hiddenCosts", title: "Hidden Cost Scanner", blurb: "See what this choice actually spends - sleep, focus, confidence.", group: "now", icon: "icon-warning.png" },
+  { id: "noActionFuture", title: "No-Action Future", blurb: "See where staying exactly the same leads.", group: "now", icon: "icon-safety.png" },
+  { id: "pressureTest", title: "Choice Pressure Test", blurb: "Check whether pressure, fear, or comparison is driving this.", group: "context", icon: "icon-boundary.png" },
+  { id: "conflictMap", title: "Future Conflict Map", blurb: "See which of your goals are actually in tension here.", group: "context", icon: "icon-decide.png" },
+  { id: "signalRadar", title: "Future Signal Radar", blurb: "Rate how ready you feel right now - not a score, a moment check.", group: "context", icon: "icon-mood.png" },
+  { id: "pastSelfCheck", title: "Past-Self Consistency Check", blurb: "See what you chose in similar moments before.", group: "time", icon: "icon-guide.png" },
+  { id: "driftDetector", title: "Drift Detector", blurb: "See if you're slowly drifting from where you said you wanted to go.", group: "time", icon: "icon-transport.png" },
+  { id: "checkBack", title: "Check-Back", blurb: "Come back later and see if the prediction matched real life.", group: "time", icon: "icon-time.png" }
 ];
 
 const FUTURE_SCAN_GROUPS = [
@@ -107,8 +91,8 @@ const FUTURE_SCAN_CHECKBACK_HORIZONS = [
 ];
 
 // Same "augment judgment, never decide for them, never invent a memory that
-// isn't real" rules as COMPASS_SYSTEM_PROMPT/FUTURE_MIRROR_SYSTEM_PROMPT,
-// scoped to Future Scan's specific job.
+// isn't real" rules as COMPASS_SYSTEM_PROMPT, scoped to Future Scan's
+// specific job.
 const FUTURE_SCAN_SYSTEM_PROMPT = "You are Future Scan, a module inside Compass's Future Mirror. Your job is to help the user see the truth about a real choice before they make it - not to decide for them. Ground every claim only in the scanContext and saved profile data you are given; never invent a memory, pattern, or fact that isn't actually present in what you were told. Never state or imply a recommended choice (no \"you should\", no \"the better option is\"). Be concise, concrete, and youth-friendly. Avoid clinical or diagnostic language, especially around emotional or mental state - this is not a mental health assessment.";
 
 // Build Mode 2.0 is a goal-based AI coach router. It must work for any youth
@@ -133,16 +117,115 @@ const BUILD_COACH_TYPES = [
   { id: "custom", name: "Custom Growth Coach", use: "any practical youth growth goal that does not fit another coach cleanly" }
 ];
 
-const BUILD_GOAL_CHIPS = [
-  "Prepare for an interview",
-  "Talk to my parents calmly",
-  "Stop procrastinating",
-  "Choose a career path",
-  "Save money",
-  "Build confidence",
-  "Apply for a scholarship",
-  "Start a small business"
+// Real-life moments (not a self-assessment, not scored) - concrete, relatable
+// situations a user can recognize themselves in and tap straight into
+// coaching. Categories mirror the subset of BUILD_COACH_TYPES that map to
+// core adult-independence gaps; Interview/Study/Entrepreneurship/Opportunity/
+// Clarity/Custom stay reachable via free-text goal entry as before.
+const BUILD_LIFE_MOMENT_CATEGORIES = [
+  { id: "independence", label: "Independence", icon: "icon-home.png" },
+  { id: "money", label: "Money", icon: "icon-money.png" },
+  { id: "communication", label: "Communication", icon: "icon-chat.png" },
+  { id: "career", label: "Career", icon: "icon-work.png" },
+  { id: "wellness", label: "Wellness", icon: "icon-health.png" },
+  { id: "relationships", label: "Relationships", icon: "icon-support.png" }
 ];
+
+const BUILD_LIFE_MOMENTS = {
+  independence: [
+    "I've never cooked a full meal for myself from scratch",
+    "I don't know how to do laundry properly, including reading care labels",
+    "I've never booked my own doctor or dentist appointment",
+    "I wouldn't know what to do if a landlord or roommate ignored a real problem",
+    "I don't have a routine that keeps my space liveable without someone reminding me"
+  ],
+  money: [
+    "I don't have a budget I actually stick to",
+    "I don't really understand how credit cards or interest work",
+    "I've never had to decide between paying a bill and something I wanted",
+    "I don't know what I'd do if I got hit with a big unexpected expense right now",
+    "I've never opened or managed my own bank account"
+  ],
+  communication: [
+    "I find it hard to say no to my parents, teachers, or friends and hold my ground",
+    "I don't know how I'd raise it if a boss or landlord treated me unfairly",
+    "I avoid conflict instead of actually addressing it",
+    "I don't know how to ask for help without feeling like a burden",
+    "I've never had to have a hard conversation with someone I depend on"
+  ],
+  career: [
+    "I don't have an updated resume",
+    "I've never done a real job interview, only imagined one",
+    "I'm not sure what I actually want to do for work",
+    "I don't know how to follow up after applying somewhere",
+    "I've never negotiated pay, hours, or anything at work"
+  ],
+  wellness: [
+    "I don't know when a symptom means 'see a doctor' versus 'wait it out'",
+    "I don't have a way to handle stress that isn't just avoiding it",
+    "I've never had to manage my own sleep or eating without someone else structuring it",
+    "I don't know what my own health coverage actually covers",
+    "I push through burnout instead of noticing it early"
+  ],
+  relationships: [
+    "I don't have an adult outside my family I could call in a real emergency",
+    "I don't know how to end a friendship or relationship that isn't good for me",
+    "I struggle to make new friends outside school or a set group",
+    "I don't know how to ask someone for real support without over-explaining",
+    "I find it hard to trust people enough to actually rely on them"
+  ]
+};
+
+// Real Cost of Living Calculator - deliberately separate from LifeVerse's
+// abstract game-balanced economy. Every figure here is a general real-world
+// Singapore estimate, presented as a range, not a simulation output. Reuses
+// the LifeVerse map's real district names (life-sim.js) for tone
+// consistency only - no cost data is shared with or derived from LifeVerse.
+const COST_OF_LIVING_HOUSING = [
+  { id: "family", label: "Staying with family", central: [0, 0], suburban: [0, 0] },
+  { id: "shared-room", label: "Room in a shared flat", central: [900, 1400], suburban: [700, 1100] },
+  { id: "studio", label: "Studio apartment", central: [2500, 3800], suburban: [1800, 2500] },
+  { id: "one-bedroom", label: "1-bedroom condo", central: [3500, 5000], suburban: [2500, 3200] }
+];
+const COST_OF_LIVING_DISTRICT_TIERS = [
+  { id: "central", label: "Central (Orchard Road, Marina Bay, Raffles Place, Clarke Quay)" },
+  { id: "suburban", label: "Suburban (Woodlands, Punggol, HDB Hub)" }
+];
+const COST_OF_LIVING_TRANSPORT = [
+  { id: "public", label: "Public transport (bus/MRT)", range: [120, 150] },
+  { id: "cycling", label: "Cycling or walking", range: [20, 50] },
+  { id: "car", label: "Own car or motorbike", range: [800, 1500] }
+];
+const COST_OF_LIVING_LIFESTYLE = [
+  { id: "frugal", label: "Frugal - mostly cook or hawker food", food: [300, 450], incidentals: [100, 200] },
+  { id: "moderate", label: "Moderate - a mix of cooking and eating out", food: [500, 700], incidentals: [150, 300] },
+  { id: "comfortable", label: "Comfortable - eat out often", food: [800, 1200], incidentals: [250, 450] }
+];
+const COST_OF_LIVING_UTILITIES_RANGE = [100, 180];
+const COST_OF_LIVING_PHONE_RANGE = [20, 40];
+const COST_OF_LIVING_ONE_TIME_NOTES = [
+  "Rental deposit: usually 1-2 months' rent, paid upfront.",
+  "Agent fee: often about half a month's rent if you use an agent.",
+  "Utility or wifi setup deposit or activation fee.",
+  "Basic furniture and setup if the place is unfurnished."
+];
+
+function computeCostOfLiving(draft) {
+  const housing = COST_OF_LIVING_HOUSING.find((item) => item.id === draft.housing) || COST_OF_LIVING_HOUSING[0];
+  const transport = COST_OF_LIVING_TRANSPORT.find((item) => item.id === draft.transport) || COST_OF_LIVING_TRANSPORT[0];
+  const lifestyle = COST_OF_LIVING_LIFESTYLE.find((item) => item.id === draft.lifestyle) || COST_OF_LIVING_LIFESTYLE[1];
+  const rent = housing[draft.district] || housing.central;
+  const rows = [
+    { label: "Housing", range: rent },
+    { label: "Transport", range: transport.range },
+    { label: "Food", range: lifestyle.food },
+    { label: "Utilities & wifi", range: COST_OF_LIVING_UTILITIES_RANGE },
+    { label: "Phone", range: COST_OF_LIVING_PHONE_RANGE },
+    { label: "Personal & incidentals", range: lifestyle.incidentals }
+  ];
+  const total = rows.reduce((sum, row) => [sum[0] + row.range[0], sum[1] + row.range[1]], [0, 0]);
+  return { rows, total };
+}
 
 const inspireCategories = [
   "All",
@@ -210,9 +293,7 @@ const defaultTrackerState = {
   journalEntries: [],
   challengeProgress: [],
   savedOpportunities: [],
-  communityPosts: [],
   futureMirror: {
-    latest: null,
     saved: []
   },
   // Future Mirror upgrade (separate system from LifeVerse - no shared state,
@@ -256,7 +337,8 @@ const defaultTrackerState = {
     },
     currentLocation: null,
     lastActivity: "",
-    consequence: "",
+    consequences: [],
+    reflection: "",
     consequenceToastUntil: 0,
     reportPromptReady: false
   },
@@ -357,51 +439,6 @@ const opportunityItems = [
   { id: "coding-skills", category: "Learn & Earn", type: "Coding", title: "Coding beginner path", description: "Start with websites, small apps, automation, or school project tools that become portfolio work.", tags: ["coding", "technology", "portfolio"], applyUrl: "https://www.google.com/search?q=learn+coding+for+beginners+students" },
   { id: "content-creation", category: "Learn & Earn", type: "Content creation", title: "Content creation portfolio", description: "Build writing, filming, editing, and publishing skills around a topic you care about.", tags: ["content", "marketing", "creative"], applyUrl: "https://www.google.com/search?q=content+creation+skills+for+beginners" },
   { id: "entrepreneurship", category: "Learn & Earn", type: "Entrepreneurship", title: "Mini entrepreneurship project", description: "Test a small service, product, or community idea with low risk and honest feedback.", tags: ["entrepreneurship", "business", "income"], applyUrl: "https://www.google.com/search?q=student+entrepreneurship+ideas" }
-];
-
-const communityGroups = [
-  {
-    id: "study-focus",
-    title: "Study Focus",
-    description: "Share focus routines, exam pressure strategies, and realistic study blocks.",
-    members: "1.8k",
-    prompts: ["What study habit helped you this week?", "What distraction do you want to reduce?"]
-  },
-  {
-    id: "leadership",
-    title: "Leadership",
-    description: "Practice communication, confidence, teamwork, and leading without ego.",
-    members: "940",
-    prompts: ["Where can you lead by helping first?", "What responsibility are you ready to try?"]
-  },
-  {
-    id: "entrepreneurship",
-    title: "Entrepreneurship",
-    description: "Discuss small business ideas, experiments, customer learning, and responsible risk.",
-    members: "1.2k",
-    prompts: ["What small problem could you solve?", "What can you test without spending much money?"]
-  },
-  {
-    id: "mental-wellness",
-    title: "Mental Wellness",
-    description: "Anonymous support, calm check-ins, and encouragement to reach trusted people.",
-    members: "2.4k",
-    prompts: ["What helped you feel 5% steadier today?", "Who is one safe person you can contact?"]
-  },
-  {
-    id: "scholarships",
-    title: "Scholarships",
-    description: "Share scholarship preparation, essay ideas, deadlines, and interview practice.",
-    members: "860",
-    prompts: ["What scholarship requirement can you prepare early?", "What story shows your growth?"]
-  },
-  {
-    id: "career-growth",
-    title: "Career Growth",
-    description: "Explore internships, portfolios, beginner skills, and career confidence.",
-    members: "1.1k",
-    prompts: ["What skill can you prove with a small project?", "What opportunity should you apply for?"]
-  }
 ];
 
 const inspireCoverImages = {
@@ -797,10 +834,7 @@ const assessmentItems = [
 
 let activeTab = "home";
 let isCompassResponding = false;
-let isFutureMirrorLoading = false;
-let futureMirrorError = "";
-let futureMirrorDraft = null;
-let futureMirrorMode = "simulator";
+let futureMirrorMode = "scan";
 
 // Future Scan - third Future Mirror mode ("help the user see the truth before
 // they choose", not a checklist and not another open-ended chat - Compass AI
@@ -833,6 +867,9 @@ let futureScanSuggestedStationIds = [];
 let buildModeGoalInput = "";
 let isBuildModeLoading = false;
 let buildModeError = "";
+let buildMomentCategory = "independence";
+let costOfLivingDraft = { housing: "shared-room", district: "suburban", transport: "public", lifestyle: "moderate" };
+let costOfLivingResult = null;
 let activeBuildEntryId = null;
 let activeBuildTrainingSessionId = null;
 let isBuildTrainingLoading = false;
@@ -989,7 +1026,6 @@ function normalizeTrackerState(state) {
     journalEntries: Array.isArray(state.journalEntries) ? state.journalEntries : fallback.journalEntries,
     challengeProgress: Array.isArray(state.challengeProgress) ? state.challengeProgress : fallback.challengeProgress,
     savedOpportunities: Array.isArray(state.savedOpportunities) ? state.savedOpportunities : fallback.savedOpportunities,
-    communityPosts: Array.isArray(state.communityPosts) ? state.communityPosts : fallback.communityPosts,
     futureMirror: {
       ...fallback.futureMirror,
       ...(state.futureMirror || {}),
@@ -1045,7 +1081,8 @@ function normalizeLifeSimState(state = {}) {
     },
     currentLocation: state.currentLocation || null,
     lastActivity: state.lastActivity || "",
-    consequence: state.consequence || "",
+    consequences: Array.isArray(state.consequences) ? state.consequences.filter(Boolean) : (state.consequence ? [String(state.consequence)] : []),
+    reflection: state.reflection || "",
     consequenceToastUntil: Math.max(0, Math.round(Number(state.consequenceToastUntil) || 0)),
     reportPromptReady: Boolean(state.reportPromptReady)
   };
@@ -1212,6 +1249,28 @@ function displayName() {
 
 function cleanText(value, limit = 2000) {
   return String(value || "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, limit);
+}
+
+// Shared by every AI call site that asks for strict-JSON replies (Future
+// Scan, Build Mode, Blueprint, resume polish, roadmap generation, etc) -
+// tries a clean parse first, then falls back to extracting the outermost
+// {...} in case the model wrapped the JSON in prose/markdown.
+function extractJsonObject(text) {
+  const raw = String(text || "").trim();
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(raw.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 function compassProfileForAI() {
@@ -1809,29 +1868,6 @@ function futureMirrorHomeHero() {
   `;
 }
 
-function lifeSimHomeHero() {
-  const verse = lifeVerseState();
-  const day = verse ? Math.max(1, Math.round(Number(verse.time.day) || 1)) : 1;
-  const started = day > 1;
-  const money = verse ? formatCurrency(verse.finance.money) : null;
-  const mood = verse ? clampStat(Math.round((Number(verse.needs.purpose) + Number(verse.relationships.support) + Number(verse.mentalWellbeing.motivation)) / 3)) : null;
-  return `
-    <header class="life-sim-home-hero">
-      <div class="life-sim-hero-skyline" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span>
-      </div>
-      <div class="life-sim-hero-copy">
-        <p class="eyebrow"><span class="life-sim-live-dot" aria-hidden="true"></span>Life Sim</p>
-        <h2>${started ? "Your life is waiting." : "Live a whole life."}</h2>
-        <p>${started
-          ? `Day ${day} in Singapore &middot; ${money}${mood !== null ? ` &middot; Mood ${mood}` : ""}. Pick up right where you left off.`
-          : "Career, money, health, relationships - a realistic 3D Singapore life, shaped entirely by you."}</p>
-        <button class="primary-action life-sim-cta" type="button" data-tab-jump="simulator">${started ? "Continue Life Sim" : "Enter Life Sim"}</button>
-      </div>
-    </header>
-  `;
-}
-
 function todayChoiceCard() {
   const latest = trackerState.futureMirror && trackerState.futureMirror.latest;
   return `
@@ -1948,14 +1984,41 @@ function futureScoreHomeCard() {
   `;
 }
 
+// LifeVerse gets its own dedicated portal instead of sitting in the uniform
+// quick-access grid - it's the flagship feature (a full life simulation, not
+// a single tool), and a returning player has a real, live world to show
+// instead of a generic promo tile.
+function lifeVerseHomeSpotlight() {
+  const started = Boolean(userProfile.characterCreated);
+  const state = started ? lifeVerseState() : null;
+  return `
+    <section class="lifeverse-home-spotlight" data-tab-jump="simulator">
+      <div class="lifeverse-home-spotlight-orb" aria-hidden="true"></div>
+      <div class="lifeverse-home-spotlight-top">
+        <p class="eyebrow">LifeVerse</p>
+        <h2>${started ? "Your life is still running." : "Live a full adult life before you have to."}</h2>
+      </div>
+      ${started ? `
+        <div class="lifeverse-home-spotlight-stats">
+          <span><strong>Day ${state.time.day}</strong>In progress</span>
+          <span><strong>$${Math.round(state.finance.money)}</strong>Cash</span>
+          <span><strong>${state.career.employed ? "Employed" : "Unemployed"}</strong>${escapeHTML(state.career.status)}</span>
+        </div>
+        <button class="lifeverse-home-spotlight-cta" type="button" data-tab-jump="simulator">Continue your life</button>
+      ` : `
+        <p class="lifeverse-home-spotlight-text">Housing, money, a job, relationships, even the trouble you can get into - a real simulation, not a quiz.</p>
+        <button class="lifeverse-home-spotlight-cta" type="button" data-tab-jump="simulator">Start your life</button>
+      `}
+    </section>
+  `;
+}
+
 function homeQuickAccessGrid() {
   const items = [
     ["icon-chat.png", "Compass AI", "Ask, plan, reflect", "compass"],
     ["icon-learn.png", "Growth", "Goals, journal, mood", "growth"],
-    ["icon-balance.png", "Life Sim", "Play adult-life choices", "simulator"],
     ["icon-support.png", "Community", "Groups and support", "community"],
-    ["icon-work.png", "Opportunities", "Scholarships and internships", "opportunities"],
-    ["icon-decide.png", "Build Mode", "AI coach training", "build"]
+    ["icon-work.png", "Opportunities", "Scholarships and internships", "opportunities"]
   ];
   return `
     <section class="home-quick-access">
@@ -1978,6 +2041,11 @@ function homeQuickAccessGrid() {
           <strong>Future Scan</strong>
           <span>See the truth before you choose</span>
         </button>
+        <button type="button" data-jump-build-mode>
+          <img src="assets/icon-decide.png" alt="">
+          <strong>Build Mode</strong>
+          <span>AI coach training</span>
+        </button>
       </div>
     </section>
   `;
@@ -1986,6 +2054,100 @@ function homeQuickAccessGrid() {
 function lifeVerseState() {
   trackerState.lifeVerse = normalizeLifeVerseState(trackerState.lifeVerse || createDefaultLifeVerseState());
   return trackerState.lifeVerse;
+}
+
+// Community actions (posting, joining a squad, sharing a milestone) nudge the
+// user's own LifeVerse simulation - this is what makes Community feel
+// connected to the rest of the app instead of a bolted-on forum.
+function bumpCommunityTrust(amount) {
+  const state = lifeVerseState();
+  state.npcSimulation.communityTrust = window.LifeVerseGame.clamp(Number(state.npcSimulation.communityTrust || 0) + amount);
+  saveTrackerState();
+  syncCommunityProfileSnapshot();
+}
+
+async function syncCommunityProfileSnapshot() {
+  if (!hasCommunitySession()) return;
+  const client = getCommunitySupabaseClient();
+  if (!client) return;
+  const state = lifeVerseState();
+  try {
+    await client.from("profiles").update({
+      community_trust_snapshot: Math.round(state.npcSimulation.communityTrust || 0),
+      community_mood_snapshot: state.world ? state.world.communityMood : null
+    }).eq("id", communityUserId());
+  } catch (error) {
+    console.error("[Community] syncCommunityProfileSnapshot failed", error);
+  }
+}
+
+async function syncCommunityBadges() {
+  if (!hasCommunitySession()) return;
+  const client = getCommunitySupabaseClient();
+  if (!client) return;
+  const state = lifeVerseState();
+  const communityBadges = (state.progression.achievements || [])
+    .filter((achievement) => achievement.id.startsWith("community-"))
+    .map((achievement) => ({ id: achievement.id, title: achievement.title, unlockedAt: achievement.unlockedAt }));
+  try {
+    await client.from("profiles").update({ badges: communityBadges }).eq("id", communityUserId());
+  } catch (error) {
+    console.error("[Community] syncCommunityBadges failed", error);
+  }
+}
+
+// Non-ranking contribution badges (idea 9) - reuses the existing, already
+// idempotent LifeVerseGame.addAchievement. Never surfaced as a leaderboard,
+// just unordered chips on post/squad cards.
+function checkCommunityAchievements() {
+  if (!hasCommunitySession()) return;
+  const state = lifeVerseState();
+  const myId = communityUserId();
+  const myPosts = communityPostsCacheSnapshot().filter((post) => post.author_id === myId && post.status === "published");
+  const mySquadMemberships = communitySquadMembersCacheSnapshot().filter((member) => member.user_id === myId);
+  const myConnections = communityAccountabilityConnectionsSnapshot().filter((connection) => connection.status === "accepted" && (connection.requester_id === myId || connection.recipient_id === myId));
+
+  let unlockedAny = false;
+  if (myPosts.length >= 1 && window.LifeVerseGame.addAchievement(state, "community-first-post", "First Post", "Published your first Community post.")) unlockedAny = true;
+  if (myPosts.length >= 5 && window.LifeVerseGame.addAchievement(state, "community-five-posts", "Steady Voice", "Published 5 Community posts.")) unlockedAny = true;
+  if (mySquadMemberships.length >= 1 && window.LifeVerseGame.addAchievement(state, "community-squad-joined", "Joined a Squad", "Joined your first Community squad.")) unlockedAny = true;
+  if (myPosts.some((post) => post.post_type === "milestone") && window.LifeVerseGame.addAchievement(state, "community-milestone-share", "Milestone Shared", "Shared a completed roadmap milestone with the Community.")) unlockedAny = true;
+  if (myConnections.length >= 1 && window.LifeVerseGame.addAchievement(state, "community-accountability-connected", "Found an Accountability Partner", "Connected with an accountability partner in Community.")) unlockedAny = true;
+
+  if (unlockedAny) {
+    saveTrackerState();
+    syncCommunityBadges();
+  }
+}
+
+// First deliberate crossing of the Future Mirror <-> LifeVerse boundary
+// ("separate system from LifeVerse - no shared state, no cross-reads" per
+// the comment near defaultTrackerState.futureMirror). Future Scan's
+// noActionFuture/hiddenCosts stations use this to ground their AI narrative
+// in a real simulated outcome instead of a purely imagined one. Always
+// clones lifeVerseState() and discards the clone after use - the user's
+// real LifeVerse save is never read-written here, only read-copied.
+function lifeVerseNoActionSnapshot(days) {
+  const clone = JSON.parse(JSON.stringify(lifeVerseState()));
+  let result = window.LifeVerseGame.dispatchLifeVerseCommand(clone, {
+    type: "FastForwardCommand",
+    actor: "future-scan",
+    payload: { days }
+  });
+  // Standalone (non-live-game) use: a scripted mid-window intervention would
+  // normally pause for the player to choose - here there's no player to ask,
+  // so auto-resolve with the first listed choice to always get a complete
+  // event instead of leaving the clone mid-decision.
+  let guard = 0;
+  while (result.pendingIntervention && guard < 5) {
+    result = window.LifeVerseGame.dispatchLifeVerseCommand(clone, {
+      type: "ResolveFastForwardInterventionCommand",
+      actor: "future-scan",
+      payload: { choiceId: result.pendingIntervention.choices[0].id }
+    });
+    guard += 1;
+  }
+  return { state: clone, event: result.event };
 }
 
 function syncLifeSimFromLifeVerse() {
@@ -2070,7 +2232,9 @@ function lifeVerseCriticalNeeds(state) {
   return `
     <aside class="lifeverse-dynamic-hud" aria-label="Needs warning">
       ${critical.slice(0, 3).map((need) => `
-        <span><strong>${escapeHTML(need.label)}</strong>${Math.round(need.value)}/100</span>
+        <span class="lifeverse-need-pill is-${escapeHTML(need.severity || "warning")}">
+          <strong>${escapeHTML(need.label)}</strong>${Math.round(need.value)}/100
+        </span>
       `).join("")}
     </aside>
   `;
@@ -2236,6 +2400,7 @@ function lifeVerseJournalPanel(state, view) {
         ${lifeVerseCloseOverlayButton()}
       </div>
       ${lifeVerseScheduleRail(state)}
+      ${lifeVerseTodayLog(state)}
       <div class="lifeverse-section-title"><strong>Recent traces</strong><span>${(state.traces || []).length} total</span></div>
       <div class="lifeverse-report-list">
         ${(state.traces || []).slice(-5).reverse().map((trace) => `
@@ -2247,6 +2412,30 @@ function lifeVerseJournalPanel(state, view) {
         ${report ? `<button type="button" data-lifeverse-tab="report">Read latest report</button>` : ""}
       </div>
     </section>
+  `;
+}
+
+function lifeVerseTodayLog(state) {
+  const items = (state.events || []).slice(-8).reverse();
+  if (!items.length) {
+    return `
+      <div class="lifeverse-today-log">
+        <div class="lifeverse-section-title"><strong>Today's log</strong><span>No events yet</span></div>
+        <p>Live one action to start building today's story.</p>
+      </div>
+    `;
+  }
+  return `
+    <div class="lifeverse-today-log">
+      <div class="lifeverse-section-title"><strong>Today's log</strong><span>${items.length} recent</span></div>
+      ${items.map((event) => `
+        <article class="lifeverse-today-log-entry">
+          <strong>${escapeHTML(event.title)}</strong>
+          <ul>${(event.consequences || []).map((line) => `<li>${escapeHTML(line)}</li>`).join("") || `<li>${escapeHTML(event.summary || "Something changed.")}</li>`}</ul>
+          ${event.reflection ? `<p class="lifeverse-today-log-reflection">${escapeHTML(event.reflection)}</p>` : ""}
+        </article>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -2439,7 +2628,7 @@ function lifeVerseSystemCard(system) {
       </div>
       ${lifeVerseSystemTutorialHint(system)}
       <div class="lifeverse-system-metrics">
-        ${(system.metrics || []).slice(0, 4).map(([label, value]) => `
+        ${(system.metrics || []).slice(0, 9).map(([label, value]) => `
           <span><small>${escapeHTML(label)}</small><b>${escapeHTML(value)}</b></span>
         `).join("")}
       </div>
@@ -2714,7 +2903,7 @@ function lifeSimLocationPanel() {
       <div class="life-sim-location-card is-empty" data-sim-location-card>
         <p class="eyebrow">Explore mode</p>
         <h3>Find a glowing zone.</h3>
-        <p class="muted">Move near a recognizable place. Some locations have playable actions now; others are visual spaces for this remaster.</p>
+        <p class="muted">Move near a recognizable place. Every location has real things to do there.</p>
         <div class="sim-activity-list" data-sim-activity-list></div>
       </div>
     `;
@@ -2772,33 +2961,23 @@ function lifeSimEffectText(effect = {}) {
   return labels.map(([label, value]) => `${label} ${Number(value) > 0 ? "+" : ""}${value}`).join(" | ");
 }
 
-function lifeSimLastResult() {
-  const sim = trackerState.lifeSim || {};
-  if (!sim.lastActivity && !sim.consequence) return "";
-  return `
-    <section class="life-sim-result-card">
-      <p class="eyebrow">Latest consequence</p>
-      <h3>${escapeHTML(sim.lastActivity || "30 days later")}</h3>
-      <p>${escapeHTML(sim.consequence || "Your stats changed. Keep exploring how daily choices shape your routine.")}</p>
-    </section>
-  `;
-}
-
-function markLifeVerseConsequence(lastActivity, consequence, options = {}) {
+function markLifeVerseConsequence(lastActivity, consequences, options = {}) {
   trackerState.lifeSim.lastActivity = lastActivity || "";
-  trackerState.lifeSim.consequence = consequence || "";
-  trackerState.lifeSim.consequenceToastUntil = Date.now() + 4000;
+  trackerState.lifeSim.consequences = Array.isArray(consequences) ? consequences.filter(Boolean) : (consequences ? [String(consequences)] : []);
+  trackerState.lifeSim.reflection = options.reflection || "";
+  trackerState.lifeSim.consequenceToastUntil = Date.now() + 6000;
   trackerState.lifeSim.reportPromptReady = Boolean(options.reportPromptReady);
 }
 
 function lifeVerseConsequenceToast(now = Date.now()) {
   const sim = trackerState.lifeSim || {};
-  if (!sim.consequence || Number(sim.consequenceToastUntil || 0) <= now) return "";
+  if (!(sim.consequences || []).length || Number(sim.consequenceToastUntil || 0) <= now) return "";
   return `
     <aside class="lifeverse-consequence-toast" aria-live="polite">
-      <p class="eyebrow">${sim.reportPromptReady ? "Fast Forward finished" : "Consequence recorded"}</p>
+      <p class="eyebrow">${sim.reportPromptReady ? "Fast Forward finished" : "What just happened"}</p>
       <strong>${escapeHTML(sim.lastActivity || "LifeVerse update")}</strong>
-      <span>${escapeHTML(sim.consequence)}</span>
+      <ul>${sim.consequences.map((line) => `<li>${escapeHTML(line)}</li>`).join("")}</ul>
+      ${sim.reflection ? `<p class="lifeverse-toast-reflection">${escapeHTML(sim.reflection)}</p>` : ""}
       ${sim.reportPromptReady ? `<button type="button" data-lifeverse-tab="report">View Life Report</button>` : ""}
     </aside>
   `;
@@ -2877,7 +3056,7 @@ function performLifeVerseActivity(activityId) {
     trackerState.lifeVerse = result.state;
     trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence(result.activity.title, result.event.summary);
+    markLifeVerseConsequence(result.activity.title, result.event.consequences, { reflection: result.event.reflection });
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   }
   return result;
@@ -2894,7 +3073,7 @@ function performLifeVerseSystemAction(systemId, actionId) {
     trackerState.lifeVerse = result.state;
     trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence(result.action.title, result.event.summary);
+    markLifeVerseConsequence(result.action.title, result.event.consequences, { reflection: result.event.reflection });
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   } else if (result && result.error) {
     markLifeVerseConsequence("Action unavailable", result.error);
@@ -2922,7 +3101,7 @@ function fastForwardLifeVerse(days = 30) {
     }
     trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence(`${days} Days Later`, result.event.summary, { reportPromptReady: true });
+    markLifeVerseConsequence(`${days} Days Later`, result.event.consequences, { reflection: result.event.reflection, reportPromptReady: true });
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   }
   return result;
@@ -2939,7 +3118,7 @@ function resolveLifeVerseIntervention(choiceId) {
     trackerState.lifeVerse = result.state;
     trackerState.lifeVerse.activeView = "today";
     syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence("Decision made", result.event.summary, { reportPromptReady: true });
+    markLifeVerseConsequence("Decision made", result.event.consequences, { reflection: result.event.reflection, reportPromptReady: true });
     if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
   }
   return result;
@@ -2964,7 +3143,8 @@ function resetLifeVerse() {
   trackerState.lifeVerse = engine && engine.reset ? engine.reset({ profile: userProfile }) : createDefaultLifeVerseState();
   syncLifeSimFromLifeVerse();
   trackerState.lifeSim.lastActivity = "";
-  trackerState.lifeSim.consequence = "";
+  trackerState.lifeSim.consequences = [];
+  trackerState.lifeSim.reflection = "";
   trackerState.lifeSim.consequenceToastUntil = 0;
   trackerState.lifeSim.reportPromptReady = false;
 }
@@ -3015,6 +3195,11 @@ let pendingTeleportLocationId = null;
 function mountLifeSim() {
   const root = document.querySelector("#life-sim-root");
   if (!root) return;
+  // Backfills interviewPracticeSessions for returning players whose real
+  // practice history predates this sync existing (it otherwise only
+  // updates when a new session finishes) - cheap and idempotent to run
+  // every time the sim is opened.
+  syncInterviewPracticeToLifeVerse();
   destroyLifeSim();
   if (!window.CompassLifeSim || typeof window.CompassLifeSim.mount !== "function") {
     root.innerHTML = `<div class="sim-canvas-fallback"><strong>3D simulator is unavailable</strong><span>Refresh the page once, then open Life Sim again.</span></div>`;
@@ -3072,162 +3257,6 @@ function growthHubPreviewCard() {
       </div>
     </section>
   `;
-}
-
-// Decision Simulator + Life Compass (Future Mirror bible Ch.6) share this one
-// prompt/engine - "mode" only changes framing copy (structured comparison vs
-// exploratory), per the bible's "one engine, two views" design. The
-// "dimensions" field is the actual multi-dimensional comparison the bible
-// asks for (money/happiness/growth/stress/opportunity-cost/family) - the AI
-// is told to surface only whichever of those are relevant, not force all six.
-const DECISION_DIMENSION_CATALOG = ["financial", "happiness/wellbeing", "growth/learning", "stress/risk", "opportunity cost", "family/relationship"];
-
-function futureMirrorPrompt(question, category, pathA, pathB, mode = "simulator") {
-  const profileFacts = realGrowthFactsText();
-  const framingLine = mode === "compass"
-    ? "This is Life Compass mode - the question may be less clearly bounded than a simple A-vs-B choice. Help the user see the shape of the choice, don't force it into a rigid verdict."
-    : "This is Decision Simulator mode - a structured comparison between named options.";
-  return `Create a Future Mirror decision impact simulation as strict JSON only. Do not include markdown. ${framingLine} The JSON shape must be:
-{
-  "question": "string",
-  "category": "string",
-  "summary": "string",
-  "dimensions": [
-    { "name": "one of: ${DECISION_DIMENSION_CATALOG.join(" | ")}", "relevantBecause": "string", "pathAScore": 0, "pathAReason": "string", "pathBScore": 0, "pathBReason": "string" }
-  ],
-  "paths": [
-    {
-      "name": "Path A",
-      "choice": "string",
-      "benefits": ["string", "string"],
-      "risks": ["string", "string"],
-      "shortTermImpact": "string",
-      "longTermImpact": "string",
-      "goalAlignmentScore": 0
-    }
-  ],
-  "timeline": {
-    "1 month": "string",
-    "6 months": "string",
-    "1 year": "string",
-    "3 years": "string"
-  },
-  "futureSelfLetter": "string",
-  "futureScore": {
-    "overall": 0,
-    "explanation": "string",
-    "categories": [
-      { "name": "Learning", "score": 0, "reason": "string" },
-      { "name": "Career", "score": 0, "reason": "string" },
-      { "name": "Finance", "score": 0, "reason": "string" },
-      { "name": "Health", "score": 0, "reason": "string" },
-      { "name": "Relationships", "score": 0, "reason": "string" },
-      { "name": "Mindset", "score": 0, "reason": "string" }
-    ]
-  },
-  "reflectionQuestions": ["string", "string", "string"]
-}
-Decision question: ${question}
-Category: ${category}
-Path A: ${pathA}
-Path B: ${pathB}
-Saved user context, if any: ${profileFacts}
-Rules: This is not prediction. Use possible outcome, potential risk, likely impact, and possible long-term effects. Include exactly two paths unless the question clearly needs a third. Scores must be 0-100 and should estimate alignment with the user's stated goals when available. For "dimensions", only include the 2-4 that are genuinely relevant to this specific decision - do not force all six in if some don't apply (e.g. a course-choice question usually doesn't need "family/relationship"). Future Self Letter should sound emotional, realistic, encouraging, and connected to the user's goals, not dramatic or guaranteed. Future Score should explain why categories increase or decrease. Hard rule, never break it: never state or imply a recommended choice ("you should," "the better option is," "I recommend") - end instead with a reflective question that hands the decision back to the user, referencing one of their Blueprint values by name if the saved context includes one. Other themes to weave in: which future feels closer to goals, which choice aligns with the person they want to become, and one small action today.`;
-}
-
-function extractJsonObject(text) {
-  const raw = String(text || "").trim();
-  try {
-    return JSON.parse(raw);
-  } catch {
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      try {
-        return JSON.parse(raw.slice(start, end + 1));
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
-}
-
-const VERDICT_PHRASES = ["you should choose", "you should pick", "you should go with", "the better option is", "the better choice is", "i recommend", "my recommendation", "the best choice is", "the best option is"];
-
-function containsVerdictLanguage(text) {
-  const lower = String(text || "").toLowerCase();
-  return VERDICT_PHRASES.some((phrase) => lower.includes(phrase));
-}
-
-function normalizeDimensions(rawDimensions) {
-  const list = Array.isArray(rawDimensions) ? rawDimensions : [];
-  return list.slice(0, 4).map((dimension) => ({
-    name: cleanText(dimension.name || "Relevant factor", 60),
-    relevantBecause: cleanText(dimension.relevantBecause || "This factor matters for this specific decision.", 220),
-    pathAScore: Math.max(0, Math.min(100, Number(dimension.pathAScore || 50))),
-    pathAReason: cleanText(dimension.pathAReason || "Score reflects how this path affects this factor.", 220),
-    pathBScore: Math.max(0, Math.min(100, Number(dimension.pathBScore || 50))),
-    pathBReason: cleanText(dimension.pathBReason || "Score reflects how this path affects this factor.", 220)
-  })).filter((dimension) => dimension.name);
-}
-
-function normalizeFutureMirrorResult(parsed, fallback) {
-  const safePaths = Array.isArray(parsed && parsed.paths) ? parsed.paths : [];
-  return {
-    id: `future-mirror-${Date.now()}`,
-    user_id: currentUserId(),
-    mode: fallback.mode || "simulator",
-    question: cleanText((parsed && parsed.question) || fallback.question, 260),
-    category: futureMirrorCategories.includes(parsed && parsed.category) ? parsed.category : fallback.category,
-    dimensions: normalizeDimensions(parsed && parsed.dimensions),
-    summary: cleanText((parsed && parsed.summary) || "Future Mirror compares possible impacts. It does not predict or guarantee outcomes.", 500),
-    paths: safePaths.slice(0, 3).map((path, index) => ({
-      name: cleanText(path.name || `Path ${String.fromCharCode(65 + index)}`, 40),
-      choice: cleanText(path.choice || (index === 0 ? fallback.pathA : fallback.pathB), 180),
-      benefits: Array.isArray(path.benefits) ? path.benefits.slice(0, 4).map((item) => cleanText(item, 180)).filter(Boolean) : ["Possible benefits depend on how consistently you act."],
-      risks: Array.isArray(path.risks) ? path.risks.slice(0, 4).map((item) => cleanText(item, 180)).filter(Boolean) : ["Potential risks should be reviewed before choosing."],
-      shortTermImpact: cleanText(path.shortTermImpact || "Possible short-term impact depends on your next action.", 260),
-      longTermImpact: cleanText(path.longTermImpact || "Possible long-term effects depend on habits, support, and timing.", 260),
-      goalAlignmentScore: Math.max(0, Math.min(100, Number(path.goalAlignmentScore || 0)))
-    })).filter((path) => path.choice),
-    timeline: {
-      "1 month": cleanText(parsed && parsed.timeline && parsed.timeline["1 month"] || "Patterns may become clearer after repeated choices.", 260),
-      "6 months": cleanText(parsed && parsed.timeline && parsed.timeline["6 months"] || "Small repeated actions may start shaping opportunities.", 260),
-      "1 year": cleanText(parsed && parsed.timeline && parsed.timeline["1 year"] || "Longer-term effects depend on consistency and support.", 260),
-      "3 years": cleanText(parsed && parsed.timeline && parsed.timeline["3 years"] || "This choice may become one part of a larger pattern, not a fixed destiny.", 260)
-    },
-    futureSelfLetter: cleanText(parsed && parsed.futureSelfLetter || "Dear me, I cannot promise exactly how life turns out, but I am proud when you choose the path that protects your growth, health, and values. Take one honest step today. It matters more than it looks.", 1200),
-    futureScore: normalizeFutureScore(parsed && parsed.futureScore),
-    reflectionQuestions: Array.isArray(parsed && parsed.reflectionQuestions) && parsed.reflectionQuestions.length
-      ? parsed.reflectionQuestions.slice(0, 4).map((item) => cleanText(item, 220)).filter(Boolean)
-      : [
-        "Which future feels closer to your goals?",
-        "Which choice aligns with the person you want to become?",
-        "What is one small action you can take today?"
-      ],
-    generated_at: new Date().toISOString(),
-    display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-  };
-}
-
-function normalizeFutureScore(score = {}) {
-  const categoryNames = ["Learning", "Career", "Finance", "Health", "Relationships", "Mindset"];
-  const sourceCategories = Array.isArray(score.categories) ? score.categories : [];
-  const categories = categoryNames.map((name) => {
-    const found = sourceCategories.find((item) => String(item.name || "").toLowerCase() === name.toLowerCase()) || {};
-    return {
-      name,
-      score: Math.max(0, Math.min(100, Number(found.score || score[name.toLowerCase()] || 50))),
-      reason: cleanText(found.reason || "This score depends on how the choice supports your habits, goals, and balance.", 220)
-    };
-  });
-  const average = Math.round(categories.reduce((sum, item) => sum + item.score, 0) / categories.length);
-  return {
-    overall: Math.max(0, Math.min(100, Number(score.overall || average))),
-    explanation: cleanText(score.explanation || "Scores rise when a choice supports learning, healthy routines, relationships, and future options. Scores fall when the choice creates avoidable risk or moves away from your goals.", 360),
-    categories
-  };
 }
 
 const FUTURE_SELF_HORIZONS = [
@@ -3810,6 +3839,17 @@ async function finishInterviewSession(session, persona) {
     console.error("[Interview Practice] Feedback generation failed", error);
   }
   session.completedAt = new Date().toISOString();
+  syncInterviewPracticeToLifeVerse();
+}
+
+// Real Interview Practice sessions (AI-based, careerStudio) had zero
+// connection to LifeVerse's career simulation - practicing the actual skill
+// had no payoff in the sim. Mirrors bumpCommunityTrust's one-way sync
+// pattern: a plain count, not an AI-parsed score, keeps LifeVerse's own
+// formula deterministic and free of AI dependence.
+function syncInterviewPracticeToLifeVerse() {
+  const state = lifeVerseState();
+  state.career.interviewPracticeSessions = trackerState.careerStudio.interviewSessions.filter((session) => session.completedAt).length;
   saveTrackerState();
 }
 
@@ -4053,89 +4093,23 @@ function futureSelfEntryCard() {
   const snapshot = latestFutureSelfSnapshot();
   return `
     <section class="mirror-form-card future-self-entry-card">
+      <img class="future-self-entry-icon" src="assets/icon-time.png" alt="">
       <p class="eyebrow">Future Self</p>
       <h3>${snapshot ? "See your future self again" : "Meet your future self"}</h3>
-      <p class="muted">${snapshot ? `Last generated ${escapeHTML(snapshot.displayTime)} - ${escapeHTML((FUTURE_SELF_HORIZONS.find((item) => item.value === snapshot.horizon) || {}).label || "")}.` : "A vivid, grounded scene of where your current path may lead - not a prediction."}</p>
+      <p class="muted">${snapshot ? `Last generated ${escapeHTML(snapshot.displayTime)} - ${escapeHTML((FUTURE_SELF_HORIZONS.find((item) => item.value === snapshot.horizon) || {}).label || "")}.` : "See where today's path may lead."}</p>
       <button class="secondary-action compact-action" type="button" data-open="futureSelfView">${snapshot ? "View Future Self" : "Start Future Self"}</button>
     </section>
   `;
 }
 
-function futureMirrorPathCards(result) {
-  return (result.paths || []).map((path) => `
-    <article class="mirror-path-card">
-      <div class="mirror-path-top">
-        <span>${escapeHTML(path.name)}</span>
-        <strong><small>Goal alignment</small>${Number(path.goalAlignmentScore || 0)}%</strong>
-      </div>
-      <h3>${escapeHTML(path.choice)}</h3>
-      <div class="mirror-score-bar"><i style="width:${Number(path.goalAlignmentScore || 0)}%"></i></div>
-      <div class="mirror-list-grid">
-        <div><strong>Possible benefits</strong><ul>${(path.benefits || []).map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul></div>
-        <div><strong>Potential risks</strong><ul>${(path.risks || []).map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul></div>
-      </div>
-      <div class="mirror-impact-grid">
-        <div><strong>Short-term impact</strong><p>${escapeHTML(path.shortTermImpact)}</p></div>
-        <div><strong>Long-term impact</strong><p>${escapeHTML(path.longTermImpact)}</p></div>
-      </div>
-    </article>
-  `).join("");
-}
-
-function futureMirrorTimeline(result) {
-  const timeline = result.timeline || {};
-  const orderedTimeline = {
-    "1 month": timeline["1 month"] || "Patterns may become clearer after repeated choices.",
-    "6 months": timeline["6 months"] || "Small repeated actions may start shaping opportunities.",
-    "1 year": timeline["1 year"] || "Longer-term effects depend on consistency and support.",
-    "3 years": timeline["3 years"] || "This choice may become one part of a larger pattern, not a fixed destiny."
-  };
+function costOfLivingEntryCard() {
   return `
-    <section class="mirror-timeline-card">
-      <p class="eyebrow">Future Timeline</p>
-      <div class="mirror-timeline">
-        ${Object.entries(orderedTimeline).map(([label, text]) => `
-          <div class="timeline-step">
-            <span>${escapeHTML(label)}</span>
-            <p>${escapeHTML(text)}</p>
-          </div>
-        `).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function futureScoreCard(result) {
-  const score = result.futureScore || normalizeFutureScore();
-  return `
-    <section class="future-score-card">
-      <div class="future-score-top">
-        <div>
-          <p class="eyebrow">Future Score</p>
-          <h3>${Number(score.overall || 0)}/100</h3>
-        </div>
-        <div class="future-score-ring" style="--score:${Number(score.overall || 0)}"><strong>${Number(score.overall || 0)}</strong></div>
-      </div>
-      <p>${escapeHTML(score.explanation)}</p>
-      <div class="future-score-grid">
-        ${(score.categories || []).map((item) => `
-          <article>
-            <strong>${escapeHTML(item.name)} <span>${Number(item.score || 0)}</span></strong>
-            <i><b style="width:${Number(item.score || 0)}%"></b></i>
-            <p>${escapeHTML(item.reason)}</p>
-          </article>
-        `).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function futureSelfLetterCard(result) {
-  return `
-    <section class="future-letter-card">
-      <p class="eyebrow">Future Self Letter</p>
-      <h3>A note from the person you are becoming</h3>
-      <p>${escapeHTML(result.futureSelfLetter || "")}</p>
+    <section class="mirror-form-card future-self-entry-card">
+      <img class="future-self-entry-icon" src="assets/icon-money.png" alt="">
+      <p class="eyebrow">Real Cost of Living</p>
+      <h3>What does independent living actually cost?</h3>
+      <p class="muted">Real Singapore estimates, not a game or a guess.</p>
+      <button class="secondary-action compact-action" type="button" data-open="costOfLiving">Calculate</button>
     </section>
   `;
 }
@@ -4167,118 +4141,11 @@ function futureReflectionList() {
       `).join("") : `
         <section class="empty-feature">
           <img src="assets/icon-spark.png" alt="">
-          <div><strong>No saved decisions yet</strong><p>Generate a Future Mirror, then save it for later reflection.</p></div>
+          <div><strong>No saved decisions yet</strong><p>Past Future Mirror decisions you saved will show up here.</p></div>
         </section>
       `}
     </section>
   `;
-}
-
-function futureMirrorDimensionsCard(result) {
-  const dimensions = result.dimensions || [];
-  if (!dimensions.length) return "";
-  const pathNames = (result.paths || []).map((path) => path.name);
-  return `
-    <section class="mirror-timeline-card dimensions-card">
-      <p class="eyebrow">Dimensions that matter for this decision</p>
-      ${dimensions.map((dimension) => `
-        <article>
-          <strong>${escapeHTML(dimension.name)}</strong>
-          <p class="muted tiny-note">${escapeHTML(dimension.relevantBecause)}</p>
-          <div class="mirror-list-grid">
-            <div>
-              <strong><small>${escapeHTML(pathNames[0] || "Path A")}</small> ${dimension.pathAScore}/100</strong>
-              <div class="mirror-score-bar"><i style="width:${dimension.pathAScore}%"></i></div>
-              <p>${escapeHTML(dimension.pathAReason)}</p>
-            </div>
-            <div>
-              <strong><small>${escapeHTML(pathNames[1] || "Path B")}</small> ${dimension.pathBScore}/100</strong>
-              <div class="mirror-score-bar"><i style="width:${dimension.pathBScore}%"></i></div>
-              <p>${escapeHTML(dimension.pathBReason)}</p>
-            </div>
-          </div>
-        </article>
-      `).join("")}
-    </section>
-  `;
-}
-
-function futureMirrorResultCard() {
-  const result = trackerState.futureMirror && trackerState.futureMirror.latest;
-  if (isFutureMirrorLoading) {
-    return `
-      <section class="mirror-loading-card">
-        <p class="eyebrow">Future Mirror is thinking</p>
-        <h3>Simulating possible impacts...</h3>
-        <p>Compass AI is comparing paths without predicting or guaranteeing the future.</p>
-        <div class="mirror-loading-dots"><i></i><i></i><i></i></div>
-      </section>
-    `;
-  }
-  if (futureMirrorError) {
-    return `
-      <section class="mirror-error-card">
-        <p class="eyebrow">Could not generate mirror</p>
-        <h3>${escapeHTML(futureMirrorError)}</h3>
-        <p>Check your local AI server and Groq API key, then try again.</p>
-      </section>
-    `;
-  }
-  if (!result) {
-    return `
-      <section class="mirror-empty-card">
-        <p class="eyebrow">Decision impact simulator</p>
-        <h3>Future Mirror is not a prediction tool.</h3>
-        <p>It helps you compare possible benefits, potential risks, and likely impact so your next step feels clearer.</p>
-      </section>
-    `;
-  }
-  return `
-    <section class="mirror-result-card">
-      <p class="eyebrow">${escapeHTML(result.category)} - ${escapeHTML(result.display_time)}</p>
-      <h3>${escapeHTML(result.question)}</h3>
-      <p>${escapeHTML(result.summary)}</p>
-      <p class="tiny-note">Future Mirror shows possible outcomes, not guaranteed results.</p>
-    </section>
-    <div class="mirror-path-grid">${futureMirrorPathCards(result)}</div>
-    ${futureMirrorDimensionsCard(result)}
-    ${futureMirrorTimeline(result)}
-    ${futureScoreCard(result)}
-    ${futureSelfLetterCard(result)}
-    <section class="mirror-reflection-card">
-      <p class="eyebrow">Reflection questions</p>
-      ${(result.reflectionQuestions || []).map((question) => `<h4>${escapeHTML(question)}</h4>`).join("")}
-      <button class="primary-action compact-action" type="button" data-save-future-decision>Save this decision</button>
-    </section>
-    ${futureMirrorIntegrationCard()}
-  `;
-}
-
-function futureMirrorIntegrationCard() {
-  return `
-    <section class="mirror-integration-card">
-      <p class="eyebrow">Connect this mirror</p>
-      <h3>Turn insight into growth data.</h3>
-      <div class="mirror-integration-grid">
-        <button type="button" data-discuss-mirror>Discuss with Compass AI</button>
-        <button type="button" data-open="growthGoals">Connect to Goals</button>
-        <button type="button" data-open="journal">Reflect in Journal</button>
-        <button type="button" data-open="mood">Log mood impact</button>
-        <button type="button" data-open="challengeHub">Start a Challenge</button>
-        <button type="button" data-tab-jump="opportunities">Career Planning</button>
-        <button type="button" data-tab-jump="stories">Learn from Inspire Hub</button>
-        <button type="button" data-tab-jump="community">Ask Community</button>
-        <button type="button" data-save-future-decision>Save for Future Reflection</button>
-      </div>
-    </section>
-  `;
-}
-
-function futureMirrorDiscussionPrompt() {
-  const result = trackerState.futureMirror && trackerState.futureMirror.latest;
-  if (!result) return "Help me use Future Mirror for a decision I am facing.";
-  const pathSummary = (result.paths || []).map((path) => `${path.name}: ${path.choice}, goal alignment ${path.goalAlignmentScore}%`).join(" | ");
-  return `I want to discuss my Future Mirror result. Decision: ${result.question}. Category: ${result.category}. Paths: ${pathSummary}. Reflection questions: ${(result.reflectionQuestions || []).join(" ")}. Help me choose one small action today without pretending to predict the future.`;
 }
 
 function growthCommunityPrompt() {
@@ -4610,37 +4477,6 @@ function readinessIconLabel(label) {
 function weakestReadinessCategory(result) {
   const bars = Array.isArray(result && result.domainBars) ? result.domainBars : [];
   return [...bars].sort((a, b) => Number(a.value) - Number(b.value))[0] || { label: "Financial Readiness", value: 0 };
-}
-
-function futureMirrorCategoryForReadiness(label) {
-  if (label === "Financial Readiness") return "Financial Mirror";
-  if (label === "Relationship & Communication Skills") return "Relationship Mirror";
-  if (label === "Life Direction & Purpose") return "Career Mirror";
-  if (label === "Emotional Resilience") return "Lifestyle Mirror";
-  if (label === "Independence & Responsibility") return "Growth Mirror";
-  return "Growth Mirror";
-}
-
-function futureReadinessMirrorDraft(result) {
-  const weakest = weakestReadinessCategory(result);
-  const category = weakest.label;
-  const pathMap = {
-    "Financial Readiness": ["Develop saving and planning habits", "Continue current spending habits"],
-    "Decision-Making Skills": ["Use a decision checklist before acting", "Keep choosing based on impulse or pressure"],
-    "Emotional Resilience": ["Build recovery habits and ask for support early", "Handle stress alone until it becomes heavy"],
-    "Life Direction & Purpose": ["Create a small future plan and test one step", "Wait for direction to become clear by itself"],
-    "Relationship & Communication Skills": ["Practice honest communication and boundaries", "Avoid difficult conversations"],
-    "Independence & Responsibility": ["Take ownership of one weekly responsibility", "Wait until someone else reminds me"]
-  };
-  const paths = pathMap[category] || pathMap["Decision-Making Skills"];
-  return {
-    source: "Future Readiness Assessment",
-    question: `How can I improve my ${category.toLowerCase()} after scoring ${weakest.value}/100?`,
-    category: futureMirrorCategoryForReadiness(category),
-    pathA: paths[0],
-    pathB: paths[1],
-    note: `Built from your Future Readiness Assessment. Lowest category: ${category} (${weakest.value}/100).`
-  };
 }
 
 function readinessDiscussionPrompt(result) {
@@ -5142,61 +4978,6 @@ function adminStudio() {
   `;
 }
 
-function visibleCommunityPosts() {
-  return (trackerState.communityPosts || [])
-    .filter((post) => post.user_id === currentUserId() || post.is_sample)
-    .slice(0, 8);
-}
-
-function communityCards() {
-  return communityGroups.map((group) => `
-    <article class="community-card">
-      <div class="community-card-top">
-        <span class="category-badge">${escapeHTML(group.members)} members</span>
-        <img src="assets/icon-support.png" alt="">
-      </div>
-      <h3>${escapeHTML(group.title)}</h3>
-      <p>${escapeHTML(group.description)}</p>
-      <div class="community-prompts">
-        ${(group.prompts || []).map((prompt) => `<span>${escapeHTML(prompt)}</span>`).join("")}
-      </div>
-      <div class="community-actions">
-        <button class="primary-action compact-action" type="button" data-open="communityGroup" data-open-payload="${escapeHTML(group.id)}">Open group</button>
-        <button class="secondary-action compact-action" type="button" data-growth-prompt="${escapeHTML(`Help me connect with a ${group.title} growth community safely. Ask me one question about my goal and suggest a respectful first post.`)}">Ask Compass</button>
-      </div>
-    </article>
-  `).join("");
-}
-
-function communityWall() {
-  const posts = visibleCommunityPosts();
-  return `
-    <section class="community-wall-card">
-      <div class="section-row">
-        <div>
-          <p class="eyebrow">Anonymous Support Wall</p>
-          <h3>Share pressure without exposing private details.</h3>
-        </div>
-        <button class="secondary-action compact-action" type="button" data-open="communityPost">Post</button>
-      </div>
-      <div class="community-wall-list">
-        ${posts.length ? posts.map((post) => `
-          <article>
-            <strong>${escapeHTML(post.group || "General support")}</strong>
-            <p>${escapeHTML(post.text)}</p>
-            <small>${escapeHTML(post.display_time || "Just now")}</small>
-          </article>
-        `).join("") : `
-          <article class="empty-wall">
-            <strong>No support posts yet</strong>
-            <p>Write a calm anonymous note, question, or encouragement. Do not include private details.</p>
-          </article>
-        `}
-      </div>
-    </section>
-  `;
-}
-
 function growthPartnerCard() {
   const interests = cleanText(userProfile.interests, 120) || "your interests";
   const goals = cleanText(userProfile.goals || userProfile.dreamCareer, 140) || "your current growth goal";
@@ -5213,49 +4994,6 @@ function growthPartnerCard() {
       </div>
       <button class="primary-action compact-action" type="button" data-growth-prompt="${escapeHTML(growthPromptFromData("a safe growth partner match description and first message"))}">Find match style</button>
     </section>
-  `;
-}
-
-function futureMirrorQuestionValue() {
-  if (futureMirrorDraft && futureMirrorDraft.question) return futureMirrorDraft.question;
-  return trackerState.futureMirror.latest ? trackerState.futureMirror.latest.question : "";
-}
-
-function futureMirrorCategoryValue() {
-  if (futureMirrorDraft && futureMirrorDraft.category) return futureMirrorDraft.category;
-  return trackerState.futureMirror.latest ? trackerState.futureMirror.latest.category : "";
-}
-
-function futureMirrorDraftNotice() {
-  if (!futureMirrorDraft) return "";
-  return `
-    <div class="support-note readiness-mirror-note">
-      <strong>${escapeHTML(futureMirrorDraft.source || "Future Readiness Assessment")}</strong>
-      <p>${escapeHTML(futureMirrorDraft.note || "Future Mirror is using your assessment result as context.")}</p>
-    </div>
-  `;
-}
-
-function futureMirrorDecisionFormSection() {
-  return `
-    <h3>${futureMirrorMode === "compass" ? "Not sure how to even frame the choice? Explore it here." : "Explore how your choices today may influence your future."}</h3>
-    ${futureMirrorDraftNotice()}
-    <label>Decision question
-      <textarea id="mirror-question" placeholder="Should I study tonight or play games?">${escapeHTML(futureMirrorQuestionValue())}</textarea>
-    </label>
-    <label>Mirror category
-      <select id="mirror-category">
-        ${futureMirrorCategories.map((category) => `<option value="${escapeHTML(category)}" ${futureMirrorCategoryValue() === category ? "selected" : ""}>${escapeHTML(category)}</option>`).join("")}
-      </select>
-    </label>
-    <div class="mirror-path-inputs">
-      <label>Path A<input id="mirror-path-a" type="text" placeholder="Example: Study tonight" value="${escapeHTML(futureMirrorDraft ? futureMirrorDraft.pathA || "" : "")}"></label>
-      <label>Path B<input id="mirror-path-b" type="text" placeholder="Example: Play games" value="${escapeHTML(futureMirrorDraft ? futureMirrorDraft.pathB || "" : "")}"></label>
-    </div>
-    <div class="mirror-example-row">
-      ${futureMirrorExamples.map((example) => `<button type="button" data-mirror-example="${escapeHTML(example)}">${escapeHTML(example)}</button>`).join("")}
-    </div>
-    <button class="primary-action mirror-run-action" type="button" data-run-future-mirror ${isFutureMirrorLoading ? "disabled" : ""}>${isFutureMirrorLoading ? "Generating..." : "Generate Future Mirror"}</button>
   `;
 }
 
@@ -5330,6 +5068,7 @@ function futureScanStationGrid() {
             const done = activeFutureScan.stations && activeFutureScan.stations[station.id];
             return `
               <button class="wide-action" type="button" data-open="futureScanStation" data-open-payload="${escapeHTML(station.id)}">
+                <img src="assets/${escapeHTML(station.icon)}" alt="">
                 <span><strong>${escapeHTML(station.title)}</strong><small>${escapeHTML(station.blurb)}</small></span>
                 ${done ? `<span class="risk-pill calm">Done</span>` : ""}
               </button>
@@ -5364,6 +5103,7 @@ function futureScanSuggestedSection() {
           const done = activeFutureScan.stations && activeFutureScan.stations[station.id];
           return `
             <button class="wide-action" type="button" data-open="futureScanStation" data-open-payload="${escapeHTML(station.id)}">
+              <img src="assets/${escapeHTML(station.icon)}" alt="">
               <span><strong>${escapeHTML(station.title)}</strong><small>${escapeHTML(station.blurb)}</small></span>
               ${done ? `<span class="risk-pill calm">Done</span>` : ""}
             </button>
@@ -5504,7 +5244,7 @@ function futureScanSignalBanner() {
 const screens = {
   home: () => `
     ${futureMirrorHomeHero()}
-    ${lifeSimHomeHero()}
+    ${lifeVerseHomeSpotlight()}
     ${todayInsightCard()}
     ${futureScoreHomeCard()}
     ${homeQuickAccessGrid()}
@@ -5520,26 +5260,29 @@ const screens = {
       <div>
         <p class="eyebrow">Future Mirror</p>
         <h2 class="screen-title">Your future is built by today's choices.</h2>
-        <p class="screen-subtitle">A decision impact simulator for comparing possible paths. It does not predict or guarantee outcomes.</p>
+        <p class="screen-subtitle">Compare paths before you choose.</p>
       </div>
       <div class="avatar"><img src="assets/icon-spark.png" alt=""></div>
     </header>
 
     ${futureSelfEntryCard()}
+    ${costOfLivingEntryCard()}
 
     <section class="mirror-form-card">
-      <p class="eyebrow">Try Future Mirror</p>
-      <div class="mirror-example-row mode-toggle-row">
-        <button type="button" class="${futureMirrorMode === "simulator" ? "is-selected" : ""}" data-future-mirror-mode="simulator">Decision Simulator</button>
-        <button type="button" class="${futureMirrorMode === "compass" ? "is-selected" : ""}" data-future-mirror-mode="compass">Life Compass</button>
-        <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">Future Scan</button>
-        <button type="button" class="${futureMirrorMode === "build" ? "is-selected" : ""}" data-future-mirror-mode="build">Build Mode</button>
+      <div class="home-quick-grid mirror-mode-grid">
+        <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">
+          <img src="assets/icon-guide.png" alt="">
+          <strong>Future Scan</strong>
+        </button>
+        <button type="button" class="${futureMirrorMode === "build" ? "is-selected" : ""}" data-future-mirror-mode="build">
+          <img src="assets/icon-decide.png" alt="">
+          <strong>Build Mode</strong>
+        </button>
       </div>
-      ${futureMirrorMode === "scan" ? futureScanEntrySection() : futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorDecisionFormSection()}
+      ${futureMirrorMode === "build" ? buildModeEntrySection() : futureScanEntrySection()}
     </section>
 
-    ${futureMirrorMode === "scan" || futureMirrorMode === "build" ? "" : futureMirrorResultCard()}
-    ${futureMirrorMode === "scan" || futureMirrorMode === "build" ? "" : futureReflectionList()}
+    ${savedFutureDecisions().length ? futureReflectionList() : ""}
   `,
 
   assess: () => `
@@ -5716,20 +5459,6 @@ const screens = {
     })}
   `,
 
-  build: () => `
-    <header class="screen-head compact-head mirror-head">
-      <div>
-        <p class="eyebrow">Build Mode</p>
-        <h2 class="screen-title">Train for the future you want.</h2>
-        <p class="screen-subtitle">Tell Compass your goal. It will match the right AI coach and guide your practice.</p>
-      </div>
-      <div class="avatar"><img src="assets/icon-decide.png" alt=""></div>
-    </header>
-    <section class="mirror-form-card">
-      ${buildModeEntrySection()}
-    </section>
-  `,
-
   simulator: () => `
     <section class="life-sim-game" data-life-sim-game>
       <div id="life-sim-root" class="life-sim-root" aria-label="Realistic 3D Singapore adult-life simulator"></div>
@@ -5797,38 +5526,11 @@ const screens = {
 
     <div class="content-rail-title"><strong>${escapeHTML(opportunityCategory === "All" ? "All opportunities" : opportunityCategory)}</strong><span>${visibleOpportunities().length} items</span></div>
     <div class="opportunity-feed">${opportunityCards()}</div>
+
+    ${communityOpportunitiesRail()}
   `,
 
-  community: () => `
-    <header class="screen-head compact-head community-head">
-      <div>
-        <p class="eyebrow">Growth Community</p>
-        <h2 class="screen-title">Find people growing in the same direction.</h2>
-        <p class="screen-subtitle">Not dating. Communities, goal groups, growth partners, and anonymous support for youth development.</p>
-      </div>
-      <div class="avatar"><img src="assets/icon-support.png" alt=""></div>
-    </header>
-
-    <section class="community-hero-card">
-      <div>
-        <p class="eyebrow">Connected growth</p>
-        <h3>Future choices are easier when support is nearby.</h3>
-        <p>Use Community to discuss goals, ask for encouragement, find accountability, and stay realistic.</p>
-      </div>
-      <div class="community-stat-row">
-        <span><strong>${communityGroups.length}</strong>Communities</span>
-        <span><strong>${visibleCommunityPosts().length}</strong>Posts</span>
-        <span><strong>${trackerState.supportContacts.filter((contact) => contact.user_id === currentUserId() || !contact.user_id).length}</strong>Trusted people</span>
-      </div>
-    </section>
-
-    ${growthPartnerCard()}
-
-    <div class="content-rail-title"><strong>Growth communities</strong><span>Goal groups</span></div>
-    <div class="community-grid">${communityCards()}</div>
-
-    ${communityWall()}
-  `,
+  community: () => (hasCommunitySession() ? communityAuthedScreen() : communityAuthGateScreen()),
 
   stories: () => `
     <header class="screen-head compact-head inspire-head">
@@ -6268,6 +5970,9 @@ const modals = {
           <h3>"${escapeHTML(milestoneJustCompleted.milestoneTitle)}" - want to reflect on it?</h3>
           <textarea id="milestone-reflection-note" placeholder="Optional - what made this happen, what's next?"></textarea>
           <button class="secondary-action compact-action" type="button" data-reflect-on-milestone data-milestone-title-value="${escapeHTML(milestoneJustCompleted.milestoneTitle)}" data-goal-title-value="${escapeHTML(milestoneJustCompleted.goalTitle)}">Save reflection</button>
+          ${hasCommunitySession()
+            ? `<button class="secondary-action compact-action" type="button" data-share-milestone-community data-milestone-title-value="${escapeHTML(milestoneJustCompleted.milestoneTitle)}" data-goal-title-value="${escapeHTML(milestoneJustCompleted.goalTitle)}">Share to Community</button>`
+            : `<button class="secondary-action compact-action" type="button" data-tab-jump="community">Sign in to Community to share this</button>`}
         </section>
       ` : ""}
       <div class="mirror-example-row mode-toggle-row">
@@ -6931,6 +6636,50 @@ const modals = {
     `;
   },
 
+  costOfLiving: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="cost-of-living-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Real Cost of Living</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="cost-of-living-title">What does independent living actually cost?</h3>
+      <p class="muted">General estimates based on typical Singapore costs - actual prices vary by exact location, timing, and personal choices. Use this as a starting point, not an exact budget.</p>
+      <div class="admin-form">
+        <label>Housing
+          <select id="col-housing">
+            ${COST_OF_LIVING_HOUSING.map((item) => `<option value="${escapeHTML(item.id)}" ${costOfLivingDraft.housing === item.id ? "selected" : ""}>${escapeHTML(item.label)}</option>`).join("")}
+          </select>
+        </label>
+        <label>Area
+          <select id="col-district">
+            ${COST_OF_LIVING_DISTRICT_TIERS.map((item) => `<option value="${escapeHTML(item.id)}" ${costOfLivingDraft.district === item.id ? "selected" : ""}>${escapeHTML(item.label)}</option>`).join("")}
+          </select>
+        </label>
+        <label>Transport
+          <select id="col-transport">
+            ${COST_OF_LIVING_TRANSPORT.map((item) => `<option value="${escapeHTML(item.id)}" ${costOfLivingDraft.transport === item.id ? "selected" : ""}>${escapeHTML(item.label)}</option>`).join("")}
+          </select>
+        </label>
+        <label>Lifestyle
+          <select id="col-lifestyle">
+            ${COST_OF_LIVING_LIFESTYLE.map((item) => `<option value="${escapeHTML(item.id)}" ${costOfLivingDraft.lifestyle === item.id ? "selected" : ""}>${escapeHTML(item.label)}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <button class="primary-action" type="button" data-calc-cost-of-living>Calculate</button>
+      ${costOfLivingResult ? `
+        <div class="future-reflection-list">
+          ${costOfLivingResult.rows.map((row) => `<p class="tiny-note"><strong>${escapeHTML(row.label)}</strong>: $${row.range[0]}-${row.range[1]}/month</p>`).join("")}
+        </div>
+        <p class="muted"><strong>Estimated total: $${costOfLivingResult.total[0]}-${costOfLivingResult.total[1]}/month</strong></p>
+        <div class="future-reflection-list">
+          <p class="eyebrow">Often forgotten one-time costs</p>
+          ${COST_OF_LIVING_ONE_TIME_NOTES.map((note) => `<p class="tiny-note">${escapeHTML(note)}</p>`).join("")}
+        </div>
+      ` : ""}
+    </div>
+  `,
+
   growthGoals: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="growth-goals-title">
       <div class="modal-top">
@@ -7077,61 +6826,26 @@ const modals = {
     </div>
   `,
 
-  communityGroup: (id) => {
-    const group = communityGroups.find((item) => item.id === id) || communityGroups[0];
-    return `
-      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-group-title">
-        <div class="modal-top">
-          <span class="risk-pill calm">Growth Community</span>
-          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
-        </div>
-        <h3 id="community-group-title">${escapeHTML(group.title)}</h3>
-        <p class="muted">${escapeHTML(group.description)}</p>
-        <div class="advice-stack">
-          ${(group.prompts || []).map((prompt, index) => `
-            <div><strong>Discussion ${index + 1}</strong><span>${escapeHTML(prompt)}</span></div>
-          `).join("")}
-          <div><strong>Goal group</strong><span>Use this group to share one weekly goal, one blocker, and one realistic update.</span></div>
-          <div><strong>Safety rule</strong><span>Do not share full name, address, school schedule, passwords, payment details, or private contact information publicly.</span></div>
-        </div>
-        <div class="profile-actions">
-          <button class="primary-action" type="button" data-open="communityPost" data-open-payload="${escapeHTML(group.title)}">Write anonymous post</button>
-          <button class="secondary-action" type="button" data-growth-prompt="${escapeHTML(`Help me write a respectful first post for the ${group.title} community. Keep it safe, short, and focused on growth.`)}">Ask Compass</button>
-        </div>
-      </div>
-    `;
-  },
+  communityGroup: (id) => communityGroupModal(id),
 
-  communityPost: (groupName = "") => `
-    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-post-title">
-      <div class="modal-top">
-        <span class="risk-pill calm">Anonymous support</span>
-        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
-      </div>
-      <h3 id="community-post-title">Write a safe support wall post</h3>
-      <p class="muted">Keep it kind and anonymous. Do not include private personal details.</p>
-      <div class="admin-form">
-        <label>Community
-          <select id="community-post-group">
-            ${["General support", ...communityGroups.map((group) => group.title)].map((title) => `
-              <option value="${escapeHTML(title)}" ${groupName === title ? "selected" : ""}>${escapeHTML(title)}</option>
-            `).join("")}
-          </select>
-        </label>
-        <label>Post<textarea id="community-post-text" placeholder="Example: I am trying to study more consistently this week. What helped you start when motivation was low?"></textarea></label>
-        <p class="form-error" id="community-post-error" aria-live="polite"></p>
-      </div>
-      <button class="primary-action" type="button" data-save-community-post>Post anonymously</button>
-    </div>
-  `,
+  communityPost: (payload = "") => communityPostModal(payload),
 
-  safety: () => `
+  communityCreateSquad: () => communityCreateSquadModal(),
+
+  communityAccountabilityRequest: (targetUserId) => communityAccountabilityRequestModal(targetUserId),
+
+  communityMentorApply: () => communityMentorApplyModal(),
+
+  communityOpportunitySubmit: () => communityOpportunitySubmitModal(),
+
+  safety: (reason = "") => `
     <div class="modal-card dark-modal" role="dialog" aria-modal="true" aria-labelledby="safety-title">
       <div class="modal-top">
         <span class="risk-pill light">Safety check</span>
         <button class="ghost-circle light" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="safety-title">Make the next move safer</h3>
+      ${reason ? `<p class="muted">${escapeHTML(reason)}</p>` : ""}
       <p>If there is immediate danger, contact local emergency services or a trusted adult now.</p>
       <div class="safety-list">
         <label><input type="checkbox" checked> Tell a trusted person where you are.</label>
@@ -7246,6 +6960,12 @@ function hidePortrait() {
 
 function renderScreen(tab) {
   activeTab = tab;
+  // community.js/community-supabase.js load before app.js as separate
+  // <script> tags, so they can't see the `activeTab` lexical binding - they
+  // read window.activeTab instead to decide whether to re-render after an
+  // async refresh resolves. Without this mirror, window.activeTab is always
+  // undefined and those re-render checks silently never fire.
+  window.activeTab = tab;
   if (tab === "compass") applyCoachProactiveOpener();
   if (tab === "simulator") {
     enterLifeSimMode();
@@ -7288,6 +7008,9 @@ function openModal(name, payload) {
     roadmapView = "timeline";
     roadmapError = "";
     milestoneJustCompleted = null;
+  }
+  if (name === "costOfLiving" && !modalLayer.classList.contains("is-open")) {
+    costOfLivingResult = null;
   }
   if (name === "discoverYourself" && !modalLayer.classList.contains("is-open")) {
     blueprintActiveSession = 1;
@@ -7410,72 +7133,6 @@ async function requestCompassDirect(systemPrompt, userPrompt) {
   return reply;
 }
 
-async function runFutureMirrorSimulation() {
-  const questionInput = document.querySelector("#mirror-question");
-  const categoryInput = document.querySelector("#mirror-category");
-  const pathAInput = document.querySelector("#mirror-path-a");
-  const pathBInput = document.querySelector("#mirror-path-b");
-  const question = cleanText(questionInput ? questionInput.value : "", 260);
-  const category = futureMirrorCategories.includes(categoryInput ? categoryInput.value : "") ? categoryInput.value : "Growth Mirror";
-  const pathA = cleanText(pathAInput ? pathAInput.value : "", 180);
-  const pathB = cleanText(pathBInput ? pathBInput.value : "", 180);
-  futureMirrorError = "";
-  if (!question || !pathA || !pathB) {
-    futureMirrorError = "Add a decision question and at least two possible paths.";
-    renderScreen("future");
-    return;
-  }
-  isFutureMirrorLoading = true;
-  renderScreen("future");
-  try {
-    const reply = await requestCompassDirect(FUTURE_MIRROR_SYSTEM_PROMPT, futureMirrorPrompt(question, category, pathA, pathB, futureMirrorMode));
-    const parsed = extractJsonObject(reply);
-    if (!parsed) {
-      // Previously fell back to normalizeFutureMirrorResult({ summary: reply }, ...),
-      // which put the raw (usually truncated/invalid) JSON text straight into
-      // the result card's summary field - looked like a broken/fake feature
-      // instead of a failed AI call. Fail loudly instead so the catch block
-      // below shows the existing retry message and nothing gets saved.
-      throw new Error("Future Mirror reply was not valid JSON.");
-    }
-    if (containsVerdictLanguage(parsed.summary) || containsVerdictLanguage(reply)) {
-      console.warn("[Future Mirror] Verdict-like language detected in AI reply - keeping generated content but flagging for review.");
-    }
-    const result = normalizeFutureMirrorResult(parsed, { question, category, pathA, pathB, mode: futureMirrorMode });
-    if (!result.paths.length) {
-      result.paths = [
-        {
-          name: "Path A",
-          choice: pathA,
-          benefits: ["This path may support progress if you follow through consistently."],
-          risks: ["This path may still require energy, time, and support."],
-          shortTermImpact: "Possible short-term impact depends on your immediate action.",
-          longTermImpact: "Possible long-term effects depend on whether this becomes a repeated pattern.",
-          goalAlignmentScore: 50
-        },
-        {
-          name: "Path B",
-          choice: pathB,
-          benefits: ["This path may meet a different need or reduce pressure in the short term."],
-          risks: ["This path may create trade-offs if it moves you away from your goals."],
-          shortTermImpact: "Possible short-term impact depends on timing and context.",
-          longTermImpact: "Possible long-term effects depend on habit, support, and opportunity cost.",
-          goalAlignmentScore: 50
-        }
-      ];
-    }
-    trackerState.futureMirror.latest = result;
-    futureMirrorDraft = null;
-    saveTrackerState();
-  } catch (error) {
-    console.error("[Future Mirror] Request failed", error);
-    futureMirrorError = "Future Mirror is having trouble generating insights right now. Please try again.";
-  } finally {
-    isFutureMirrorLoading = false;
-    renderScreen("future");
-    refreshStaticScreens();
-  }
-}
 
 // ---- Future Scan ---------------------------------------------------------
 
@@ -7753,12 +7410,43 @@ async function runFutureScanValues() {
   }
 }
 
+// Maps the Hidden Cost Scanner's 6 labels onto real LifeVerse state fields.
+// betterWhenHigh: true means the field going DOWN over the simulated window
+// is the cost (e.g. sleep draining); false means the field going UP is the
+// cost (burnoutRisk rising). scaleFactor turns a raw 30-day point delta into
+// a 0-100 severity - tuned so a typical drift lands in a believable 20-70
+// band rather than always pinning to 0 or 100.
+const HIDDEN_COST_FIELD_MAP = [
+  { label: "Sleep", get: (state) => state.needs.sleep, betterWhenHigh: true },
+  { label: "Energy", get: (state) => state.needs.energy, betterWhenHigh: true },
+  { label: "Focus", get: (state) => state.mentalWellbeing.burnoutRisk, betterWhenHigh: false },
+  { label: "Confidence", get: (state) => state.mentalWellbeing.confidence, betterWhenHigh: true },
+  { label: "Future opportunity", get: (state) => state.career.readiness, betterWhenHigh: true },
+  { label: "Relationships", get: (state) => state.relationships.support, betterWhenHigh: true }
+];
+const HIDDEN_COST_SCALE_FACTOR = 2.5;
+
+function computeHiddenCostSeverities() {
+  const before = lifeVerseState();
+  const beforeValues = HIDDEN_COST_FIELD_MAP.map((field) => Number(field.get(before)) || 0);
+  const { state: after } = lifeVerseNoActionSnapshot(30);
+  return HIDDEN_COST_FIELD_MAP.map((field, index) => {
+    const afterValue = Number(field.get(after)) || 0;
+    const delta = field.betterWhenHigh ? beforeValues[index] - afterValue : afterValue - beforeValues[index];
+    return { label: field.label, severity: Math.max(0, Math.min(100, Math.round(delta * HIDDEN_COST_SCALE_FACTOR))) };
+  });
+}
+
 function futureScanHiddenCostsView() {
   const result = activeFutureScan.stations.hiddenCosts;
   return `
     ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
     <button class="primary-action mirror-run-action" type="button" data-run-scan-costs ${futureScanStationLoading === "hiddenCosts" ? "disabled" : ""}>${futureScanStationLoading === "hiddenCosts" ? "Scanning..." : result ? "Re-scan" : "Run Hidden Cost Scanner"}</button>
     ${result ? `
+      <div class="scan-simulated-title">
+        <span class="risk-pill calm">Simulated</span>
+        <small>${result.personalized ? "Based on your LifeVerse profile" : "Based on a general starting-adult simulation"}</small>
+      </div>
       <div class="struggle-map">
         ${result.costs.map((cost, index) => `
           <div class="struggle-row scan-cost-row" style="animation-delay:${index * 120}ms">
@@ -7780,16 +7468,20 @@ async function runFutureScanHiddenCosts() {
   futureScanStationLoading = "hiddenCosts";
   openModal("futureScanStation", "hiddenCosts");
   try {
-    const prompt = `${scanContextText("hiddenCosts")} List the hidden costs of this choice/pattern - pick 4 to 6 that are genuinely relevant from: sleep, energy, focus, confidence, future opportunity, relationships. Give each a severity 0-100 based on how much THIS specific situation costs there, and a one-sentence reason. Respond as strict JSON only: {"costs":[{"label":"string","severity":0,"reason":"string"}]}`;
+    const severities = computeHiddenCostSeverities();
+    const severitiesText = severities.map((item) => `${item.label}: severity ${item.severity}/100`).join("; ");
+    const prompt = `${scanContextText("hiddenCosts")}\n\nCompass's own life simulation engine computed these real severities for this user if this pattern continues for about a month: ${severitiesText}.\n\nFor EACH of these exact labels, in this exact order, write a one-sentence reason grounded in the real severity number and the user's specific real situation - do not invent a different severity, only explain why it lands there for them. Respond as strict JSON only: {"costs":[{"label":"string","reason":"string"}]}`;
     const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
     const parsed = extractJsonObject(reply);
     if (!parsed || !Array.isArray(parsed.costs)) throw new Error("Hidden cost reply was not valid JSON.");
+    const reasonByLabel = new Map(parsed.costs.map((item) => [cleanText(item.label || "", 40).toLowerCase(), cleanText(item.reason || "", 160)]));
     const result = {
-      costs: parsed.costs.slice(0, 6).map((item) => ({
-        label: cleanText(item.label || "", 40),
-        severity: Math.max(0, Math.min(100, Number(item.severity) || 0)),
-        reason: cleanText(item.reason || "", 160)
-      })).filter((item) => item.label),
+      costs: severities.map((item) => ({
+        label: item.label,
+        severity: item.severity,
+        reason: reasonByLabel.get(item.label.toLowerCase()) || "This reflects how this pattern affects that part of your life if it continues."
+      })),
+      personalized: Boolean(userProfile.characterCreated),
       generatedAt: new Date().toISOString()
     };
     saveFutureScanStation("hiddenCosts", result);
@@ -7808,8 +7500,22 @@ function futureScanNoActionView() {
     ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
     <button class="primary-action mirror-run-action" type="button" data-run-scan-noaction ${futureScanStationLoading === "noActionFuture" ? "disabled" : ""}>${futureScanStationLoading === "noActionFuture" ? "Scanning..." : result ? "Re-scan" : "Run No-Action Future"}</button>
     ${result ? `
+      <div class="scan-simulated-block">
+        <div class="scan-simulated-title">
+          <span class="risk-pill calm">Simulated</span>
+          <small>${result.personalized ? "Based on your LifeVerse profile" : "Based on a general starting-adult simulation"}</small>
+        </div>
+        <div class="scan-timeline-row">
+          ${FUTURE_SCAN_NO_ACTION_CHECKPOINTS.map(([key]) => `
+            <div class="mirror-timeline-card scan-timeline-card">
+              <p class="eyebrow">${escapeHTML(key)}</p>
+              <p>${escapeHTML((result.simulated && result.simulated[key] && result.simulated[key].summary) || "")}</p>
+            </div>
+          `).join("")}
+        </div>
+      </div>
       <div class="scan-timeline-row">
-        ${["1 week", "1 month", "6 months", "1 year"].map((key) => `
+        ${FUTURE_SCAN_NO_ACTION_CHECKPOINTS.map(([key]) => `
           <div class="mirror-timeline-card scan-timeline-card">
             <p class="eyebrow">${escapeHTML(key)}</p>
             <p>${escapeHTML(result.timeline[key] || "")}</p>
@@ -7820,12 +7526,25 @@ function futureScanNoActionView() {
   `;
 }
 
+const FUTURE_SCAN_NO_ACTION_CHECKPOINTS = [["1 week", 7], ["1 month", 30], ["6 months", 180], ["1 year", 365]];
+
 async function runFutureScanNoAction() {
   futureScanStationError = "";
   futureScanStationLoading = "noActionFuture";
   openModal("futureScanStation", "noActionFuture");
   try {
-    const prompt = `${scanContextText("noActionFuture")} If the user changes NOTHING and keeps doing exactly what they're doing now regarding this situation, describe what that realistically looks like at each checkpoint. Be concrete and specific to their situation, not generic. Respond as strict JSON only: {"timeline":{"1 week":"string","1 month":"string","6 months":"string","1 year":"string"}}`;
+    const simulated = {};
+    FUTURE_SCAN_NO_ACTION_CHECKPOINTS.forEach(([label, days]) => {
+      const { event } = lifeVerseNoActionSnapshot(days);
+      simulated[label] = {
+        summary: event ? cleanText(event.summary, 200) : "",
+        consequences: event && Array.isArray(event.consequences) ? event.consequences.slice(0, 3) : []
+      };
+    });
+    const factsBlock = FUTURE_SCAN_NO_ACTION_CHECKPOINTS
+      .map(([label]) => `${label}: ${simulated[label].consequences.join(" ") || simulated[label].summary}`)
+      .join("\n");
+    const prompt = `${scanContextText("noActionFuture")}\n\nReal simulated outcome data for this user if nothing changes, from Compass's own life simulation engine:\n${factsBlock}\n\nIf the user changes NOTHING and keeps doing exactly what they're doing now regarding this situation, describe what that realistically looks like at each checkpoint. Use the real simulated data above as the primary basis for each entry - do not contradict it, but add interpretation relevant to their specific real-life situation. Be concrete, not generic. Respond as strict JSON only: {"timeline":{"1 week":"string","1 month":"string","6 months":"string","1 year":"string"}}`;
     const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
     const parsed = extractJsonObject(reply);
     if (!parsed || !parsed.timeline) throw new Error("No-Action Future reply was not valid JSON.");
@@ -7836,6 +7555,8 @@ async function runFutureScanNoAction() {
         "6 months": cleanText(parsed.timeline["6 months"] || "", 200),
         "1 year": cleanText(parsed.timeline["1 year"] || "", 200)
       },
+      simulated,
+      personalized: Boolean(userProfile.characterCreated),
       generatedAt: new Date().toISOString()
     };
     saveFutureScanStation("noActionFuture", result);
@@ -8271,10 +7992,20 @@ function buildCoachCatalogText() {
   return BUILD_COACH_TYPES.map((coach) => `${coach.name}: ${coach.use}`).join("\n");
 }
 
-function buildGoalChipRow() {
+function buildLifeMomentsSection() {
+  const moments = BUILD_LIFE_MOMENTS[buildMomentCategory] || [];
   return `
+    <p class="eyebrow">Real-life moments</p>
+    <div class="category-tabs build-moment-tabs">
+      ${BUILD_LIFE_MOMENT_CATEGORIES.map((category) => `
+        <button type="button" data-build-moment-category="${escapeHTML(category.id)}" class="${category.id === buildMomentCategory ? "is-selected" : ""}">
+          <img src="assets/${escapeHTML(category.icon)}" alt="">
+          ${escapeHTML(category.label)}
+        </button>
+      `).join("")}
+    </div>
     <div class="mirror-example-row build-goal-chip-row">
-      ${BUILD_GOAL_CHIPS.map((chip) => `<button type="button" data-build-goal-chip="${escapeHTML(chip)}">${escapeHTML(chip)}</button>`).join("")}
+      ${moments.map((moment) => `<button type="button" data-build-goal-chip="${escapeHTML(moment)}">${escapeHTML(moment)}</button>`).join("")}
     </div>
   `;
 }
@@ -8400,7 +8131,15 @@ function normalizeBuildTrainingSession(session) {
     ? session.messages.map((message) => ({
         sender: message && message.sender === "user" ? "user" : "assistant",
         message: cleanText(message && message.message ? message.message : "", 900),
-        createdAt: message && message.createdAt ? message.createdAt : startedAt
+        createdAt: message && message.createdAt ? message.createdAt : startedAt,
+        // pendingAi marks a message as still waiting for enhanceBuildTrainingReply()
+        // to swap in the live AI reply - it MUST survive normalization, or every
+        // render between the immediate local reply and the live reply arriving
+        // erases the flag, enhanceBuildTrainingReply's lookup then finds nothing,
+        // and the real AI reply is silently discarded (this was the actual bug:
+        // the coach looked stuck on generic canned replies even though the AI
+        // call itself was succeeding).
+        ...(message && message.pendingAi ? { pendingAi: true } : {})
       })).filter((message) => message.message).slice(-40)
     : [];
   return {
@@ -8473,9 +8212,9 @@ function buildModeEntrySection() {
   const entries = myBuildEntries();
   return `
     <label>What are you trying to build?
-      <textarea id="build-goal-input" placeholder="Example: I want to prepare for an interview, talk to my parents, stop procrastinating, save money, choose a career, or build confidence.">${escapeHTML(buildModeGoalInput)}</textarea>
+      <textarea id="build-goal-input" placeholder="Example: prepare for an interview, talk to my parents, save money.">${escapeHTML(buildModeGoalInput)}</textarea>
     </label>
-    ${buildGoalChipRow()}
+    ${buildLifeMomentsSection()}
     ${buildModeError ? `<p class="form-error">${escapeHTML(buildModeError)}</p>` : ""}
     <button class="primary-action mirror-run-action" type="button" data-start-build-entry ${isBuildModeLoading ? "disabled" : ""}>${isBuildModeLoading ? "Matching your coach..." : "Match My Coach"}</button>
     ${entries.length ? `
@@ -8483,6 +8222,7 @@ function buildModeEntrySection() {
       <div class="action-stack build-plan-list">
         ${entries.map((entry) => `
           <button class="wide-action" type="button" data-open-build-entry="${escapeHTML(entry.id)}">
+            <img src="assets/icon-decide.png" alt="">
             <span><strong>${escapeHTML(cleanText(entry.goal, 70))}</strong><small>${escapeHTML(entry.coachType)} - ${entry.trainingPath.length} training${entry.trainingPath.length === 1 ? "" : "s"}</small></span>
           </button>
         `).join("")}
@@ -8618,13 +8358,13 @@ async function startBuildEntry() {
   const goal = cleanText(inputEl ? inputEl.value : buildModeGoalInput, 200);
   if (!goal) {
     buildModeError = "Tell me what you want to work on first.";
-    renderScreen("build");
+    renderScreen("future");
     return;
   }
   buildModeGoalInput = goal;
   buildModeError = "";
   isBuildModeLoading = true;
-  renderScreen("build");
+  renderScreen("future");
   try {
     const prompt = `User goal: "${goal}".
 Saved real context, if any:
@@ -8671,7 +8411,7 @@ Respond as strict JSON only:
     openBuildEntry(fallbackEntry.id);
   } finally {
     isBuildModeLoading = false;
-    renderScreen("build");
+    renderScreen("future");
   }
 }
 
@@ -8924,7 +8664,7 @@ function finishBuildTrainingSession() {
   entry.nextStep = session.nextStep || entry.nextStep;
   entry.updatedAt = new Date().toISOString();
   saveTrackerState();
-  renderScreen("build");
+  renderScreen("future");
   openModal("buildEntry", entry.id);
 }
 
@@ -9045,7 +8785,6 @@ document.addEventListener("click", async (event) => {
   const inspireCategoryButton = event.target.closest("[data-inspire-category]");
   const opportunityCategoryButton = event.target.closest("[data-opportunity-category]");
   const opportunityAi = event.target.closest("[data-opportunity-ai]");
-  const runFutureMirror = event.target.closest("[data-run-future-mirror]");
   const futureMirrorModeButton = event.target.closest("[data-future-mirror-mode]");
   const scanFromEntry = event.target.closest("[data-scan-from-entry]");
   const startFutureScanButton = event.target.closest("[data-start-future-scan]");
@@ -9071,7 +8810,9 @@ document.addEventListener("click", async (event) => {
   const runScanSynthesisButton = event.target.closest("[data-run-scan-synthesis]");
   const openPastScanButton = event.target.closest("[data-open-past-scan]");
   const jumpFutureScanButton = event.target.closest("[data-jump-future-scan]");
+  const jumpBuildModeButton = event.target.closest("[data-jump-build-mode]");
   const buildGoalChipButton = event.target.closest("[data-build-goal-chip]");
+  const buildMomentCategoryButton = event.target.closest("[data-build-moment-category]");
   const startBuildEntryButton = event.target.closest("[data-start-build-entry]");
   const openBuildEntryButton = event.target.closest("[data-open-build-entry]");
   const startBuildTrainingButton = event.target.closest("[data-start-build-training]");
@@ -9079,9 +8820,6 @@ document.addEventListener("click", async (event) => {
   const sendBuildTrainingButton = event.target.closest("[data-send-build-training]");
   const buildCoachPromptButton = event.target.closest("[data-build-coach-prompt]");
   const finishBuildTrainingButton = event.target.closest("[data-finish-build-training]");
-  const mirrorExample = event.target.closest("[data-mirror-example]");
-  const discussMirror = event.target.closest("[data-discuss-mirror]");
-  const saveFutureDecision = event.target.closest("[data-save-future-decision]");
   const saveFutureReflection = event.target.closest("[data-save-future-reflection]");
   const copyCommunityPrompt = event.target.closest("[data-copy-community-prompt]");
   const clearChat = event.target.closest("[data-clear-chat]");
@@ -9130,9 +8868,26 @@ document.addEventListener("click", async (event) => {
   const deleteContact = event.target.closest("[data-delete-contact]");
   const messageContact = event.target.closest("[data-message-contact]");
   const saveGrowthGoals = event.target.closest("[data-save-growth-goals]");
+  const calcCostOfLiving = event.target.closest("[data-calc-cost-of-living]");
   const saveJournal = event.target.closest("[data-save-journal]");
   const startChallenge = event.target.closest("[data-start-challenge]");
   const saveCommunityPost = event.target.closest("[data-save-community-post]");
+  const communityAuthModeButton = event.target.closest("[data-community-auth-mode]");
+  const communitySignUpButton = event.target.closest("[data-community-sign-up]");
+  const communitySignInButton = event.target.closest("[data-community-sign-in]");
+  const communitySignOutButton = event.target.closest("[data-community-sign-out]");
+  const communityComposeAssistButton = event.target.closest("[data-community-compose-assist]");
+  const joinSquadButton = event.target.closest("[data-join-squad]");
+  const leaveSquadButton = event.target.closest("[data-leave-squad]");
+  const saveSquadButton = event.target.closest("[data-save-squad]");
+  const shareMilestoneCommunityButton = event.target.closest("[data-share-milestone-community]");
+  const saveAccountabilityOptInButton = event.target.closest("[data-save-accountability-optin]");
+  const sendAccountabilityRequestButton = event.target.closest("[data-send-accountability-request]");
+  const acceptAccountabilityRequestButton = event.target.closest("[data-accept-accountability-request]");
+  const declineAccountabilityRequestButton = event.target.closest("[data-decline-accountability-request]");
+  const saveContactHintButton = event.target.closest("[data-save-contact-hint]");
+  const submitMentorApplicationButton = event.target.closest("[data-submit-mentor-application]");
+  const saveCommunityOpportunityButton = event.target.closest("[data-save-community-opportunity]");
   const saveOpportunity = event.target.closest("[data-save-opportunity]");
   const shareOpportunity = event.target.closest("[data-share-opportunity]");
   const storyReader = event.target.closest("[data-story-id]");
@@ -9156,7 +8911,10 @@ document.addEventListener("click", async (event) => {
   const dismissSystemTutorial = event.target.closest("[data-dismiss-system-tutorial]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
 
-  if (opener) openModal(opener.dataset.open, opener.dataset.reflectionId || opener.dataset.openPayload || "");
+  if (opener) {
+    if (opener.dataset.open === "communityPost") setPendingMilestoneShare(null);
+    openModal(opener.dataset.open, opener.dataset.reflectionId || opener.dataset.openPayload || "");
+  }
   if (dismissSystemTutorial) {
     trackerState.systemTutorialsSeen[dismissSystemTutorial.dataset.dismissSystemTutorial] = true;
     saveTrackerState();
@@ -9295,57 +9053,6 @@ document.addEventListener("click", async (event) => {
   if (opportunityAi) {
     renderScreen("compass");
     await sendChatMessage(opportunityRecommendationPrompt());
-  }
-  if (mirrorExample) {
-    const question = document.querySelector("#mirror-question");
-    const pathA = document.querySelector("#mirror-path-a");
-    const pathB = document.querySelector("#mirror-path-b");
-    const example = mirrorExample.dataset.mirrorExample || "";
-    if (question) question.value = example;
-    if (pathA && pathB) {
-      if (example.includes("study")) {
-        pathA.value = "Study tonight";
-        pathB.value = "Play games tonight";
-      } else if (example.includes("internship")) {
-        pathA.value = "Apply for the internship";
-        pathB.value = "Wait and apply later";
-      } else if (example.includes("save")) {
-        pathA.value = "Save the money";
-        pathB.value = "Spend the money now";
-      } else if (example.includes("challenge")) {
-        pathA.value = "Join the challenge";
-        pathB.value = "Skip the challenge";
-      }
-    }
-  }
-  if (runFutureMirror) {
-    await runFutureMirrorSimulation();
-  }
-  if (discussMirror) {
-    renderScreen("compass");
-    await sendChatMessage(futureMirrorDiscussionPrompt());
-  }
-  if (saveFutureDecision) {
-    const latest = trackerState.futureMirror && trackerState.futureMirror.latest;
-    if (latest) {
-      const exists = savedFutureDecisions().some((item) => item.source_id === latest.id || item.question === latest.question);
-      if (!exists) {
-        trackerState.futureMirror.saved.unshift({
-          ...latest,
-          id: `saved-${Date.now()}`,
-          source_id: latest.id,
-          user_id: currentUserId(),
-          saved_at: new Date().toISOString(),
-          decisionMade: "",
-          whatHappened: "",
-          lesson: ""
-        });
-        trackerState.futureMirror.saved = trackerState.futureMirror.saved.slice(0, 30);
-        saveTrackerState();
-      }
-      renderScreen("future");
-      refreshStaticScreens();
-    }
   }
   if (saveFutureReflection) {
     const id = modalLayer.querySelector("#future-reflection-id") && modalLayer.querySelector("#future-reflection-id").value;
@@ -9608,9 +9315,17 @@ document.addEventListener("click", async (event) => {
     futureMirrorMode = "scan";
     renderScreen("future");
   }
+  if (jumpBuildModeButton) {
+    futureMirrorMode = "build";
+    renderScreen("future");
+  }
   if (buildGoalChipButton) {
     buildModeGoalInput = buildGoalChipButton.dataset.buildGoalChip || "";
-    renderScreen("build");
+    renderScreen("future");
+  }
+  if (buildMomentCategoryButton) {
+    buildMomentCategory = buildMomentCategoryButton.dataset.buildMomentCategory || "independence";
+    renderScreen("future");
   }
   if (startBuildEntryButton) await startBuildEntry();
   if (openBuildEntryButton) openBuildEntry(openBuildEntryButton.dataset.openBuildEntry);
@@ -9792,9 +9507,10 @@ document.addEventListener("click", async (event) => {
   if (exploreReadinessFuture) {
     const result = trackerState.assessment;
     if (result) {
-      futureMirrorDraft = futureReadinessMirrorDraft(result);
+      const weakest = weakestReadinessCategory(result);
       closeModal();
-      renderScreen("future");
+      futureMirrorMode = "scan";
+      await startFutureScan(`How can I improve my ${weakest.label.toLowerCase()} after scoring ${weakest.value}/100?`);
       refreshStaticScreens();
     }
   }
@@ -9893,6 +9609,17 @@ document.addEventListener("click", async (event) => {
     refreshStaticScreens();
   }
 
+  if (calcCostOfLiving) {
+    costOfLivingDraft = {
+      housing: modalLayer.querySelector("#col-housing").value,
+      district: modalLayer.querySelector("#col-district").value,
+      transport: modalLayer.querySelector("#col-transport").value,
+      lifestyle: modalLayer.querySelector("#col-lifestyle").value
+    };
+    costOfLivingResult = computeCostOfLiving(costOfLivingDraft);
+    openModal("costOfLiving");
+  }
+
   if (saveJournal) {
     const input = modalLayer.querySelector("#journal-entry-input");
     const error = modalLayer.querySelector("#journal-error");
@@ -9940,24 +9667,308 @@ document.addEventListener("click", async (event) => {
     const textInput = modalLayer.querySelector("#community-post-text");
     const groupInput = modalLayer.querySelector("#community-post-group");
     const error = modalLayer.querySelector("#community-post-error");
-    const text = cleanText(textInput ? textInput.value : "", 500);
+    const text = cleanText(textInput ? textInput.value : "", 1500);
+    const squadId = groupInput ? groupInput.value : "";
     if (!text || text.length < 8) {
       if (error) error.textContent = "Write a short but clear post first.";
       return;
     }
-    trackerState.communityPosts.unshift({
-      id: `community-${Date.now()}`,
-      user_id: currentUserId(),
-      group: groupInput ? groupInput.value : "General support",
-      text,
-      created_at: new Date().toISOString(),
-      display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
-    });
-    trackerState.communityPosts = trackerState.communityPosts.slice(0, 60);
-    saveTrackerState();
-    closeModal();
+    if (error) error.textContent = "";
+    saveCommunityPost.disabled = true;
+    saveCommunityPost.textContent = "Posting...";
+    const pendingMilestone = getPendingMilestoneShare();
+    try {
+      const result = await submitCommunityPost({
+        body: text,
+        squadId,
+        postType: pendingMilestone ? "milestone" : "general",
+        relatedGoalTitle: pendingMilestone ? pendingMilestone.goalTitle : undefined,
+        relatedMilestoneTitle: pendingMilestone ? pendingMilestone.milestoneTitle : undefined,
+        themeWeek: CommunityMatching.isoWeekNumber(new Date())
+      });
+      setPendingMilestoneShare(null);
+      await refreshCommunityData();
+      closeModal();
+      if (result.status === "blocked") {
+        openModal("safety", result.reason);
+      } else {
+        bumpCommunityTrust(pendingMilestone ? 5 : 2);
+        checkCommunityAchievements();
+        renderScreen("community");
+      }
+      refreshStaticScreens();
+    } catch (err) {
+      saveCommunityPost.disabled = false;
+      saveCommunityPost.textContent = "Post";
+      if (error) error.textContent = err.message || "Could not publish your post right now.";
+    }
+  }
+
+  if (communityAuthModeButton) {
+    setCommunityAuthMode(communityAuthModeButton.dataset.communityAuthMode || "sign-in");
+    setCommunityAuthError("");
     renderScreen("community");
-    refreshStaticScreens();
+  }
+
+  if (communitySignUpButton) {
+    const emailInput = document.querySelector("#community-auth-email");
+    const passwordInput = document.querySelector("#community-auth-password");
+    const usernameInput = document.querySelector("#community-auth-username");
+    const email = cleanText(emailInput ? emailInput.value : "", 200);
+    const password = passwordInput ? passwordInput.value : "";
+    const username = usernameInput ? cleanUsername(usernameInput.value) : "";
+    if (!email || password.length < 6) {
+      setCommunityAuthError("Enter an email and a password with at least 6 characters.");
+      renderScreen("community");
+    } else {
+      setCommunityAuthBusy(true);
+      setCommunityAuthError("");
+      renderScreen("community");
+      try {
+        const result = await communitySignUp(email, password, username);
+        if (!result.session) {
+          setCommunityAuthMode("sign-in");
+          setCommunityAuthError("Account created. Check your email to confirm it, then sign in here.");
+        }
+      } catch (err) {
+        setCommunityAuthError(err.message || "Could not create your account.");
+      } finally {
+        setCommunityAuthBusy(false);
+        renderScreen("community");
+      }
+    }
+  }
+
+  if (communitySignInButton) {
+    const emailInput = document.querySelector("#community-auth-email");
+    const passwordInput = document.querySelector("#community-auth-password");
+    const email = cleanText(emailInput ? emailInput.value : "", 200);
+    const password = passwordInput ? passwordInput.value : "";
+    if (!email || !password) {
+      setCommunityAuthError("Enter your email and password.");
+      renderScreen("community");
+    } else {
+      setCommunityAuthBusy(true);
+      setCommunityAuthError("");
+      renderScreen("community");
+      try {
+        await communitySignIn(email, password);
+      } catch (err) {
+        setCommunityAuthError(err.message || "Could not sign in.");
+      } finally {
+        setCommunityAuthBusy(false);
+        renderScreen("community");
+      }
+    }
+  }
+
+  if (communitySignOutButton) {
+    await communitySignOut();
+    renderScreen("community");
+  }
+
+  if (communityComposeAssistButton) {
+    const textInput = modalLayer.querySelector("#community-post-text");
+    const suggestionBox = modalLayer.querySelector("#community-compose-suggestion");
+    const draft = cleanText(textInput ? textInput.value : "", 1500);
+    if (draft && suggestionBox) {
+      communityComposeAssistButton.disabled = true;
+      communityComposeAssistButton.textContent = "Thinking...";
+      try {
+        const suggestion = await requestCompassDirect(COMMUNITY_COMPOSE_ASSIST_SYSTEM_PROMPT, draft);
+        suggestionBox.innerHTML = `
+          <div class="quote-block">${escapeHTML(suggestion)}</div>
+          <button class="secondary-action compact-action" type="button" data-use-community-suggestion>Use this wording</button>
+        `;
+        suggestionBox.dataset.suggestionText = suggestion;
+      } catch {
+        suggestionBox.innerHTML = `<p class="form-error">Could not get a suggestion right now.</p>`;
+      } finally {
+        communityComposeAssistButton.disabled = false;
+        communityComposeAssistButton.textContent = "Improve my wording";
+      }
+    }
+  }
+  if (event.target.closest("[data-use-community-suggestion]")) {
+    const suggestionBox = modalLayer.querySelector("#community-compose-suggestion");
+    const textInput = modalLayer.querySelector("#community-post-text");
+    if (suggestionBox && textInput && suggestionBox.dataset.suggestionText) {
+      textInput.value = suggestionBox.dataset.suggestionText;
+      suggestionBox.innerHTML = "";
+    }
+  }
+
+  if (joinSquadButton) {
+    const squadId = joinSquadButton.dataset.joinSquad;
+    const ok = await joinSquad(squadId);
+    if (ok) {
+      bumpCommunityTrust(3);
+      await refreshCommunityData();
+      checkCommunityAchievements();
+    }
+    renderScreen("community");
+    if (modalLayer.classList.contains("is-open")) openModal("communityGroup", squadId);
+  }
+  if (leaveSquadButton) {
+    const squadId = leaveSquadButton.dataset.leaveSquad;
+    await leaveSquad(squadId);
+    await refreshCommunityData();
+    renderScreen("community");
+    if (modalLayer.classList.contains("is-open")) openModal("communityGroup", squadId);
+  }
+
+  if (saveSquadButton) {
+    const titleInput = modalLayer.querySelector("#community-squad-title");
+    const descriptionInput = modalLayer.querySelector("#community-squad-description");
+    const tagsInput = modalLayer.querySelector("#community-squad-tags");
+    const error = modalLayer.querySelector("#community-squad-error");
+    const title = cleanText(titleInput ? titleInput.value : "", 80);
+    const description = cleanText(descriptionInput ? descriptionInput.value : "", 400);
+    const tags = (tagsInput ? tagsInput.value : "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean).slice(0, 6);
+    if (!title || !description) {
+      if (error) error.textContent = "Add a title and description first.";
+      return;
+    }
+    try {
+      await createSquad({ title, description, tags });
+      await refreshCommunityData();
+      closeModal();
+      renderScreen("community");
+    } catch (err) {
+      if (error) error.textContent = err.message || "Could not create that squad.";
+    }
+  }
+
+  if (shareMilestoneCommunityButton) {
+    setPendingMilestoneShare({
+      goalTitle: shareMilestoneCommunityButton.dataset.goalTitleValue || "",
+      milestoneTitle: shareMilestoneCommunityButton.dataset.milestoneTitleValue || ""
+    });
+    milestoneJustCompleted = null;
+    closeModal();
+    openModal("communityPost");
+  }
+
+  if (saveAccountabilityOptInButton) {
+    const select = document.querySelector("#accountability-goal-select");
+    const textInput = document.querySelector("#accountability-goal-text");
+    const error = document.querySelector("#accountability-optin-error");
+    let goalTitle = "";
+    let roadmapStage = "starting";
+    if (select) {
+      const goal = myRoadmapGoals().find((item) => item.id === select.value);
+      if (goal) {
+        goalTitle = goal.title;
+        roadmapStage = CommunityMatching.computeRoadmapStage(goal);
+      }
+    } else if (textInput) {
+      goalTitle = cleanText(textInput.value, 200);
+    }
+    if (!goalTitle) {
+      if (error) error.textContent = "Add a goal first.";
+      return;
+    }
+    const goalTags = CommunityMatching.extractTags(goalTitle);
+    try {
+      await saveAccountabilityOptIn({ goalTitle, roadmapStage, goalTags });
+      await refreshCommunityData();
+      renderScreen("community");
+    } catch (err) {
+      if (error) error.textContent = err.message || "Could not save your opt-in.";
+    }
+  }
+
+  if (sendAccountabilityRequestButton) {
+    const targetUserId = sendAccountabilityRequestButton.dataset.sendAccountabilityRequest;
+    const messageInput = modalLayer.querySelector("#community-accountability-message");
+    const error = modalLayer.querySelector("#community-accountability-error");
+    const message = cleanText(messageInput ? messageInput.value : "", 500);
+    if (!message || message.length < 5) {
+      if (error) error.textContent = "Write a short intro message first.";
+      return;
+    }
+    try {
+      await requestAccountabilityConnection(targetUserId, message);
+      await refreshCommunityData();
+      closeModal();
+      renderScreen("community");
+    } catch (err) {
+      if (error) error.textContent = err.message || "Could not send that request.";
+    }
+  }
+
+  if (acceptAccountabilityRequestButton) {
+    await respondAccountabilityConnection(acceptAccountabilityRequestButton.dataset.acceptAccountabilityRequest, "accepted");
+    await refreshCommunityData();
+    checkCommunityAchievements();
+    renderScreen("community");
+  }
+  if (declineAccountabilityRequestButton) {
+    await respondAccountabilityConnection(declineAccountabilityRequestButton.dataset.declineAccountabilityRequest, "declined");
+    await refreshCommunityData();
+    renderScreen("community");
+  }
+  if (saveContactHintButton) {
+    const connectionId = saveContactHintButton.dataset.saveContactHint;
+    const hintInput = document.querySelector(`[data-contact-hint-input="${connectionId}"]`);
+    const hint = cleanText(hintInput ? hintInput.value : "", 140);
+    await saveAccountabilityContactHint(connectionId, hint);
+    await refreshCommunityData();
+    renderScreen("community");
+  }
+
+  if (submitMentorApplicationButton) {
+    const bioInput = modalLayer.querySelector("#community-mentor-bio");
+    const tagsInput = modalLayer.querySelector("#community-mentor-tags");
+    const error = modalLayer.querySelector("#community-mentor-apply-error");
+    const bio = cleanText(bioInput ? bioInput.value : "", 600);
+    const focusTags = (tagsInput ? tagsInput.value : "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean).slice(0, 6);
+    if (bio.length < 40) {
+      if (error) error.textContent = "Write a bit more about your experience first (at least 40 characters).";
+      return;
+    }
+    try {
+      await submitMentorApplication({ bio, focusTags });
+      await refreshCommunityData();
+      closeModal();
+      renderScreen("community");
+    } catch (err) {
+      if (error) error.textContent = err.message || "Could not submit your mentor application right now.";
+    }
+  }
+
+  if (saveCommunityOpportunityButton) {
+    const titleInput = modalLayer.querySelector("#community-opportunity-title");
+    const descriptionInput = modalLayer.querySelector("#community-opportunity-description");
+    const linkInput = modalLayer.querySelector("#community-opportunity-link");
+    const categorySelect = modalLayer.querySelector("#community-opportunity-category");
+    const tagsInput = modalLayer.querySelector("#community-opportunity-tags");
+    const error = modalLayer.querySelector("#community-opportunity-error");
+    const title = cleanText(titleInput ? titleInput.value : "", 140);
+    const description = cleanText(descriptionInput ? descriptionInput.value : "", 800);
+    const link = (linkInput ? linkInput.value : "").trim();
+    const category = categorySelect ? categorySelect.value : "";
+    const tags = (tagsInput ? tagsInput.value : "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean).slice(0, 8);
+    if (!title || !description || !/^https?:\/\//i.test(link)) {
+      if (error) error.textContent = "Add a title, description, and a valid link (starting with http:// or https://).";
+      return;
+    }
+    saveCommunityOpportunityButton.disabled = true;
+    saveCommunityOpportunityButton.textContent = "Sharing...";
+    try {
+      const result = await submitCommunityOpportunity({ title, description, link, category, tags });
+      await refreshCommunityData();
+      closeModal();
+      if (result.status === "blocked") {
+        openModal("safety", result.reason);
+      } else {
+        renderScreen("opportunities");
+      }
+    } catch (err) {
+      saveCommunityOpportunityButton.disabled = false;
+      saveCommunityOpportunityButton.textContent = "Share";
+      if (error) error.textContent = err.message || "Could not share this opportunity right now.";
+    }
   }
 
   if (demoReceipt) {
