@@ -117,6 +117,61 @@
       "author": "Kawaii.panzer",
       "sourceUrl": "https://sketchfab.com/3d-models/a5ed4c7a97b640de882058e071488164",
       "targetHeightMeters": 9.0
+    },
+    {
+      "id": "flowerpot:2cd19743",
+      "uid": "2cd197434b5340e0a322a0893b9b08b7",
+      "url": "assets/props/objaverse/2cd197434b5340e0a322a0893b9b08b7.glb",
+      "label": "Flower Pot",
+      "category": "flowerpot",
+      "license": "by",
+      "author": "saskatoon.sebastian",
+      "sourceUrl": "https://sketchfab.com/3d-models/2cd197434b5340e0a322a0893b9b08b7",
+      "targetHeightMeters": 0.4
+    },
+    {
+      "id": "statue:e2c68551",
+      "uid": "e2c68551a5ba4dfc9226ab8d6cb15398",
+      "url": "assets/props/objaverse/e2c68551a5ba4dfc9226ab8d6cb15398.glb",
+      "label": "Smiling Woman",
+      "category": "statue",
+      "license": "by",
+      "author": "chaitanyak",
+      "sourceUrl": "https://sketchfab.com/3d-models/e2c68551a5ba4dfc9226ab8d6cb15398",
+      "targetHeightMeters": 1.8
+    },
+    {
+      "id": "bicycle:84c4f27b",
+      "uid": "84c4f27b8eb84938bfc2cf36944baf3d",
+      "url": "assets/props/objaverse/84c4f27b8eb84938bfc2cf36944baf3d.glb",
+      "label": "Bicicleta",
+      "category": "bicycle",
+      "license": "by",
+      "author": "Cabritta",
+      "sourceUrl": "https://sketchfab.com/3d-models/84c4f27b8eb84938bfc2cf36944baf3d",
+      "targetHeightMeters": 1.1
+    },
+    {
+      "id": "mailbox:dfdff506",
+      "uid": "dfdff5061b974695be24cbfaa429f46a",
+      "url": "assets/props/objaverse/dfdff5061b974695be24cbfaa429f46a.glb",
+      "label": "Mailbox",
+      "category": "mailbox",
+      "license": "by",
+      "author": "milkfromsaturn",
+      "sourceUrl": "https://sketchfab.com/3d-models/dfdff5061b974695be24cbfaa429f46a",
+      "targetHeightMeters": 1.1
+    },
+    {
+      "id": "umbrella:2c8c7cc2",
+      "uid": "2c8c7cc2aa154388a5c321c284211236",
+      "url": "assets/props/objaverse/2c8c7cc2aa154388a5c321c284211236.glb",
+      "label": "Beach Umbrella - Low Poly",
+      "category": "umbrella",
+      "license": "by",
+      "author": "Styro_",
+      "sourceUrl": "https://sketchfab.com/3d-models/2c8c7cc2aa154388a5c321c284211236",
+      "targetHeightMeters": 2.2
     }
   ]
 }

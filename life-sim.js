@@ -171,7 +171,8 @@
     warnOnColliderOverlaps(activeStaticColliders);
     const districtSamplesReady = loadDistrictAssetSamples(THREE, scene, state.assetManager, state);
     const roadPropsReady = addRoadDetailProps(THREE, scene, state.assetManager, state);
-    Promise.all([districtSamplesReady, roadPropsReady]).then(() => {
+    const plazaPropsReady = addDistrictPlazaProps(THREE, scene, state.assetManager, state);
+    Promise.all([districtSamplesReady, roadPropsReady, plazaPropsReady]).then(() => {
       if (state.destroyed) return;
       auditSceneLayout(THREE, scene);
     });
@@ -2148,6 +2149,82 @@
     place(nextEntry("stop_sign"), [30 - 4.5, 0, -32 - 4.5], Math.PI);
     place(nextEntry("cone"), [6, 0, -30]);
     place(nextEntry("cone"), [7.4, 0, -30.6]);
+  }
+
+  // Realistic-style pivot: user feedback ("很多空白" - a lot of blank space)
+  // after fixing the Little India temple pointed at a wider problem - every
+  // district's open plaza ground has nothing scattered on it beyond the
+  // buildings themselves. Scatters real Objaverse props (flowerpot, statue,
+  // bicycle, mailbox, umbrella) in a ring around each district's center,
+  // reusing the same manifest/parallel-preload pattern as
+  // addRoadDetailProps() rather than duplicating it. Deliberately placed at
+  // 1.3x-1.7x each zone's own interaction radius - inside that ring is where
+  // the zone's actual buildings/interaction trigger live, so staying outside
+  // it keeps these decorative-only props from sitting on top of a building.
+  async function addDistrictPlazaProps(THREE, scene, assetManager, state) {
+    if (!assetManager) return;
+    const ready = await assetManager.ensureGltfLoader();
+    if (!ready || (state && state.destroyed)) return;
+
+    let manifest;
+    try {
+      const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
+      manifest = await response.json();
+    } catch (error) {
+      console.warn("[Life Sim] Could not load asset manifest for plaza props:", error);
+      return;
+    }
+
+    const byCategory = {};
+    (manifest.objaverseAssets || []).forEach((entry) => {
+      (byCategory[entry.category] = byCategory[entry.category] || []).push(entry);
+    });
+
+    const loadedByUrl = new Map();
+    const entries = manifest.objaverseAssets || [];
+    await Promise.all(entries.map(async (entry) => {
+      if (loadedByUrl.has(entry.url)) return;
+      const asset = await assetManager.loadModel(entry.url, {
+        id: entry.id,
+        label: entry.label,
+        targetHeightMeters: entry.targetHeightMeters
+      });
+      loadedByUrl.set(entry.url, asset);
+    }));
+    if (state && state.destroyed) return;
+
+    function place(entry, position, rotationY = 0) {
+      if (!entry) return;
+      const asset = loadedByUrl.get(entry.url);
+      if (!asset || asset.fallback || !asset.scene) return;
+      const instance = asset.scene.clone(true);
+      instance.position.set(position[0], position[1] || 0, position[2]);
+      instance.rotation.y = rotationY;
+      scene.add(instance);
+    }
+
+    const plazaCategories = ["flowerpot", "statue", "bicycle", "mailbox", "umbrella"];
+    const roundRobin = {};
+    function nextEntry(category) {
+      const list = byCategory[category];
+      if (!list || !list.length) return null;
+      roundRobin[category] = (roundRobin[category] || 0) + 1;
+      return list[(roundRobin[category] - 1) % list.length];
+    }
+
+    let categoryCursor = 0;
+    locationZones.forEach((zone) => {
+      const propsPerZone = 3;
+      for (let i = 0; i < propsPerZone; i += 1) {
+        const category = plazaCategories[categoryCursor % plazaCategories.length];
+        categoryCursor += 1;
+        const angle = (i / propsPerZone) * Math.PI * 2 + zone.x * 0.37;
+        const ringRadius = zone.radius * (1.3 + (i % 2) * 0.4);
+        const px = zone.x + Math.cos(angle) * ringRadius;
+        const pz = zone.z + Math.sin(angle) * ringRadius;
+        place(nextEntry(category), [px, 0, pz], angle);
+      }
+    });
   }
 
   function addHdbHome(THREE, scene, mat) {
