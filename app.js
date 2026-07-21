@@ -2066,6 +2066,47 @@ function bumpCommunityTrust(amount) {
   syncCommunityProfileSnapshot();
 }
 
+// Idea from a GitHub research pass (Habitica-style): a real-life daily
+// check-in streak nourishes the same HP/Energy stats shown in the LifeVerse
+// HUD, instead of being a completely separate progress bar - so "I kept my
+// streak" and "my character is thriving" read as one system, not two.
+// Deliberately positive-only, no HP/Energy loss for a missed day - Build
+// Mode already stripped punitive "Proof Log"/"Feedback Scorecard" framing
+// from this app (see tests/build-mode.test.js), so a Habitica-style penalty
+// mechanic would cut against that established, deliberate design direction.
+// Guarded by a per-kind "already boosted today" date on the state itself so
+// logging a second mood entry (or a page re-render re-reading the streak)
+// the same day can't be farmed for free stats - only the FIRST check-in of
+// a given kind each calendar day actually nudges the stat.
+function applyGrowthCheckInBoost(kind, streak) {
+  const state = lifeVerseState();
+  state.growthSync = state.growthSync || {};
+  const dateKey = `${kind}BoostDate`;
+  const today = new Date().toDateString();
+  if (state.growthSync[dateKey] === today) return null;
+  state.growthSync[dateKey] = today;
+
+  const boost = Math.min(2 + Math.min(Math.max(streak, 1) - 1, 6) * 0.5, 5);
+  let statLabel;
+  if (kind === "mood") {
+    state.needs.energy = window.LifeVerseGame.clamp(Number(state.needs.energy || 0) + boost);
+    statLabel = "Energy";
+  } else {
+    state.health.physical = window.LifeVerseGame.clamp(Number(state.health.physical || 0) + boost);
+    statLabel = "HP";
+  }
+  if (streak >= 7) {
+    window.LifeVerseGame.addAchievement(
+      state,
+      `growth-${kind}-streak-7`,
+      "One Week Strong",
+      `Kept a 7-day ${kind === "mood" ? "mood check-in" : "daily reflection"} streak going.`
+    );
+  }
+  saveTrackerState();
+  return { boost: Math.round(boost * 10) / 10, statLabel };
+}
+
 async function syncCommunityProfileSnapshot() {
   if (!hasCommunitySession()) return;
   const client = getCommunitySupabaseClient();
@@ -9379,7 +9420,9 @@ document.addEventListener("click", async (event) => {
       renderScreen(activeTab);
       refreshStaticScreens();
       const newStreak = reflectionCheckInStreak().streak;
-      triggerCheckInCelebration(newStreak > 1 ? `🌱 Saved! ${newStreak}-day reflection streak` : "🌱 Reflection saved");
+      const growthBoost = applyGrowthCheckInBoost("reflection", newStreak);
+      const boostSuffix = growthBoost ? ` · +${growthBoost.boost} ${growthBoost.statLabel} in Life Sim` : "";
+      triggerCheckInCelebration((newStreak > 1 ? `🌱 Saved! ${newStreak}-day reflection streak` : "🌱 Reflection saved") + boostSuffix);
     }
   }
 
@@ -9578,7 +9621,9 @@ document.addEventListener("click", async (event) => {
     renderScreen(activeTab);
     refreshStaticScreens();
     const newStreak = moodCheckInStreak().streak;
-    triggerCheckInCelebration(newStreak > 1 ? `🔥 Logged! ${newStreak}-day streak` : "✅ Mood logged for today");
+    const growthBoost = applyGrowthCheckInBoost("mood", newStreak);
+    const boostSuffix = growthBoost ? ` · +${growthBoost.boost} ${growthBoost.statLabel} in Life Sim` : "";
+    triggerCheckInCelebration((newStreak > 1 ? `🔥 Logged! ${newStreak}-day streak` : "✅ Mood logged for today") + boostSuffix);
   }
 
   if (saveAiProfile) {
