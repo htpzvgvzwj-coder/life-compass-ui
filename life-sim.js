@@ -1957,21 +1957,31 @@
       (byCategory[entry.category] = byCategory[entry.category] || []).push(entry);
     });
 
+    // Load every unique prop GLB in parallel up front, once each, instead of
+    // one `await` per placement point (~50+ placements across 17 road
+    // segments). On localhost the difference is invisible - near-zero
+    // latency hides a sequential-await chain completely - but on real
+    // production network latency, awaiting one placement before even
+    // starting the next asset's fetch serializes requests that could have
+    // overlapped, which is measurably slower to first-fully-populated-scene
+    // for an actual visitor. Only ~8 unique GLBs exist regardless of how
+    // many times each is placed, so this is a small, bounded Promise.all.
+    const entries = manifest.objaverseAssets || [];
     const loadedByUrl = new Map();
-    async function loadedAsset(entry) {
-      if (loadedByUrl.has(entry.url)) return loadedByUrl.get(entry.url);
-      const promise = assetManager.loadModel(entry.url, {
+    await Promise.all(entries.map(async (entry) => {
+      if (loadedByUrl.has(entry.url)) return;
+      const asset = await assetManager.loadModel(entry.url, {
         id: entry.id,
         label: entry.label,
         targetHeightMeters: entry.targetHeightMeters
       });
-      loadedByUrl.set(entry.url, promise);
-      return promise;
-    }
+      loadedByUrl.set(entry.url, asset);
+    }));
+    if (state && state.destroyed) return;
 
-    async function place(entry, position, rotationY = 0) {
-      if (!entry || (state && state.destroyed)) return;
-      const asset = await loadedAsset(entry);
+    function place(entry, position, rotationY = 0) {
+      if (!entry) return;
+      const asset = loadedByUrl.get(entry.url);
       if (!asset || asset.fallback || !asset.scene) return;
       const instance = asset.scene.clone(true);
       instance.position.set(position[0], position[1] || 0, position[2]);
@@ -2006,11 +2016,11 @@
       const [poleDx, poleDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, -sidewalkDistance);
       const lightPoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 20);
       for (const [px, pz] of lightPoints) {
-        await place(nextEntry("lamppost", "streetlight"), [px + lightDx, 0, pz + lightDz]);
+        place(nextEntry("lamppost", "streetlight"), [px + lightDx, 0, pz + lightDz]);
       }
       const polePoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 30);
       for (const [px, pz] of polePoints) {
-        await place(nextEntry("telephone_pole"), [px + poleDx, 0, pz + poleDz]);
+        place(nextEntry("telephone_pole"), [px + poleDx, 0, pz + poleDz]);
       }
     }
 
@@ -2023,21 +2033,21 @@
       const [sideDx, sideDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, sidewalkDistance);
       const benchPoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 40);
       for (const [px, pz] of benchPoints) {
-        await place(nextEntry("bench"), [px + sideDx, 0, pz + sideDz]);
-        await place(nextEntry("trash_can"), [px + sideDx * 1.4, 0, pz + sideDz * 1.4]);
+        place(nextEntry("bench"), [px + sideDx, 0, pz + sideDz]);
+        place(nextEntry("trash_can"), [px + sideDx * 1.4, 0, pz + sideDz * 1.4]);
       }
       const manholePoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 25);
       for (const [px, pz] of manholePoints) {
-        await place(nextEntry("manhole"), [px, 0.02, pz], Math.random() * Math.PI * 2);
+        place(nextEntry("manhole"), [px, 0.02, pz], Math.random() * Math.PI * 2);
       }
     }
 
     // Stop signs and a couple of traffic cones at the busiest junctions only
     // - one per real-world intersection, not swept across every segment.
-    await place(nextEntry("stop_sign"), [0 + 4.5, 0, 8 + 4.5]);
-    await place(nextEntry("stop_sign"), [30 - 4.5, 0, -32 - 4.5], Math.PI);
-    await place(nextEntry("cone"), [6, 0, -30]);
-    await place(nextEntry("cone"), [7.4, 0, -30.6]);
+    place(nextEntry("stop_sign"), [0 + 4.5, 0, 8 + 4.5]);
+    place(nextEntry("stop_sign"), [30 - 4.5, 0, -32 - 4.5], Math.PI);
+    place(nextEntry("cone"), [6, 0, -30]);
+    place(nextEntry("cone"), [7.4, 0, -30.6]);
   }
 
   function addHdbHome(THREE, scene, mat) {
