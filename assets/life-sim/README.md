@@ -42,6 +42,25 @@ Objaverse has no "building" category at all (checked its full LVIS taxonomy - no
 
 Objaverse scans arrive at wildly inconsistent native scales (unlike a single hand-modeled kit). Every new asset needs a `targetHeightMeters` in its manifest entry so it can be normalized to a real-world height - hand-eyeballing a scale multiplier per model (the pattern used for the older kit swaps) doesn't hold up at Objaverse's variety. Rough reference table: character ~1.7m, HDB block by floor count, shophouse ~12m, streetlamp ~4m, car ~4.3m, bench ~0.9m.
 
+## Zone theming
+
+`addDistrictPlazaProps()` in `life-sim.js` scatters a generic 5-category prop rotation (flowerpot/statue/bicycle/mailbox/umbrella) around every zone, but zones with a distinctive real-world identity get one themed prop layered into their ring instead - `ZONE_THEME_CATEGORIES` (right above that function) is the single source of truth for which zone gets which category:
+
+| Zone id | Theme category |
+|---|---|
+| `hospital` | `wheelchair` |
+| `university` | `backpack` |
+| `gym` | `dumbbell` |
+| `airport` | `suitcase` |
+| `chinatown`, `little-india`, `bugis` | `lantern` |
+| `beach` | `deck_chair` |
+| `clarke-quay`, `cafe` | `coffee_table` |
+| `mall` | `shopping_cart` |
+
+This **replaces** 1 of the existing 3 generic slots per themed zone rather than adding a 4th - keeps the total city-wide placement count unchanged (3 props x 22 zones), so a themed batch only adds payload in the form of the new shared GLBs themselves (fetched once, reused by every zone using that category), not more props per zone. Every category above was checked to actually exist in Objaverse's LVIS taxonomy via `--list-categories` before being relied on here - don't add a new theme category without doing the same check first (this taxonomy is quirky: `picnic`/`luggage`/`fountain`/`planter` all return zero matches despite sounding plausible).
+
+Don't hand-maintain a second copy of this table anywhere else - if the mapping needs to change, edit `ZONE_THEME_CATEGORIES` in `life-sim.js` and update the table above to match, the same way the Attribution section above warns against a hand-maintained credits list.
+
 ## Performance Targets
 
 - First-load model + texture budget: 45MB or less.

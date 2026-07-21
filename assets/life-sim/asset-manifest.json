@@ -172,6 +172,105 @@
       "author": "Styro_",
       "sourceUrl": "https://sketchfab.com/3d-models/2c8c7cc2aa154388a5c321c284211236",
       "targetHeightMeters": 2.2
+    },
+    {
+      "id": "wheelchair:a2d0c239",
+      "uid": "a2d0c23925354a23a229fb6a883babd8",
+      "url": "assets/props/objaverse/a2d0c23925354a23a229fb6a883babd8.glb",
+      "label": "Wheelchair",
+      "category": "wheelchair",
+      "license": "by",
+      "author": "NguoiDaiViet",
+      "sourceUrl": "https://sketchfab.com/3d-models/a2d0c23925354a23a229fb6a883babd8",
+      "targetHeightMeters": 1.0
+    },
+    {
+      "id": "backpack:e7dc65bb",
+      "uid": "e7dc65bbf189461d89899b42082a802c",
+      "url": "assets/props/objaverse/e7dc65bbf189461d89899b42082a802c.glb",
+      "label": "Travel Backpack",
+      "category": "backpack",
+      "license": "by",
+      "author": "Whatta",
+      "sourceUrl": "https://sketchfab.com/3d-models/e7dc65bbf189461d89899b42082a802c",
+      "targetHeightMeters": 0.5
+    },
+    {
+      "id": "dumbbell:9f1520a4",
+      "uid": "9f1520a479b34af7bc2c2fbcc2f362f5",
+      "url": "assets/props/objaverse/9f1520a479b34af7bc2c2fbcc2f362f5.glb",
+      "label": "20 Lbs Dumbbells",
+      "category": "dumbbell",
+      "license": "by",
+      "author": "Yanez-Designs",
+      "sourceUrl": "https://sketchfab.com/3d-models/9f1520a479b34af7bc2c2fbcc2f362f5",
+      "targetHeightMeters": 0.3
+    },
+    {
+      "id": "suitcase:19842492",
+      "uid": "19842492eaac4381b4a67f84371e945f",
+      "url": "assets/props/objaverse/19842492eaac4381b4a67f84371e945f.glb",
+      "label": "Suitcase",
+      "category": "suitcase",
+      "license": "by",
+      "author": "imagineburner",
+      "sourceUrl": "https://sketchfab.com/3d-models/19842492eaac4381b4a67f84371e945f",
+      "targetHeightMeters": 0.6
+    },
+    {
+      "id": "lantern:903558c9",
+      "uid": "903558c9098943aa87124283ce93f393",
+      "url": "assets/props/objaverse/903558c9098943aa87124283ce93f393.glb",
+      "label": "Hex Lantern",
+      "category": "lantern",
+      "license": "by",
+      "author": "acurteman",
+      "sourceUrl": "https://sketchfab.com/3d-models/903558c9098943aa87124283ce93f393",
+      "targetHeightMeters": 0.5
+    },
+    {
+      "id": "lantern:b27a303b",
+      "uid": "b27a303bd4c747d7970780a148b97a24",
+      "url": "assets/props/objaverse/b27a303bd4c747d7970780a148b97a24.glb",
+      "label": "Lantern",
+      "category": "lantern",
+      "license": "by",
+      "author": "Kavzekenza",
+      "sourceUrl": "https://sketchfab.com/3d-models/b27a303bd4c747d7970780a148b97a24",
+      "targetHeightMeters": 0.5
+    },
+    {
+      "id": "deck_chair:2a49fdcd",
+      "uid": "2a49fdcd95be44daa87a6b8bb4ed9f5b",
+      "url": "assets/props/objaverse/2a49fdcd95be44daa87a6b8bb4ed9f5b.glb",
+      "label": "Chair Beach",
+      "category": "deck_chair",
+      "license": "by",
+      "author": "neutralize",
+      "sourceUrl": "https://sketchfab.com/3d-models/2a49fdcd95be44daa87a6b8bb4ed9f5b",
+      "targetHeightMeters": 0.9
+    },
+    {
+      "id": "coffee_table:70efc4b2",
+      "uid": "70efc4b261324911bee731fa1b69fde2",
+      "url": "assets/props/objaverse/70efc4b261324911bee731fa1b69fde2.glb",
+      "label": "End Table",
+      "category": "coffee_table",
+      "license": "by",
+      "author": "lucasalic99",
+      "sourceUrl": "https://sketchfab.com/3d-models/70efc4b261324911bee731fa1b69fde2",
+      "targetHeightMeters": 0.45
+    },
+    {
+      "id": "shopping_cart:71c93115",
+      "uid": "71c931156b9e4be3b8545e9641c73888",
+      "url": "assets/props/objaverse/71c931156b9e4be3b8545e9641c73888.glb",
+      "label": "Shop Cart",
+      "category": "shopping_cart",
+      "license": "by",
+      "author": "grox777",
+      "sourceUrl": "https://sketchfab.com/3d-models/71c931156b9e4be3b8545e9641c73888",
+      "targetHeightMeters": 1.0
     }
   ]
 }

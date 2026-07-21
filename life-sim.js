@@ -165,15 +165,26 @@
       const yawOverride = Number(debugParams.get("yaw"));
       if (Number.isFinite(yawOverride)) state.yaw = yawOverride;
     }
+    const spawnX = player.group.position.x;
+    const spawnZ = player.group.position.z;
     scene.add(player.group);
     activeStaticColliders = state.staticColliders = [];
     createDistrict(THREE, scene, materials);
     warnOnColliderOverlaps(activeStaticColliders);
-    const districtSamplesReady = loadDistrictAssetSamples(THREE, scene, state.assetManager, state);
-    const roadPropsReady = addRoadDetailProps(THREE, scene, state.assetManager, state);
-    const plazaPropsReady = addDistrictPlazaProps(THREE, scene, state.assetManager, state);
-    Promise.all([districtSamplesReady, roadPropsReady, plazaPropsReady]).then(() => {
+    setDistrictLoadingHint(root, "Loading nearby area…");
+    const objaverseIndexReady = loadObjaverseManifestAssets(state.assetManager, state);
+    const districtSamplesReady = loadDistrictAssetSamples(THREE, scene, state.assetManager, state, spawnX, spawnZ);
+    const roadPropsReady = addRoadDetailProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady);
+    const plazaPropsReady = addDistrictPlazaProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady);
+    const allDistrictAssetsReady = Promise.all([districtSamplesReady, roadPropsReady, plazaPropsReady]);
+    let districtLoadingSafetyTimeout = window.setTimeout(() => {
       if (state.destroyed) return;
+      clearDistrictLoadingHint(root);
+    }, 20000);
+    allDistrictAssetsReady.then(() => {
+      window.clearTimeout(districtLoadingSafetyTimeout);
+      if (state.destroyed) return;
+      clearDistrictLoadingHint(root);
       auditSceneLayout(THREE, scene);
     });
     loadCharacterAsset(THREE, state.assetManager, player, state, root).then((loaded) => {
@@ -428,6 +439,7 @@
     return {
       destroy() {
         state.destroyed = true;
+        window.clearTimeout(districtLoadingSafetyTimeout);
         resizeObserver.disconnect();
         window.removeEventListener("keydown", keydown);
         window.removeEventListener("keyup", keyup);
@@ -1383,6 +1395,28 @@
     if (status) status.remove();
   }
 
+  // Distance-tiered load pass: a separate, dedicated status element (not a
+  // reuse of setAssetStatus/clearAssetStatus above) since that one is a
+  // singleton already claimed by the character-loading path - even though
+  // that path is dormant today (manifest.character is null), reusing it
+  // here would silently collide the moment a real character is wired up.
+  function setDistrictLoadingHint(root, message) {
+    if (!root) return;
+    let hint = root.querySelector("[data-life-sim-district-status]");
+    if (!hint) {
+      hint = document.createElement("div");
+      hint.dataset.lifeSimDistrictStatus = "";
+      hint.className = "life-sim-district-loading";
+      root.appendChild(hint);
+    }
+    hint.textContent = message;
+  }
+
+  function clearDistrictLoadingHint(root) {
+    const hint = root && root.querySelector("[data-life-sim-district-status]");
+    if (hint) hint.remove();
+  }
+
   // Urban planning pass: each zone's building function still uses the
   // ABSOLUTE literal coordinates it always had (its own implicit "home"
   // origin) - addZoneAt() builds it into a throwaway THREE.Group instead of
@@ -1586,7 +1620,101 @@
     instance.position.z += targetZ - center.z;
   }
 
-  async function loadDistrictAssetSamples(THREE, scene, assetManager, state) {
+  // Whole-map load reliability pass: everything the district/road/plaza
+  // loaders fetch used to fire in one giant parallel batch regardless of
+  // distance from the player, so a fresh spawn competed for the same
+  // limited browser connection pool as districts on the far side of the
+  // 200x157-unit map (Woodlands, Airport, Sentosa) - nothing rendered fast,
+  // everything rendered slowly together (confirmed via a live-production
+  // timing check: the asset-debug panel's count was still climbing 45+
+  // seconds after load). Splitting into a near tier (loaded first, gates
+  // nothing but itself) and a far tier (streamed in afterward, in the
+  // background, blocking nothing) fixes "time to a populated-looking
+  // world" without touching total payload size. A fixed radius is used
+  // instead of "N nearest zones" because zone density is uneven - the
+  // downtown ring packs 5 zones within the map's own ~28-unit minimum
+  // clearance, while Punggol/Woodlands/Airport sit 60-135 units out; "N
+  // nearest" would still pull in a distant zone from a sparse area. 40
+  // units comfortably covers the spawn zone's own footprint plus the 1-2
+  // truly adjacent zones (verified against the default spawn at (-19,-10):
+  // train is 19.0 units out, mall 29.1, cafe 34.4, then a real gap to
+  // little-india at 44.2 - a 40-unit radius cleanly captures that first
+  // cluster and excludes the rest).
+  const NEAR_TIER_RADIUS = 40;
+
+  function classifyByDistance(entries, spawnX, spawnZ, getAnchorPoint, nearRadius) {
+    const near = [];
+    const far = [];
+    entries.forEach((entry) => {
+      const anchor = getAnchorPoint(entry);
+      if (!anchor) {
+        far.push(entry);
+        return;
+      }
+      const dist = Math.hypot(anchor[0] - spawnX, anchor[1] - spawnZ);
+      (dist <= nearRadius ? near : far).push(entry);
+    });
+    return { near, far };
+  }
+
+  // For a "positions" (plural, clone-based) swap entry, use the CLOSEST
+  // instance as the tiering anchor rather than the first one. Every
+  // instance clones one already-fetched GLB, so tiering only decides WHEN
+  // that single shared fetch is scheduled, not how many fetches happen -
+  // being generous here (near tier if ANY instance is close) means, e.g., a
+  // tree right next to spawn renders immediately even though most of
+  // TREE_POSITIONS is scattered across the whole map, at zero extra cost.
+  function swapAnchorPoint(swap, spawnX, spawnZ) {
+    if (Array.isArray(swap.position)) return [swap.position[0], swap.position[2]];
+    if (Array.isArray(swap.positions) && swap.positions.length) {
+      let closest = swap.positions[0];
+      let closestDist = Infinity;
+      swap.positions.forEach(([x, z]) => {
+        const dist = Math.hypot(x - spawnX, z - spawnZ);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closest = [x, z];
+        }
+      });
+      return closest;
+    }
+    return null;
+  }
+
+  // Shared by addRoadDetailProps() and addDistrictPlazaProps(): both used to
+  // independently fetch+parse asset-manifest.json and preload the same
+  // shared Objaverse prop GLBs, risking duplicate concurrent fetches for the
+  // same URL since both loaders kick off back-to-back from mount() before
+  // either's internal cache is populated. One shared load, called once.
+  async function loadObjaverseManifestAssets(assetManager, state) {
+    if (!assetManager) return { byCategory: {}, loadedByUrl: new Map() };
+    let manifest;
+    try {
+      const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
+      manifest = await response.json();
+    } catch (error) {
+      console.warn("[Life Sim] Could not load asset manifest for props:", error);
+      return { byCategory: {}, loadedByUrl: new Map() };
+    }
+    const byCategory = {};
+    (manifest.objaverseAssets || []).forEach((entry) => {
+      (byCategory[entry.category] = byCategory[entry.category] || []).push(entry);
+    });
+    const loadedByUrl = new Map();
+    await Promise.all((manifest.objaverseAssets || []).map(async (entry) => {
+      if (loadedByUrl.has(entry.url)) return;
+      const asset = await assetManager.loadModel(entry.url, {
+        id: entry.id,
+        label: entry.label,
+        targetHeightMeters: entry.targetHeightMeters
+      });
+      loadedByUrl.set(entry.url, asset);
+    }));
+    if (state && state.destroyed) return { byCategory, loadedByUrl };
+    return { byCategory, loadedByUrl };
+  }
+
+  async function loadDistrictAssetSamples(THREE, scene, assetManager, state, spawnX, spawnZ) {
     if (!assetManager) return;
     const ready = await assetManager.ensureGltfLoader();
     if (!ready || (state && state.destroyed)) return;
@@ -1909,52 +2037,64 @@
     // made total load time (each fetch+parse ~1-1.5s) stack up to 40s+ before
     // the last buildings appeared. Each swap is still independently
     // try/caught so one failed/slow model can't block or break the others.
-    await Promise.all(swaps.map(async (swap) => {
-      try {
-        const asset = await assetManager.loadModel(swap.url, {
-          toonify: true,
-          scale: swap.scale,
-          label: swap.url
-        });
-        if (state && state.destroyed) return;
-        if (!asset || asset.fallback || !asset.scene) return;
+    // Distance-tiered load pass: run the near-tier batch (swaps close to the
+    // player's spawn point) to completion first, THEN start the far-tier
+    // batch - splits ~30 simultaneous fetches into two smaller waves so the
+    // handful nearest the player aren't competing for connections with
+    // distant districts like Woodlands.
+    async function runSwapBatch(list) {
+      await Promise.all(list.map(async (swap) => {
+        try {
+          const asset = await assetManager.loadModel(swap.url, {
+            toonify: true,
+            scale: swap.scale,
+            label: swap.url
+          });
+          if (state && state.destroyed) return;
+          if (!asset || asset.fallback || !asset.scene) return;
 
-        if (Array.isArray(swap.positions)) {
-          swap.positions.forEach(([x, z]) => {
-            const instance = asset.scene.clone(true);
-            assetManager.prepareModel(instance, { toonify: true, position: [x, 0, z], scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
-            recenterOnGroundSlot(THREE, instance, x, z);
-            scene.add(instance);
-            // registerPresentationObjects() already ran (synchronously, before this
-            // async load resolved) and only found the original procedural "Tree
-            // Crown" groups this is about to hide. Register the replacement
-            // directly so it keeps the same wind-sway animation instead of going static.
-            if (state && state.presentation && Array.isArray(state.presentation.treeCrowns)) {
-              state.presentation.treeCrowns.push(instance);
+          if (Array.isArray(swap.positions)) {
+            swap.positions.forEach(([x, z]) => {
+              const instance = asset.scene.clone(true);
+              assetManager.prepareModel(instance, { toonify: true, position: [x, 0, z], scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
+              recenterOnGroundSlot(THREE, instance, x, z);
+              scene.add(instance);
+              // registerPresentationObjects() already ran (synchronously, before this
+              // async load resolved) and only found the original procedural "Tree
+              // Crown" groups this is about to hide. Register the replacement
+              // directly so it keeps the same wind-sway animation instead of going static.
+              if (state && state.presentation && Array.isArray(state.presentation.treeCrowns)) {
+                state.presentation.treeCrowns.push(instance);
+              }
+            });
+          } else {
+            assetManager.prepareModel(asset.scene, { toonify: true, position: swap.position, scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
+            recenterOnGroundSlot(THREE, asset.scene, swap.position[0], swap.position[2]);
+            scene.add(asset.scene);
+          }
+
+          const hideNames = swap.hideNames || [];
+          const hidePrefixes = swap.hideNamePrefixes || [];
+          // Zones now build into a per-zone offset Group (see addZoneAt) rather
+          // than straight into `scene`, so the procedural placeholders this is
+          // hiding sit one level deeper than they used to - traverse() finds
+          // them at any depth instead of only scene's direct children.
+          scene.traverse((child) => {
+            if (!child.name) return;
+            if (hideNames.includes(child.name) || hidePrefixes.some((prefix) => child.name.startsWith(prefix))) {
+              child.visible = false;
             }
           });
-        } else {
-          assetManager.prepareModel(asset.scene, { toonify: true, position: swap.position, scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
-          recenterOnGroundSlot(THREE, asset.scene, swap.position[0], swap.position[2]);
-          scene.add(asset.scene);
+        } catch (error) {
+          console.warn(`[Life Sim] Optional district asset swap failed: ${swap.url}`, error);
         }
+      }));
+    }
 
-        const hideNames = swap.hideNames || [];
-        const hidePrefixes = swap.hideNamePrefixes || [];
-        // Zones now build into a per-zone offset Group (see addZoneAt) rather
-        // than straight into `scene`, so the procedural placeholders this is
-        // hiding sit one level deeper than they used to - traverse() finds
-        // them at any depth instead of only scene's direct children.
-        scene.traverse((child) => {
-          if (!child.name) return;
-          if (hideNames.includes(child.name) || hidePrefixes.some((prefix) => child.name.startsWith(prefix))) {
-            child.visible = false;
-          }
-        });
-      } catch (error) {
-        console.warn(`[Life Sim] Optional district asset swap failed: ${swap.url}`, error);
-      }
-    }));
+    const { near, far } = classifyByDistance(swaps, spawnX, spawnZ, (swap) => swapAnchorPoint(swap, spawnX, spawnZ), NEAR_TIER_RADIUS);
+    await runSwapBatch(near);
+    if (state && state.destroyed) return;
+    await runSwapBatch(far);
   }
 
   // Rebuilt for the real-asset spacing replan: the old cross-shaped road
@@ -2039,45 +2179,17 @@
   // pavement/asphalt/tile category at all (checked all 1156 categories), so
   // there is nothing to swap the surface itself to. This is deliberately
   // props-only, per the plan's flagged fallback for that gap.
-  async function addRoadDetailProps(THREE, scene, assetManager, state) {
+  async function addRoadDetailProps(THREE, scene, assetManager, state, spawnX, spawnZ, objaverseIndexReady) {
     if (!assetManager) return;
     const ready = await assetManager.ensureGltfLoader();
     if (!ready || (state && state.destroyed)) return;
 
-    let manifest;
-    try {
-      const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
-      manifest = await response.json();
-    } catch (error) {
-      console.warn("[Life Sim] Could not load asset manifest for road props:", error);
-      return;
-    }
-
-    const byCategory = {};
-    (manifest.objaverseAssets || []).forEach((entry) => {
-      (byCategory[entry.category] = byCategory[entry.category] || []).push(entry);
-    });
-
-    // Load every unique prop GLB in parallel up front, once each, instead of
-    // one `await` per placement point (~50+ placements across 17 road
-    // segments). On localhost the difference is invisible - near-zero
-    // latency hides a sequential-await chain completely - but on real
-    // production network latency, awaiting one placement before even
-    // starting the next asset's fetch serializes requests that could have
-    // overlapped, which is measurably slower to first-fully-populated-scene
-    // for an actual visitor. Only ~8 unique GLBs exist regardless of how
-    // many times each is placed, so this is a small, bounded Promise.all.
-    const entries = manifest.objaverseAssets || [];
-    const loadedByUrl = new Map();
-    await Promise.all(entries.map(async (entry) => {
-      if (loadedByUrl.has(entry.url)) return;
-      const asset = await assetManager.loadModel(entry.url, {
-        id: entry.id,
-        label: entry.label,
-        targetHeightMeters: entry.targetHeightMeters
-      });
-      loadedByUrl.set(entry.url, asset);
-    }));
+    // Manifest fetch + shared-prop preload now lives in
+    // loadObjaverseManifestAssets() (called once from mount()) rather than
+    // duplicated here and in addDistrictPlazaProps() - both loaders used to
+    // independently fetch the same manifest and preload the same ~13 shared
+    // GLBs, risking duplicate concurrent fetches for the same URL.
+    const { byCategory, loadedByUrl } = await objaverseIndexReady;
     if (state && state.destroyed) return;
 
     function place(entry, position, rotationY = 0) {
@@ -2107,11 +2219,11 @@
       ...ROAD_CONNECTOR_PATHS.map(([x1, z1, x2, z2]) => ({ x1, z1, x2, z2, width: 1.3 }))
     ];
 
-    // Streetlights and telephone poles down opposite sidewalks of every
-    // segment - real streets have both, and alternating sides reads as a
-    // planned street rather than one row of identical clutter.
-    for (const segment of allSegments) {
-      if (state && state.destroyed) return;
+    function segmentMidpoint(segment) {
+      return [(segment.x1 + segment.x2) / 2, (segment.z1 + segment.z2) / 2];
+    }
+
+    function placeStreetFurniture(segment) {
       const sidewalkDistance = segment.width / 2 + 1.4;
       const [lightDx, lightDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, sidewalkDistance);
       const [poleDx, poleDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, -sidewalkDistance);
@@ -2125,11 +2237,7 @@
       }
     }
 
-    // Benches, trash cans, and manholes only along the two main spine roads -
-    // keeps the busiest, most-walked stretch feeling detailed without
-    // scattering the same handful of props across all 17 segments.
-    for (const segment of ROAD_MAIN_SEGMENTS) {
-      if (state && state.destroyed) return;
+    function placeMainSpineFurniture(segment) {
       const sidewalkDistance = segment.width / 2 + 2.4;
       const [sideDx, sideDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, sidewalkDistance);
       const benchPoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 40);
@@ -2141,6 +2249,34 @@
       for (const [px, pz] of manholePoints) {
         place(nextEntry("manhole"), [px, 0.02, pz], Math.random() * Math.PI * 2);
       }
+    }
+
+    // Streetlights and telephone poles down opposite sidewalks of every
+    // segment - real streets have both, and alternating sides reads as a
+    // planned street rather than one row of identical clutter. Near-tier
+    // segments (closest to spawn) are placed first, far-tier afterward -
+    // same distance-tiered pattern as loadDistrictAssetSamples().
+    const segmentTiers = classifyByDistance(allSegments, spawnX, spawnZ, segmentMidpoint, NEAR_TIER_RADIUS);
+    for (const segment of segmentTiers.near) {
+      if (state && state.destroyed) return;
+      placeStreetFurniture(segment);
+    }
+    for (const segment of segmentTiers.far) {
+      if (state && state.destroyed) return;
+      placeStreetFurniture(segment);
+    }
+
+    // Benches, trash cans, and manholes only along the two main spine roads -
+    // keeps the busiest, most-walked stretch feeling detailed without
+    // scattering the same handful of props across all 17 segments.
+    const mainSpineTiers = classifyByDistance(ROAD_MAIN_SEGMENTS, spawnX, spawnZ, segmentMidpoint, NEAR_TIER_RADIUS);
+    for (const segment of mainSpineTiers.near) {
+      if (state && state.destroyed) return;
+      placeMainSpineFurniture(segment);
+    }
+    for (const segment of mainSpineTiers.far) {
+      if (state && state.destroyed) return;
+      placeMainSpineFurniture(segment);
     }
 
     // Stop signs and a couple of traffic cones at the busiest junctions only
@@ -2161,36 +2297,41 @@
   // 1.3x-1.7x each zone's own interaction radius - inside that ring is where
   // the zone's actual buildings/interaction trigger live, so staying outside
   // it keeps these decorative-only props from sitting on top of a building.
-  async function addDistrictPlazaProps(THREE, scene, assetManager, state) {
+  // "Use more Objaverse resources" pass: instead of the same 5-category
+  // rotation on every zone regardless of what it actually is, zones with a
+  // distinctive real-world identity get one themed prop layered into their
+  // ring (replacing 1 of the 3 generic slots, not adding a 4th - keeps
+  // total city-wide placement count unchanged at 3 x 22 = 66, so the only
+  // new payload is the themed GLBs themselves, fetched once and shared
+  // across every zone using that category). Every category below was
+  // confirmed to exist in Objaverse's LVIS taxonomy via
+  // `python tools/objaverse_fetch.py --list-categories <keyword>` before
+  // being relied on here - Objaverse's category list is quirky (e.g.
+  // "picnic"/"luggage"/"fountain"/"planter" all return zero matches), so
+  // nothing here is guessed.
+  const ZONE_THEME_CATEGORIES = {
+    hospital: ["wheelchair"],
+    university: ["backpack"],
+    gym: ["dumbbell"],
+    airport: ["suitcase"],
+    chinatown: ["lantern"],
+    "little-india": ["lantern"],
+    bugis: ["lantern"],
+    beach: ["deck_chair"],
+    "clarke-quay": ["coffee_table"],
+    cafe: ["coffee_table"],
+    mall: ["shopping_cart"]
+  };
+
+  async function addDistrictPlazaProps(THREE, scene, assetManager, state, spawnX, spawnZ, objaverseIndexReady) {
     if (!assetManager) return;
     const ready = await assetManager.ensureGltfLoader();
     if (!ready || (state && state.destroyed)) return;
 
-    let manifest;
-    try {
-      const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
-      manifest = await response.json();
-    } catch (error) {
-      console.warn("[Life Sim] Could not load asset manifest for plaza props:", error);
-      return;
-    }
-
-    const byCategory = {};
-    (manifest.objaverseAssets || []).forEach((entry) => {
-      (byCategory[entry.category] = byCategory[entry.category] || []).push(entry);
-    });
-
-    const loadedByUrl = new Map();
-    const entries = manifest.objaverseAssets || [];
-    await Promise.all(entries.map(async (entry) => {
-      if (loadedByUrl.has(entry.url)) return;
-      const asset = await assetManager.loadModel(entry.url, {
-        id: entry.id,
-        label: entry.label,
-        targetHeightMeters: entry.targetHeightMeters
-      });
-      loadedByUrl.set(entry.url, asset);
-    }));
+    // Manifest fetch + shared-prop preload now lives in
+    // loadObjaverseManifestAssets() (called once from mount()) - see the
+    // comment in addRoadDetailProps() for why this used to be duplicated.
+    const { byCategory, loadedByUrl } = await objaverseIndexReady;
     if (state && state.destroyed) return;
 
     function place(entry, position, rotationY = 0) {
@@ -2212,18 +2353,37 @@
       return list[(roundRobin[category] - 1) % list.length];
     }
 
+    function categoryForSlot(zone, slotIndex, genericCategory) {
+      const themes = ZONE_THEME_CATEGORIES[zone.id];
+      if (slotIndex === 0 && themes && themes.length && byCategory[themes[0]] && byCategory[themes[0]].length) {
+        return themes[0];
+      }
+      return genericCategory;
+    }
+
     let categoryCursor = 0;
-    locationZones.forEach((zone) => {
+    function placeZoneProps(zone) {
       const propsPerZone = 3;
       for (let i = 0; i < propsPerZone; i += 1) {
-        const category = plazaCategories[categoryCursor % plazaCategories.length];
+        const genericCategory = plazaCategories[categoryCursor % plazaCategories.length];
         categoryCursor += 1;
+        const category = categoryForSlot(zone, i, genericCategory);
         const angle = (i / propsPerZone) * Math.PI * 2 + zone.x * 0.37;
         const ringRadius = zone.radius * (1.3 + (i % 2) * 0.4);
         const px = zone.x + Math.cos(angle) * ringRadius;
         const pz = zone.z + Math.sin(angle) * ringRadius;
         place(nextEntry(category), [px, 0, pz], angle);
       }
+    }
+
+    const zoneTiers = classifyByDistance(locationZones, spawnX, spawnZ, (zone) => [zone.x, zone.z], NEAR_TIER_RADIUS);
+    zoneTiers.near.forEach((zone) => {
+      if (state && state.destroyed) return;
+      placeZoneProps(zone);
+    });
+    zoneTiers.far.forEach((zone) => {
+      if (state && state.destroyed) return;
+      placeZoneProps(zone);
     });
   }
 
