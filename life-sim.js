@@ -166,7 +166,9 @@
       if (Number.isFinite(yawOverride)) state.yaw = yawOverride;
     }
     scene.add(player.group);
+    activeStaticColliders = state.staticColliders = [];
     createDistrict(THREE, scene, materials);
+    warnOnColliderOverlaps(activeStaticColliders);
     loadDistrictAssetSamples(THREE, scene, state.assetManager, state);
     addRoadDetailProps(THREE, scene, state.assetManager, state);
     loadCharacterAsset(THREE, state.assetManager, player, state, root).then((loaded) => {
@@ -331,6 +333,11 @@
         // to give real modeled buildings enough clearance from each other.
         player.group.position.x = clamp(player.group.position.x, -88, 118);
         player.group.position.z = clamp(player.group.position.z, -103, 60);
+        if (state.staticColliders && state.staticColliders.length) {
+          const [resolvedX, resolvedZ] = resolveStaticCollision(state.staticColliders, player.group.position.x, player.group.position.z, 0.42);
+          player.group.position.x = resolvedX;
+          player.group.position.z = resolvedZ;
+        }
         const targetAngle = Math.atan2(direction.x, direction.z);
         player.group.rotation.y = lerpAngle(player.group.rotation.y, targetAngle, Math.min(1, delta * 8.5));
         state.footstepTimer -= delta * state.moveSpeed;
@@ -432,6 +439,40 @@
     };
   }
 
+  // Realistic-style pivot: flat MeshStandardMaterial colors (however correct
+  // the PBR roughness/metalness numbers) read as "flat plastic toy," not
+  // real - a surface needs actual photographic micro-detail (bump/grain/
+  // roughness variation) to read as real, which a solid color literally
+  // cannot provide regardless of lighting quality. These are real CC0
+  // photogrammetry PBR texture sets from ambientCG (no login required to
+  // download - see assets/textures/ambientcg/ for the ones fetched so far),
+  // 1K JPG resolution, Color/NormalGL/Roughness maps only (skipping
+  // Displacement/preview/source files ambientCG bundles, to stay light).
+  const pbrTextureCache = new Map();
+  function loadPbrTexture(THREE, assetId, suffix, repeatX, repeatY) {
+    const cacheKey = `${assetId}:${suffix}:${repeatX}:${repeatY}`;
+    if (pbrTextureCache.has(cacheKey)) return pbrTextureCache.get(cacheKey);
+    const texture = new THREE.TextureLoader().load(`assets/textures/ambientcg/${assetId}_1K-JPG_${suffix}.jpg`);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(repeatX, repeatY);
+    if (suffix === "Color" && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    pbrTextureCache.set(cacheKey, texture);
+    return texture;
+  }
+
+  // Full photographic material (color + normal + roughness) for large,
+  // continuously-visible ground-plane surfaces where the photographed base
+  // tone IS the desired look, not just a tint carrier.
+  function pbrGroundMaterial(THREE, assetId, repeatX, repeatY, options = {}) {
+    return new THREE.MeshStandardMaterial({
+      map: loadPbrTexture(THREE, assetId, "Color", repeatX, repeatY),
+      normalMap: loadPbrTexture(THREE, assetId, "NormalGL", repeatX, repeatY),
+      roughnessMap: loadPbrTexture(THREE, assetId, "Roughness", repeatX, repeatY),
+      roughness: 1,
+      ...options
+    });
+  }
+
   function createMaterials(THREE) {
     // Modern-realistic Singapore direction (supersedes the earlier anime
     // cel-shading and "Stylized Low Poly City" pastel-PBR passes, per an
@@ -445,7 +486,17 @@
       ? window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" })
       : null;
     const shared = (key, fallback) => library && library.get ? library.get(key) : fallback();
-    const make = (color, emissive = 0x000000, roughness = 0.7, metalness = 0.03) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness });
+    // Every "make()" material (every building wall/structure color in the
+    // game) picks up the same tiled Concrete034 normal+roughness maps for
+    // real surface micro-detail, while keeping its own distinct hue via
+    // `color` (which tints the otherwise-neutral map rather than fighting a
+    // photographed color) - addBuildingCore() only puts a facade texture on
+    // a building's front face, so this is what fixes the other 5 flat faces
+    // on every single building at once instead of one texture assignment
+    // per building type.
+    const wallNormal = loadPbrTexture(THREE, "Concrete034", "NormalGL", 2.4, 2.4);
+    const wallRoughness = loadPbrTexture(THREE, "Concrete034", "Roughness", 2.4, 2.4);
+    const make = (color, emissive = 0x000000, roughness = 0.7, metalness = 0.03) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness, normalMap: wallNormal, roughnessMap: wallRoughness, normalScale: new THREE.Vector2(0.4, 0.4) });
     const standard = (color, emissive = 0x000000, roughness = 0.68, metalness = 0.02) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness });
     const glass = (color) => new THREE.MeshPhysicalMaterial({
       color,
@@ -459,12 +510,12 @@
 
     return {
       library,
-      grass: shared("grass", () => make(0x5f8f52)),
-      ground: make(0xb6ad97),
+      grass: pbrGroundMaterial(THREE, "Grass005", 60, 60, { color: 0xcfe0c6 }),
+      ground: pbrGroundMaterial(THREE, "Concrete034", 70, 55, { color: 0xe8e2d0 }),
       warmGround: make(0xcbb290),
-      road: shared("road", () => standard(0x2b2e33)),
+      road: pbrGroundMaterial(THREE, "Asphalt031", 34, 6, { color: 0xb7b7b7 }),
       roadLine: make(0xd9d4c4, 0x0a0906, 0.55),
-      sidewalk: shared("concrete", () => make(0xb2a98f)),
+      sidewalk: pbrGroundMaterial(THREE, "Concrete034", 6, 6, { color: 0xdcd5c0 }),
       curb: shared("stone", () => make(0xa89d87)),
       curbWarm: make(0xc9bfa2),
       hdb: make(0xe1dccd),
@@ -547,6 +598,65 @@
   //   windows, a collapsible laundry pole angled out near the corridor edge.
   // - "modern": plain glass-curtain-wall grid, no ornamentation - office/
   //   mall/hospital-scale commercial buildings.
+  // Realistic-style pivot, Phase 4: static collision registry. There was
+  // zero collision detection anywhere in this file before this - retrofitting
+  // one onto every addBox call across ~20 zone-builder functions wasn't
+  // practical in scope, but every real building shell (HDB blocks, gym, work
+  // tower, hospital, library, university, mall, shophouses, etc.) already
+  // funnels through the single addBuildingCore() function below, so
+  // registering colliders there covers the walls a player would actually
+  // notice walking through, with exact precision (no scene-traversal
+  // heuristics needed). Reset per mount() - a stale collider list from a
+  // previous mount/remount must never block the new scene.
+  let activeStaticColliders = [];
+  function registerStaticCollider(name, centerX, centerZ, sizeX, sizeZ) {
+    activeStaticColliders.push({
+      name,
+      minX: centerX - sizeX / 2,
+      maxX: centerX + sizeX / 2,
+      minZ: centerZ - sizeZ / 2,
+      maxZ: centerZ + sizeZ / 2
+    });
+  }
+
+  // Authoring-time diagnostic (the automated version of the one clipping bug
+  // already found and hand-fixed in this file - a GLB lecture hall and a
+  // leftover primitive box rendering as two overlapping buildings, life-
+  // sim.js history) - logs instead of silently tolerating overlaps.
+  function warnOnColliderOverlaps(colliders) {
+    for (let i = 0; i < colliders.length; i += 1) {
+      for (let j = i + 1; j < colliders.length; j += 1) {
+        const a = colliders[i];
+        const b = colliders[j];
+        const overlapX = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);
+        const overlapZ = Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ);
+        if (overlapX > 0.15 && overlapZ > 0.15) {
+          console.warn(`[Life Sim] Static colliders overlap: "${a.name}" and "${b.name}" (${overlapX.toFixed(2)}x${overlapZ.toFixed(2)} units)`);
+        }
+      }
+    }
+  }
+
+  // Cheap axis-aligned circle-vs-rect push-out, run once per axis so the
+  // player slides along a wall instead of stopping dead on any contact.
+  function resolveStaticCollision(colliders, x, z, radius) {
+    let resolvedX = x;
+    let resolvedZ = z;
+    for (const box of colliders) {
+      const closestX = Math.max(box.minX, Math.min(resolvedX, box.maxX));
+      const closestZ = Math.max(box.minZ, Math.min(resolvedZ, box.maxZ));
+      const dx = resolvedX - closestX;
+      const dz = resolvedZ - closestZ;
+      const distSq = dx * dx + dz * dz;
+      if (distSq >= radius * radius || distSq === 0) continue;
+      const dist = Math.sqrt(distSq) || 0.0001;
+      const push = radius - dist;
+      resolvedX += (dx / dist) * push;
+      resolvedZ += (dz / dist) * push;
+    }
+    return [resolvedX, resolvedZ];
+  }
+
   // Cached by its own parameters so repeated calls with the same
   // color/floors/columns/style reuse one canvas instead of redrawing.
   const facadeTextureCache = new Map();
@@ -1608,7 +1718,7 @@
       {
         url: "assets/environment/city-kit-commercial/bugis-shophouse-b.glb",
         hideNamePrefixes: ["Bugis Heritage Shophouse B"],
-        position: [47.6, 0, -37],
+        position: [48.2, 0, -37],
         scale: [3.2, 3.2, 3.2]
       },
       {
@@ -2232,8 +2342,8 @@
     addBox(THREE, scene, "Bugis Junction Glass Front", [28, 3.2, 1.6], [5.4, 4.2, 0.16], mat.glass);
     addBuildingCore(THREE, scene, "Bugis Heritage Shophouse A", [18, 3.4, -3], [4, 6.8, 4], mat.gym, mat, "shophouse");
     addBox(THREE, scene, "Bugis Heritage Shophouse A Roof", [18, 7.0, -3], [4.4, 0.4, 4.4], mat.roofDark);
-    addBuildingCore(THREE, scene, "Bugis Heritage Shophouse B", [21.6, 3.0, -3], [3.6, 6.0, 3.8], mat.signGold, mat, "shophouse");
-    addBox(THREE, scene, "Bugis Heritage Shophouse B Roof", [21.6, 6.2, -3], [4.0, 0.4, 4.2], mat.roofDark);
+    addBuildingCore(THREE, scene, "Bugis Heritage Shophouse B", [22.2, 3.0, -3], [3.6, 6.0, 3.8], mat.signGold, mat, "shophouse");
+    addBox(THREE, scene, "Bugis Heritage Shophouse B Roof", [22.2, 6.2, -3], [4.0, 0.4, 4.2], mat.roofDark);
     addBox(THREE, scene, "Bugis Market Stall", [19.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
     addBox(THREE, scene, "Bugis Market Stall", [21.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
     addBox(THREE, scene, "Bugis Market Awning", [20.5, 1.9, 3.4], [5.4, 0.16, 1.6], mat.signBlue);
@@ -2400,7 +2510,7 @@
     // swapped for real modeled buildings in loadDistrictAssetSamples() (at
     // [-11,0,53] and [-27,0,47]) - these stay only as hidden placeholders.
     addBuildingCore(THREE, scene, "Woodlands HDB Block A", [baseX - 13, 9, baseZ + 3], [6, 18, 4.6], mat.hdb, mat, "hdb");
-    addBuildingCore(THREE, scene, "Woodlands HDB Block B", [baseX - 19, 7.5, baseZ - 3], [5.2, 15, 4.2], mat.hdbAccent, mat, "hdb");
+    addBuildingCore(THREE, scene, "Woodlands HDB Block B", [baseX - 19, 7.5, baseZ - 1], [5.2, 15, 4.2], mat.hdbAccent, mat, "hdb");
     addFlowerBed(THREE, scene, [baseX - 13, baseZ + 8], 4, mat);
 
     // Estate expansion: a real multi-block neighbourhood instead of just the
@@ -2687,6 +2797,7 @@
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
+    registerStaticCollider(name, position[0], position[2], scale[0], scale[2]);
 
     if (style !== "modern") {
       for (let floor = 0; floor < floors; floor++) {

@@ -23,6 +23,12 @@ This queries Objaverse's human-labeled LVIS category index, filters candidates t
 
 **Attribution**: CC0 assets need no credit. Everything else needs one - the in-app "Asset Credits" tag (bottom-left corner during Life Sim) reads `objaverseAssets` from this manifest and lists every non-CC0 asset's author + license + source link automatically. Don't hand-maintain a separate credits list; it'll drift from what's actually shipped.
 
+## Surface materials (why buildings don't look flat anymore)
+
+Objaverse has no "building" category at all (checked its full LVIS taxonomy - nothing building/house/tower/shophouse-shaped, same gap as roads). So the realistic-style pass for buildings isn't new geometry, it's real photographic PBR materials applied to the *existing* geometry: `assets/textures/ambientcg/` holds Color/NormalGL/Roughness JPGs (1K resolution, ~12MB total) from [ambientCG](https://ambientcg.com) - CC0, no login, no attribution required, fetched via their public JSON API (`ambientcg.com/api/v2/full_json?type=Material&q=<search>`, then `ambientcg.com/get?file=<AssetId>_1K-JPG.zip`).
+
+`life-sim.js`'s `createMaterials()` applies Concrete034's normal+roughness maps to *every* `make()`-built material (every building wall/structure color in the game) so all 6 faces get real surface micro-detail, not just the front (`addBuildingCore()` only ever put a texture on the front face via its canvas-drawn window facade). `ground`/`road`/`grass`/`sidewalk` get full photographic materials (Concrete034/Asphalt031/Grass005) since those are large continuously-visible surfaces where the photographed tone itself is the point, not just a tint carrier.
+
 ## Required Folders
 
 - `../environment/` - city/HDB/MRT/food court/mall/park/CBD/district chunks. Currently a mix of the older CC0 Kenney "City Kit Commercial" + Quaternius "Downtown City MegaKit" low-poly building swaps (see `loadDistrictAssetSamples()` in `life-sim.js`) - these are the blocky "kit" look being phased out in favor of Objaverse pieces, landmark buildings first.
