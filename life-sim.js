@@ -169,8 +169,12 @@
     activeStaticColliders = state.staticColliders = [];
     createDistrict(THREE, scene, materials);
     warnOnColliderOverlaps(activeStaticColliders);
-    loadDistrictAssetSamples(THREE, scene, state.assetManager, state);
-    addRoadDetailProps(THREE, scene, state.assetManager, state);
+    const districtSamplesReady = loadDistrictAssetSamples(THREE, scene, state.assetManager, state);
+    const roadPropsReady = addRoadDetailProps(THREE, scene, state.assetManager, state);
+    Promise.all([districtSamplesReady, roadPropsReady]).then(() => {
+      if (state.destroyed) return;
+      auditSceneLayout(THREE, scene);
+    });
     loadCharacterAsset(THREE, state.assetManager, player, state, root).then((loaded) => {
       if (state.destroyed) return;
       state.realCharacterLoaded = loaded;
@@ -639,6 +643,65 @@
         }
       }
     }
+  }
+
+  // Whole-map layout audit (broader than warnOnColliderOverlaps, which only
+  // covers addBuildingCore() shells). Walks scene.children - top-level
+  // objects only, not a deep traverse - so a GLB swap's dozens of internal
+  // submeshes (window frames overlapping their own wall, etc.) don't produce
+  // false positives; every addBox/addBuildingCore call and every swapped-in
+  // GLB group is already a direct scene child. Runs once, after district
+  // samples + road props both finish loading, logging real coordinates so
+  // findings are directly actionable, not just names.
+  const LAYOUT_AUDIT_EXCLUDE_NAME_PATTERN = /ground|road|path|line|crosswalk|zone.*ring|sidewalk|sand|^water|grass|green|flower|bed$|dust|cloud|rain|balcony/i;
+  function pushLayoutAuditCandidate(THREE, candidates, node, labelPrefix) {
+    const box = new THREE.Box3().setFromObject(node);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    if (size.y < 0.8 || size.x * size.z < 1.5) return;
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const label = labelPrefix ? `${labelPrefix} > ${node.name || "(unnamed)"}` : (node.name || "(unnamed)");
+    candidates.push({ name: label, box, center, size });
+  }
+  function auditSceneLayout(THREE, scene) {
+    const candidates = [];
+    scene.children.forEach((node) => {
+      if (!node.visible) return;
+      // "Zone Offset Group: x" wrapper groups (addZoneAt()) are containers,
+      // not real obstacles - their bounding box is the union of everything
+      // inside them, so every building inside its own zone trivially
+      // "overlaps" the wrapper. Recurse into them one level instead of
+      // treating the wrapper itself as a candidate, tagging each child with
+      // its zone so an ambiguous swapped-GLB name like "Scene" is still
+      // traceable back to a specific place on the map.
+      if (node.name && node.name.startsWith("Zone Offset Group")) {
+        const zoneLabel = node.name.replace("Zone Offset Group: ", "");
+        node.children.forEach((child) => {
+          if (!child.visible) return;
+          if (child.name && LAYOUT_AUDIT_EXCLUDE_NAME_PATTERN.test(child.name)) return;
+          pushLayoutAuditCandidate(THREE, candidates, child, zoneLabel);
+        });
+        return;
+      }
+      if (node.name && LAYOUT_AUDIT_EXCLUDE_NAME_PATTERN.test(node.name)) return;
+      pushLayoutAuditCandidate(THREE, candidates, node);
+    });
+    console.info(`[Life Sim] Layout audit: ${candidates.length} significant top-level objects scanned.`);
+    let overlapCount = 0;
+    for (let i = 0; i < candidates.length; i += 1) {
+      for (let j = i + 1; j < candidates.length; j += 1) {
+        const a = candidates[i];
+        const b = candidates[j];
+        const overlapX = Math.min(a.box.max.x, b.box.max.x) - Math.max(a.box.min.x, b.box.min.x);
+        const overlapZ = Math.min(a.box.max.z, b.box.max.z) - Math.max(a.box.min.z, b.box.min.z);
+        if (overlapX > 0.3 && overlapZ > 0.3) {
+          overlapCount += 1;
+          console.warn(`[Layout Audit] OVERLAP "${a.name}" @(${a.center.x.toFixed(1)},${a.center.z.toFixed(1)}) size ${a.size.x.toFixed(1)}x${a.size.z.toFixed(1)} vs "${b.name}" @(${b.center.x.toFixed(1)},${b.center.z.toFixed(1)}) size ${b.size.x.toFixed(1)}x${b.size.z.toFixed(1)} - overlap ${overlapX.toFixed(1)}x${overlapZ.toFixed(1)}`);
+        }
+      }
+    }
+    console.info(`[Life Sim] Layout audit: ${overlapCount} overlapping pair(s) found.`);
   }
 
   // Cheap axis-aligned circle-vs-rect push-out, run once per axis so the
@@ -1502,6 +1565,26 @@
   const SENTOSA_PALM_POSITIONS = [[65, -84], [67, -77.5], [74, -77], [82, -80.5]];
   const SENTOSA_PALM_BEND_POSITIONS = [[71, -86.5], [79, -85]];
 
+  // Layout pass: swapped-in GLBs get positioned by their own origin/pivot,
+  // not their visible bounding-box center - the whole-map overlap audit
+  // (auditSceneLayout()) traced a whole cluster of overlaps to exactly this,
+  // most visibly the 4 "Building_Large_2.gltf" clones (reused for both
+  // Causeway Point Mall and part of the Woodlands estate grid) landing with
+  // their real footprint's center offset by several units from the slot
+  // they were placed at, because that file's geometry isn't centered on its
+  // own local origin. Re-centering the XZ bounding-box onto the intended
+  // slot after positioning fixes every current and future use of an
+  // off-center source file at once, instead of hand-tuning coordinates per
+  // symptom. Y is left alone - these are all ground-level placements and
+  // the existing position[1]=0 convention already gets that right.
+  function recenterOnGroundSlot(THREE, instance, targetX, targetZ) {
+    const box = new THREE.Box3().setFromObject(instance);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    instance.position.x += targetX - center.x;
+    instance.position.z += targetZ - center.z;
+  }
+
   async function loadDistrictAssetSamples(THREE, scene, assetManager, state) {
     if (!assetManager) return;
     const ready = await assetManager.ensureGltfLoader();
@@ -1638,23 +1721,31 @@
       // reuse a url already used by a singular entry above (see the
       // Punggol/Raffles Place comment for why singular+singular is the
       // unsafe combination, not singular+plural).
+      // targetHeightMeters (not scale: [1,1,1]) on all three of these -
+      // the layout audit measured Building_Large_2.gltf's native/unscaled
+      // footprint at 20.6x16.6 units, comfortably wider than any grid slot
+      // regardless of spacing. normalizeToHeight() (lifeverse-asset-
+      // manager.js) scales uniformly from real height instead of leaving
+      // native GLB scale untouched, which is what every other real-asset
+      // swap on the map should probably be doing too, not just this one -
+      // flagged here since fixing all of them is out of scope for one pass.
       {
         url: "assets/environment/city-kit-quaternius/Building_Large_2.gltf",
         hideNamePrefixes: ["Woodlands Estate Block C", "Woodlands Estate Block F", "Woodlands Estate Block I", "Woodlands Estate Block L"],
-        positions: [[-16, 30], [5, 30], [-2, 37], [-9, 44]],
-        scale: [1, 1, 1]
+        positions: [[-21, 14], [18, 14], [5, 27], [-8, 40]],
+        targetHeightMeters: 16
       },
       {
         url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.gltf",
         hideNamePrefixes: ["Woodlands Estate Block D", "Woodlands Estate Block G", "Woodlands Estate Block J", "Woodlands Estate Block M"],
-        positions: [[-9, 30], [-16, 37], [5, 37], [-2, 44]],
-        scale: [1, 1, 1]
+        positions: [[-8, 14], [-21, 27], [18, 27], [5, 40]],
+        targetHeightMeters: 16
       },
       {
         url: "assets/environment/city-kit-quaternius/Building_Small_1.gltf",
         hideNamePrefixes: ["Woodlands Estate Block E", "Woodlands Estate Block H", "Woodlands Estate Block K", "Woodlands Estate Block N"],
-        positions: [[-2, 30], [-9, 37], [-16, 44], [5, 44]],
-        scale: [1, 1, 1]
+        positions: [[5, 14], [-8, 27], [-21, 40], [18, 40]],
+        targetHeightMeters: 16
       },
       // Real-model pass: swapping the remaining hand-built primitive-box
       // shophouses/buildings for real CC0 modeled buildings (Kenney "City Kit
@@ -1668,49 +1759,49 @@
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-a.glb",
         hideNamePrefixes: ["Chinatown Shophouse Rose"],
-        position: [3.8, 0, -65],
+        position: [2, 0, -65],
         scale: [5.2, 5.2, 5.2]
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-b.glb",
         hideNamePrefixes: ["Chinatown Shophouse Ochre"],
-        position: [7.8, 0, -65],
+        position: [7.5, 0, -65],
         scale: [5.2, 5.2, 5.2]
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-c.glb",
         hideNamePrefixes: ["Chinatown Shophouse Teal"],
-        position: [11.8, 0, -65],
+        position: [13, 0, -65],
         scale: [5.2, 5.2, 5.2]
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-d.glb",
         hideNamePrefixes: ["Chinatown Shophouse Cream"],
-        position: [15.8, 0, -65],
+        position: [18.5, 0, -65],
         scale: [5.2, 5.2, 5.2]
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-a.glb",
         hideNamePrefixes: ["Little India Shophouse Blue"],
-        position: [18.8, 0, -19],
+        position: [17, 0, -19],
         scale: [4.0, 4.0, 4.0]
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-b.glb",
         hideNamePrefixes: ["Little India Shophouse Saffron"],
-        position: [22.8, 0, -19],
+        position: [22.5, 0, -19],
         scale: [3.5, 3.5, 3.5]
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-c.glb",
         hideNamePrefixes: ["Little India Shophouse Magenta"],
-        position: [26.8, 0, -19],
+        position: [28, 0, -19],
         scale: [3.2, 3.2, 3.2]
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-d.glb",
         hideNamePrefixes: ["Little India Shophouse Cream"],
-        position: [30.8, 0, -19],
+        position: [33.5, 0, -19],
         scale: [2.2, 3.2, 2.2]
       },
       {
@@ -1722,7 +1813,7 @@
       {
         url: "assets/environment/city-kit-commercial/bugis-shophouse-b.glb",
         hideNamePrefixes: ["Bugis Heritage Shophouse B"],
-        position: [48.2, 0, -37],
+        position: [49.2, 0, -37],
         scale: [3.2, 3.2, 3.2]
       },
       {
@@ -1823,7 +1914,8 @@
         if (Array.isArray(swap.positions)) {
           swap.positions.forEach(([x, z]) => {
             const instance = asset.scene.clone(true);
-            assetManager.prepareModel(instance, { toonify: true, position: [x, 0, z], scale: swap.scale });
+            assetManager.prepareModel(instance, { toonify: true, position: [x, 0, z], scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
+            recenterOnGroundSlot(THREE, instance, x, z);
             scene.add(instance);
             // registerPresentationObjects() already ran (synchronously, before this
             // async load resolved) and only found the original procedural "Tree
@@ -1834,7 +1926,8 @@
             }
           });
         } else {
-          assetManager.prepareModel(asset.scene, { toonify: true, position: swap.position, scale: swap.scale });
+          assetManager.prepareModel(asset.scene, { toonify: true, position: swap.position, scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
+          recenterOnGroundSlot(THREE, asset.scene, swap.position[0], swap.position[2]);
           scene.add(asset.scene);
         }
 
@@ -2277,13 +2370,18 @@
   // two isolated candy-colored boxes. Paifang gate keeps its vivid red/gold -
   // that IS the real color of Chinatown's gate, not a stylization to mute.
   function addChinatown(THREE, scene, mat) {
-    addPlane(THREE, scene, "Chinatown Street Floor", [-10, 0.02, -14], [15, 10], mat.curbWarm);
+    addPlane(THREE, scene, "Chinatown Street Floor", [-9.75, 0.02, -14], [19, 10], mat.curbWarm);
 
+    // Layout pass: widened from 4-unit to 5.5-unit spacing - the whole-map
+    // overlap audit (auditSceneLayout()) found the real swapped-in GLBs
+    // (loadDistrictAssetSamples() below) overlapping their immediate
+    // neighbors at the old spacing, since those real models are wider than
+    // the 3.6-unit primitive placeholders they replace.
     const shophouses = [
-      { name: "Chinatown Shophouse Rose", x: -16.2, height: 6.6, color: mat.gym },
-      { name: "Chinatown Shophouse Ochre", x: -12.2, height: 7.0, color: mat.signGold },
-      { name: "Chinatown Shophouse Teal", x: -8.2, height: 6.4, color: mat.hospitalAccent },
-      { name: "Chinatown Shophouse Cream", x: -4.2, height: 6.8, color: mat.hdb }
+      { name: "Chinatown Shophouse Rose", x: -18, height: 6.6, color: mat.gym },
+      { name: "Chinatown Shophouse Ochre", x: -12.5, height: 7.0, color: mat.signGold },
+      { name: "Chinatown Shophouse Teal", x: -7, height: 6.4, color: mat.hospitalAccent },
+      { name: "Chinatown Shophouse Cream", x: -1.5, height: 6.8, color: mat.hdb }
     ];
     shophouses.forEach((house) => {
       // addBuildingCore's window/balcony grid faces -z (the back of this row,
@@ -2320,13 +2418,16 @@
   // Little India's shophouses really are painted in saturated blue/saffron/
   // magenta), plus the Sri Veeramakaliamman-style temple kept at the far end.
   function addLittleIndia(THREE, scene, mat) {
-    addPlane(THREE, scene, "Little India Street Floor", [10, 0.02, 14], [15, 10], mat.curbWarm);
+    addPlane(THREE, scene, "Little India Street Floor", [10.25, 0.02, 14], [19, 10], mat.curbWarm);
 
+    // Layout pass: widened from 4-unit to 5.5-unit spacing, same fix and
+    // same reason as Chinatown's row above - the audit found the real
+    // swapped-in GLBs overlapping their neighbors at the old spacing.
     const shophouses = [
-      { name: "Little India Shophouse Blue", x: 3.8, height: 6.6, color: mat.hdbAccent },
-      { name: "Little India Shophouse Saffron", x: 7.8, height: 7.0, color: mat.signGold },
-      { name: "Little India Shophouse Magenta", x: 11.8, height: 6.4, color: mat.mall },
-      { name: "Little India Shophouse Cream", x: 15.8, height: 6.8, color: mat.hdb }
+      { name: "Little India Shophouse Blue", x: 2, height: 6.6, color: mat.hdbAccent },
+      { name: "Little India Shophouse Saffron", x: 7.5, height: 7.0, color: mat.signGold },
+      { name: "Little India Shophouse Magenta", x: 13, height: 6.4, color: mat.mall },
+      { name: "Little India Shophouse Cream", x: 18.5, height: 6.8, color: mat.hdb }
     ];
     shophouses.forEach((house) => {
       addBuildingCore(THREE, scene, house.name, [house.x, house.height / 2, 9], [3.6, house.height, 4.2], house.color, mat, "shophouse");
@@ -2356,8 +2457,8 @@
     addBox(THREE, scene, "Bugis Junction Glass Front", [28, 3.2, 1.6], [5.4, 4.2, 0.16], mat.glass);
     addBuildingCore(THREE, scene, "Bugis Heritage Shophouse A", [18, 3.4, -3], [4, 6.8, 4], mat.gym, mat, "shophouse");
     addBox(THREE, scene, "Bugis Heritage Shophouse A Roof", [18, 7.0, -3], [4.4, 0.4, 4.4], mat.roofDark);
-    addBuildingCore(THREE, scene, "Bugis Heritage Shophouse B", [22.2, 3.0, -3], [3.6, 6.0, 3.8], mat.signGold, mat, "shophouse");
-    addBox(THREE, scene, "Bugis Heritage Shophouse B Roof", [22.2, 6.2, -3], [4.0, 0.4, 4.2], mat.roofDark);
+    addBuildingCore(THREE, scene, "Bugis Heritage Shophouse B", [23.2, 3.0, -3], [3.6, 6.0, 3.8], mat.signGold, mat, "shophouse");
+    addBox(THREE, scene, "Bugis Heritage Shophouse B Roof", [23.2, 6.2, -3], [4.0, 0.4, 4.2], mat.roofDark);
     addBox(THREE, scene, "Bugis Market Stall", [19.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
     addBox(THREE, scene, "Bugis Market Stall", [21.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
     addBox(THREE, scene, "Bugis Market Awning", [20.5, 1.9, 3.4], [5.4, 0.16, 1.6], mat.signBlue);
@@ -2533,19 +2634,36 @@
     // footprint further southwest). Swapped for real modelled buildings in
     // loadDistrictAssetSamples(), cycling through the same 3 Quaternius
     // Downtown City MegaKit files as the original 2 blocks/mall above.
+    // Realistic-style pivot, layout pass: this grid used 7-unit spacing
+    // against 5.4-unit primitive placeholders (a plausible 1.6-unit gap),
+    // but the real swapped-in GLB models (loadDistrictAssetSamples() below)
+    // are not scale-normalized to that footprint at all (scale: [1,1,1],
+    // native GLB size) - the whole-map layout audit (auditSceneLayout())
+    // found the real "Scene"-named replacements heavily overlapping each
+    // other once swapped in, the single densest cluster of overlaps on the
+    // map. Widened to 9-unit spacing and shifted south (away from Causeway
+    // Point Mall/the Woodlands interchange, both near baseZ+0..-1) - verified
+    // against the audit after this change.
+    // Second widening pass: the first pass (9-unit spacing) was based on an
+    // assumed model size before normalizeToHeight() was wired in for these
+    // swaps - once the swapped GLBs were correctly measured at their real,
+    // normalized ~10-12 unit footprint (not the original 20+ unit native
+    // scale, but still bigger than 9-unit spacing allows), the audit still
+    // showed residual overlap. 13-unit spacing, still shifted south clear of
+    // Causeway Point Mall/the Woodlands interchange.
     const estateGrid = [
-      { name: "Woodlands Estate Block C", x: -16, z: -20, color: mat.hdb },
-      { name: "Woodlands Estate Block D", x: -9, z: -20, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block E", x: -2, z: -20, color: mat.hdb },
-      { name: "Woodlands Estate Block F", x: 5, z: -20, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block G", x: -16, z: -13, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block H", x: -9, z: -13, color: mat.hdb },
-      { name: "Woodlands Estate Block I", x: -2, z: -13, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block J", x: 5, z: -13, color: mat.hdb },
-      { name: "Woodlands Estate Block K", x: -16, z: -6, color: mat.hdb },
-      { name: "Woodlands Estate Block L", x: -9, z: -6, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block M", x: -2, z: -6, color: mat.hdb },
-      { name: "Woodlands Estate Block N", x: 5, z: -6, color: mat.hdbAccent }
+      { name: "Woodlands Estate Block C", x: -21, z: -36, color: mat.hdb },
+      { name: "Woodlands Estate Block D", x: -8, z: -36, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block E", x: 5, z: -36, color: mat.hdb },
+      { name: "Woodlands Estate Block F", x: 18, z: -36, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block G", x: -21, z: -23, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block H", x: -8, z: -23, color: mat.hdb },
+      { name: "Woodlands Estate Block I", x: 5, z: -23, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block J", x: 18, z: -23, color: mat.hdb },
+      { name: "Woodlands Estate Block K", x: -21, z: -10, color: mat.hdb },
+      { name: "Woodlands Estate Block L", x: -8, z: -10, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block M", x: 5, z: -10, color: mat.hdb },
+      { name: "Woodlands Estate Block N", x: 18, z: -10, color: mat.hdbAccent }
     ];
     estateGrid.forEach((block, index) => {
       const height = 14 + (index % 3) * 2.5;
