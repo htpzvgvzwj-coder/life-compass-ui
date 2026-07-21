@@ -2454,9 +2454,30 @@
       addCylinder(THREE, scene, "Little India Arcade Column", [2.4 + i * 3.0, 1.5, 11.8], [0.14, 3.0, 8], mat.hdb);
     }
 
-    addBox(THREE, scene, "Little India Temple Base", [10, 1.1, 17.3], [3.2, 2.2, 3.0], mat.signGold);
-    addCylinder(THREE, scene, "Little India Temple Spire", [10, 3.4, 17.3], [1.1, 2.6, 4], mat.mrt);
+    // Sri Veeramakaliamman-style temple: was a single gold box + a red
+    // cylinder dropped on top, which reads as two random floating primitives,
+    // not a temple (user feedback: "what is this"). A gopuram's actual
+    // silhouette is a tapering stack of tiers - swapping to 4 narrowing tiers
+    // plus a spire and finial reads as a temple tower from primitives alone,
+    // no model needed.
+    addBox(THREE, scene, "Little India Temple Base", [10, 1.1, 17.3], [3.8, 2.2, 3.6], mat.signGold);
+    addBox(THREE, scene, "Little India Temple Tier 2", [10, 3.05, 17.3], [3.1, 1.7, 2.9], mat.flowerPink);
+    addBox(THREE, scene, "Little India Temple Tier 3", [10, 4.55, 17.3], [2.4, 1.3, 2.2], mat.signGold);
+    addBox(THREE, scene, "Little India Temple Tier 4", [10, 5.75, 17.3], [1.7, 0.9, 1.5], mat.flowerPink);
+    addCylinder(THREE, scene, "Little India Temple Spire", [10, 6.85, 17.3], [0.55, 1.1, 8], mat.mrt);
+    addBox(THREE, scene, "Little India Temple Finial", [10, 7.55, 17.3], [0.4, 0.4, 0.4], mat.signGold);
+
+    // Filled in some of the open plaza in front of the arcade/temple - the
+    // layout audit's screenshots (and user feedback: "很多空白", a lot of
+    // blank space) showed a lot of bare ground between the shophouse row and
+    // the temple with nothing placed on it.
     addFlowerBed(THREE, scene, [3.4, 9.2], 3.2, mat);
+    addFlowerBed(THREE, scene, [10, 13.5], 2.6, mat);
+    addFlowerBed(THREE, scene, [16, 15], 2.4, mat);
+    addBox(THREE, scene, "Little India Market Stall", [5.5, 0.9, 16], [2.2, 1.2, 0.9], mat.curbWarm);
+    addBox(THREE, scene, "Little India Market Awning", [5.5, 1.9, 15.4], [2.6, 0.16, 1.4], mat.flowerYellow);
+    addBox(THREE, scene, "Little India Market Stall 2", [14.5, 0.9, 16], [2.2, 1.2, 0.9], mat.curbWarm);
+    addBox(THREE, scene, "Little India Market Awning 2", [14.5, 1.9, 15.4], [2.6, 0.16, 1.4], mat.flowerPurple);
     addSignBoard(THREE, scene, "Little India Sign", "LITTLE INDIA", [3, 4.6, 8.2], mat.hdbAccent, 0x160018);
   }
 
