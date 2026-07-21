@@ -26,7 +26,8 @@ License: CC0 1.0 (public domain). Free for personal, educational, and commercial
 
 ## city-kit-quaternius/
 
-- `Building_Small_1.gltf`, `Building_Medium_2_001.gltf`, `Building_Large_2.gltf`, `Sidewalk_Straight_3m.gltf`, `Street_2Lane.gltf` (+ shared `.bin`/`T_*.png` texture files) — from Quaternius's "Downtown City MegaKit" (free/CC0 standard version), https://quaternius.itch.io/downtown-city-megakit
+- `Building_Small_1.glb`, `Building_Medium_2_001.glb`, `Building_Large_2.glb` — from Quaternius's "Downtown City MegaKit" (free/CC0 standard version), https://quaternius.itch.io/downtown-city-megakit
 - Real modeled+textured buildings (brick/window/trim detail) used to replace the primitive-box HDB/mall placeholders in Woodlands, per the art-direction reassessment in this session - this is the pilot district for that swap.
+- Load-reliability pass (2026-07-21): these 3 files originally shipped as separate `.gltf`+`.bin`+20 shared `T_*.png` texture files (~50MB total, ~80% of it uncompressed/lightly-compressed normal-map PNGs) - the dominant cost in this app's whole asset payload. Repacked each into a single self-contained `.glb` via `gltfpack` (quantized geometry + all textures re-encoded to WebP, both natively supported by the GLTFLoader already in use, no loader changes needed) - **50MB -> 14MB**, ~72% smaller, no visible quality loss. `Sidewalk_Straight_3m.gltf`/`Street_2Lane.gltf` (from the same kit) were confirmed unused by any code in this repo and removed rather than repacked.
 
 License: CC0 1.0 Universal (public domain). Free for personal, educational, and commercial use. Attribution to Quaternius (quaternius.com) is appreciated but not required.

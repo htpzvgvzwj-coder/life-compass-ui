@@ -1832,19 +1832,19 @@
       // further apart than the boxes they replace since these models are
       // larger and more detailed than a plain box footprint.
       {
-        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.gltf",
+        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.glb",
         hideNamePrefixes: ["Woodlands HDB Block A"],
         position: [-11, 0, 53],
         scale: [1, 1, 1]
       },
       {
-        url: "assets/environment/city-kit-quaternius/Building_Small_1.gltf",
+        url: "assets/environment/city-kit-quaternius/Building_Small_1.glb",
         hideNamePrefixes: ["Woodlands HDB Block B"],
         position: [-27, 0, 47],
         scale: [1, 1, 1]
       },
       {
-        url: "assets/environment/city-kit-quaternius/Building_Large_2.gltf",
+        url: "assets/environment/city-kit-quaternius/Building_Large_2.glb",
         hideNames: ["Causeway Point Mall", "Causeway Point Glass Front", "Causeway Point Roof"],
         position: [22, 0, 48],
         scale: [1, 1, 1]
@@ -1864,19 +1864,19 @@
       // swap on the map should probably be doing too, not just this one -
       // flagged here since fixing all of them is out of scope for one pass.
       {
-        url: "assets/environment/city-kit-quaternius/Building_Large_2.gltf",
+        url: "assets/environment/city-kit-quaternius/Building_Large_2.glb",
         hideNamePrefixes: ["Woodlands Estate Block C", "Woodlands Estate Block F", "Woodlands Estate Block I", "Woodlands Estate Block L"],
         positions: [[-21, 14], [18, 14], [5, 27], [-8, 36]],
         targetHeightMeters: 16
       },
       {
-        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.gltf",
+        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.glb",
         hideNamePrefixes: ["Woodlands Estate Block D", "Woodlands Estate Block G", "Woodlands Estate Block J", "Woodlands Estate Block M"],
         positions: [[-8, 14], [-21, 27], [18, 27], [5, 36]],
         targetHeightMeters: 16
       },
       {
-        url: "assets/environment/city-kit-quaternius/Building_Small_1.gltf",
+        url: "assets/environment/city-kit-quaternius/Building_Small_1.glb",
         hideNamePrefixes: ["Woodlands Estate Block E", "Woodlands Estate Block H", "Woodlands Estate Block K", "Woodlands Estate Block N"],
         positions: [[5, 14], [-8, 27], [-21, 36], [18, 36]],
         targetHeightMeters: 16
