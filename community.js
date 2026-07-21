@@ -430,17 +430,47 @@
     return communityAccountabilityConnectionsCache.filter((entry) => entry.requester_id === myId || entry.recipient_id === myId);
   }
 
+  // Connection ids for an arbitrary user (not just "me") - lets us recompute
+  // someone ELSE's candidate pool the same way we compute our own, which is
+  // exactly what the mutual-match check below needs.
+  function accountabilityConnectedIdsFor(userId) {
+    return new Set(
+      communityAccountabilityConnectionsCache
+        .filter((entry) => entry.requester_id === userId || entry.recipient_id === userId)
+        .map((entry) => (entry.requester_id === userId ? entry.recipient_id : entry.requester_id))
+    );
+  }
+
+  // Same ranking logic `suggestedAccountabilityPartners` uses for "me", but
+  // parameterized so it can be re-run from any opted-in user's point of
+  // view - used both for my own suggestions and for the reciprocity check.
+  function rankedAccountabilityCandidatesFor(userId, forEntry) {
+    const connectedIds = accountabilityConnectedIdsFor(userId);
+    return communityAccountabilityOptInsCache
+      .filter((entry) => entry.user_id !== userId && !connectedIds.has(entry.user_id) && entry.roadmap_stage === forEntry.roadmap_stage)
+      .map((entry) => ({ entry, score: CommunityMatching.scoreTagOverlap(forEntry.goal_tags || [], entry.goal_tags || []) }))
+      .sort((a, b) => b.score - a.score);
+  }
+
+  // Tag-overlap ranking alone is one-sided: it answers "how well do THEIR
+  // tags match mine" but says nothing about whether they'd rank me back.
+  // True Gale-Shapley stable matching doesn't cleanly apply to this pool -
+  // accountability partners are matched within one symmetric peer group,
+  // not two distinct sides, which is the harder (and not always solvable)
+  // Stable Roommates problem, not Stable Marriage. Instead of forcing that
+  // algorithm in, this recomputes each candidate's OWN top-3 the same way
+  // and flags whether I'd actually appear on it - a direct, honest fix for
+  // "don't suggest someone who wouldn't also suggest me back."
   function suggestedAccountabilityPartners() {
     const mine = myAccountabilityOptIn();
     if (!mine) return [];
     const myId = communityUserId();
-    const connectedIds = new Set(myAccountabilityConnections().map((entry) => (entry.requester_id === myId ? entry.recipient_id : entry.requester_id)));
-    return communityAccountabilityOptInsCache
-      .filter((entry) => entry.user_id !== myId && !connectedIds.has(entry.user_id) && entry.roadmap_stage === mine.roadmap_stage)
-      .map((entry) => ({ entry, score: CommunityMatching.scoreTagOverlap(mine.goal_tags || [], entry.goal_tags || []) }))
-      .sort((a, b) => b.score - a.score)
+    return rankedAccountabilityCandidatesFor(myId, mine)
       .slice(0, 3)
-      .map((item) => item.entry);
+      .map(({ entry }) => {
+        const theirTopPicks = rankedAccountabilityCandidatesFor(entry.user_id, entry).slice(0, 3).map((item) => item.entry.user_id);
+        return { ...entry, isMutualPick: theirTopPicks.includes(myId) };
+      });
   }
 
   function accountabilityConnectionCard(connection) {
@@ -507,6 +537,7 @@
             const profile = communityProfileFor(entry.user_id);
             return `
               <article class="accountability-match-card">
+                ${entry.isMutualPick ? `<span class="mutual-pick-badge">Likely a mutual match</span>` : ""}
                 <strong>${escapeHTML(profile ? profile.username : "Member")}</strong>
                 <p>${escapeHTML(entry.goal_title)}</p>
                 <button class="primary-action compact-action" type="button" data-open="communityAccountabilityRequest" data-open-payload="${escapeHTML(entry.user_id)}">Request partner</button>

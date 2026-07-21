@@ -5110,6 +5110,18 @@ body {
   font-weight: 700;
 }
 
+.mutual-pick-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--color-mint-soft);
+  color: var(--color-ink);
+  font-size: 10px;
+  font-weight: 850;
+}
+
 @media (max-width: 420px) {
   .growth-stat-grid,
   .growth-chip-grid,
