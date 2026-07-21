@@ -1666,19 +1666,24 @@
       // which uses the same primitive-box style as every other district
       // building rather than a downloaded model - there's no free CC0 model
       // of that specific silhouette.
+      // Layout pass: nudged away from the hand-built Marina Bay Sands towers
+      // (33-47,-66..-60) and ArtScience Museum (19.8-28.2,-70.2..-61.8) - the
+      // layout audit found all three overlapping one or both landmarks at
+      // their original positions. Still clustered nearby for background
+      // density, just pushed clear of the landmarks' actual footprints.
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
-        position: [30, 0, -67],
+        position: [30, 0, -76],
         scale: [4.9, 4.9, 4.9]
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-c.glb",
-        position: [40, 0, -59],
+        position: [58, 0, -56],
         scale: [4.4, 4.4, 4.4]
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
-        position: [50, 0, -67],
+        position: [56, 0, -75],
         scale: [3.9, 3.9, 3.9]
       },
       // Sentosa: purely additive palm trees around the existing Beach zone.
@@ -1732,19 +1737,19 @@
       {
         url: "assets/environment/city-kit-quaternius/Building_Large_2.gltf",
         hideNamePrefixes: ["Woodlands Estate Block C", "Woodlands Estate Block F", "Woodlands Estate Block I", "Woodlands Estate Block L"],
-        positions: [[-21, 14], [18, 14], [5, 27], [-8, 40]],
+        positions: [[-21, 14], [18, 14], [5, 27], [-8, 36]],
         targetHeightMeters: 16
       },
       {
         url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.gltf",
         hideNamePrefixes: ["Woodlands Estate Block D", "Woodlands Estate Block G", "Woodlands Estate Block J", "Woodlands Estate Block M"],
-        positions: [[-8, 14], [-21, 27], [18, 27], [5, 40]],
+        positions: [[-8, 14], [-21, 27], [18, 27], [5, 36]],
         targetHeightMeters: 16
       },
       {
         url: "assets/environment/city-kit-quaternius/Building_Small_1.gltf",
         hideNamePrefixes: ["Woodlands Estate Block E", "Woodlands Estate Block H", "Woodlands Estate Block K", "Woodlands Estate Block N"],
-        positions: [[5, 14], [-8, 27], [-21, 40], [18, 40]],
+        positions: [[5, 14], [-8, 27], [-21, 36], [18, 36]],
         targetHeightMeters: 16
       },
       // Real-model pass: swapping the remaining hand-built primitive-box
@@ -1759,25 +1764,25 @@
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-a.glb",
         hideNamePrefixes: ["Chinatown Shophouse Rose"],
-        position: [2, 0, -65],
+        position: [0, 0, -65],
         scale: [5.2, 5.2, 5.2]
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-b.glb",
         hideNamePrefixes: ["Chinatown Shophouse Ochre"],
-        position: [7.5, 0, -65],
+        position: [5.5, 0, -65],
         scale: [5.2, 5.2, 5.2]
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-c.glb",
         hideNamePrefixes: ["Chinatown Shophouse Teal"],
-        position: [13, 0, -65],
+        position: [11, 0, -65],
         scale: [5.2, 5.2, 5.2]
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-d.glb",
         hideNamePrefixes: ["Chinatown Shophouse Cream"],
-        position: [18.5, 0, -65],
+        position: [16.5, 0, -65],
         scale: [5.2, 5.2, 5.2]
       },
       {
@@ -1884,14 +1889,16 @@
       // below - see the Punggol comment above for why reusing a url via two
       // singular entries is unsafe but two "positions" entries (or one
       // singular + one "positions") are not.
+      // Layout pass: nudged away from Raffles Place's own hand-built towers
+      // (addRafflesPlace()) - the audit found Tower A/C overlapping these.
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
-        positions: [[68, -30]],
+        positions: [[61, -35]],
         scale: [4.6, 4.6, 4.6]
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
-        positions: [[88, -28]],
+        positions: [[95, -23]],
         scale: [4.2, 4.2, 4.2]
       }
     ];
@@ -2370,18 +2377,23 @@
   // two isolated candy-colored boxes. Paifang gate keeps its vivid red/gold -
   // that IS the real color of Chinatown's gate, not a stylization to mute.
   function addChinatown(THREE, scene, mat) {
-    addPlane(THREE, scene, "Chinatown Street Floor", [-9.75, 0.02, -14], [19, 10], mat.curbWarm);
+    addPlane(THREE, scene, "Chinatown Street Floor", [-12.5, 0.02, -14], [19, 10], mat.curbWarm);
 
     // Layout pass: widened from 4-unit to 5.5-unit spacing - the whole-map
     // overlap audit (auditSceneLayout()) found the real swapped-in GLBs
     // (loadDistrictAssetSamples() below) overlapping their immediate
     // neighbors at the old spacing, since those real models are wider than
     // the 3.6-unit primitive placeholders they replace.
+    // Shifted 2 more units west (on top of the 5.5-unit widening) - Cream
+    // (the east end) sits right against ArtScience Museum's territory in
+    // the neighboring marina-bay zone, and pulling Cream back alone just
+    // squeezed it into Teal instead. Shifting the whole row preserves the
+    // internal 5.5-unit spacing while clearing both neighbors.
     const shophouses = [
-      { name: "Chinatown Shophouse Rose", x: -18, height: 6.6, color: mat.gym },
-      { name: "Chinatown Shophouse Ochre", x: -12.5, height: 7.0, color: mat.signGold },
-      { name: "Chinatown Shophouse Teal", x: -7, height: 6.4, color: mat.hospitalAccent },
-      { name: "Chinatown Shophouse Cream", x: -1.5, height: 6.8, color: mat.hdb }
+      { name: "Chinatown Shophouse Rose", x: -20, height: 6.6, color: mat.gym },
+      { name: "Chinatown Shophouse Ochre", x: -14.5, height: 7.0, color: mat.signGold },
+      { name: "Chinatown Shophouse Teal", x: -9, height: 6.4, color: mat.hospitalAccent },
+      { name: "Chinatown Shophouse Cream", x: -3.5, height: 6.8, color: mat.hdb }
     ];
     shophouses.forEach((house) => {
       // addBuildingCore's window/balcony grid faces -z (the back of this row,
@@ -2660,10 +2672,10 @@
       { name: "Woodlands Estate Block H", x: -8, z: -23, color: mat.hdb },
       { name: "Woodlands Estate Block I", x: 5, z: -23, color: mat.hdbAccent },
       { name: "Woodlands Estate Block J", x: 18, z: -23, color: mat.hdb },
-      { name: "Woodlands Estate Block K", x: -21, z: -10, color: mat.hdb },
-      { name: "Woodlands Estate Block L", x: -8, z: -10, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block M", x: 5, z: -10, color: mat.hdb },
-      { name: "Woodlands Estate Block N", x: 18, z: -10, color: mat.hdbAccent }
+      { name: "Woodlands Estate Block K", x: -21, z: -14, color: mat.hdb },
+      { name: "Woodlands Estate Block L", x: -8, z: -14, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block M", x: 5, z: -14, color: mat.hdb },
+      { name: "Woodlands Estate Block N", x: 18, z: -14, color: mat.hdbAccent }
     ];
     estateGrid.forEach((block, index) => {
       const height = 14 + (index % 3) * 2.5;
