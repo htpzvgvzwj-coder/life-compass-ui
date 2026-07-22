@@ -223,7 +223,9 @@
       window.clearTimeout(districtLoadingSafetyTimeout);
       if (state.destroyed) return;
       clearDistrictLoadingHint(root);
-      auditSceneLayout(THREE, scene);
+      if (isLayoutAuditEnabled()) {
+        auditSceneLayout(THREE, scene);
+      }
     });
     Promise.all([roadPropsReady, plazaPropsReady, singaporeObjaversePropsReady]).catch((error) => {
       console.warn("[Life Sim] Background prop streaming failed:", error);
@@ -746,6 +748,14 @@
   // samples + road props both finish loading, logging real coordinates so
   // findings are directly actionable, not just names.
   const LAYOUT_AUDIT_EXCLUDE_NAME_PATTERN = /ground|road|path|line|crosswalk|zone.*ring|sidewalk|sand|^water|grass|green|flower|bed$|dust|cloud|rain|balcony/i;
+  function isLayoutAuditEnabled() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("lifeSimAudit") === "1" || window.localStorage?.getItem("lifeSimLayoutAudit") === "1";
+    } catch (error) {
+      return false;
+    }
+  }
   function pushLayoutAuditCandidate(THREE, candidates, node, labelPrefix) {
     const box = new THREE.Box3().setFromObject(node);
     const size = new THREE.Vector3();
@@ -3448,7 +3458,7 @@
     [
       [-46, 6, 38, 5.2, 12, 4.0, mat.hdb],
       [-38, 7.5, 34, 5.8, 15, 4.2, mat.hdbAccent],
-      [-21, 6.8, 48, 5.4, 13.6, 4.2, mat.hdb],
+      [-28, 6.8, 49.5, 5.4, 13.6, 4.2, mat.hdb],
       [-15, 5.7, 41, 4.8, 11.4, 3.8, mat.hdbAccent]
     ].forEach(([x, y, z, sx, sy, sz, material], index) => {
       addBuildingCore(THREE, scene, `Heartland HDB Precinct Block ${index + 1}`, [x, y, z], [sx, sy, sz], material, mat, "hdb");
@@ -3475,7 +3485,7 @@
     // gives the over-shoulder camera real city depth.
     const northRow = [
       [-46, -25, "TUITION"], [-37, -25, "PHARMACY"], [-28, -25, "BANK"], [-18, -25, "LAUNDRY"],
-      [-8, -25, "BAKERY"], [12, -25, "RETAIL"], [23, -25, "SKILLS"], [34, -25, "CO-WORK"],
+      [3, -25, "BAKERY"], [12, -25, "RETAIL"], [23, -25, "SKILLS"], [34, -25, "CO-WORK"],
       [46, -25, "DESIGN"], [58, -25, "TECH"]
     ];
     northRow.forEach(([x, z, label], index) => {
