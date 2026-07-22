@@ -8,6 +8,21 @@ The art direction moved from an anime/cel-shaded look to a realistic one. The ce
 
 **Objaverse, not the Unity Asset Store.** This folder's older guidance (still visible in git history) assumed buying commercial Unity Asset Store packs and exporting them to GLB. That's no longer the plan - assets now come from [Objaverse](https://objaverse.allenai.org/) (real-world 3D scans, sourced from Sketchfab uploads under Creative Commons licenses), fetched via `tools/objaverse_fetch.py`.
 
+## Map plan and loading budget
+
+Before adding more Objaverse resources, check `assets/life-sim/map-plan.json` and `docs/lifeverse-life-sim-map-plan.md`.
+
+The map is planned around a PUBG-style over-shoulder camera, six compact adult-life districts, and route-based gameplay loops. New assets must support a district identity, route, or life-choice pressure. Do not add decorative models just because they are available.
+
+Performance rules from the plan:
+
+- First playable entry should stay under 18MB of critical assets.
+- Full background load should stay under 45MB.
+- Near model loading concurrency should stay at 3 or below.
+- Far model loading concurrency should stay at 2 or below.
+- Decorative Objaverse props should lazy-load by category and never block movement.
+- Every optional asset must have a procedural fallback.
+
 ## Fetching new assets
 
 ```

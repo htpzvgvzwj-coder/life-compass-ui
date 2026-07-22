@@ -81,6 +81,21 @@
     lookDamping: 10.4
   };
 
+  const LIFE_SIM_PERFORMANCE = {
+    // Mobile browser first: 2x rendering + 2048 shadows made the simulator
+    // feel stuck on entry while shaders, textures, and models all uploaded.
+    maxPixelRatio: 1.35,
+    shadowSize: 1024,
+    shadowCameraSize: 34,
+    nearAssetConcurrency: 3,
+    farAssetConcurrency: 2,
+    farAssetDelayMs: 900,
+    roadPropsDelayMs: 900,
+    plazaPropsDelayMs: 1500,
+    farPropsDelayMs: 700,
+    propYieldEvery: 5
+  };
+
   function mount(root, options = {}) {
     if (!root) return null;
     root.innerHTML = "";
@@ -108,9 +123,9 @@
     const camera = new THREE.PerspectiveCamera(OVER_SHOULDER_CAMERA.fov, 1, 0.1, 180);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     if (window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.configureRenderer) {
-      window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.86, shadows: true, maxPixelRatio: 2 });
+      window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.86, shadows: true, maxPixelRatio: LIFE_SIM_PERFORMANCE.maxPixelRatio });
     } else {
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LIFE_SIM_PERFORMANCE.maxPixelRatio));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace || renderer.outputColorSpace;
@@ -196,18 +211,20 @@
     setDistrictLoadingHint(root, "Loading nearby area…");
     const objaverseIndexReady = loadObjaverseManifestAssets(state.assetManager, state);
     const districtSamplesReady = loadDistrictAssetSamples(THREE, scene, state.assetManager, state, spawnX, spawnZ);
-    const roadPropsReady = addRoadDetailProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady);
-    const plazaPropsReady = addDistrictPlazaProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady);
-    const allDistrictAssetsReady = Promise.all([districtSamplesReady, roadPropsReady, plazaPropsReady]);
+    const roadPropsReady = deferWorldLoad(() => addRoadDetailProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady), LIFE_SIM_PERFORMANCE.roadPropsDelayMs);
+    const plazaPropsReady = deferWorldLoad(() => addDistrictPlazaProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady), LIFE_SIM_PERFORMANCE.plazaPropsDelayMs);
     let districtLoadingSafetyTimeout = window.setTimeout(() => {
       if (state.destroyed) return;
       clearDistrictLoadingHint(root);
     }, 20000);
-    allDistrictAssetsReady.then(() => {
+    districtSamplesReady.then(() => {
       window.clearTimeout(districtLoadingSafetyTimeout);
       if (state.destroyed) return;
       clearDistrictLoadingHint(root);
       auditSceneLayout(THREE, scene);
+    });
+    Promise.all([roadPropsReady, plazaPropsReady]).catch((error) => {
+      console.warn("[Life Sim] Background prop streaming failed:", error);
     });
     loadCharacterAsset(THREE, state.assetManager, player, state, root).then((loaded) => {
       if (state.destroyed) return;
@@ -620,6 +637,19 @@
       signBlue: make(0x2f5fa8, 0x00102e),
       signGreen: make(0x2f8a5e, 0x001c10),
       signGold: make(0xc99a3f, 0x1c1200),
+      // Little India temple gopuram - dedicated, deliberately muted versions
+      // of the bright sign/flower/MRT colors it used to borrow. Reusing
+      // those shared materials directly (emissive glow included) made the
+      // temple read as a saturated, glowing "layer cake" with nothing
+      // visually bridging it to the muted city around it - found via an
+      // actual recorded playthrough, not a screenshot at a flattering angle.
+      // These keep the same warm-toned identity (a real Little India temple
+      // should still visibly be the most colorful thing on the block) but
+      // toned down and with no emissive glow, so it reads as sun-worn stone
+      // architecture instead of a lit-up prop.
+      templeBase: make(0xb8814a, 0x000000, 0.85, 0.02),
+      templeAccent: make(0xc07d84, 0x000000, 0.85, 0.02),
+      templeSpire: make(0x9c4a3e, 0x000000, 0.82, 0.02),
       roofDark: make(0x3a3f47, 0x000000, 0.55, 0.15),
       window: standard(0xf2dfa0, 0x6b5400),
       glass: shared("glass", () => glass(0x9fc4d1)),
@@ -909,8 +939,8 @@
         ambientIntensity: 0.95,
         sunIntensity: 1.08,
         sunPosition: [-12, 24, 12],
-        shadowSize: 2048,
-        shadowCameraSize: 38
+        shadowSize: LIFE_SIM_PERFORMANCE.shadowSize,
+        shadowCameraSize: LIFE_SIM_PERFORMANCE.shadowCameraSize
       })
       : null;
     const hemi = rig ? rig.hemi : new THREE.HemisphereLight(0xffffff, 0x91ad82, 0.95);
@@ -919,11 +949,11 @@
       scene.add(hemi);
       sun.position.set(-12, 24, 12);
       sun.castShadow = true;
-      sun.shadow.mapSize.set(2048, 2048);
-      sun.shadow.camera.left = -38;
-      sun.shadow.camera.right = 38;
-      sun.shadow.camera.top = 38;
-      sun.shadow.camera.bottom = -38;
+      sun.shadow.mapSize.set(LIFE_SIM_PERFORMANCE.shadowSize, LIFE_SIM_PERFORMANCE.shadowSize);
+      sun.shadow.camera.left = -LIFE_SIM_PERFORMANCE.shadowCameraSize;
+      sun.shadow.camera.right = LIFE_SIM_PERFORMANCE.shadowCameraSize;
+      sun.shadow.camera.top = LIFE_SIM_PERFORMANCE.shadowCameraSize;
+      sun.shadow.camera.bottom = -LIFE_SIM_PERFORMANCE.shadowCameraSize;
       scene.add(sun);
     }
 
@@ -1515,9 +1545,13 @@
     // tripled from the original compact map).
     addPlane(THREE, scene, "Soft Anime Town Ground", [15, -0.04, -21.5], [210, 165], mat.ground);
     addPlane(THREE, scene, "North Residential Green", [-45, -0.02, 46], [55, 35], mat.grass);
+    addSoftEdgeGroundPatch(THREE, scene, "North Residential Green", [-45, -0.02, 46], [55, 35], 0xcfe0c6);
     addPlane(THREE, scene, "Campus Green", [-80, -0.015, -5], [26, 26], mat.grass);
+    addSoftEdgeGroundPatch(THREE, scene, "Campus Green", [-80, -0.015, -5], [26, 26], 0xcfe0c6);
     addPlane(THREE, scene, "Park Green", [13, -0.01, 23], [24, 20], mat.park);
+    addSoftEdgeGroundPatch(THREE, scene, "Park Green", [13, -0.01, 23], [24, 20], 0x3f7a52);
     addPlane(THREE, scene, "Beach Sand", [75, 0, -82], [26, 11], mat.sand);
+    addSoftEdgeGroundPatch(THREE, scene, "Beach Sand", [75, 0, -82], [26, 11], 0xd8c184);
     addPlane(THREE, scene, "Shallow Anime Sea", [75, 0.015, -90], [28, 9], mat.water);
 
     addRoadNetwork(THREE, scene, mat);
@@ -1689,6 +1723,38 @@
   // cluster and excludes the rest).
   const NEAR_TIER_RADIUS = 40;
 
+  function delayMs(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  function yieldToBrowser() {
+    return new Promise((resolve) => {
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(() => resolve(), { timeout: 80 });
+        return;
+      }
+      window.requestAnimationFrame ? window.requestAnimationFrame(() => resolve()) : window.setTimeout(resolve, 0);
+    });
+  }
+
+  async function deferWorldLoad(task, delay) {
+    await delayMs(delay);
+    await yieldToBrowser();
+    return task();
+  }
+
+  async function runLimitedBatch(items, limit, worker) {
+    const queue = [...items];
+    const workers = Array.from({ length: Math.max(1, limit) }, async () => {
+      while (queue.length) {
+        const item = queue.shift();
+        await worker(item);
+        await yieldToBrowser();
+      }
+    });
+    await Promise.all(workers);
+  }
+
   function classifyByDistance(entries, spawnX, spawnZ, getAnchorPoint, nearRadius) {
     const near = [];
     const far = [];
@@ -1734,31 +1800,43 @@
   // same URL since both loaders kick off back-to-back from mount() before
   // either's internal cache is populated. One shared load, called once.
   async function loadObjaverseManifestAssets(assetManager, state) {
-    if (!assetManager) return { byCategory: {}, loadedByUrl: new Map() };
+    if (!assetManager) return { byCategory: {}, loadedByUrl: new Map(), loadEntry: async () => null };
     let manifest;
     try {
       const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
       manifest = await response.json();
     } catch (error) {
       console.warn("[Life Sim] Could not load asset manifest for props:", error);
-      return { byCategory: {}, loadedByUrl: new Map() };
+      return { byCategory: {}, loadedByUrl: new Map(), loadEntry: async () => null };
     }
     const byCategory = {};
     (manifest.objaverseAssets || []).forEach((entry) => {
       (byCategory[entry.category] = byCategory[entry.category] || []).push(entry);
     });
     const loadedByUrl = new Map();
-    await Promise.all((manifest.objaverseAssets || []).map(async (entry) => {
-      if (loadedByUrl.has(entry.url)) return;
-      const asset = await assetManager.loadModel(entry.url, {
-        id: entry.id,
-        label: entry.label,
-        targetHeightMeters: entry.targetHeightMeters
-      });
-      loadedByUrl.set(entry.url, asset);
-    }));
-    if (state && state.destroyed) return { byCategory, loadedByUrl };
-    return { byCategory, loadedByUrl };
+    const loadingByUrl = new Map();
+    async function loadEntry(entry) {
+      if (!entry || (state && state.destroyed)) return null;
+      if (loadedByUrl.has(entry.url)) return loadedByUrl.get(entry.url);
+      if (!loadingByUrl.has(entry.url)) {
+        loadingByUrl.set(entry.url, assetManager.loadModel(entry.url, {
+          id: entry.id,
+          label: entry.label,
+          targetHeightMeters: entry.targetHeightMeters
+        }).then((asset) => {
+          loadedByUrl.set(entry.url, asset);
+          loadingByUrl.delete(entry.url);
+          return asset;
+        }).catch((error) => {
+          loadingByUrl.delete(entry.url);
+          console.warn(`[Life Sim] Optional prop asset failed: ${entry.url}`, error);
+          return null;
+        }));
+      }
+      return loadingByUrl.get(entry.url);
+    }
+    if (state && state.destroyed) return { byCategory, loadedByUrl, loadEntry };
+    return { byCategory, loadedByUrl, loadEntry };
   }
 
   async function loadDistrictAssetSamples(THREE, scene, assetManager, state, spawnX, spawnZ) {
@@ -2094,8 +2172,8 @@
     // batch - splits ~30 simultaneous fetches into two smaller waves so the
     // handful nearest the player aren't competing for connections with
     // distant districts like Woodlands.
-    async function runSwapBatch(list) {
-      await Promise.all(list.map(async (swap) => {
+    async function runSwapBatch(list, concurrency) {
+      await runLimitedBatch(list, concurrency, async (swap) => {
         try {
           const asset = await assetManager.loadModel(swap.url, {
             toonify: true,
@@ -2178,13 +2256,14 @@
         } catch (error) {
           console.warn(`[Life Sim] Optional district asset swap failed: ${swap.url}`, error);
         }
-      }));
+      });
     }
 
     const { near, far } = classifyByDistance(swaps, spawnX, spawnZ, (swap) => swapAnchorPoint(swap, spawnX, spawnZ), NEAR_TIER_RADIUS);
-    await runSwapBatch(near);
+    await runSwapBatch(near, LIFE_SIM_PERFORMANCE.nearAssetConcurrency);
     if (state && state.destroyed) return;
-    await runSwapBatch(far);
+    await delayMs(LIFE_SIM_PERFORMANCE.farAssetDelayMs);
+    await runSwapBatch(far, LIFE_SIM_PERFORMANCE.farAssetConcurrency);
   }
 
   // Rebuilt for the real-asset spacing replan: the old cross-shaped road
@@ -2279,17 +2358,20 @@
     // duplicated here and in addDistrictPlazaProps() - both loaders used to
     // independently fetch the same manifest and preload the same ~13 shared
     // GLBs, risking duplicate concurrent fetches for the same URL.
-    const { byCategory, loadedByUrl } = await objaverseIndexReady;
+    const { byCategory, loadedByUrl, loadEntry } = await objaverseIndexReady;
     if (state && state.destroyed) return;
 
-    function place(entry, position, rotationY = 0) {
+    let placementCount = 0;
+    async function place(entry, position, rotationY = 0) {
       if (!entry) return;
-      const asset = loadedByUrl.get(entry.url);
+      const asset = loadedByUrl.get(entry.url) || (typeof loadEntry === "function" ? await loadEntry(entry) : null);
       if (!asset || asset.fallback || !asset.scene) return;
       const instance = asset.scene.clone(true);
       instance.position.set(position[0], position[1] || 0, position[2]);
       instance.rotation.y = rotationY;
       scene.add(instance);
+      placementCount += 1;
+      if (placementCount % LIFE_SIM_PERFORMANCE.propYieldEvery === 0) await yieldToBrowser();
     }
 
     const roundRobin = {};
@@ -2313,31 +2395,31 @@
       return [(segment.x1 + segment.x2) / 2, (segment.z1 + segment.z2) / 2];
     }
 
-    function placeStreetFurniture(segment) {
+    async function placeStreetFurniture(segment) {
       const sidewalkDistance = segment.width / 2 + 1.4;
       const [lightDx, lightDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, sidewalkDistance);
       const [poleDx, poleDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, -sidewalkDistance);
       const lightPoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 20);
       for (const [px, pz] of lightPoints) {
-        place(nextEntry("lamppost", "streetlight"), [px + lightDx, 0, pz + lightDz]);
+        await place(nextEntry("lamppost", "streetlight"), [px + lightDx, 0, pz + lightDz]);
       }
       const polePoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 30);
       for (const [px, pz] of polePoints) {
-        place(nextEntry("telephone_pole"), [px + poleDx, 0, pz + poleDz]);
+        await place(nextEntry("telephone_pole"), [px + poleDx, 0, pz + poleDz]);
       }
     }
 
-    function placeMainSpineFurniture(segment) {
+    async function placeMainSpineFurniture(segment) {
       const sidewalkDistance = segment.width / 2 + 2.4;
       const [sideDx, sideDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, sidewalkDistance);
       const benchPoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 40);
       for (const [px, pz] of benchPoints) {
-        place(nextEntry("bench"), [px + sideDx, 0, pz + sideDz]);
-        place(nextEntry("trash_can"), [px + sideDx * 1.4, 0, pz + sideDz * 1.4]);
+        await place(nextEntry("bench"), [px + sideDx, 0, pz + sideDz]);
+        await place(nextEntry("trash_can"), [px + sideDx * 1.4, 0, pz + sideDz * 1.4]);
       }
       const manholePoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 25);
       for (const [px, pz] of manholePoints) {
-        place(nextEntry("manhole"), [px, 0.02, pz], Math.random() * Math.PI * 2);
+        await place(nextEntry("manhole"), [px, 0.02, pz], Math.random() * Math.PI * 2);
       }
     }
 
@@ -2349,11 +2431,12 @@
     const segmentTiers = classifyByDistance(allSegments, spawnX, spawnZ, segmentMidpoint, NEAR_TIER_RADIUS);
     for (const segment of segmentTiers.near) {
       if (state && state.destroyed) return;
-      placeStreetFurniture(segment);
+      await placeStreetFurniture(segment);
     }
+    await delayMs(LIFE_SIM_PERFORMANCE.farPropsDelayMs);
     for (const segment of segmentTiers.far) {
       if (state && state.destroyed) return;
-      placeStreetFurniture(segment);
+      await placeStreetFurniture(segment);
     }
 
     // Benches, trash cans, and manholes only along the two main spine roads -
@@ -2362,19 +2445,20 @@
     const mainSpineTiers = classifyByDistance(ROAD_MAIN_SEGMENTS, spawnX, spawnZ, segmentMidpoint, NEAR_TIER_RADIUS);
     for (const segment of mainSpineTiers.near) {
       if (state && state.destroyed) return;
-      placeMainSpineFurniture(segment);
+      await placeMainSpineFurniture(segment);
     }
+    await delayMs(LIFE_SIM_PERFORMANCE.farPropsDelayMs);
     for (const segment of mainSpineTiers.far) {
       if (state && state.destroyed) return;
-      placeMainSpineFurniture(segment);
+      await placeMainSpineFurniture(segment);
     }
 
     // Stop signs and a couple of traffic cones at the busiest junctions only
     // - one per real-world intersection, not swept across every segment.
-    place(nextEntry("stop_sign"), [0 + 4.5, 0, 8 + 4.5]);
-    place(nextEntry("stop_sign"), [30 - 4.5, 0, -32 - 4.5], Math.PI);
-    place(nextEntry("cone"), [6, 0, -30]);
-    place(nextEntry("cone"), [7.4, 0, -30.6]);
+    await place(nextEntry("stop_sign"), [0 + 4.5, 0, 8 + 4.5]);
+    await place(nextEntry("stop_sign"), [30 - 4.5, 0, -32 - 4.5], Math.PI);
+    await place(nextEntry("cone"), [6, 0, -30]);
+    await place(nextEntry("cone"), [7.4, 0, -30.6]);
   }
 
   // Realistic-style pivot: user feedback ("很多空白" - a lot of blank space)
@@ -2421,17 +2505,20 @@
     // Manifest fetch + shared-prop preload now lives in
     // loadObjaverseManifestAssets() (called once from mount()) - see the
     // comment in addRoadDetailProps() for why this used to be duplicated.
-    const { byCategory, loadedByUrl } = await objaverseIndexReady;
+    const { byCategory, loadedByUrl, loadEntry } = await objaverseIndexReady;
     if (state && state.destroyed) return;
 
-    function place(entry, position, rotationY = 0) {
+    let placementCount = 0;
+    async function place(entry, position, rotationY = 0) {
       if (!entry) return;
-      const asset = loadedByUrl.get(entry.url);
+      const asset = loadedByUrl.get(entry.url) || (typeof loadEntry === "function" ? await loadEntry(entry) : null);
       if (!asset || asset.fallback || !asset.scene) return;
       const instance = asset.scene.clone(true);
       instance.position.set(position[0], position[1] || 0, position[2]);
       instance.rotation.y = rotationY;
       scene.add(instance);
+      placementCount += 1;
+      if (placementCount % LIFE_SIM_PERFORMANCE.propYieldEvery === 0) await yieldToBrowser();
     }
 
     const plazaCategories = ["flowerpot", "statue", "bicycle", "mailbox", "umbrella"];
@@ -2452,7 +2539,7 @@
     }
 
     let categoryCursor = 0;
-    function placeZoneProps(zone) {
+    async function placeZoneProps(zone) {
       const propsPerZone = 3;
       for (let i = 0; i < propsPerZone; i += 1) {
         const genericCategory = plazaCategories[categoryCursor % plazaCategories.length];
@@ -2462,19 +2549,20 @@
         const ringRadius = zone.radius * (1.3 + (i % 2) * 0.4);
         const px = zone.x + Math.cos(angle) * ringRadius;
         const pz = zone.z + Math.sin(angle) * ringRadius;
-        place(nextEntry(category), [px, 0, pz], angle);
+        await place(nextEntry(category), [px, 0, pz], angle);
       }
     }
 
     const zoneTiers = classifyByDistance(locationZones, spawnX, spawnZ, (zone) => [zone.x, zone.z], NEAR_TIER_RADIUS);
-    zoneTiers.near.forEach((zone) => {
+    for (const zone of zoneTiers.near) {
       if (state && state.destroyed) return;
-      placeZoneProps(zone);
-    });
-    zoneTiers.far.forEach((zone) => {
+      await placeZoneProps(zone);
+    }
+    await delayMs(LIFE_SIM_PERFORMANCE.farPropsDelayMs);
+    for (const zone of zoneTiers.far) {
       if (state && state.destroyed) return;
-      placeZoneProps(zone);
-    });
+      await placeZoneProps(zone);
+    }
   }
 
   function addHdbHome(THREE, scene, mat) {
@@ -2787,12 +2875,12 @@
     // silhouette is a tapering stack of tiers - swapping to 4 narrowing tiers
     // plus a spire and finial reads as a temple tower from primitives alone,
     // no model needed.
-    addBox(THREE, scene, "Little India Temple Base", [10, 1.1, 17.3], [3.8, 2.2, 3.6], mat.signGold);
-    addBox(THREE, scene, "Little India Temple Tier 2", [10, 3.05, 17.3], [3.1, 1.7, 2.9], mat.flowerPink);
-    addBox(THREE, scene, "Little India Temple Tier 3", [10, 4.55, 17.3], [2.4, 1.3, 2.2], mat.signGold);
-    addBox(THREE, scene, "Little India Temple Tier 4", [10, 5.75, 17.3], [1.7, 0.9, 1.5], mat.flowerPink);
-    addCylinder(THREE, scene, "Little India Temple Spire", [10, 6.85, 17.3], [0.55, 1.1, 8], mat.mrt);
-    addBox(THREE, scene, "Little India Temple Finial", [10, 7.55, 17.3], [0.4, 0.4, 0.4], mat.signGold);
+    addBox(THREE, scene, "Little India Temple Base", [10, 1.1, 17.3], [3.8, 2.2, 3.6], mat.templeBase);
+    addBox(THREE, scene, "Little India Temple Tier 2", [10, 3.05, 17.3], [3.1, 1.7, 2.9], mat.templeAccent);
+    addBox(THREE, scene, "Little India Temple Tier 3", [10, 4.55, 17.3], [2.4, 1.3, 2.2], mat.templeBase);
+    addBox(THREE, scene, "Little India Temple Tier 4", [10, 5.75, 17.3], [1.7, 0.9, 1.5], mat.templeAccent);
+    addCylinder(THREE, scene, "Little India Temple Spire", [10, 6.85, 17.3], [0.55, 1.1, 8], mat.templeSpire);
+    addBox(THREE, scene, "Little India Temple Finial", [10, 7.55, 17.3], [0.4, 0.4, 0.4], mat.templeBase);
 
     // Filled in some of the open plaza in front of the arcade/temple - the
     // layout audit's screenshots (and user feedback: "很多空白", a lot of
@@ -3397,6 +3485,63 @@
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(position[0], position[1], position[2]);
     mesh.receiveShadow = true;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  // Found via the same recorded playthrough as the collision bug: a large
+  // grass/park/sand patch (addPlane above) is a flat rectangle laid directly
+  // on top of the base ground plane with a completely different material -
+  // no transition, so walking near its edge shows a razor-straight color
+  // seam that reads as a rendering bug rather than a deliberate boundary.
+  // Cheapest real fix that doesn't require a custom shader: draw a "frame"
+  // shape on a canvas (solid color band, transparent hole in the middle so
+  // it doesn't cover the patch's own photographic texture, transparent
+  // outside so the base ground shows through), blur it, and lay that as a
+  // transparent overlay slightly larger than the patch. The blur softens
+  // both the inner edge (fading into the patch's real texture) and the
+  // outer edge (fading into the base ground) in one pass.
+  function createGroundBlendTexture(THREE, colorHex, innerRatio, blurPx, canvasSize = 256) {
+    const shape = document.createElement("canvas");
+    shape.width = canvasSize;
+    shape.height = canvasSize;
+    const shapeCtx = shape.getContext("2d");
+    shapeCtx.fillStyle = `#${colorHex.toString(16).padStart(6, "0")}`;
+    shapeCtx.fillRect(0, 0, canvasSize, canvasSize);
+    const holeMargin = (canvasSize * (1 - innerRatio)) / 2;
+    shapeCtx.globalCompositeOperation = "destination-out";
+    shapeCtx.fillRect(holeMargin, holeMargin, canvasSize - holeMargin * 2, canvasSize - holeMargin * 2);
+
+    const blurred = document.createElement("canvas");
+    blurred.width = canvasSize;
+    blurred.height = canvasSize;
+    const blurredCtx = blurred.getContext("2d");
+    blurredCtx.filter = `blur(${blurPx}px)`;
+    blurredCtx.drawImage(shape, 0, 0);
+
+    const texture = new THREE.CanvasTexture(blurred);
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  function addSoftEdgeGroundPatch(THREE, scene, name, position, scale, colorHex, marginRatio = 0.3) {
+    const overlayWidth = scale[0] * (1 + marginRatio);
+    const overlayDepth = scale[1] * (1 + marginRatio);
+    const innerRatio = 1 / (1 + marginRatio);
+    const texture = createGroundBlendTexture(THREE, colorHex, innerRatio, 22);
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      roughness: 1,
+      metalness: 0
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(overlayWidth, overlayDepth), material);
+    mesh.name = `${name} Soft Edge`;
+    mesh.rotation.x = -Math.PI / 2;
+    // Just above the patch it's blending, comfortably below anything a
+    // player-height object would render at, so it never fights or floats.
+    mesh.position.set(position[0], position[1] + 0.006, position[2]);
     scene.add(mesh);
     return mesh;
   }

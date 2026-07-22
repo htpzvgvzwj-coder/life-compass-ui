@@ -1,0 +1,507 @@
+{
+  "version": "2026-07-22-lifeverse-map-plan-v1",
+  "title": "LifeVerse Singapore District Map Plan",
+  "northStar": "A playable adult-life simulator where daily movement, choices, trade-offs, and consequences are readable in the world.",
+  "camera": {
+    "profile": "pubg-style-over-shoulder",
+    "orientation": "landscape-first",
+    "playerScreenAnchor": "left-third",
+    "fov": 68,
+    "distanceMeters": 5.2,
+    "movingDistanceMeters": 4.75,
+    "shoulderOffsetMeters": 1.18,
+    "lookAheadMeters": 7.25,
+    "lookHeightMeters": 1.62,
+    "inputModel": {
+      "mobileMove": "left virtual joystick",
+      "mobileLook": "right-side drag",
+      "desktopMove": "WASD",
+      "desktopLook": "mouse drag"
+    },
+    "avoid": [
+      "top-down dashboard camera",
+      "high floating city-view camera",
+      "camera centered directly behind the character with no shoulder offset",
+      "UI covering the forward street view"
+    ]
+  },
+  "performanceBudget": {
+    "target": "smooth mobile web entry before visual completeness",
+    "maxPixelRatio": 1.35,
+    "shadowMapSize": 1024,
+    "firstEntryCriticalAssetBudgetMb": 18,
+    "totalBackgroundAssetBudgetMb": 45,
+    "nearAssetConcurrency": 3,
+    "farAssetConcurrency": 2,
+    "roadPropsDelayMs": 900,
+    "plazaPropsDelayMs": 1500,
+    "farAssetDelayMs": 900,
+    "streamingRules": [
+      "load spawn district and adjacent route first",
+      "delay far districts until after first playable frame",
+      "load Objaverse props only when the placement needs that category",
+      "never preload the full Objaverse manifest payload on entry",
+      "reuse cached models through the asset manager",
+      "create simple collision proxies separate from decorative meshes",
+      "keep gameplay active when optional assets fail"
+    ],
+    "objaverseRules": {
+      "requiredManifestFields": [
+        "id",
+        "url",
+        "category",
+        "license",
+        "sourceUrl",
+        "targetHeightMeters"
+      ],
+      "allowedInitialTiers": [
+        "critical",
+        "near"
+      ],
+      "backgroundTiers": [
+        "background",
+        "decorative"
+      ],
+      "maxCriticalModelsPerDistrict": 3,
+      "maxDecorativePropsPerZone": 3,
+      "fallbackPolicy": "If an Objaverse asset fails, keep the procedural location and continue play."
+    }
+  },
+  "districts": [
+    {
+      "id": "heartland-independence",
+      "name": "Heartland Independence",
+      "purpose": "Home routines, basic responsibility, housing, community, and everyday recovery.",
+      "zones": [
+        "home",
+        "hdb-hub",
+        "woodlands",
+        "punggol"
+      ],
+      "systems": [
+        "housing",
+        "finance",
+        "relationships",
+        "needs",
+        "progression"
+      ],
+      "visualLandmarks": [
+        "HDB blocks",
+        "void deck",
+        "mailbox and bills",
+        "community notice board",
+        "neighborhood walkway"
+      ],
+      "objaversePriority": "near",
+      "assetSlots": [
+        {
+          "slot": "housing-block",
+          "tier": "critical",
+          "categories": [
+            "apartment",
+            "building"
+          ],
+          "fallback": "procedural HDB block"
+        },
+        {
+          "slot": "life-admin-props",
+          "tier": "near",
+          "categories": [
+            "mailbox",
+            "bench"
+          ],
+          "fallback": "small procedural sign or bench"
+        },
+        {
+          "slot": "neighborhood-detail",
+          "tier": "decorative",
+          "categories": [
+            "flowerpot",
+            "bicycle"
+          ],
+          "fallback": "skip decorative prop"
+        }
+      ]
+    },
+    {
+      "id": "health-recovery",
+      "name": "Health And Recovery",
+      "purpose": "Sleep, exercise, illness, rest, energy, stress, and mental wellbeing reset.",
+      "zones": [
+        "park",
+        "gym",
+        "hospital",
+        "beach"
+      ],
+      "systems": [
+        "health",
+        "mentalWellbeing",
+        "needs",
+        "finance",
+        "time"
+      ],
+      "visualLandmarks": [
+        "park loop",
+        "gym entrance",
+        "hospital drop-off",
+        "beach boardwalk",
+        "quiet recovery spots"
+      ],
+      "objaversePriority": "near",
+      "assetSlots": [
+        {
+          "slot": "exercise-equipment",
+          "tier": "near",
+          "categories": [
+            "dumbbell",
+            "bench"
+          ],
+          "fallback": "procedural gym equipment"
+        },
+        {
+          "slot": "medical-context",
+          "tier": "near",
+          "categories": [
+            "wheelchair",
+            "chair"
+          ],
+          "fallback": "procedural waiting area"
+        },
+        {
+          "slot": "nature-props",
+          "tier": "decorative",
+          "categories": [
+            "deck_chair",
+            "flowerpot"
+          ],
+          "fallback": "skip decorative prop"
+        }
+      ]
+    },
+    {
+      "id": "learning-purpose",
+      "name": "Learning And Purpose",
+      "purpose": "Study choices, self-improvement, education progress, focus, and future direction.",
+      "zones": [
+        "university",
+        "library",
+        "cafe"
+      ],
+      "systems": [
+        "education",
+        "career",
+        "mentalWellbeing",
+        "time",
+        "progression"
+      ],
+      "visualLandmarks": [
+        "lecture hall",
+        "library shelves",
+        "study tables",
+        "scholarship poster",
+        "quiet cafe corner"
+      ],
+      "objaversePriority": "near",
+      "assetSlots": [
+        {
+          "slot": "study-core",
+          "tier": "critical",
+          "categories": [
+            "bookshelf",
+            "desk"
+          ],
+          "fallback": "procedural study tables"
+        },
+        {
+          "slot": "student-life",
+          "tier": "near",
+          "categories": [
+            "backpack",
+            "coffee_table"
+          ],
+          "fallback": "procedural school props"
+        }
+      ]
+    },
+    {
+      "id": "work-money",
+      "name": "Work And Money",
+      "purpose": "Career pressure, salary, spending, food decisions, shopping temptation, and daily budget trade-offs.",
+      "zones": [
+        "work",
+        "raffles-place",
+        "mall",
+        "food"
+      ],
+      "systems": [
+        "career",
+        "finance",
+        "needs",
+        "economy",
+        "lifeReport"
+      ],
+      "visualLandmarks": [
+        "office tower",
+        "CBD towers",
+        "food court stalls",
+        "sale signage",
+        "ATM and shopfronts"
+      ],
+      "objaversePriority": "near",
+      "assetSlots": [
+        {
+          "slot": "office-core",
+          "tier": "critical",
+          "categories": [
+            "office",
+            "building"
+          ],
+          "fallback": "procedural office tower"
+        },
+        {
+          "slot": "spending-pressure",
+          "tier": "near",
+          "categories": [
+            "shopping_cart",
+            "trash_can"
+          ],
+          "fallback": "procedural shop sign"
+        },
+        {
+          "slot": "food-court-detail",
+          "tier": "near",
+          "categories": [
+            "table",
+            "chair"
+          ],
+          "fallback": "procedural hawker tables"
+        }
+      ]
+    },
+    {
+      "id": "culture-social",
+      "name": "Culture And Social Balance",
+      "purpose": "Friendship, social choices, identity, confidence, relationship maintenance, and culture.",
+      "zones": [
+        "chinatown",
+        "little-india",
+        "bugis",
+        "clarke-quay"
+      ],
+      "systems": [
+        "relationships",
+        "mentalWellbeing",
+        "finance",
+        "time",
+        "npcSimulation"
+      ],
+      "visualLandmarks": [
+        "shophouse row",
+        "temple street",
+        "lanterns",
+        "riverside seating",
+        "night social route"
+      ],
+      "objaversePriority": "background",
+      "assetSlots": [
+        {
+          "slot": "street-culture",
+          "tier": "background",
+          "categories": [
+            "lantern",
+            "statue"
+          ],
+          "fallback": "procedural signage"
+        },
+        {
+          "slot": "social-seating",
+          "tier": "decorative",
+          "categories": [
+            "bench",
+            "coffee_table"
+          ],
+          "fallback": "skip decorative prop"
+        }
+      ]
+    },
+    {
+      "id": "mobility-future",
+      "name": "Mobility And Future Edge",
+      "purpose": "Commute choices, opportunity access, future travel, city ambition, and long-term planning.",
+      "zones": [
+        "train",
+        "airport",
+        "marina-bay"
+      ],
+      "systems": [
+        "transportation",
+        "career",
+        "opportunity",
+        "worldSimulation",
+        "futureMirror"
+      ],
+      "visualLandmarks": [
+        "MRT sign",
+        "ticket gate",
+        "airport terminal",
+        "CBD skyline",
+        "future opportunity billboard"
+      ],
+      "objaversePriority": "background",
+      "assetSlots": [
+        {
+          "slot": "mobility-core",
+          "tier": "critical",
+          "categories": [
+            "train_station",
+            "sign"
+          ],
+          "fallback": "procedural MRT entrance"
+        },
+        {
+          "slot": "future-city-skyline",
+          "tier": "background",
+          "categories": [
+            "building",
+            "tower"
+          ],
+          "fallback": "procedural skyline"
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "id": "morning-commute",
+      "name": "Morning Commute",
+      "path": [
+        "home",
+        "train",
+        "work"
+      ],
+      "alternatePath": [
+        "home",
+        "train",
+        "university"
+      ],
+      "systems": [
+        "time",
+        "transportation",
+        "career",
+        "education",
+        "needs"
+      ],
+      "choicePressure": "Save time or save money while preserving energy.",
+      "lifeReportTrace": "commute-routine"
+    },
+    {
+      "id": "money-pressure-loop",
+      "name": "Money Pressure Loop",
+      "path": [
+        "work",
+        "food",
+        "mall",
+        "home"
+      ],
+      "systems": [
+        "finance",
+        "needs",
+        "happiness",
+        "stress",
+        "lifeReport"
+      ],
+      "choicePressure": "Eat, spend, or save after work.",
+      "lifeReportTrace": "spending-choice"
+    },
+    {
+      "id": "health-reset-loop",
+      "name": "Health Reset Loop",
+      "path": [
+        "home",
+        "park",
+        "gym",
+        "food"
+      ],
+      "alternatePath": [
+        "home",
+        "hospital",
+        "park"
+      ],
+      "systems": [
+        "health",
+        "mentalWellbeing",
+        "needs",
+        "finance"
+      ],
+      "choicePressure": "Recover early or pay the cost later.",
+      "lifeReportTrace": "health-maintenance"
+    },
+    {
+      "id": "opportunity-day",
+      "name": "Opportunity Day",
+      "path": [
+        "university",
+        "library",
+        "cafe",
+        "raffles-place"
+      ],
+      "systems": [
+        "education",
+        "career",
+        "relationships",
+        "progression"
+      ],
+      "choicePressure": "Prepare quietly before seeking a bigger opportunity.",
+      "lifeReportTrace": "opportunity-preparation"
+    },
+    {
+      "id": "social-balance-night",
+      "name": "Social Balance Night",
+      "path": [
+        "work",
+        "clarke-quay",
+        "bugis",
+        "home"
+      ],
+      "systems": [
+        "relationships",
+        "finance",
+        "stress",
+        "time"
+      ],
+      "choicePressure": "Maintain connection without losing balance.",
+      "lifeReportTrace": "social-balance"
+    },
+    {
+      "id": "future-gateway",
+      "name": "Future Gateway",
+      "path": [
+        "train",
+        "marina-bay",
+        "airport"
+      ],
+      "systems": [
+        "futureMirror",
+        "opportunity",
+        "career",
+        "worldSimulation"
+      ],
+      "choicePressure": "Connect today's preparation to future mobility.",
+      "lifeReportTrace": "future-direction"
+    }
+  ],
+  "implementationOrder": [
+    "keep PUBG-style camera as the default Life Sim camera",
+    "use this map plan as the source for future map-zone JSON extraction",
+    "make routes visible in the phone map before adding more physical land",
+    "replace one critical asset per district before adding decorative props",
+    "test mobile entry after every Objaverse batch"
+  ],
+  "redLines": [
+    "do not expand into a full Singapore map before the compact district feels alive",
+    "do not add decorative Objaverse props that do not support a life choice or place identity",
+    "do not block gameplay while optional models load",
+    "do not let UI cover the over-shoulder street view",
+    "do not make game logic depend on decorative mesh names or downloaded asset success"
+  ]
+}
