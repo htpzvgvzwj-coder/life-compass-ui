@@ -146,8 +146,16 @@ assert.ok(realReplacementPass.categories.includes("bench"), "real replacement pa
 assert.ok(realReplacementPass.categories.includes("trash_can"), "real replacement pass includes trash cans");
 assert.ok(realManifest.objaverseAssets.some((entry) => entry.url.includes("assets/props/objaverse/") && entry.category === "lamppost"), "real manifest has local Objaverse lamppost GLB");
 assert.ok(realManifest.objaverseAssets.some((entry) => entry.url.includes("assets/props/objaverse/") && entry.category === "bench"), "real manifest has local Objaverse bench GLB");
-assert.ok(realManifest.character.url.includes("KhronosGroup/glTF-Sample-Assets"), "real manifest uses a GitHub-hosted humanoid GLB");
-assert.strictEqual(realManifest.character.targetHeightMeters, 1.72, "real character is normalized to adult human scale");
+// Character reverted to null (2026-07-22): CesiumMan validated that the
+// real-character pipeline loads/animates a textured humanoid GLB correctly,
+// but it's a glTF conformance/test asset with a deliberately stylized blue-
+// green swirl texture over the whole body, not a real-person appearance -
+// confirmed via production screenshots to look like a broken sci-fi
+// mannequin rather than a placeholder person, actively working against the
+// realistic-Singapore feel. Falls back to the primitive capsule/sphere rig
+// (same documented no-crash behavior) until a real, properly licensed
+// character GLB is sourced.
+assert.strictEqual(realManifest.character, null, "real manifest has no character asset until a real, properly licensed one is sourced");
 
 const THREE = makeFakeThree();
 const materials = sandbox.window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" });

@@ -10,12 +10,18 @@
     "never the live asset-swap mechanism anyway (life-sim.js's",
     "loadDistrictAssetSamples() is, and always runs regardless of this manifest).",
     "",
-    "character (2026-07-22 update): Objaverse's person category was not a",
-    "reliable source for a rigged game character with locomotion, so the live",
-    "character slot now points at KhronosGroup's GitHub-hosted Cesium Man GLB",
-    "to validate the real-character pipeline with a textured humanoid asset.",
-    "This is still replaceable: swap the character.url for a properly licensed",
-    "youth/anime-realistic character GLB later without changing gameplay logic.",
+    "character (2026-07-22 revert): Cesium Man validated that the real-",
+    "character pipeline loads and animates a textured humanoid GLB correctly,",
+    "but it's a glTF conformance/test asset (Khronos/Cesium's official sample",
+    "model), not a real-person model - its texture is a deliberately stylized",
+    "blue-green swirl pattern covering the whole body including the head, not",
+    "skin/clothing. In actual gameplay this reads as a broken/bizarre sci-fi",
+    "mannequin, not a placeholder person, actively hurting the realistic-",
+    "Singapore feel this whole pass is going for. Reverted character back to",
+    "null (falls back to the neutral primitive capsule/sphere rig, same",
+    "documented no-crash behavior as before) until a real, properly licensed",
+    "youth-appropriate character GLB is sourced - the pipeline itself (proven",
+    "by this test) does not need to change when that happens.",
     "",
     "Keep total first-load model + texture size under 45MB for mobile."
   ],
@@ -102,24 +108,7 @@
     }
   ],
   "objaverseBuildingAssets": [],
-  "character": {
-    "id": "github-khronos-cesium-man",
-    "url": "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@main/Models/CesiumMan/glTF-Binary/CesiumMan.glb",
-    "label": "GitHub-hosted textured humanoid character",
-    "sourceUrl": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CesiumMan",
-    "license": "cc-by-4.0-with-trademark-limitations",
-    "targetHeightMeters": 1.72,
-    "rotation": [0, 3.141592653589793, 0],
-    "animationMap": {
-      "idle": ["idle", "rest"],
-      "walk": ["walk"],
-      "run": ["run"],
-      "jump": ["jump"],
-      "sit": ["idle"],
-      "eat": ["idle"],
-      "exercise": ["run"]
-    }
-  },
+  "character": null,
   "objaverseAssets": [
     {
       "id": "bench:91e9a8ae",

@@ -162,7 +162,19 @@
       scene.fog = new THREE.Fog(0xcdd2c2, 38, 104);
     }
 
-    const camera = new THREE.PerspectiveCamera(OVER_SHOULDER_CAMERA.fov, 1, 0.1, 180);
+    // Performance fix: the camera's far plane used to be 180 units while fog
+    // reaches full opacity at 104 - everything between 104 and 180 units was
+    // fully invisible (fogged out) but three.js's automatic frustum culling
+    // still submitted it for rendering, since fog is a post-process visual
+    // effect, not a culling distance. Across a ~200x157 unit map with 20+
+    // districts, that meant huge amounts of completely-invisible geometry
+    // were still costing real draw calls and GPU time every frame - a real,
+    // measured contributor to the lag/heat complaints (draw calls climbing
+    // into the thousands, FPS dropping to single digits, on a real recorded
+    // production test). Matching the far plane to just past the fog
+    // distance lets three.js skip that geometry entirely with zero visual
+    // difference (it was never visible anyway).
+    const camera = new THREE.PerspectiveCamera(OVER_SHOULDER_CAMERA.fov, 1, 0.1, 112);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     if (window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.configureRenderer) {
       window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.86, shadows: LIFE_SIM_PERFORMANCE.shadowsEnabled, maxPixelRatio: LIFE_SIM_PERFORMANCE.maxPixelRatio });
@@ -3621,14 +3633,23 @@
     const baseX = 0;
     const baseZ = 50;
 
-    // Integrated transport hub (MRT + bus interchange)
-    addBox(THREE, scene, "Woodlands Interchange Platform", [baseX, 0.32, baseZ], [10, 0.64, 6], mat.mrt);
-    addBox(THREE, scene, "Woodlands Interchange Roof", [baseX, 3.1, baseZ], [11, 0.45, 7], mat.roofDark);
-    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX - 4, 1.5, baseZ - 2.5], [0.2, 3, 8], mat.metal);
-    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX + 4, 1.5, baseZ - 2.5], [0.2, 3, 8], mat.metal);
-    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX - 4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
-    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX + 4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
-    addSignBoard(THREE, scene, "Woodlands Interchange Sign", "WOODLANDS", [baseX - 4.5, 4.4, baseZ - 3.6], mat.signBlue, 0xffffff);
+    // Integrated transport hub (MRT + bus interchange). Layout fix: this
+    // used to be centered at baseX (x=0), dead on the "Main Road NS"
+    // centerline (x=0, 7 units wide) that runs right through Woodlands -
+    // the platform (10 units wide) and roof (11 units wide) both fully
+    // spanned the road, reading as a building sitting in the middle of
+    // traffic. Shifted west of the road by interchangeX and narrowed to fit
+    // the gap between the road's left edge (x=-3.5) and HDB Block A's right
+    // edge (x=-10, per its own position/scale below) without overlapping
+    // either.
+    const interchangeX = baseX - 6.5;
+    addBox(THREE, scene, "Woodlands Interchange Platform", [interchangeX, 0.32, baseZ], [6, 0.64, 6], mat.mrt);
+    addBox(THREE, scene, "Woodlands Interchange Roof", [interchangeX, 3.1, baseZ], [6.6, 0.45, 7], mat.roofDark);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [interchangeX - 2.4, 1.5, baseZ - 2.5], [0.2, 3, 8], mat.metal);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [interchangeX + 2.4, 1.5, baseZ - 2.5], [0.2, 3, 8], mat.metal);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [interchangeX - 2.4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [interchangeX + 2.4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
+    addSignBoard(THREE, scene, "Woodlands Interchange Sign", "WOODLANDS", [interchangeX - 2.7, 4.4, baseZ - 3.6], mat.signBlue, 0xffffff);
 
     // Causeway Point mall, right next to the interchange (as it is in reality).
     // The visible mall volume itself is swapped for a real modeled building in
