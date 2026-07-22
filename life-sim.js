@@ -109,6 +109,16 @@
     fallbackScale: 0.56
   };
 
+  const LIFE_SIM_SCALE_BUDGETS = {
+    playerHeightMeters: PLAYER_VISUAL_REFERENCE.heightMeters,
+    hawkerPavilionHeightMeters: 6.2,
+    hawkerShopHeightMeters: 5.6,
+    shophouseHeightMeters: 11.5,
+    hdbBlockHeightMeters: 24,
+    roadLaneWidthMeters: 3.5,
+    sidewalkMinWidthMeters: 1.6
+  };
+
   const LIFE_SIM_PERFORMANCE = {
     // Mobile browser first: 2x rendering + 2048 shadows made the simulator
     // feel stuck on entry while shaders, textures, and models all uploaded.
@@ -2047,12 +2057,67 @@
     if (!ready || (state && state.destroyed)) return;
 
     const swaps = [
+      // Food Court first-screen real-model pass: the player spawns here often,
+      // so the hawker street edge must be the first thing that stops looking
+      // like placeholder boxes. These local GLBs are small enough for mobile,
+      // load through the Asset Manager, hide the procedural shophouse shells,
+      // and keep the awnings/sign text as light street-layer dressing.
+      {
+        url: "assets/environment/city-kit-commercial/chinatown-shophouse-a.glb",
+        hideNamePrefixes: ["Hawker Street Shop VALUE"],
+        position: [-6, 0, -90],
+        scale: [1, 1, 1],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
+      },
+      {
+        url: "assets/environment/city-kit-commercial/chinatown-shophouse-b.glb",
+        hideNamePrefixes: ["Hawker Street Shop KOPI"],
+        position: [2, 0, -90],
+        scale: [1, 1, 1],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
+      },
+      {
+        url: "assets/environment/city-kit-commercial/chinatown-shophouse-c.glb",
+        hideNamePrefixes: ["Hawker Street Shop NASI"],
+        position: [10, 0, -90],
+        scale: [1, 1, 1],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
+      },
+      {
+        url: "assets/environment/city-kit-commercial/chinatown-shophouse-d.glb",
+        hideNamePrefixes: ["Hawker Street Shop FRUIT"],
+        position: [18, 0, -90],
+        scale: [1, 1, 1],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
+      },
+      {
+        url: "assets/environment/city-kit-commercial/bugis-shophouse-a.glb",
+        hideNamePrefixes: ["Hawker Street Shop MART"],
+        position: [26, 0, -90],
+        scale: [1, 1, 1],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
+      },
+      {
+        url: "assets/environment/city-kit-commercial/bugis-shophouse-b.glb",
+        hideNamePrefixes: ["Hawker Street Shop ATM"],
+        position: [34, 0, -90],
+        scale: [1, 1, 1],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
+      },
+      {
+        url: "assets/environment/cafe-building.glb",
+        hideNames: ["Food Court Roof", "Food Court Roof Ridge"],
+        hideNamePrefixes: ["Food Court Column"],
+        position: [20, 0, -96],
+        scale: [1, 1, 1],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerPavilionHeightMeters
+      },
       {
         url: "assets/environment/hdb-block.glb",
         hideNamePrefixes: ["HDB Home Block A", "HDB Home Block B"],
         position: [-30, 0, 42.2],
         scale: [5.5, 5.5, 5.5],
-        targetHeightMeters: 24
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hdbBlockHeightMeters
       },
       {
         url: "assets/environment/office-tower.glb",
@@ -2248,28 +2313,28 @@
         hideNamePrefixes: ["Chinatown Shophouse Rose"],
         position: [0, 0, -65],
         scale: [5.2, 5.2, 5.2],
-        targetHeightMeters: 12
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.shophouseHeightMeters
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-b.glb",
         hideNamePrefixes: ["Chinatown Shophouse Ochre"],
         position: [5.5, 0, -65],
         scale: [5.2, 5.2, 5.2],
-        targetHeightMeters: 12
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.shophouseHeightMeters
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-c.glb",
         hideNamePrefixes: ["Chinatown Shophouse Teal"],
         position: [11, 0, -65],
         scale: [5.2, 5.2, 5.2],
-        targetHeightMeters: 12
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.shophouseHeightMeters
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-d.glb",
         hideNamePrefixes: ["Chinatown Shophouse Cream"],
         position: [16.5, 0, -65],
         scale: [5.2, 5.2, 5.2],
-        targetHeightMeters: 12
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.shophouseHeightMeters
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-a.glb",
@@ -2647,6 +2712,8 @@
     for (let x = -5; x <= 34; x += 7) addBox(THREE, scene, "Hawker Street Lane Dash", [x, 0.17, -84.5], [2.2, 0.035, 0.18], mat.roadLine, true);
     addCrosswalk(THREE, scene, [2, -84.5], mat, "z");
     addCrosswalk(THREE, scene, [31, -84.5], mat, "z");
+    for (let x = -8; x <= 39; x += 4) addBox(THREE, scene, "Hawker Apron Tile Seam X", [x, 0.255, -77.2], [0.025, 0.025, 8.2], mat.curbWarm, true);
+    for (let z = -81; z <= -73; z += 2) addBox(THREE, scene, "Hawker Apron Tile Seam Z", [15, 0.26, z], [48, 0.025, 0.025], mat.curbWarm, true);
 
     [
       [-6, -90, "VALUE"], [2, -90, "KOPI"], [10, -90, "NASI"], [18, -90, "FRUIT"], [26, -90, "MART"], [34, -90, "ATM"]
@@ -2657,8 +2724,8 @@
       addBox(THREE, scene, `Hawker Street ${label} Sign Band`, [x, 3.65, z + 1.82], [4.5, 0.48, 0.12], index % 2 ? mat.signBlue : mat.signGold);
     });
 
-    [-4, 5, 14, 23, 32].forEach((x, index) => {
-      addStreetLight(THREE, scene, [x, -80.2], mat);
+    [-8, 12, 32, 42].forEach((x, index) => {
+      addStreetLight(THREE, scene, [x, -77.4], mat);
       addPlanterRow(THREE, scene, [x - 0.8, -78.9], 2, mat);
       if (index % 2 === 0) addBench(THREE, scene, [x + 1.7, -79.6], mat);
     });
@@ -4129,7 +4196,7 @@
   }
 
   function addStreetLight(THREE, scene, position, mat) {
-    addCylinder(THREE, scene, "Street Light Pole", [position[0], 1.5, position[1]], [0.08, 3, 10], mat.lamp);
+    addCylinder(THREE, scene, "Street Light Pole", [position[0], 1.5, position[1]], [0.045, 3, 10], mat.metal);
     addCylinder(THREE, scene, "Street Light Glow", [position[0], 3.1, position[1]], [0.34, 0.32, 16], mat.lampGlow);
   }
 

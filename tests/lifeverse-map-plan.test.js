@@ -115,6 +115,33 @@ assert.ok(simSource.includes("addStreetCompositionLayer"), "Life Sim adds a firs
 assert.ok(simSource.includes("addFoodCourtStreetComposition"), "Life Sim repairs the Food Court spawn with a framed Singapore street scene");
 assert.ok(simSource.includes("Hawker Street Road Surface"), "Life Sim gives the Food Court entry a real road edge instead of blank concrete");
 assert.ok(simSource.includes("Hawker Street ${label} Awning"), "Food Court shopfronts include visible awnings on the player-facing side");
+assert.ok(simSource.includes("LIFE_SIM_SCALE_BUDGETS"), "Life Sim has an explicit real-world scale budget");
+assert.ok(simSource.includes("hawkerPavilionHeightMeters: 6.2"), "Food Court pavilion uses a controlled human-scale height");
+assert.ok(simSource.includes("hawkerShopHeightMeters: 5.6"), "Food Court street shops use a controlled human-scale height");
+assert.ok(simSource.includes("Food Court first-screen real-model pass"), "Life Sim prioritizes real models at the first Food Court camera");
+assert.ok(simSource.includes("assets/environment/cafe-building.glb"), "Food Court pavilion uses a real local GLB replacement");
+assert.ok(simSource.includes("Hawker Apron Tile Seam X"), "Food Court plaza has tile seams instead of a blank plane");
+assert.ok(simSource.includes("[0.045, 3, 10], mat.metal"), "Street light poles are thin and light enough not to block the camera");
+[
+  "Hawker Street Shop VALUE",
+  "Hawker Street Shop KOPI",
+  "Hawker Street Shop NASI",
+  "Hawker Street Shop FRUIT",
+  "Hawker Street Shop MART",
+  "Hawker Street Shop ATM"
+].forEach((placeholderName) => {
+  assert.ok(simSource.includes(`hideNamePrefixes: ["${placeholderName}"]`), `Food Court replacement hides ${placeholderName}`);
+});
+[
+  "assets/environment/city-kit-commercial/chinatown-shophouse-a.glb",
+  "assets/environment/city-kit-commercial/chinatown-shophouse-b.glb",
+  "assets/environment/city-kit-commercial/chinatown-shophouse-c.glb",
+  "assets/environment/city-kit-commercial/chinatown-shophouse-d.glb",
+  "assets/environment/city-kit-commercial/bugis-shophouse-a.glb",
+  "assets/environment/city-kit-commercial/bugis-shophouse-b.glb"
+].forEach((assetPath) => {
+  assert.ok(fs.existsSync(path.join(root, assetPath)), `Food Court real model exists: ${assetPath}`);
+});
 assert.ok(simSource.includes("loadEntry"), "Life Sim implementation supports lazy Objaverse prop loading");
 assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation throttles optional model loading");
 [
@@ -138,7 +165,7 @@ assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation thrott
 ].forEach((marker) => {
   assert.ok(simSource.includes(marker), `Life Sim renderer includes Singapore city infill marker: ${marker}`);
 });
-assert.ok(indexSource.includes("life-sim.js?v=lifesim-city-polish-20260722-1"), "index cache key points at the city polish build");
+assert.ok(indexSource.includes("life-sim.js?v=lifesim-real-asset-pass-20260722-1"), "index cache key points at the real asset pass build");
 
 [
   "Purpose",
