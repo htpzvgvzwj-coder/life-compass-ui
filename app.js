@@ -99,7 +99,7 @@ const FUTURE_SCAN_SYSTEM_PROMPT = "You are Future Scan, a module inside Compass'
 // growth goal (not just interview/study/money): the app keeps the coach
 // catalog and safety boundaries, while AI dynamically chooses the coach and
 // writes the training path from the user's real goal/context.
-const BUILD_MODE_SYSTEM_PROMPT = "You are Build Mode, a goal-based AI coach router inside Compass. The user may bring ANY practical growth goal: interview, study, money, family conversation, confidence, career direction, scholarship, entrepreneurship, independence, wellness, opportunity planning, or something unusual. First match the goal to the most useful coach; if no specialist fits, use Custom Growth Coach. Then create a training path, not a proof log and not a static checklist. Keep every training step concrete, interactive, and immediately usable. Ground everything only in the user's stated goal, saved profile/context, and current training conversation. Never invent memories, traits, achievements, mood, or history. Never guarantee outcomes; use possible/likely language. Do not diagnose mental health or act as a therapist, parent, teacher, employer, or emergency service. If the user mentions danger or serious self-harm risk, respond safely and encourage contacting a trusted person or emergency support. Return strict JSON whenever JSON is requested.";
+const BUILD_MODE_SYSTEM_PROMPT = "You are Build Mode, a goal-based AI coach router inside Compass. The user may bring ANY practical growth goal: interview, study, money, family conversation, confidence, career direction, scholarship, entrepreneurship, independence, wellness, opportunity planning, or something unusual. First match the goal to the most useful coach; if no specialist fits, use Custom Growth Coach. Then create a training path, not a proof log and not a static checklist. Keep every training step concrete, interactive, and immediately usable. Ground everything only in the user's stated goal, saved profile/context, and current training conversation. Never invent memories, traits, achievements, mood, or history. Never guarantee outcomes; use possible/likely language. When a training step is a roleplay or practice scenario, run it as a graduated exposure: start with an easier, lower-pressure version of the scenario, then once the user handles it, explicitly say you are raising the difficulty and escalate to a harder, more realistic version - never open with the hardest version cold. Do not diagnose mental health or act as a therapist, parent, teacher, employer, or emergency service. If the user mentions danger or serious self-harm risk, respond safely and encourage contacting a trusted person or emergency support. Return strict JSON whenever JSON is requested.";
 
 const BUILD_COACH_TYPES = [
   { id: "interview", name: "Interview Coach", use: "interviews, internships, scholarship interviews, job interviews, self-introduction, STAR stories" },
@@ -323,7 +323,8 @@ const defaultTrackerState = {
   careerStudio: {
     interviewSessions: [],
     resume: null,
-    portfolio: null
+    portfolio: null,
+    paycheckCheck: null
   },
   lifeVerse: createDefaultLifeVerseState(),
   lifeSim: {
@@ -1045,7 +1046,8 @@ function normalizeTrackerState(state) {
     careerStudio: {
       interviewSessions: Array.isArray(state.careerStudio && state.careerStudio.interviewSessions) ? state.careerStudio.interviewSessions : fallback.careerStudio.interviewSessions,
       resume: (state.careerStudio && state.careerStudio.resume && typeof state.careerStudio.resume === "object") ? state.careerStudio.resume : fallback.careerStudio.resume,
-      portfolio: (state.careerStudio && state.careerStudio.portfolio && typeof state.careerStudio.portfolio === "object") ? state.careerStudio.portfolio : fallback.careerStudio.portfolio
+      portfolio: (state.careerStudio && state.careerStudio.portfolio && typeof state.careerStudio.portfolio === "object") ? state.careerStudio.portfolio : fallback.careerStudio.portfolio,
+      paycheckCheck: (state.careerStudio && state.careerStudio.paycheckCheck && typeof state.careerStudio.paycheckCheck === "object") ? state.careerStudio.paycheckCheck : fallback.careerStudio.paycheckCheck
     },
     lifeVerse: normalizeLifeVerseState(state.lifeVerse || fallback.lifeVerse),
     lifeSim: normalizeLifeSimState(state.lifeSim || fallback.lifeSim),
@@ -3195,6 +3197,7 @@ function destroyLifeSim() {
     lifeSimInstance.destroy();
   }
   lifeSimInstance = null;
+  window.__CompassLifeSimDebug = null;
 }
 
 function enterLifeSimMode() {
@@ -3246,7 +3249,7 @@ function mountLifeSim() {
     root.innerHTML = `<div class="sim-canvas-fallback"><strong>3D simulator is unavailable</strong><span>Refresh the page once, then open Life Sim again.</span></div>`;
     return;
   }
-  const initialLocationId = pendingTeleportLocationId;
+  const initialLocationId = pendingTeleportLocationId || trackerState.lifeSim.currentLocation || "home";
   pendingTeleportLocationId = null;
   lifeSimInstance = window.CompassLifeSim.mount(root, {
     getLifeVerseState: () => lifeVerseState(),
@@ -3257,6 +3260,9 @@ function mountLifeSim() {
       updateLifeSimDom();
     }
   });
+  window.__CompassLifeSimDebug = lifeSimInstance && typeof lifeSimInstance.getDebugState === "function"
+    ? () => lifeSimInstance.getDebugState()
+    : null;
 }
 
 function lifeVersePresentationPause(kind = "soft", duration = 420) {
@@ -4062,6 +4068,87 @@ function portfolioBuilderView() {
         <div class="modal-action-row"><strong>Preview</strong><button class="secondary-action compact-action" type="button" data-copy-portfolio>Copy text</button></div>
         <pre class="resume-preview-text">${escapeHTML(portfolio.polishedText)}</pre>
       </div>
+    ` : ""}
+  `;
+}
+
+// Career Studio - Paycheck Reality Check (GitHub research idea, inspired by
+// PolicyEngine's approach of computing real policy numbers instead of
+// inventing plausible ones). "How much would I actually take home" is a
+// concrete, nameable version of a vague "adulting" fear (taxes/CPF are
+// confusing) - so this uses real, published Singapore figures (IRAS
+// resident individual tax brackets, CPF Ordinary Wage employee rate/
+// ceiling) rather than a fictional estimate, the same way the rest of
+// Career Studio never invents facts about the user. Deliberately simplified
+// (no bonus/relief/age-tier edge cases) and labeled as an estimate, not tax
+// advice - the goal is turning an abstract fear into a concrete ballpark
+// number, not filing an accurate return.
+const SG_RESIDENT_TAX_BRACKETS_2024 = [
+  { upTo: 20000, rate: 0 },
+  { upTo: 30000, rate: 0.02 },
+  { upTo: 40000, rate: 0.035 },
+  { upTo: 80000, rate: 0.07 },
+  { upTo: 120000, rate: 0.115 },
+  { upTo: 160000, rate: 0.15 },
+  { upTo: 200000, rate: 0.18 },
+  { upTo: 240000, rate: 0.19 },
+  { upTo: 280000, rate: 0.195 },
+  { upTo: 320000, rate: 0.2 },
+  { upTo: Infinity, rate: 0.22 }
+];
+const SG_CPF_EMPLOYEE_RATE = 0.2;
+const SG_CPF_OW_CEILING_MONTHLY = 6800;
+
+function computeSingaporeTakeHome(grossMonthly) {
+  const monthly = Math.max(0, Number(grossMonthly) || 0);
+  const cpfableMonthly = Math.min(monthly, SG_CPF_OW_CEILING_MONTHLY);
+  const employeeCpfMonthly = cpfableMonthly * SG_CPF_EMPLOYEE_RATE;
+  const annualIncome = monthly * 12;
+  const chargeableIncome = Math.max(0, annualIncome - employeeCpfMonthly * 12);
+  let annualTax = 0;
+  let lowerBound = 0;
+  for (const bracket of SG_RESIDENT_TAX_BRACKETS_2024) {
+    if (chargeableIncome <= lowerBound) break;
+    annualTax += (Math.min(chargeableIncome, bracket.upTo) - lowerBound) * bracket.rate;
+    lowerBound = bracket.upTo;
+  }
+  const monthlyTax = annualTax / 12;
+  return {
+    grossMonthly: monthly,
+    employeeCpfMonthly: Math.round(employeeCpfMonthly),
+    monthlyTax: Math.round(monthlyTax),
+    takeHomeMonthly: Math.round(monthly - employeeCpfMonthly - monthlyTax),
+    annualTax: Math.round(annualTax)
+  };
+}
+
+function calculatePaycheckReality() {
+  const monthlyInput = modalLayer.querySelector("#paycheck-monthly-input");
+  const grossMonthly = Number(monthlyInput ? monthlyInput.value : 0);
+  if (!grossMonthly || grossMonthly <= 0) {
+    trackerState.careerStudio.paycheckCheck = null;
+    openModal("paycheckCalculator");
+    return;
+  }
+  trackerState.careerStudio.paycheckCheck = { grossMonthly, result: computeSingaporeTakeHome(grossMonthly), updatedAt: new Date().toISOString() };
+  saveTrackerState();
+  openModal("paycheckCalculator");
+}
+
+function paycheckCalculatorView() {
+  const saved = trackerState.careerStudio.paycheckCheck;
+  const result = saved ? saved.result : null;
+  return `
+    <label>Gross monthly salary (S$)<input type="number" min="0" step="50" id="paycheck-monthly-input" value="${saved ? escapeHTML(String(saved.grossMonthly)) : ""}" placeholder="e.g. 3500"></label>
+    <button class="primary-action compact-action" type="button" data-calculate-paycheck>Show my real take-home</button>
+    ${result ? `
+      <div class="resume-preview-card paycheck-result-card">
+        <div class="paycheck-result-row"><span>Gross monthly pay</span><strong>S$${result.grossMonthly.toLocaleString()}</strong></div>
+        <div class="paycheck-result-row"><span>CPF (yours - not lost, it's your own retirement/housing savings)</span><strong>-S$${result.employeeCpfMonthly.toLocaleString()}</strong></div>
+        <div class="paycheck-result-row"><span>Estimated income tax</span><strong>-S$${result.monthlyTax.toLocaleString()}</strong></div>
+        <div class="paycheck-result-row paycheck-result-final"><span>What actually lands in your bank account</span><strong>S$${result.takeHomeMonthly.toLocaleString()}</strong></div>
+      </div>
+      <p class="tiny-note">Estimate based on published IRAS resident individual tax brackets and CPF Ordinary Wage employee rate/ceiling. Not tax advice - real reliefs, bonuses, and CPF age tiers can change your actual numbers.</p>
     ` : ""}
   `;
 }
@@ -6124,7 +6211,7 @@ const modals = {
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="career-studio-title">Practice for the real thing</h3>
-      <p class="muted">Four tools that work together - practice how you sound, write what you've done, build a profile, and see which roles fit your Blueprint.</p>
+      <p class="muted">Five tools that work together - practice how you sound, write what you've done, build a profile, see which roles fit your Blueprint, and check what a salary actually becomes.</p>
       <div class="action-stack">
         <button class="wide-action" type="button" data-open="interviewPractice">
           <img src="assets/icon-boundary.png" alt="">
@@ -6141,6 +6228,10 @@ const modals = {
         <button class="wide-action" type="button" data-open="jobMatching">
           <img src="assets/icon-learn.png" alt="">
           <span><strong>Job Matching</strong><small>See which role archetypes fit your saved Personal Blueprint.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="paycheckCalculator">
+          <img src="assets/icon-work.png" alt="">
+          <span><strong>Paycheck Reality Check</strong><small>See what a salary actually becomes after CPF and tax - real Singapore numbers, not a guess.</small></span>
         </button>
       </div>
     </div>
@@ -6170,6 +6261,20 @@ const modals = {
       <p class="muted">Write your real about, experience, and projects in your own words - Compass AI organizes it into a LinkedIn-style profile, without inventing anything you didn't provide.</p>
       <div class="admin-form">
         ${portfolioBuilderView()}
+      </div>
+    </div>
+  `,
+
+  paycheckCalculator: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="paycheck-calculator-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Paycheck Reality Check</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="paycheck-calculator-title">What does that salary actually become?</h3>
+      <p class="muted">Type a monthly salary offer and see what actually lands in your bank account after CPF and income tax - real Singapore numbers, not a made-up estimate.</p>
+      <div class="admin-form">
+        ${paycheckCalculatorView()}
       </div>
     </div>
   `,
@@ -8089,6 +8194,7 @@ function localBuildTrainingPath(goal, coach) {
       title: "Clarify Your Real Situation",
       purpose: `Make "${shortGoal}" specific enough to practice instead of staying vague.`,
       trainingType: "coach conversation",
+      difficulty: "Warm-up",
       openingPrompt: `Tell me the real situation behind "${shortGoal}". What is happening now, and what result would feel successful?`,
       coachInstructions: `${coachName} should ask one useful question at a time, identify the real barrier, and turn the answer into a practical next move.`,
       nextStep: "Share the real situation in your own words."
@@ -8096,10 +8202,11 @@ function localBuildTrainingPath(goal, coach) {
     {
       id: "practice-one-scenario",
       title: "Practice One Real Scenario",
-      purpose: "Turn the goal into a realistic practice conversation, decision, or planning drill.",
+      purpose: "Turn the goal into a realistic practice conversation, decision, or planning drill - starting easy, then turning up the pressure.",
       trainingType: "guided practice",
-      openingPrompt: `Let's practice one realistic moment connected to "${shortGoal}". Describe the moment you want to handle better, or ask me for an example first.`,
-      coachInstructions: `${coachName} should roleplay, give examples, or adapt the practice based on what the user asks for.`,
+      difficulty: "Escalating",
+      openingPrompt: `Let's practice one realistic moment connected to "${shortGoal}". We'll start with an easier, lower-stakes version first. Describe the moment you want to handle better, or ask me for an example first.`,
+      coachInstructions: `${coachName} should roleplay this in two passes: first a calmer, lower-pressure version of the scenario so the user can find their footing, then - once they handle it reasonably - a harder, more realistic version (more resistance, less time, higher stakes). Say plainly when moving to the harder version so the escalation is visible, not sprung on the user. Adapt or slow back down if the user asks.`,
       nextStep: "Choose one real situation to rehearse."
     },
     {
@@ -8107,6 +8214,7 @@ function localBuildTrainingPath(goal, coach) {
       title: "Build the Next Step",
       purpose: "Create one small action the user can actually do this week.",
       trainingType: "action planning",
+      difficulty: "Wrap-up",
       openingPrompt: `What is one small step you could take this week for "${shortGoal}"? If you are unsure, I can suggest a low-pressure first step.`,
       coachInstructions: `${coachName} should make the plan realistic, safe, and flexible. Avoid pressure and avoid fake guarantees.`,
       nextStep: "Pick one action small enough to complete this week."
@@ -8136,7 +8244,23 @@ function createLocalBuildEntry(goal, reason = "") {
   });
 }
 
-function normalizeTrainingModule(module, index, usedIds = new Set()) {
+// Graduated difficulty (GitHub research idea): a roleplay that starts at
+// full difficulty trains panic, not skill - real exposure-practice design
+// starts with an easier version of a hard scenario and escalates once the
+// user handles it. DIFFICULTY_LADDER is the position-based fallback label
+// (module 1 = warm-up, last module = hardest) used whenever the AI-
+// generated or local-fallback path doesn't supply its own; live AI paths
+// can still set a more specific one via the JSON schema.
+const DIFFICULTY_LADDER = ["Warm-up", "Real practice", "Under pressure"];
+function difficultyForIndex(index, total) {
+  if (total <= 1) return DIFFICULTY_LADDER[1];
+  const ratio = index / (total - 1);
+  if (ratio <= 0.15) return DIFFICULTY_LADDER[0];
+  if (ratio >= 0.85) return DIFFICULTY_LADDER[2];
+  return DIFFICULTY_LADDER[1];
+}
+
+function normalizeTrainingModule(module, index, usedIds = new Set(), total = 1) {
   const rawTitle = cleanText(module && module.title ? module.title : `Training ${index + 1}`, 80);
   const fallbackId = buildSafeId(rawTitle, `training-${index + 1}`);
   const rawId = buildSafeId(module && module.id ? module.id : fallbackId, fallbackId);
@@ -8152,6 +8276,7 @@ function normalizeTrainingModule(module, index, usedIds = new Set()) {
     title: rawTitle,
     purpose: cleanText(module && module.purpose ? module.purpose : "Practice one useful step for this goal.", 220),
     trainingType: cleanText(module && module.trainingType ? module.trainingType : "custom", 40),
+    difficulty: cleanText(module && module.difficulty ? module.difficulty : difficultyForIndex(index, total), 24),
     openingPrompt: cleanText(module && module.openingPrompt ? module.openingPrompt : "Tell me what you have tried so far, and I will guide the next practice step.", 280),
     coachInstructions: cleanText(module && module.coachInstructions ? module.coachInstructions : "Guide the user through one practical training step. Ask one question at a time.", 360),
     nextStep: cleanText(module && module.nextStep ? module.nextStep : "Start this training when you are ready.", 180)
@@ -8160,9 +8285,8 @@ function normalizeTrainingModule(module, index, usedIds = new Set()) {
 
 function normalizeTrainingPath(items, maxItems = 6) {
   const usedIds = new Set();
-  return (Array.isArray(items) ? items : [])
-    .slice(0, maxItems)
-    .map((item, index) => normalizeTrainingModule(item, index, usedIds));
+  const trimmed = (Array.isArray(items) ? items : []).slice(0, maxItems);
+  return trimmed.map((item, index) => normalizeTrainingModule(item, index, usedIds, trimmed.length));
 }
 
 function normalizeBuildTrainingSession(session) {
@@ -8301,6 +8425,7 @@ function buildTrainingPathSection(entry) {
       ${entry.trainingPath.map((module, index) => `
         <article class="build-training-card">
           <span>${String(index + 1).padStart(2, "0")} - ${escapeHTML(module.trainingType)}</span>
+          ${module.difficulty ? `<span class="difficulty-chip">${escapeHTML(module.difficulty)}</span>` : ""}
           <h4>${escapeHTML(module.title)}</h4>
           <p>${escapeHTML(module.purpose)}</p>
           <button class="secondary-action compact-action" type="button" data-start-build-training="${escapeHTML(module.id)}">Start training</button>
@@ -8414,10 +8539,10 @@ ${realGrowthFactsText()}
 Coach catalog:
 ${buildCoachCatalogText()}
 
-Match the best coach for this goal. Do NOT limit yourself to interview, study, or money; choose the coach that fits the user's actual need, or Custom Growth Coach if no specialist fits. Create a training path with 3 to 5 interactive trainings. Training modules should be things the user can actually practice with AI: roleplay, script-builder, planning drill, active recall, decision simulation, application planner, routine builder, confidence exposure, etc. Avoid proof logs, scores, badges, and generic advice.
+Match the best coach for this goal. Do NOT limit yourself to interview, study, or money; choose the coach that fits the user's actual need, or Custom Growth Coach if no specialist fits. Create a training path with 3 to 5 interactive trainings. Training modules should be things the user can actually practice with AI: roleplay, script-builder, planning drill, active recall, decision simulation, application planner, routine builder, confidence exposure, etc. Avoid proof logs, scores, badges, and generic advice. Order the path so difficulty rises across modules ("Warm-up" first, hardest last), and for any roleplay/practice module set coachInstructions to run it in an easy pass first before escalating to a harder, higher-pressure version - never open with the hardest version of a scenario.
 
 Respond as strict JSON only:
-{"coachType":"string","coachReason":"string","goalSummary":"string","missingContext":["string"],"trainingPath":[{"id":"short-kebab-id","title":"string","purpose":"string","trainingType":"string","openingPrompt":"string","coachInstructions":"string","nextStep":"string"}],"nextStep":"string"}`;
+{"coachType":"string","coachReason":"string","goalSummary":"string","missingContext":["string"],"trainingPath":[{"id":"short-kebab-id","title":"string","purpose":"string","trainingType":"string","difficulty":"string","openingPrompt":"string","coachInstructions":"string","nextStep":"string"}],"nextStep":"string"}`;
     const reply = await requestCompassDirect(BUILD_MODE_SYSTEM_PROMPT, prompt);
     const parsed = extractJsonObject(reply);
     if (!parsed || !Array.isArray(parsed.trainingPath)) throw new Error("Coach router reply was not valid JSON.");
@@ -8508,6 +8633,7 @@ function buildTrainingModal(sessionId) {
     `;
   }
   const messages = (session.messages || []).filter((message) => cleanText(message && message.message, 900));
+  const module = buildTrainingModuleById(entry, session.trainingId);
   return `
     <div class="modal-card assessment-modal future-self-modal build-training-modal" role="dialog" aria-modal="true" aria-labelledby="build-training-title">
       <div class="modal-top">
@@ -8515,6 +8641,7 @@ function buildTrainingModal(sessionId) {
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="build-training-title">${escapeHTML(session.title)}</h3>
+      ${module && module.difficulty ? `<span class="difficulty-chip">${escapeHTML(module.difficulty)}</span>` : ""}
       <p class="muted">${escapeHTML(entry.goalSummary)}</p>
       <section class="build-free-coach-note">
         <strong>You are not locked into this exercise.</strong>
@@ -8533,9 +8660,13 @@ function buildTrainingModal(sessionId) {
         <div class="build-coach-prompt-row">
           ${buildCoachFreedomPrompts().map((prompt) => `<button type="button" data-build-coach-prompt="${escapeHTML(prompt)}" ${isBuildTrainingLoading ? "disabled" : ""}>${escapeHTML(prompt)}</button>`).join("")}
         </div>
-        <textarea id="build-training-input" placeholder="Say anything. Add context, ask a question, or tell the coach to change direction." data-build-training-draft>${escapeHTML(buildTrainingDraft)}</textarea>
+        <div class="build-training-input-row">
+          <button class="voice-button" type="button" data-voice-build-training aria-label="Record your answer" ${isBuildTrainingLoading ? "disabled" : ""}>Mic</button>
+          <textarea id="build-training-input" placeholder="Say anything. Add context, ask a question, or tell the coach to change direction." data-build-training-draft>${escapeHTML(buildTrainingDraft)}</textarea>
+        </div>
+        <p class="tiny-note build-voice-status" data-build-voice-status aria-live="polite"></p>
         <button class="primary-action mirror-run-action" type="button" data-send-build-training ${isBuildTrainingLoading ? "disabled" : ""}>${isBuildTrainingLoading ? "Training..." : "Send freely"}</button>
-        <p class="tiny-note">Tip: Ctrl + Enter sends without losing your text.</p>
+        <p class="tiny-note">Tip: Ctrl + Enter sends without losing your text. Or tap Mic and say your answer out loud - real interviews and hard conversations happen out loud, not typed.</p>
       `}
       <div class="profile-actions">
         <button class="secondary-action compact-action" type="button" data-open-build-entry="${escapeHTML(entry.id)}">Back to plan</button>
@@ -8647,6 +8778,43 @@ async function enhanceBuildTrainingReply(entryId, sessionId, assistantCreatedAt,
   } catch (error) {
     console.error("[Build Mode] Live coach refinement failed; local coach reply kept.", error);
   }
+}
+
+// Voice practice (GitHub research idea): real interviews, hard phone calls,
+// and asking-for-help conversations happen out loud, not typed - typing a
+// roleplay answer trains a different skill than saying it. Reuses the exact
+// SpeechRecognition feature-detection pattern already used for the main
+// Compass chat's voice input (data-voice-chat, above) rather than a new
+// pattern, transcribing into the same #build-training-input textarea so it
+// flows through the existing review-then-send path unchanged - voice is
+// just an alternate way to fill the box, not a bypass of it.
+function startBuildTrainingVoiceInput() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const input = modalLayer.querySelector("#build-training-input");
+  const status = modalLayer.querySelector("[data-build-voice-status]");
+  if (!SpeechRecognition) {
+    if (status) status.textContent = "Voice input is not available in this browser. You can type your answer instead.";
+    return;
+  }
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  if (status) status.textContent = "Listening... say your answer out loud.";
+  recognition.onresult = (result) => {
+    const transcript = result.results[0][0].transcript;
+    if (input) {
+      input.value = transcript;
+      buildTrainingDraft = transcript;
+      input.focus();
+    }
+    if (status) status.textContent = "Got it - review your answer below, then send when ready.";
+  };
+  recognition.onerror = () => {
+    if (status) status.textContent = "Voice input had trouble listening. You can type your answer instead.";
+  };
+  recognition.onend = () => {
+    if (status && status.textContent === "Listening... say your answer out loud.") status.textContent = "";
+  };
+  recognition.start();
 }
 
 async function sendBuildTrainingReply(forcedText = "") {
@@ -8859,6 +9027,7 @@ document.addEventListener("click", async (event) => {
   const startBuildTrainingButton = event.target.closest("[data-start-build-training]");
   const openBuildTrainingButton = event.target.closest("[data-open-build-training]");
   const sendBuildTrainingButton = event.target.closest("[data-send-build-training]");
+  const voiceBuildTrainingButton = event.target.closest("[data-voice-build-training]");
   const buildCoachPromptButton = event.target.closest("[data-build-coach-prompt]");
   const finishBuildTrainingButton = event.target.closest("[data-finish-build-training]");
   const saveFutureReflection = event.target.closest("[data-save-future-reflection]");
@@ -8893,6 +9062,7 @@ document.addEventListener("click", async (event) => {
   const savePortfolioDraftButton = event.target.closest("[data-save-portfolio-draft]");
   const polishPortfolioButton = event.target.closest("[data-polish-portfolio]");
   const copyPortfolioButton = event.target.closest("[data-copy-portfolio]");
+  const calculatePaycheckButton = event.target.closest("[data-calculate-paycheck]");
   const exportVaultButton = event.target.closest("[data-export-vault]");
   const saveMood = event.target.closest("[data-save-mood]");
   const demoReceipt = event.target.closest("[data-demo-receipt]");
@@ -9373,6 +9543,7 @@ document.addEventListener("click", async (event) => {
   if (startBuildTrainingButton) startBuildTraining(startBuildTrainingButton.dataset.startBuildTraining);
   if (openBuildTrainingButton) openBuildTraining(openBuildTrainingButton.dataset.openBuildTraining);
   if (sendBuildTrainingButton) await sendBuildTrainingReply();
+  if (voiceBuildTrainingButton) startBuildTrainingVoiceInput();
   if (buildCoachPromptButton) await sendBuildTrainingReply(buildCoachPromptButton.dataset.buildCoachPrompt || "");
   if (finishBuildTrainingButton) finishBuildTrainingSession();
 
@@ -9530,6 +9701,10 @@ document.addEventListener("click", async (event) => {
 
   if (polishPortfolioButton) {
     await polishPortfolioWithAI();
+  }
+
+  if (calculatePaycheckButton) {
+    calculatePaycheckReality();
   }
 
   if (copyPortfolioButton) {

@@ -2911,6 +2911,29 @@ h3 {
   color: var(--color-ink);
 }
 
+.paycheck-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-faint);
+  font-size: 13px;
+}
+
+.paycheck-result-row:last-child {
+  border-bottom: none;
+}
+
+.paycheck-result-final {
+  padding-top: 10px;
+  font-size: 15px;
+}
+
+.paycheck-result-final strong {
+  color: var(--color-calm-ink, var(--color-ink));
+}
+
 .empty-state-card {
   padding: 14px;
   border-radius: var(--radius-md);
@@ -5108,6 +5131,18 @@ body {
   color: #0d0d0d;
   font-size: 10px;
   font-weight: 700;
+}
+
+.difficulty-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--color-warm);
+  color: var(--color-ink);
+  font-size: 10px;
+  font-weight: 850;
 }
 
 .mutual-pick-badge {
@@ -7955,6 +7990,26 @@ body.life-sim-active .lifeverse-consequence-toast {
 
 .build-coach-prompt-row button:disabled {
   opacity: 0.55;
+}
+
+.build-training-input-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.build-training-input-row .voice-button {
+  flex: 0 0 auto;
+}
+
+.build-training-input-row textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.build-voice-status {
+  min-height: 14px;
+  color: var(--color-ink-soft, #6b6558);
 }
 
 @media (min-width: 480px) {
