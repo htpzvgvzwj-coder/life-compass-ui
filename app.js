@@ -413,31 +413,50 @@ const opportunityCategories = [
   "Learn & Earn"
 ];
 
+// Honesty pass (self-audit finding): every applyUrl used to be a generic
+// Google search dressed up as an individual "opportunity" with an "Apply"
+// button - there is no real listings feed behind this app, so pretending
+// otherwise was actively misleading. Two changes: (1) route each category
+// to the single best REAL, well-established, free directory/search engine
+// for that category where one clearly exists (Indeed for jobs/internships,
+// Fastweb for US-heavy scholarship search, Devpost for hackathons/
+// innovation challenges, VolunteerMatch for volunteering, freeCodeCamp/
+// Canva Design School/YouTube Creator Academy for the actual skill-learning
+// entries) instead of a bare Google query - a real, maintained directory is
+// a genuinely better starting point than a search string, even though it's
+// still a directory, not a specific posting. (2) Where no single dominant
+// global platform exists (international/university/government scholarships
+// are too jurisdiction-specific for one link; business competitions,
+// leadership programs, content creation, and entrepreneurship are too broad
+// for one site), a refined Google search stays the honest choice - this
+// intentionally does NOT force a link to a site whose current legitimacy
+// isn't well-established just to avoid using search. See opportunityCards()
+// for the matching "Search"/"Start learning" button-label honesty fix.
 const opportunityItems = [
-  { id: "part-time-jobs", category: "Jobs", type: "Part-time jobs", title: "Part-time job starter list", description: "Cafe, retail, event crew, tutoring, and campus helper roles that fit around study time.", tags: ["income", "student", "flexible"], applyUrl: "https://www.google.com/search?q=part+time+jobs+for+students+near+me" },
-  { id: "student-jobs", category: "Jobs", type: "Student jobs", title: "Student-friendly work options", description: "Roles that build confidence, communication, and basic money habits without overloading school.", tags: ["student", "confidence", "money"], applyUrl: "https://www.google.com/search?q=student+jobs+near+me" },
-  { id: "remote-jobs", category: "Jobs", type: "Remote jobs", title: "Remote beginner work", description: "Search for virtual assistant, transcription, social media, tutoring, and data entry roles carefully.", tags: ["remote", "skills", "income"], applyUrl: "https://www.google.com/search?q=remote+jobs+for+students" },
-  { id: "entry-level-jobs", category: "Jobs", type: "Entry-level jobs", title: "Entry-level career path", description: "Find roles that train beginners and help build a resume after school, college, or university.", tags: ["career", "entry-level", "resume"], applyUrl: "https://www.google.com/search?q=entry+level+jobs+for+fresh+graduates" },
-  { id: "business-internship", category: "Internships", type: "Business", title: "Business internship search", description: "Explore operations, admin, project coordination, and startup assistant internships.", tags: ["business", "career", "internship"], applyUrl: "https://www.google.com/search?q=business+internship+for+students" },
-  { id: "marketing-internship", category: "Internships", type: "Marketing", title: "Marketing internship search", description: "Practice content calendars, campaigns, copywriting, analytics, and brand communication.", tags: ["marketing", "content", "communication"], applyUrl: "https://www.google.com/search?q=marketing+internship+for+students" },
-  { id: "technology-internship", category: "Internships", type: "Technology", title: "Technology internship search", description: "Look for web, app, QA, IT support, data, and product internships with beginner-friendly teams.", tags: ["technology", "coding", "product"], applyUrl: "https://www.google.com/search?q=technology+internship+for+students" },
-  { id: "design-internship", category: "Internships", type: "Design", title: "Design internship search", description: "Build portfolio evidence through UI, graphic design, brand, product, or social content work.", tags: ["design", "portfolio", "creative"], applyUrl: "https://www.google.com/search?q=design+internship+for+students" },
-  { id: "social-impact-internship", category: "Internships", type: "Social Impact", title: "Social impact internship", description: "Explore NGOs, youth programs, education, environment, and community development placements.", tags: ["impact", "community", "leadership"], applyUrl: "https://www.google.com/search?q=social+impact+internship+for+students" },
-  { id: "local-scholarships", category: "Scholarships", type: "Local scholarships", title: "Local scholarship tracker", description: "Search local foundations, companies, universities, and community scholarship programs.", tags: ["scholarship", "local", "education"], applyUrl: "https://www.google.com/search?q=local+scholarships+for+students" },
-  { id: "international-scholarships", category: "Scholarships", type: "International scholarships", title: "International scholarship shortlist", description: "Find overseas scholarships and prepare requirements early: grades, essays, activities, and references.", tags: ["international", "education", "future"], applyUrl: "https://www.google.com/search?q=international+scholarships+for+students" },
+  { id: "part-time-jobs", category: "Jobs", type: "Part-time jobs", title: "Part-time job starter list", description: "Cafe, retail, event crew, tutoring, and campus helper roles that fit around study time.", tags: ["income", "student", "flexible"], applyUrl: "https://www.indeed.com/jobs?q=part-time&explvl=entry_level" },
+  { id: "student-jobs", category: "Jobs", type: "Student jobs", title: "Student-friendly work options", description: "Roles that build confidence, communication, and basic money habits without overloading school.", tags: ["student", "confidence", "money"], applyUrl: "https://www.indeed.com/jobs?q=student" },
+  { id: "remote-jobs", category: "Jobs", type: "Remote jobs", title: "Remote beginner work", description: "Search for virtual assistant, transcription, social media, tutoring, and data entry roles carefully.", tags: ["remote", "skills", "income"], applyUrl: "https://www.indeed.com/jobs?q=remote&explvl=entry_level" },
+  { id: "entry-level-jobs", category: "Jobs", type: "Entry-level jobs", title: "Entry-level career path", description: "Find roles that train beginners and help build a resume after school, college, or university.", tags: ["career", "entry-level", "resume"], applyUrl: "https://www.indeed.com/jobs?q=entry+level&explvl=entry_level" },
+  { id: "business-internship", category: "Internships", type: "Business", title: "Business internship search", description: "Explore operations, admin, project coordination, and startup assistant internships.", tags: ["business", "career", "internship"], applyUrl: "https://www.indeed.com/jobs?q=business+internship" },
+  { id: "marketing-internship", category: "Internships", type: "Marketing", title: "Marketing internship search", description: "Practice content calendars, campaigns, copywriting, analytics, and brand communication.", tags: ["marketing", "content", "communication"], applyUrl: "https://www.indeed.com/jobs?q=marketing+internship" },
+  { id: "technology-internship", category: "Internships", type: "Technology", title: "Technology internship search", description: "Look for web, app, QA, IT support, data, and product internships with beginner-friendly teams.", tags: ["technology", "coding", "product"], applyUrl: "https://www.indeed.com/jobs?q=technology+internship" },
+  { id: "design-internship", category: "Internships", type: "Design", title: "Design internship search", description: "Build portfolio evidence through UI, graphic design, brand, product, or social content work.", tags: ["design", "portfolio", "creative"], applyUrl: "https://www.indeed.com/jobs?q=design+internship" },
+  { id: "social-impact-internship", category: "Internships", type: "Social Impact", title: "Social impact internship", description: "Explore NGOs, youth programs, education, environment, and community development placements.", tags: ["impact", "community", "leadership"], applyUrl: "https://www.indeed.com/jobs?q=nonprofit+internship" },
+  { id: "local-scholarships", category: "Scholarships", type: "Local scholarships", title: "Local scholarship search", description: "Search local foundations, companies, universities, and community scholarship programs.", tags: ["scholarship", "local", "education"], applyUrl: "https://www.fastweb.com/college-scholarships" },
+  { id: "international-scholarships", category: "Scholarships", type: "International scholarships", title: "International scholarship search", description: "Find overseas scholarships and prepare requirements early: grades, essays, activities, and references.", tags: ["international", "education", "future"], applyUrl: "https://www.google.com/search?q=international+scholarships+for+students" },
   { id: "university-scholarships", category: "Scholarships", type: "University scholarships", title: "University financial aid", description: "Check each university's scholarship page, deadlines, required documents, and interview needs.", tags: ["university", "study", "financial aid"], applyUrl: "https://www.google.com/search?q=university+scholarships+financial+aid" },
   { id: "government-scholarships", category: "Scholarships", type: "Government scholarships", title: "Government scholarship prep", description: "Track eligibility, documents, leadership evidence, essays, and application deadlines.", tags: ["government", "education", "leadership"], applyUrl: "https://www.google.com/search?q=government+scholarships+for+students" },
-  { id: "innovation-challenges", category: "Competitions", type: "Innovation challenges", title: "Innovation challenge finder", description: "Pitch solutions for real problems and build proof for your portfolio or scholarship profile.", tags: ["innovation", "portfolio", "problem-solving"], applyUrl: "https://www.google.com/search?q=student+innovation+challenge" },
-  { id: "business-competitions", category: "Competitions", type: "Business competitions", title: "Business competition finder", description: "Practice pitching, market research, financial thinking, and team communication.", tags: ["business", "entrepreneurship", "pitching"], applyUrl: "https://www.google.com/search?q=student+business+competition" },
-  { id: "hackathons", category: "Competitions", type: "Hackathons", title: "Hackathon search", description: "Join beginner-friendly tech challenges to practice coding, design, product, and teamwork.", tags: ["hackathon", "coding", "teamwork"], applyUrl: "https://www.google.com/search?q=student+hackathons" },
-  { id: "leadership-programs", category: "Competitions", type: "Leadership programs", title: "Leadership program list", description: "Find youth councils, student leadership camps, fellowships, and public speaking programs.", tags: ["leadership", "confidence", "network"], applyUrl: "https://www.google.com/search?q=youth+leadership+programs" },
-  { id: "ngo-volunteer", category: "Volunteer Opportunities", type: "NGOs", title: "NGO volunteer roles", description: "Support education, food aid, mental health, disability, animal welfare, or community projects.", tags: ["volunteer", "ngo", "community"], applyUrl: "https://www.google.com/search?q=NGO+volunteer+opportunities+for+youth" },
-  { id: "community-service", category: "Volunteer Opportunities", type: "Community service", title: "Community service projects", description: "Help with tutoring, clean-ups, events, elderly support, food drives, or local campaigns.", tags: ["service", "community", "leadership"], applyUrl: "https://www.google.com/search?q=community+service+opportunities+for+students" },
-  { id: "environmental-projects", category: "Volunteer Opportunities", type: "Environmental projects", title: "Environmental action projects", description: "Explore recycling, beach clean-ups, tree planting, climate education, and local green teams.", tags: ["environment", "impact", "teamwork"], applyUrl: "https://www.google.com/search?q=environmental+volunteer+projects+for+youth" },
+  { id: "innovation-challenges", category: "Competitions", type: "Innovation challenges", title: "Innovation challenge search", description: "Pitch solutions for real problems and build proof for your portfolio or scholarship profile.", tags: ["innovation", "portfolio", "problem-solving"], applyUrl: "https://devpost.com/hackathons" },
+  { id: "business-competitions", category: "Competitions", type: "Business competitions", title: "Business competition search", description: "Practice pitching, market research, financial thinking, and team communication.", tags: ["business", "entrepreneurship", "pitching"], applyUrl: "https://www.google.com/search?q=student+business+competition" },
+  { id: "hackathons", category: "Competitions", type: "Hackathons", title: "Hackathon search", description: "Join beginner-friendly tech challenges to practice coding, design, product, and teamwork.", tags: ["hackathon", "coding", "teamwork"], applyUrl: "https://devpost.com/hackathons" },
+  { id: "leadership-programs", category: "Competitions", type: "Leadership programs", title: "Leadership program search", description: "Find youth councils, student leadership camps, fellowships, and public speaking programs.", tags: ["leadership", "confidence", "network"], applyUrl: "https://www.google.com/search?q=youth+leadership+programs" },
+  { id: "ngo-volunteer", category: "Volunteer Opportunities", type: "NGOs", title: "NGO volunteer roles", description: "Support education, food aid, mental health, disability, animal welfare, or community projects.", tags: ["volunteer", "ngo", "community"], applyUrl: "https://www.volunteermatch.org/search/" },
+  { id: "community-service", category: "Volunteer Opportunities", type: "Community service", title: "Community service projects", description: "Help with tutoring, clean-ups, events, elderly support, food drives, or local campaigns.", tags: ["service", "community", "leadership"], applyUrl: "https://www.volunteermatch.org/search/" },
+  { id: "environmental-projects", category: "Volunteer Opportunities", type: "Environmental projects", title: "Environmental action projects", description: "Explore recycling, beach clean-ups, tree planting, climate education, and local green teams.", tags: ["environment", "impact", "teamwork"], applyUrl: "https://www.volunteermatch.org/search/?k=environment" },
   { id: "youth-organizations", category: "Volunteer Opportunities", type: "Youth organizations", title: "Youth organization directory", description: "Join groups that build leadership, communication, teamwork, and social impact experience.", tags: ["youth", "leadership", "network"], applyUrl: "https://www.google.com/search?q=youth+organizations+near+me" },
-  { id: "canva-skills", category: "Learn & Earn", type: "Canva skills", title: "Canva design micro-skill", description: "Learn poster, social media, presentation, and resume design for small freelance tasks.", tags: ["canva", "design", "income"], applyUrl: "https://www.google.com/search?q=learn+Canva+skills+for+freelancing" },
-  { id: "video-editing", category: "Learn & Earn", type: "Video editing", title: "Video editing starter path", description: "Learn short-form editing, captions, pacing, thumbnails, and portfolio clips for creators.", tags: ["video", "content", "creative"], applyUrl: "https://www.google.com/search?q=learn+video+editing+for+beginners" },
-  { id: "coding-skills", category: "Learn & Earn", type: "Coding", title: "Coding beginner path", description: "Start with websites, small apps, automation, or school project tools that become portfolio work.", tags: ["coding", "technology", "portfolio"], applyUrl: "https://www.google.com/search?q=learn+coding+for+beginners+students" },
+  { id: "canva-skills", category: "Learn & Earn", type: "Canva skills", title: "Canva design micro-skill", description: "Learn poster, social media, presentation, and resume design for small freelance tasks.", tags: ["canva", "design", "income"], applyUrl: "https://www.canva.com/designschool/" },
+  { id: "video-editing", category: "Learn & Earn", type: "Video editing", title: "Video editing starter path", description: "Learn short-form editing, captions, pacing, thumbnails, and portfolio clips for creators.", tags: ["video", "content", "creative"], applyUrl: "https://creatoracademy.youtube.com/" },
+  { id: "coding-skills", category: "Learn & Earn", type: "Coding", title: "Coding beginner path", description: "Start with websites, small apps, automation, or school project tools that become portfolio work.", tags: ["coding", "technology", "portfolio"], applyUrl: "https://www.freecodecamp.org/" },
   { id: "content-creation", category: "Learn & Earn", type: "Content creation", title: "Content creation portfolio", description: "Build writing, filming, editing, and publishing skills around a topic you care about.", tags: ["content", "marketing", "creative"], applyUrl: "https://www.google.com/search?q=content+creation+skills+for+beginners" },
   { id: "entrepreneurship", category: "Learn & Earn", type: "Entrepreneurship", title: "Mini entrepreneurship project", description: "Test a small service, product, or community idea with low risk and honest feedback.", tags: ["entrepreneurship", "business", "income"], applyUrl: "https://www.google.com/search?q=student+entrepreneurship+ideas" }
 ];
@@ -1844,7 +1863,7 @@ function opportunityCards() {
         </div>
         <div class="opportunity-actions">
           <button class="${saved ? "secondary-action" : "primary-action"} compact-action" type="button" data-save-opportunity="${escapeHTML(item.id)}">${saved ? "Saved" : "Save for later"}</button>
-          <button class="secondary-action compact-action" type="button" data-open-link="${escapeHTML(item.applyUrl)}">Apply</button>
+          <button class="secondary-action compact-action" type="button" data-open-link="${escapeHTML(item.applyUrl)}">${item.category === "Learn & Earn" ? "Start learning" : "Search"}</button>
           <button class="text-action" type="button" data-share-opportunity="${escapeHTML(item.id)}">Share</button>
         </div>
       </article>
@@ -1852,8 +1871,11 @@ function opportunityCards() {
   }).join("");
 }
 
+// Honesty pass: this is a curated starting point (a real external directory
+// or search engine per category), not an individual posting, so "Apply"
+// overstated what pressing the button actually does - it opens a search.
 function shareOpportunityText(item) {
-  return `${item.title}\n${item.description}\nApply/search: ${item.applyUrl}`;
+  return `${item.title}\n${item.description}\nSearch: ${item.applyUrl}`;
 }
 
 function futureMirrorHomeHero() {
@@ -4355,6 +4377,46 @@ function generateMoodSuggestion(label, score, note) {
   };
 }
 
+// Self-audit finding: generateMoodSuggestion() above only ever matches a
+// handful of literal keywords ("money"/"tired"/"stress") against 4 fixed
+// outputs - anything the user actually wrote outside those keywords always
+// landed on the same generic "one win" text, despite the UI presenting it
+// as a suggestion based on what they wrote. Kept as the instant, offline
+// fallback (same role as buildTrainingAdaptiveReply in Build Mode), but the
+// real suggestion now comes from an actual AI read of the entry, refined in
+// the background the same way enhanceBuildTrainingReply already does for
+// Build Mode - the user sees the fast local suggestion immediately, then it
+// gets replaced once the live read comes back, instead of never reading
+// the entry's real content at all.
+async function requestMoodSuggestionFromAI(label, score, note) {
+  const systemPrompt = "You are a supportive, evidence-based wellbeing coach inside Compass. Read the user's actual mood entry and suggest ONE small, concrete, doable action grounded in a real psychological technique (behavioral activation, cognitive reappraisal, implementation intentions, self-determination theory, cognitive offloading, or another genuinely fitting technique - pick whichever actually fits what they wrote, don't force one). Never diagnose, never act as a therapist. If the note suggests danger or serious self-harm risk, keep the suggestion safe and gently point toward contacting a trusted person or emergency support instead of a generic technique. Return strict JSON only.";
+  const userPrompt = `Mood label: ${label}\nMood score (0-100): ${score}\nUser's own note: "${note}"\n\nRespond as strict JSON only: {"title":"string, under 8 words","summary":"string, one sentence, a concrete action","detail":"string, 1-3 sentences explaining why this helps, referencing the real technique","technique":"string, short name of the psychological technique used"}`;
+  const reply = await requestCompassDirect(systemPrompt, userPrompt);
+  const parsed = extractJsonObject(reply);
+  if (!parsed || !parsed.title || !parsed.summary) throw new Error("Mood suggestion reply was not valid JSON.");
+  return {
+    title: cleanText(parsed.title, 60),
+    summary: cleanText(parsed.summary, 200),
+    detail: cleanText(parsed.detail, 400),
+    technique: cleanText(parsed.technique, 80)
+  };
+}
+
+async function enhanceMoodSuggestionWithAI(label, score, note) {
+  try {
+    const suggestion = await requestMoodSuggestionFromAI(label, score, note);
+    // Only overwrite if this is still the current mood entry - the user
+    // may have logged a newer one while this request was in flight.
+    if (trackerState.mood.label === label && trackerState.mood.score === score && trackerState.mood.note === note) {
+      trackerState.moodSuggestion = suggestion;
+      saveTrackerState();
+      renderScreen(activeTab);
+    }
+  } catch (error) {
+    console.error("[Mood] Live AI suggestion failed; local suggestion kept.", error);
+  }
+}
+
 function supportContactCards() {
   const contacts = trackerState.supportContacts.filter((contact) => contact.user_id === currentUserId() || !contact.user_id);
   if (!contacts.length) {
@@ -5639,7 +5701,7 @@ const screens = {
       <div>
         <p class="eyebrow">Future builder</p>
         <h3>Find the next door you can actually open.</h3>
-        <p>Save useful options, apply through external links, or ask Compass AI to recommend what fits your age, interests, goals, and career direction.</p>
+        <p>These are curated starting points, not individual postings - save what's useful, search real openings through trusted external sites, or ask Compass AI to recommend what fits your age, interests, goals, and career direction.</p>
       </div>
       ${opportunityStats()}
     </section>
@@ -9795,6 +9857,7 @@ document.addEventListener("click", async (event) => {
     closeModal();
     renderScreen(activeTab);
     refreshStaticScreens();
+    void enhanceMoodSuggestionWithAI(trackerState.mood.label, score, note);
     const newStreak = moodCheckInStreak().streak;
     const growthBoost = applyGrowthCheckInBoost("mood", newStreak);
     const boostSuffix = growthBoost ? ` · +${growthBoost.boost} ${growthBoost.statLabel} in Life Sim` : "";

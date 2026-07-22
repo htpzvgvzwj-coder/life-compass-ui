@@ -662,7 +662,7 @@
           `).join("")}
         ` : `<p class="muted">No mentors yet - check back soon.</p>`}
         ${myApplication ? `
-          <p class="muted">${myApplication.status === "pending" ? "Your mentor application is pending review."
+          <p class="muted">${myApplication.status === "pending" ? "Your mentor application is saved and waiting on a manual review - there's no fixed timeline, so this may take a while."
             : myApplication.status === "approved" ? "You're a listed Community mentor."
             : myApplication.status === "declined" ? "Your mentor application wasn't approved this time."
             : "Your mentor application needs changes before it can be reviewed."}</p>
@@ -679,7 +679,7 @@
           <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
         </div>
         <h3 id="community-mentor-apply-title">Apply to become a Community mentor</h3>
-        <p class="muted">Tell us about your own experience and what you'd want to help with. Applications are reviewed by the Compass team before a mentor profile goes live - this isn't instant.</p>
+        <p class="muted">Tell us about your own experience and what you'd want to help with. Applications are reviewed manually, in batches, not on a fixed schedule - it can take a while before a mentor profile goes live, and we can't guarantee every application gets a response.</p>
         <div class="admin-form">
           <label>Your bio<textarea id="community-mentor-bio" maxlength="600" placeholder="Example: I spent two years figuring out budgeting and lease-signing the hard way. I'd like to help with money basics and first-apartment questions."></textarea></label>
           <label>Focus areas (comma separated)<input id="community-mentor-tags" type="text" placeholder="budgeting, first job, moving out"></label>
