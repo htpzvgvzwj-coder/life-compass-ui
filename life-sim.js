@@ -92,6 +92,7 @@
     farAssetDelayMs: 900,
     roadPropsDelayMs: 900,
     plazaPropsDelayMs: 1500,
+    urbanReplacementPropsDelayMs: 1900,
     farPropsDelayMs: 700,
     propYieldEvery: 5
   };
@@ -213,6 +214,7 @@
     const districtSamplesReady = loadDistrictAssetSamples(THREE, scene, state.assetManager, state, spawnX, spawnZ);
     const roadPropsReady = deferWorldLoad(() => addRoadDetailProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady), LIFE_SIM_PERFORMANCE.roadPropsDelayMs);
     const plazaPropsReady = deferWorldLoad(() => addDistrictPlazaProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady), LIFE_SIM_PERFORMANCE.plazaPropsDelayMs);
+    const singaporeObjaversePropsReady = deferWorldLoad(() => addSingaporeObjaverseReplacementProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady), LIFE_SIM_PERFORMANCE.urbanReplacementPropsDelayMs);
     let districtLoadingSafetyTimeout = window.setTimeout(() => {
       if (state.destroyed) return;
       clearDistrictLoadingHint(root);
@@ -223,7 +225,7 @@
       clearDistrictLoadingHint(root);
       auditSceneLayout(THREE, scene);
     });
-    Promise.all([roadPropsReady, plazaPropsReady]).catch((error) => {
+    Promise.all([roadPropsReady, plazaPropsReady, singaporeObjaversePropsReady]).catch((error) => {
       console.warn("[Life Sim] Background prop streaming failed:", error);
     });
     loadCharacterAsset(THREE, state.assetManager, player, state, root).then((loaded) => {
@@ -2563,6 +2565,148 @@
     for (const zone of zoneTiers.far) {
       if (state && state.destroyed) return;
       await placeZoneProps(zone);
+    }
+  }
+
+  async function addSingaporeObjaverseReplacementProps(THREE, scene, assetManager, state, spawnX, spawnZ, objaverseIndexReady) {
+    if (!assetManager) return;
+    const ready = await assetManager.ensureGltfLoader();
+    if (!ready || (state && state.destroyed)) return;
+
+    const { byCategory, loadedByUrl, loadEntry } = await objaverseIndexReady;
+    if (state && state.destroyed) return;
+
+    const hiddenPlaceholderNames = new Set();
+    const placementGroups = [
+      {
+        id: "town-centre-transit",
+        maxFarDistance: 58,
+        items: [
+          { category: "lamppost", position: [-19.5, 0, 4.2], rotation: 0.1, replace: ["Street Light Pole", "Street Light Glow"] },
+          { category: "lamppost", position: [-4.2, 0, 4.4], rotation: -0.2, replace: ["Street Light Pole", "Street Light Glow"] },
+          { category: "bench", position: [-17.8, 0, -4.2], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "bench", position: [-7.2, 0, -7.6], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "trash_can", position: [-15.8, 0, -7.2], replace: ["Street Trash Bin"] },
+          { category: "cone", position: [-13.4, 0, 6.4], rotation: 0.2 },
+          { category: "cone", position: [-8.2, 0, 6.2], rotation: -0.1 },
+          { category: "stop_sign", position: [-19.2, 0, 9.8], rotation: Math.PI * 0.5 }
+        ]
+      },
+      {
+        id: "hdb-neighbourhood-centre",
+        maxFarDistance: 70,
+        items: [
+          { category: "mailbox", position: [-35.8, 0, 35.4], rotation: Math.PI * 0.5 },
+          { category: "bench", position: [-29.4, 0, 39.4], rotation: Math.PI * 0.5, replace: ["Bench Seat", "Bench Back"] },
+          { category: "bench", position: [-22.4, 0, 34.7], rotation: 0, replace: ["Bench Seat", "Bench Back"] },
+          { category: "trash_can", position: [-42.8, 0, 30.7], replace: ["Street Trash Bin"] },
+          { category: "bicycle", position: [-37.8, 0, 31.5], rotation: Math.PI * 0.7 },
+          { category: "flowerpot", position: [-47.5, 0, 31.6] },
+          { category: "flowerpot", position: [-33.2, 0, 31.3] }
+        ]
+      },
+      {
+        id: "main-street-active-frontage",
+        maxFarDistance: 90,
+        items: [
+          { category: "shopping_cart", position: [12.5, 0, -35.4], rotation: -0.4 },
+          { category: "shopping_cart", position: [79.2, 0, -35.9], rotation: 0.35 },
+          { category: "trash_can", position: [-8.8, 0, -29.2], replace: ["Street Trash Bin"] },
+          { category: "trash_can", position: [36.7, 0, -37.4], replace: ["Street Trash Bin"] },
+          { category: "bench", position: [4.5, 0, -28.9], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "bench", position: [45.5, 0, -36.3], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "coffee_table", position: [-42.5, 0, -37.8], rotation: 0.2 },
+          { category: "coffee_table", position: [78.5, 0, -41.8], rotation: -0.3 }
+        ]
+      },
+      {
+        id: "park-connector-active-mobility",
+        maxFarDistance: 100,
+        items: [
+          { category: "bicycle", position: [8.2, 0, 36.1], rotation: Math.PI * 0.5 },
+          { category: "bicycle", position: [33.7, 0, 38.5], rotation: Math.PI * 0.52 },
+          { category: "bicycle", position: [67.2, 0, 37.2], rotation: Math.PI * 0.48 },
+          { category: "bench", position: [18.5, 0, 42.8], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "bench", position: [54.5, 0, 42.8], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "trash_can", position: [31.5, 0, 43.2], replace: ["Street Trash Bin"] }
+        ]
+      },
+      {
+        id: "life-service-specific-props",
+        maxFarDistance: 120,
+        items: [
+          { category: "wheelchair", position: [76.2, 0, -49.4], rotation: Math.PI * 0.1 },
+          { category: "dumbbell", position: [-59.6, 0, 49.3], rotation: Math.PI * 0.25 },
+          { category: "suitcase", position: [105.5, 0, -8.6], rotation: Math.PI * 0.08 },
+          { category: "backpack", position: [-78.2, 0, -10.4], rotation: -0.35 },
+          { category: "deck_chair", position: [71.8, 0, -84.8], rotation: Math.PI * 0.5 },
+          { category: "lantern", position: [12.4, 0, -66.5], rotation: 0.2 },
+          { category: "lantern", position: [24.6, 0, -17.5], rotation: -0.1 }
+        ]
+      }
+    ];
+
+    const roundRobin = {};
+    function nextEntry(category) {
+      const list = byCategory[category];
+      if (!list || !list.length) return null;
+      roundRobin[category] = (roundRobin[category] || 0) + 1;
+      return list[(roundRobin[category] - 1) % list.length];
+    }
+
+    function hidePlaceholders(names) {
+      if (!Array.isArray(names) || !names.length) return;
+      names.forEach((name) => {
+        if (hiddenPlaceholderNames.has(name)) return;
+        let hidden = 0;
+        scene.traverse((node) => {
+          if (node && node.name === name) {
+            node.visible = false;
+            hidden += 1;
+          }
+        });
+        if (hidden) hiddenPlaceholderNames.add(name);
+      });
+    }
+
+    let placementCount = 0;
+    async function place(item) {
+      const entry = nextEntry(item.category);
+      if (!entry) return false;
+      const asset = loadedByUrl.get(entry.url) || (typeof loadEntry === "function" ? await loadEntry(entry) : null);
+      if (!asset || asset.fallback || !asset.scene) return false;
+      const instance = asset.scene.clone(true);
+      instance.name = `Objaverse Singapore Replacement: ${item.category}`;
+      instance.userData.lifeVerseObjaverseReplacement = {
+        pass: "singapore-urban-props-v1",
+        category: item.category,
+        sourceUrl: entry.sourceUrl,
+        license: entry.license
+      };
+      instance.position.set(item.position[0], item.position[1] || 0, item.position[2]);
+      instance.rotation.y = Number(item.rotation || 0);
+      scene.add(instance);
+      hidePlaceholders(item.replace);
+      placementCount += 1;
+      if (placementCount % LIFE_SIM_PERFORMANCE.propYieldEvery === 0) await yieldToBrowser();
+      return true;
+    }
+
+    const tiers = classifyByDistance(placementGroups, spawnX, spawnZ, (group) => {
+      const first = group.items && group.items[0] && group.items[0].position;
+      return first ? [first[0], first[2]] : [0, 0];
+    }, NEAR_TIER_RADIUS);
+
+    for (const group of tiers.near) {
+      if (state && state.destroyed) return;
+      for (const item of group.items) await place(item);
+    }
+    await delayMs(LIFE_SIM_PERFORMANCE.farPropsDelayMs);
+    for (const group of tiers.far) {
+      if (state && state.destroyed) return;
+      const nearestItemDistance = Math.min(...group.items.map((item) => Math.hypot(item.position[0] - spawnX, item.position[2] - spawnZ)));
+      if (nearestItemDistance > group.maxFarDistance) continue;
+      for (const item of group.items) await place(item);
     }
   }
 

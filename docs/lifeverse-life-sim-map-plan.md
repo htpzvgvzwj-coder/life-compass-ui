@@ -64,6 +64,46 @@ Future Objaverse/GLB replacement rule:
 
 Every layer above is a replaceable visual slot. Gameplay logic must stay attached to LifeVerse zones, commands, and simulation systems. The decorative world meshes can be swapped for real assets later without changing activity logic, Fast Forward, Life Report, or player progression.
 
+## Objaverse Replacement Pass 1
+
+Status: implemented as `singapore-urban-props-v1`.
+
+This pass replaces the first small-prop layer with real Objaverse GLB assets already stored in `assets/props/objaverse/`. It intentionally does not replace every building yet; large building swaps must wait until this pass is checked on mobile.
+
+Replaced or enhanced:
+
+- Street lights
+- Benches
+- Trash bins
+- Traffic cones
+- Stop signs
+- Mailbox
+- Bicycles
+- Flowerpots
+- Shopping carts
+- Coffee tables
+- Wheelchair
+- Dumbbell
+- Suitcase
+- Backpack
+- Deck chair
+- Lanterns
+
+Safety rule:
+
+Old procedural street lights, benches, and trash bins are hidden only after a matching Objaverse asset loads successfully. If a GLB fails, the procedural fallback stays visible and the game continues.
+
+Not yet replaced:
+
+- MRT entrance building
+- Bus interchange shelter module
+- HDB facade modules
+- Neighbourhood centre shopfront modules
+- Food court stall modules
+- CBD tower modules
+- Airport terminal modules
+- Anime-style player character
+
 ## Camera Direction
 
 Use the current `OVER_SHOULDER_CAMERA` as the default Life Sim camera.

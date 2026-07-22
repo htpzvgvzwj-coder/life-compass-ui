@@ -4,6 +4,7 @@ const path = require("path");
 const vm = require("vm");
 
 const root = path.join(__dirname, "..");
+const realManifest = JSON.parse(fs.readFileSync(path.join(root, "assets", "life-sim", "asset-manifest.json"), "utf8"));
 
 function makeFakeThree() {
   class Color {
@@ -136,6 +137,15 @@ const requiredFolders = [
 requiredFolders.forEach((folder) => {
   assert.ok(fs.existsSync(path.join(root, folder)), `${folder} exists`);
 });
+
+assert.strictEqual(realManifest.enabled, true, "real Life Sim asset manifest is enabled");
+const realReplacementPass = (realManifest.objaverseReplacementPasses || []).find((pass) => pass.id === "singapore-urban-props-v1");
+assert.ok(realReplacementPass, "real manifest includes singapore-urban-props-v1");
+assert.ok(realReplacementPass.categories.includes("lamppost"), "real replacement pass includes lampposts");
+assert.ok(realReplacementPass.categories.includes("bench"), "real replacement pass includes benches");
+assert.ok(realReplacementPass.categories.includes("trash_can"), "real replacement pass includes trash cans");
+assert.ok(realManifest.objaverseAssets.some((entry) => entry.url.includes("assets/props/objaverse/") && entry.category === "lamppost"), "real manifest has local Objaverse lamppost GLB");
+assert.ok(realManifest.objaverseAssets.some((entry) => entry.url.includes("assets/props/objaverse/") && entry.category === "bench"), "real manifest has local Objaverse bench GLB");
 
 const THREE = makeFakeThree();
 const materials = sandbox.window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" });

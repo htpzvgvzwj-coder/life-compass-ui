@@ -4,8 +4,10 @@ const path = require("path");
 
 const root = path.join(__dirname, "..");
 const plan = JSON.parse(fs.readFileSync(path.join(root, "assets", "life-sim", "map-plan.json"), "utf8"));
+const manifest = JSON.parse(fs.readFileSync(path.join(root, "assets", "life-sim", "asset-manifest.json"), "utf8"));
 const simSource = fs.readFileSync(path.join(root, "life-sim.js"), "utf8");
 const docSource = fs.readFileSync(path.join(root, "docs", "lifeverse-life-sim-map-plan.md"), "utf8");
+const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
 const zoneStart = simSource.indexOf("const locationZones = [");
 const zoneEnd = simSource.indexOf("];", zoneStart);
@@ -76,6 +78,26 @@ assert.ok(Array.isArray(plan.infillLayers) && plan.infillLayers.length >= 6, "ma
   assert.ok(layer, `map plan includes ${layerId}`);
   assert.ok(Array.isArray(layer.futureAssetSlots) && layer.futureAssetSlots.length >= 3, `${layerId} has future asset slots`);
 });
+assert.strictEqual(plan.objaverseReplacementStatus.currentPass, "singapore-urban-props-v1", "map plan records the active Objaverse replacement pass");
+assert.ok(plan.objaverseReplacementStatus.replacedOrEnhanced.includes("street lights"), "map plan records street-light Objaverse replacement");
+assert.ok(plan.objaverseReplacementStatus.notYetReplaced.includes("HDB facade modules"), "map plan is honest about large assets not yet replaced");
+
+assert.strictEqual(manifest.enabled, true, "Objaverse manifest is enabled");
+const replacementPass = (manifest.objaverseReplacementPasses || []).find((pass) => pass.id === "singapore-urban-props-v1");
+assert.ok(replacementPass, "manifest includes singapore-urban-props-v1");
+[
+  "lamppost",
+  "bench",
+  "trash_can",
+  "bicycle",
+  "shopping_cart",
+  "wheelchair",
+  "suitcase",
+  "lantern"
+].forEach((category) => {
+  assert.ok(replacementPass.categories.includes(category), `replacement pass uses ${category}`);
+  assert.ok((manifest.objaverseAssets || []).some((entry) => entry.category === category), `manifest has a real Objaverse asset for ${category}`);
+});
 
 assert.ok(simSource.includes("LIFE_SIM_PERFORMANCE"), "Life Sim has a centralized performance profile");
 assert.ok(simSource.includes("maxPixelRatio: 1.35"), "Life Sim implementation matches map pixel-ratio budget");
@@ -83,6 +105,12 @@ assert.ok(simSource.includes("shadowSize: 1024"), "Life Sim implementation match
 assert.ok(simSource.includes("loadEntry"), "Life Sim implementation supports lazy Objaverse prop loading");
 assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation throttles optional model loading");
 [
+  "addSingaporeObjaverseReplacementProps",
+  "urbanReplacementPropsDelayMs",
+  "Objaverse Singapore Replacement",
+  "lifeVerseObjaverseReplacement",
+  "hidePlaceholders",
+  "singapore-urban-props-v1",
   "addSingaporeUrbanPlanningInfill",
   "Fine-grain Singapore town planning pass",
   "Integrated MRT Bus Interchange Deck",
@@ -96,12 +124,14 @@ assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation thrott
 ].forEach((marker) => {
   assert.ok(simSource.includes(marker), `Life Sim renderer includes Singapore city infill marker: ${marker}`);
 });
+assert.ok(indexSource.includes("life-sim.js?v=objaverse-replacement-20260722-1"), "index cache key points at the Objaverse replacement build");
 
 [
   "Purpose",
   "Supported Product Pillars",
   "Supported Learning Outcomes",
   "Singapore Urban Planning Pass",
+  "Objaverse Replacement Pass 1",
   "Long-Term Consequences",
   "Reflection Opportunities",
   "Technical Considerations",

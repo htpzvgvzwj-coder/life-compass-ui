@@ -1,5 +1,5 @@
 {
-  "enabled": false,
+  "enabled": true,
   "qualityTarget": "realistic-singapore-mobile",
   "notes": [
     "Realistic-style pivot (2026-07-21): assets come from Objaverse (CC-licensed",
@@ -27,6 +27,38 @@
     "when character is null, no crash, no broken state.",
     "",
     "Keep total first-load model + texture size under 45MB for mobile."
+  ],
+  "objaverseReplacementPasses": [
+    {
+      "id": "singapore-urban-props-v1",
+      "status": "enabled",
+      "purpose": "Replace the first layer of procedural street-life placeholders with real Objaverse GLB props while keeping procedural fallbacks if any model fails.",
+      "replacementPolicy": [
+        "Load after the first playable frame.",
+        "Use cached GLBs from assets/props/objaverse.",
+        "Hide old procedural street lights, benches, and trash bins only after the matching Objaverse category loads successfully.",
+        "Do not replace buildings in this pass.",
+        "Keep gameplay logic attached to LifeVerse zones and commands, never to decorative model names."
+      ],
+      "categories": [
+        "lamppost",
+        "bench",
+        "trash_can",
+        "cone",
+        "stop_sign",
+        "mailbox",
+        "bicycle",
+        "flowerpot",
+        "shopping_cart",
+        "coffee_table",
+        "wheelchair",
+        "dumbbell",
+        "suitcase",
+        "backpack",
+        "deck_chair",
+        "lantern"
+      ]
+    }
   ],
   "character": null,
   "objaverseAssets": [

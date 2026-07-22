@@ -192,6 +192,39 @@
       ]
     }
   ],
+  "objaverseReplacementStatus": {
+    "currentPass": "singapore-urban-props-v1",
+    "strategy": "Replace small city-life props first, then review performance before replacing large buildings.",
+    "replacedOrEnhanced": [
+      "street lights",
+      "benches",
+      "trash bins",
+      "traffic cones",
+      "stop signs",
+      "mailbox",
+      "bicycles",
+      "flowerpots",
+      "shopping carts",
+      "coffee tables",
+      "wheelchair",
+      "dumbbell",
+      "suitcase",
+      "backpack",
+      "deck chair",
+      "lanterns"
+    ],
+    "notYetReplaced": [
+      "MRT entrance building",
+      "bus interchange shelter module",
+      "HDB facade modules",
+      "neighbourhood centre shopfront modules",
+      "food court stall modules",
+      "CBD tower modules",
+      "airport terminal modules",
+      "anime-style player character"
+    ],
+    "performanceRule": "Do not replace major buildings until the first prop replacement pass remains smooth on mobile."
+  },
   "districts": [
     {
       "id": "heartland-independence",

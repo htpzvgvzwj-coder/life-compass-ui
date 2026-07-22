@@ -14,6 +14,31 @@ Before adding more Objaverse resources, check `assets/life-sim/map-plan.json` an
 
 The map is planned around a PUBG-style over-shoulder camera, six compact adult-life districts, and route-based gameplay loops. New assets must support a district identity, route, or life-choice pressure. Do not add decorative models just because they are available.
 
+## Current Objaverse replacement pass
+
+`singapore-urban-props-v1` is enabled in `asset-manifest.json` and loaded by `addSingaporeObjaverseReplacementProps()` in `life-sim.js`.
+
+This pass uses the existing local GLBs in `assets/props/objaverse/` to replace or enhance the light street-life layer:
+
+- `lamppost`
+- `bench`
+- `trash_can`
+- `cone`
+- `stop_sign`
+- `mailbox`
+- `bicycle`
+- `flowerpot`
+- `shopping_cart`
+- `coffee_table`
+- `wheelchair`
+- `dumbbell`
+- `suitcase`
+- `backpack`
+- `deck_chair`
+- `lantern`
+
+Procedural street lights, benches, and trash bins are hidden only after the matching Objaverse GLB successfully loads. Do not remove the procedural fallback first; public mobile browsers need a safe failure path.
+
 Performance rules from the plan:
 
 - First playable entry should stay under 18MB of critical assets.
