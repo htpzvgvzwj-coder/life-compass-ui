@@ -138,6 +138,10 @@ assert.ok(!simSource.includes("Food Court first-screen real-model pass"), "Life 
 assert.ok(!simSource.includes('hideNamePrefixes: ["Hawker Street Shop VALUE"]'), "Food Court spawn does not hide stable fallback shops with unaudited GLBs");
 assert.ok(!simSource.includes('hideNames: ["Food Court Roof", "Food Court Roof Ridge"]'), "Food Court roof is not replaced by an unaudited first-screen GLB");
 assert.ok(simSource.includes("Hawker Apron Tile Seam X"), "Food Court plaza has tile seams instead of a blank plane");
+assert.ok(simSource.includes("player.group.position.set(8, 0, -82)"), "Life Sim default entry opens from a clear street corridor");
+assert.ok(simSource.includes("state.yaw = Math.PI / 2"), "Life Sim default entry camera faces along the street instead of into a wall");
+assert.ok(simSource.includes("Town Centre Active Frontage"), "Life Sim still includes town-centre active frontage after scale corrections");
+assert.ok(simSource.includes("Pedestrian Apron"), "Life Sim planning frontage is scaled as a walkable street edge, not a tall wall");
 assert.ok(simSource.includes("[0.045, 3, 10], mat.metal"), "Street light poles are thin and light enough not to block the camera");
 assert.ok(simSource.includes("loadEntry"), "Life Sim implementation supports lazy Objaverse prop loading");
 assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation throttles optional model loading");
@@ -165,7 +169,7 @@ assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation thrott
 ].forEach((marker) => {
   assert.ok(simSource.includes(marker), `Life Sim renderer includes Singapore city infill marker: ${marker}`);
 });
-assert.ok(indexSource.includes("life-sim.js?v=lifesim-singapore-replan-20260722-1"), "index cache key points at the Singapore planning rebase build");
+assert.ok(indexSource.includes("life-sim.js?v=lifesim-singapore-replan-20260722-2"), "index cache key points at the Singapore planning rebase build");
 
 [
   "Purpose",

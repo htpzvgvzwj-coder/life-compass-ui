@@ -221,7 +221,11 @@
     if (state.assetManager) state.assetDebug = state.assetManager.createDebugPanel(host, renderer, scene);
 
     const player = createPlayer(THREE, materials);
-    player.group.position.set(-19, 0, -10);
+    // Default Life Sim entry now opens from a clear street corridor instead of
+    // the town-centre frontage, which could place the camera directly against
+    // a wall-like planning mass on public builds with restored player data.
+    state.yaw = Math.PI / 2;
+    player.group.position.set(8, 0, -82);
     resetOverShoulderCamera(THREE, state, player.group.position);
     if (options.initialLocationId) {
       const targetZone = locationZones.find((zone) => zone.id === options.initialLocationId);
@@ -3770,18 +3774,18 @@
     });
 
     addNeighbourhoodMicroBlocks(THREE, scene, mat, "HDB Neighbourhood Micro Block", [
-      [-53, 34, 4.2, 6.2, "CARE"],
-      [-47, 31, 4.0, 5.6, "MINI"],
-      [-41, 29, 4.6, 5.8, "KOPI"],
-      [-34, 28, 4.2, 5.0, "BILLS"],
-      [-28, 29, 4.6, 5.6, "STUDY"]
+      [-53, 34, 3.4, 3.1, "CARE"],
+      [-47, 31, 3.2, 2.9, "MINI"],
+      [-41, 29, 3.5, 3.0, "KOPI"],
+      [-34, 28, 3.3, 2.8, "BILLS"],
+      [-28, 29, 3.5, 3.0, "STUDY"]
     ]);
     addNeighbourhoodMicroBlocks(THREE, scene, mat, "Town Centre Active Frontage", [
-      [-23, -12, 4.6, 5.2, "CLINIC"],
-      [-15, -12, 4.4, 5.0, "TUITION"],
-      [-7, -12, 4.6, 5.2, "SERVICE"],
-      [2, -12, 4.8, 5.4, "SKILLS"],
-      [11, -12, 4.6, 5.2, "CAFE"]
+      [-24, -15.5, 3.4, 2.9, "CLINIC"],
+      [-16, -15.5, 3.2, 2.8, "TUITION"],
+      [-8, -15.5, 3.4, 2.9, "SERVICE"],
+      [1, -15.5, 3.5, 3.0, "SKILLS"],
+      [10, -15.5, 3.4, 2.9, "CAFE"]
     ]);
 
     [
@@ -3800,8 +3804,11 @@
   function addNeighbourhoodMicroBlocks(THREE, scene, mat, prefix, blocks) {
     blocks.forEach(([x, z, width, height, label], index) => {
       const material = index % 3 === 0 ? mat.hdbAccent : (index % 3 === 1 ? mat.cafe : mat.mall);
-      addBuildingCore(THREE, scene, `${prefix} ${label}`, [x, height / 2, z], [width, height, 3.6], material, mat, "shophouse");
-      addShopFront(THREE, scene, [x - 0.35, z - 1.92], label, index % 2 ? mat.signBlue : mat.signGreen, mat);
+      const kioskDepth = 2.25;
+      addBuildingCore(THREE, scene, `${prefix} ${label}`, [x, height / 2, z], [width, height, kioskDepth], material, mat, "shophouse");
+      addBox(THREE, scene, `${prefix} ${label} Pedestrian Apron`, [x, 0.21, z - 1.75], [width + 0.8, 0.1, 1.6], mat.sidewalk, true);
+      addBox(THREE, scene, `${prefix} ${label} Awning`, [x, height - 0.45, z - 1.25], [width + 0.65, 0.16, 0.75], index % 2 ? mat.signBlue : mat.signGreen, true);
+      addShopFront(THREE, scene, [x - 0.35, z - 1.28], label, index % 2 ? mat.signBlue : mat.signGreen, mat);
     });
   }
 
