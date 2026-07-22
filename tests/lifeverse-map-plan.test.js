@@ -104,10 +104,17 @@ assert.ok(simSource.includes("maxPixelRatio: 1"), "Life Sim implementation match
 assert.ok(simSource.includes("shadowSize: 512"), "Life Sim implementation matches the stability shadow budget");
 assert.ok(simSource.includes("shadowsEnabled: false"), "Life Sim disables default shadow maps for stability");
 assert.ok(simSource.includes("safeSpawnPointForZone"), "Life Sim uses safe outdoor spawn points instead of building centers");
+assert.ok(simSource.includes("safeSpawnYawForZone"), "Life Sim uses authored spawn camera directions instead of facing walls");
 assert.ok(simSource.includes("food: [8, 0, -82]"), "Food Court opens from a clear plaza spawn instead of a wall-facing spawn");
+assert.ok(simSource.includes("food: Math.PI / 2"), "Food Court opens looking along the street instead of straight at a wall");
 assert.ok(simSource.includes("}, 6500);"), "Life Sim removes the optional model loading hint quickly");
 assert.ok(simSource.includes("resolveCameraOcclusion"), "Life Sim prevents the camera from clipping into building colliders");
 assert.ok(simSource.includes("animateAsTree"), "Life Sim only applies wind animation to tree assets");
+assert.ok(simSource.includes("canvas.width = 1024"), "Life Sim sky uses a high-resolution painted sky texture");
+assert.ok(simSource.includes("addStreetCompositionLayer"), "Life Sim adds a first-entry street composition layer");
+assert.ok(simSource.includes("addFoodCourtStreetComposition"), "Life Sim repairs the Food Court spawn with a framed Singapore street scene");
+assert.ok(simSource.includes("Hawker Street Road Surface"), "Life Sim gives the Food Court entry a real road edge instead of blank concrete");
+assert.ok(simSource.includes("Hawker Street ${label} Awning"), "Food Court shopfronts include visible awnings on the player-facing side");
 assert.ok(simSource.includes("loadEntry"), "Life Sim implementation supports lazy Objaverse prop loading");
 assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation throttles optional model loading");
 [
@@ -131,7 +138,7 @@ assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation thrott
 ].forEach((marker) => {
   assert.ok(simSource.includes(marker), `Life Sim renderer includes Singapore city infill marker: ${marker}`);
 });
-assert.ok(indexSource.includes("life-sim.js?v=lifesim-stability-hotfix-20260722-1"), "index cache key points at the stability hotfix build");
+assert.ok(indexSource.includes("life-sim.js?v=lifesim-city-polish-20260722-1"), "index cache key points at the city polish build");
 
 [
   "Purpose",

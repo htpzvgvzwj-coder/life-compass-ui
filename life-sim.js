@@ -77,6 +77,13 @@
     cafe: [-47, 0, -31]
   };
 
+  const LOCATION_SAFE_SPAWN_YAWS = {
+    food: Math.PI / 2,
+    mall: Math.PI / 2,
+    home: Math.PI * 0.78,
+    train: Math.PI * 0.62
+  };
+
   const OVER_SHOULDER_CAMERA = {
     // PUBG-style life-sim view: close, low, and slightly over the right
     // shoulder so the player sits on the left third while the street opens up.
@@ -210,6 +217,7 @@
       const targetZone = locationZones.find((zone) => zone.id === options.initialLocationId);
       if (targetZone) {
         const safeSpawn = safeSpawnPointForZone(targetZone);
+        state.yaw = safeSpawnYawForZone(targetZone);
         player.group.position.set(safeSpawn[0], safeSpawn[1], safeSpawn[2]);
         resetOverShoulderCamera(THREE, state, player.group.position);
       }
@@ -585,6 +593,11 @@
     return [zone.x, 0, zone.z];
   }
 
+  function safeSpawnYawForZone(zone) {
+    if (!zone || !zone.id) return Math.PI;
+    return LOCATION_SAFE_SPAWN_YAWS[zone.id] || Math.PI;
+  }
+
   function resetOverShoulderCamera(THREE, state, target) {
     const rig = getOverShoulderCameraVectors(THREE, target, state.yaw, state.pitch, state.moveSpeed || 0);
     state.cameraPosition.copy(rig.position);
@@ -666,12 +679,12 @@
 
     return {
       library,
-      grass: pbrGroundMaterial(THREE, "Grass005", 60, 60, { color: 0xcfe0c6 }),
-      ground: pbrGroundMaterial(THREE, "Concrete034", 70, 55, { color: 0xe8e2d0 }),
+      grass: pbrGroundMaterial(THREE, "Grass005", 60, 60, { color: 0xc7d9bd }),
+      ground: pbrGroundMaterial(THREE, "Concrete034", 70, 55, { color: 0xd8d2c2 }),
       warmGround: make(0xcbb290),
-      road: pbrGroundMaterial(THREE, "Asphalt031", 34, 6, { color: 0xb7b7b7 }),
-      roadLine: make(0xd9d4c4, 0x0a0906, 0.55),
-      sidewalk: pbrGroundMaterial(THREE, "Concrete034", 6, 6, { color: 0xdcd5c0 }),
+      road: pbrGroundMaterial(THREE, "Asphalt031", 34, 6, { color: 0x4f5655 }),
+      roadLine: make(0xf0ead6, 0x0a0906, 0.55),
+      sidewalk: pbrGroundMaterial(THREE, "Concrete034", 6, 6, { color: 0xd8d1bd }),
       curb: shared("stone", () => make(0xa89d87)),
       curbWarm: make(0xc9bfa2),
       hdb: make(0xe1dccd),
@@ -744,15 +757,40 @@
 
   function createSkyTexture(THREE) {
     const canvas = document.createElement("canvas");
-    canvas.width = 32;
-    canvas.height = 256;
+    canvas.width = 1024;
+    canvas.height = 512;
     const ctx = canvas.getContext("2d");
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, "#4f8fc7");
-    gradient.addColorStop(0.55, "#a8cfe0");
-    gradient.addColorStop(1, "#dcd8c8");
+    gradient.addColorStop(0, "#3f82bf");
+    gradient.addColorStop(0.42, "#8fc5df");
+    gradient.addColorStop(0.72, "#d9d5be");
+    gradient.addColorStop(1, "#f1dcc0");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const sunGlow = ctx.createRadialGradient(760, 145, 8, 760, 145, 190);
+    sunGlow.addColorStop(0, "rgba(255, 244, 194, 0.84)");
+    sunGlow.addColorStop(0.28, "rgba(255, 214, 143, 0.28)");
+    sunGlow.addColorStop(1, "rgba(255, 214, 143, 0)");
+    ctx.fillStyle = sunGlow;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "rgba(255, 255, 246, 0.78)";
+    [
+      [130, 118, 78, 20], [192, 108, 92, 25], [254, 124, 70, 18],
+      [470, 84, 82, 22], [540, 96, 110, 28], [620, 82, 74, 18],
+      [820, 218, 105, 26], [905, 205, 82, 20]
+    ].forEach(([x, y, w, h]) => {
+      ctx.beginPath();
+      ctx.ellipse(x, y, w, h, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.fillStyle = "rgba(255, 244, 218, 0.32)";
+    for (let i = 0; i < 9; i += 1) {
+      const y = 300 + i * 14;
+      ctx.fillRect(0, y, canvas.width, 2);
+    }
     const texture = new THREE.CanvasTexture(canvas);
     texture.mapping = THREE.EquirectangularReflectionMapping;
     return texture;
@@ -1133,6 +1171,16 @@
     for (let i = 0; i < 8; i++) {
       clouds.add(createCloud(THREE, mat.cloud, -28 + i * 8, 12 + (i % 3) * 1.2, -27 + (i % 4) * 15, 1.15 + (i % 2) * 0.32));
     }
+    [
+      [-22, 17.5, -82, 1.5],
+      [-4, 18.6, -94, 1.85],
+      [16, 17.2, -78, 1.35],
+      [30, 19.0, -88, 1.7]
+    ].forEach(([x, y, z, scale]) => {
+      const cloud = createCloud(THREE, mat.cloud, x, y, z, scale);
+      cloud.name = "Food Court Horizon Cloud";
+      clouds.add(cloud);
+    });
     scene.add(clouds);
 
     const dust = createParticleField(THREE, mat.dust, 56, 32, 7.5, "Presentation Floating Dust");
@@ -1691,6 +1739,7 @@
     addPlane(THREE, scene, "Shallow Anime Sea", [75, 0.015, -90], [28, 9], mat.water);
 
     addRoadNetwork(THREE, scene, mat);
+    addStreetCompositionLayer(THREE, scene, mat);
     addZoneAt(addHdbHome, THREE, scene, mat, "home");
     addZoneAt(addGym, THREE, scene, mat, "gym");
     addZoneAt(addWorkTower, THREE, scene, mat, "work");
@@ -2092,21 +2141,25 @@
       // density, just pushed clear of the landmarks' actual footprints.
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
-        position: [30, 0, -76],
-        scale: [4.9, 4.9, 4.9],
-        targetHeightMeters: 48
+        // This used to sit at [30,-76] with a 48m target height, which loaded
+        // inside the Food Court first camera cone as a giant black wall. Keep
+        // the CBD tower, but move it back into the Marina/CBD cluster and
+        // lower its first-screen pressure.
+        position: [46, 0, -62],
+        scale: [3.7, 3.7, 3.7],
+        targetHeightMeters: 28
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-c.glb",
-        position: [58, 0, -56],
-        scale: [4.4, 4.4, 4.4],
-        targetHeightMeters: 44
+        position: [64, 0, -51],
+        scale: [3.6, 3.6, 3.6],
+        targetHeightMeters: 30
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
-        position: [56, 0, -75],
-        scale: [3.9, 3.9, 3.9],
-        targetHeightMeters: 38
+        position: [66, 0, -66],
+        scale: [3.2, 3.2, 3.2],
+        targetHeightMeters: 28
       },
       // Sentosa: purely additive palm trees around the existing Beach zone.
       {
@@ -2546,6 +2599,71 @@
     for (let x = -50; x <= 110; x += 6) addBox(THREE, scene, "Road Center Line EW", [x, 0.14, -32], [2.15, 0.04, 0.25], mat.roadLine, true);
     addCrosswalk(THREE, scene, [0, -28], mat, "x");
     addCrosswalk(THREE, scene, [-4, -32], mat, "z");
+  }
+
+  function addStreetCompositionLayer(THREE, scene, mat) {
+    ROAD_MAIN_SEGMENTS.forEach((segment) => addRoadEdgesAndStreetRhythm(THREE, scene, segment, mat, "main"));
+    ROAD_CONNECTOR_PATHS.forEach(([x1, z1, x2, z2]) => {
+      addRoadEdgesAndStreetRhythm(THREE, scene, { x1, z1, x2, z2, width: 2.2 }, mat, "connector");
+    });
+    addFoodCourtStreetComposition(THREE, scene, mat);
+  }
+
+  function addRoadEdgesAndStreetRhythm(THREE, scene, segment, mat, density = "main") {
+    const { x1, z1, x2, z2, width } = segment;
+    const edgeOffset = width / 2 + 0.18;
+    [-edgeOffset, edgeOffset].forEach((offset) => {
+      const startOffset = segmentPerpendicularOffset(x1, z1, x2, z2, offset);
+      addPath(
+        THREE,
+        scene,
+        [x1 + startOffset[0], z1 + startOffset[1]],
+        [x2 + startOffset[0], z2 + startOffset[1]],
+        density === "main" ? 0.24 : 0.15,
+        mat.curbWarm
+      );
+    });
+
+    const spacing = density === "main" ? 12 : 20;
+    const points = sampleSegmentPoints(x1, z1, x2, z2, spacing);
+    points.forEach((point, index) => {
+      const side = index % 2 === 0 ? 1 : -1;
+      const offset = segmentPerpendicularOffset(x1, z1, x2, z2, side * (width / 2 + 1.65));
+      const px = point[0] + offset[0];
+      const pz = point[1] + offset[1];
+      if (density === "main" && index % 3 === 0) addStreetLight(THREE, scene, [px, pz], mat);
+      else if (index % 3 === 1) addTree(THREE, scene, [px, pz], mat);
+      else addPlanterRow(THREE, scene, [px - 0.65, pz], 2, mat);
+    });
+  }
+
+  function addFoodCourtStreetComposition(THREE, scene, mat) {
+    // First-impression repair: the food-court spawn used to open onto a wide,
+    // empty concrete slab. This frames it as a Singapore street edge instead:
+    // darker road, kerb, shop row, planters, lights, and crosswalk rhythm.
+    addBox(THREE, scene, "Hawker Street Road Surface", [15, 0.055, -84.5], [48, 0.07, 4.6], mat.road, true);
+    addBox(THREE, scene, "Hawker Street North Kerb", [15, 0.18, -81.95], [48, 0.18, 0.28], mat.curbWarm, true);
+    addBox(THREE, scene, "Hawker Street South Kerb", [15, 0.18, -87.05], [48, 0.18, 0.28], mat.curbWarm, true);
+    for (let x = -5; x <= 34; x += 7) addBox(THREE, scene, "Hawker Street Lane Dash", [x, 0.17, -84.5], [2.2, 0.035, 0.18], mat.roadLine, true);
+    addCrosswalk(THREE, scene, [2, -84.5], mat, "z");
+    addCrosswalk(THREE, scene, [31, -84.5], mat, "z");
+
+    [
+      [-6, -90, "VALUE"], [2, -90, "KOPI"], [10, -90, "NASI"], [18, -90, "FRUIT"], [26, -90, "MART"], [34, -90, "ATM"]
+    ].forEach(([x, z, label], index) => {
+      addBuildingCore(THREE, scene, `Hawker Street Shop ${label}`, [x, 2.4, z], [5.8, 4.8, 3.2], index % 2 ? mat.cafe : mat.hdbAccent, mat, "shophouse");
+      addShopFront(THREE, scene, [x, z + 1.72], label, index % 2 ? mat.signGold : mat.signBlue, mat);
+      addBox(THREE, scene, `Hawker Street ${label} Awning`, [x, 2.95, z + 1.9], [5.4, 0.18, 0.95], index % 2 ? mat.signGold : mat.signGreen, true);
+      addBox(THREE, scene, `Hawker Street ${label} Sign Band`, [x, 3.65, z + 1.82], [4.5, 0.48, 0.12], index % 2 ? mat.signBlue : mat.signGold);
+    });
+
+    [-4, 5, 14, 23, 32].forEach((x, index) => {
+      addStreetLight(THREE, scene, [x, -80.2], mat);
+      addPlanterRow(THREE, scene, [x - 0.8, -78.9], 2, mat);
+      if (index % 2 === 0) addBench(THREE, scene, [x + 1.7, -79.6], mat);
+    });
+    [[-2, -76], [8, -76], [18, -76], [28, -76]].forEach(([x, z]) => addTree(THREE, scene, [x, z], mat));
+    addSignBoard(THREE, scene, "Hawker Street Direction Sign", "FOOD COURT  MRT  MALL", [-8, 2.4, -79.2], mat.signGreen, 0xffffff);
   }
 
   function segmentPoint(x1, z1, x2, z2, t) {
