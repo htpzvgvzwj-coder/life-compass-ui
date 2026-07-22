@@ -1748,14 +1748,16 @@
         url: "assets/environment/tree-oak.glb",
         hideNames: ["Tree Trunk", "Tree Crown"],
         positions: TREE_POSITIONS,
-        scale: [2.4, 2.4, 2.4]
+        scale: [2.4, 2.4, 2.4],
+        isBuilding: false
       },
       // Orchard Road's dense rain-tree canopy - purely additive, denser than
       // the city-wide tree scatter above.
       {
         url: "assets/environment/tree-oak.glb",
         positions: ORCHARD_STREET_TREE_POSITIONS,
-        scale: [2.2, 2.2, 2.2]
+        scale: [2.2, 2.2, 2.2],
+        isBuilding: false
       },
       // Orchard Road: extends the Mall zone with two more shopfronts along the
       // same street instead of replacing anything, so the existing shop
@@ -1819,12 +1821,14 @@
       {
         url: "assets/environment/tree-palm.glb",
         positions: SENTOSA_PALM_POSITIONS,
-        scale: [3.0, 3.0, 3.0]
+        scale: [3.0, 3.0, 3.0],
+        isBuilding: false
       },
       {
         url: "assets/environment/tree-palm-bend.glb",
         positions: SENTOSA_PALM_BEND_POSITIONS,
-        scale: [3.0, 3.0, 3.0]
+        scale: [3.0, 3.0, 3.0],
+        isBuilding: false
       },
       // Woodlands pilot: real modeled+textured buildings (Quaternius's free
       // CC0 "Downtown City MegaKit") replacing the primitive-box HDB blocks
@@ -1986,7 +1990,8 @@
         url: "assets/environment/park-bench.glb",
         hideNames: ["Bench Seat", "Bench Back"],
         positions: [[8, 20.2], [18, 25.8], [72.3, -80.1], [0, 40.5], [5, 43], [82, -18], [70, -20], [68, 2], [87, 2], [84, 74.5], [96, 74.5], [27, 44], [37, 44], [-5, 33.5], [1, 40.5]],
-        scale: [4, 2, 3]
+        scale: [4, 2, 3],
+        isBuilding: false
       },
       // Punggol: reuses the same real HDB block model as Home, and the same
       // mall model as Orchard Road. Both use the "positions" (plural, clone-
@@ -2053,12 +2058,31 @@
           if (state && state.destroyed) return;
           if (!asset || asset.fallback || !asset.scene) return;
 
+          // Collision-fix pass: found via an actual recorded playthrough (the
+          // static layout audit and warnOnColliderOverlaps only ever check
+          // bounding-box overlap between OBJECTS - neither ever verified
+          // player-vs-collider correctness). registerStaticCollider() is only
+          // called from addBuildingCore(), which builds the primitive-box
+          // placeholders - once a swap here hides that primitive (or, for a
+          // purely-additive swap, never had one to begin with), the real GLB
+          // on screen had NO matching collider, so the player could walk
+          // straight through every "realistic" building this session added.
+          // isBuilding defaults to true (most swaps are buildings); only
+          // trees/benches opt out with isBuilding: false.
+          const isBuilding = swap.isBuilding !== false;
+
           if (Array.isArray(swap.positions)) {
-            swap.positions.forEach(([x, z]) => {
+            swap.positions.forEach(([x, z], index) => {
               const instance = asset.scene.clone(true);
               assetManager.prepareModel(instance, { toonify: true, position: [x, 0, z], scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
               recenterOnGroundSlot(THREE, instance, x, z);
               scene.add(instance);
+              if (isBuilding) {
+                const box = new THREE.Box3().setFromObject(instance);
+                const size = new THREE.Vector3();
+                box.getSize(size);
+                registerStaticCollider(`${swap.url} #${index}`, x, z, size.x, size.z);
+              }
               // registerPresentationObjects() already ran (synchronously, before this
               // async load resolved) and only found the original procedural "Tree
               // Crown" groups this is about to hide. Register the replacement
@@ -2071,10 +2095,29 @@
             assetManager.prepareModel(asset.scene, { toonify: true, position: swap.position, scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
             recenterOnGroundSlot(THREE, asset.scene, swap.position[0], swap.position[2]);
             scene.add(asset.scene);
+            if (isBuilding) {
+              const box = new THREE.Box3().setFromObject(asset.scene);
+              const size = new THREE.Vector3();
+              box.getSize(size);
+              registerStaticCollider(swap.url, swap.position[0], swap.position[2], size.x, size.z);
+            }
           }
 
           const hideNames = swap.hideNames || [];
           const hidePrefixes = swap.hideNamePrefixes || [];
+          if (isBuilding) {
+            // The primitive(s) being hidden below already have a collider
+            // registered at their OWN position/size - stale the moment the
+            // real GLB (registered above, at ITS real measured footprint)
+            // takes over the visuals. Remove by name match, same matching
+            // rule as the visibility hide right below.
+            for (let i = activeStaticColliders.length - 1; i >= 0; i -= 1) {
+              const colliderName = activeStaticColliders[i].name;
+              if (hideNames.includes(colliderName) || hidePrefixes.some((prefix) => colliderName.startsWith(prefix))) {
+                activeStaticColliders.splice(i, 1);
+              }
+            }
+          }
           // Zones now build into a per-zone offset Group (see addZoneAt) rather
           // than straight into `scene`, so the procedural placeholders this is
           // hiding sit one level deeper than they used to - traverse() finds
