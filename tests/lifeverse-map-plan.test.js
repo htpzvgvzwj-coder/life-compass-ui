@@ -145,6 +145,32 @@ assert.ok(appSource.includes("const initialLocationId = pendingTeleportLocationI
 assert.ok(!appSource.includes('trackerState.lifeSim.currentLocation || "home"'), "Compass app avoids stale location restores that can spawn the camera beside a wall");
 assert.ok(simSource.includes("Town Centre Active Frontage"), "Life Sim still includes town-centre active frontage after scale corrections");
 assert.ok(simSource.includes("Pedestrian Apron"), "Life Sim planning frontage is scaled as a walkable street edge, not a tall wall");
+assert.ok(simSource.includes("addSingaporeIdentityPass"), "Life Sim adds a visible Singapore identity pass in the first camera cone");
+[
+  "Singapore HDB Blk 219 Facade",
+  "Singapore HDB Void Deck",
+  "Singapore HDB Block Number Street Sign",
+  "Singapore MRT Roundel Red",
+  "Singapore MRT Street Pylon Red",
+  "Singapore MRT Road Facing Station Sign",
+  "LTA Bus Stop Green Roof",
+  "LTA Bus Stop PIDS Panel",
+  "LTA Bus Stop Road Facing Sign",
+  "Singapore Sheltered Walkway Roof",
+  "Singapore Hawker ${label} Textured Stall",
+  "Singapore Hawker Centre Road Facing Sign",
+  "Singapore Bus Lane Marking",
+  "Singapore Bus Lane Road Text BUS",
+  "Singapore Yellow Box",
+  "Singapore Zebra Crossing Stripe",
+  "Singapore Rain Tree Broad Crown",
+  "Singapore Street Lamp Pole",
+  "Singapore Green Trash Bin",
+  "Singapore Marina Bay Skyline Backdrop",
+  "Singapore Town Centre Overhead Wayfinding Sign"
+].forEach((marker) => {
+  assert.ok(simSource.includes(marker), `Life Sim includes Singapore visual marker: ${marker}`);
+});
 assert.ok(simSource.includes("[0.045, 3, 10], mat.metal"), "Street light poles are thin and light enough not to block the camera");
 assert.ok(simSource.includes("loadEntry"), "Life Sim implementation supports lazy Objaverse prop loading");
 assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation throttles optional model loading");
@@ -172,7 +198,7 @@ assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation thrott
 ].forEach((marker) => {
   assert.ok(simSource.includes(marker), `Life Sim renderer includes Singapore city infill marker: ${marker}`);
 });
-assert.ok(indexSource.includes("life-sim.js?v=lifesim-singapore-replan-20260722-4"), "index cache key points at the Singapore planning rebase build");
+assert.ok(indexSource.includes("life-sim.js?v=lifesim-singapore-identity-20260722-1"), "index cache key points at the Singapore identity build");
 
 [
   "Purpose",

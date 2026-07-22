@@ -1755,6 +1755,7 @@
     addRoadNetwork(THREE, scene, mat);
     addStreetCompositionLayer(THREE, scene, mat);
     addSingaporeOfficialPlanningRebase(THREE, scene, mat);
+    addSingaporeIdentityPass(THREE, scene, mat);
     addZoneAt(addHdbHome, THREE, scene, mat, "home");
     addZoneAt(addGym, THREE, scene, mat, "gym");
     addZoneAt(addWorkTower, THREE, scene, mat, "work");
@@ -3864,6 +3865,280 @@
     });
   }
 
+  function addSingaporeIdentityPass(THREE, scene, mat) {
+    // Visual identity pass for the first Life Sim camera cone: Singapore should
+    // read before the player touches controls. These are lightweight authored
+    // elements based on real local infrastructure cues - HDB void decks, block
+    // numbers, LTA bus shelters, Walk2Ride-style sheltered links, MRT signage,
+    // hawker/kopitiam frontage, yellow-box road marking, and tropical planting.
+    addSingaporeSkylineBackdrop(THREE, scene, mat);
+    addHdbVoidDeckStreetWall(THREE, scene, mat, [9.5, -76.4]);
+    addMrtEntranceLandmark(THREE, scene, mat, [28, -79.6]);
+    addSingaporeBusStop(THREE, scene, mat, [2.2, -78.6]);
+    addSingaporeCoveredWalkway(THREE, scene, mat);
+    addHawkerKopitiamFrontage(THREE, scene, mat);
+    addSingaporeRoadMarkings(THREE, scene, mat);
+    addTropicalStreetEdge(THREE, scene, mat);
+    addSingaporeStreetFurniture(THREE, scene, mat);
+  }
+
+  function addHdbVoidDeckStreetWall(THREE, scene, mat, origin) {
+    const [x, z] = origin;
+    const facadeMat = createSingaporeFacadeMaterial(THREE, {
+      type: "hdb",
+      wall: "#d9d4c7",
+      accent: "#6f8fa0",
+      label: "BLK 219"
+    });
+    addBox(THREE, scene, "Singapore HDB Blk 219 Facade", [x, 7.4, z], [11.5, 14.8, 2.6], facadeMat);
+    addBox(THREE, scene, "Singapore HDB Blk 219 Street Side Facade", [x + 5.92, 7.1, z - 3.2], [0.3, 14.2, 5.2], facadeMat);
+    addBox(THREE, scene, "Singapore HDB Blk 219 Void Deck Opening", [x, 1.35, z - 1.45], [9.8, 2.7, 0.22], mat.glass);
+    addBox(THREE, scene, "Singapore HDB Void Deck Floor", [x, 0.18, z - 3.1], [12.2, 0.16, 4.2], mat.sidewalk, true);
+    addBox(THREE, scene, "Singapore HDB Void Deck Bench", [x - 3.7, 0.52, z - 3.45], [2.4, 0.28, 0.48], mat.wood);
+    addBox(THREE, scene, "Singapore HDB Void Deck Backrest", [x - 3.7, 0.9, z - 3.72], [2.4, 0.58, 0.16], mat.wood);
+    addBox(THREE, scene, "Singapore HDB Lift Lobby Yellow Wall", [x + 3.45, 1.8, z - 3.45], [2.3, 3.0, 0.2], mat.signGold);
+    addText(THREE, scene, "BLK 219", [x - 5.4, 5.2, z - 1.65], 0.4, 0x111111);
+    addText(THREE, scene, "VOID DECK", [x - 4.9, 2.15, z - 3.85], 0.26, 0x111111);
+    addFacingXSignBoard(THREE, scene, "Singapore HDB Block Number Street Sign", "BLK 219", [x + 6.12, 5.25, z - 4.1], mat.signGold, 0x111111, 2.7, 0.8);
+    for (let i = 0; i < 5; i++) {
+      addCylinder(THREE, scene, "Singapore HDB Void Deck Column", [x - 4.8 + i * 2.4, 1.45, z - 3.2], [0.12, 2.9, 10], mat.hdbBalcony);
+    }
+    for (let i = 0; i < 5; i++) {
+      addCylinder(THREE, scene, "Singapore HDB Laundry Pole", [x + 6.18, 4.2 + i * 1.6, z - 2.2], [0.035, 1.9, 8], mat.metal, Math.PI / 2);
+    }
+  }
+
+  function addMrtEntranceLandmark(THREE, scene, mat, origin) {
+    const [x, z] = origin;
+    addBox(THREE, scene, "Singapore MRT Entrance Glass Box", [x, 1.55, z], [4.6, 3.1, 3.3], mat.glass);
+    addBox(THREE, scene, "Singapore MRT Entrance Roof", [x, 3.25, z], [5.4, 0.28, 4.0], mat.roofDark, true);
+    addBox(THREE, scene, "Singapore MRT Escalator Well", [x - 0.65, 0.55, z - 0.1], [2.6, 0.26, 2.2], mat.metal, true);
+    addCylinder(THREE, scene, "Singapore MRT Roundel Red", [x - 2.85, 2.6, z - 1.95], [0.58, 0.12, 28], mat.mrt, Math.PI / 2);
+    addCylinder(THREE, scene, "Singapore MRT Roundel White", [x - 2.85, 2.6, z - 1.88], [0.34, 0.13, 28], mat.shoes, Math.PI / 2);
+    addCylinder(THREE, scene, "Singapore MRT Street Pylon Red", [x - 7.5, 2.4, z - 4.2], [0.76, 0.16, 32], mat.mrt, Math.PI / 2);
+    addCylinder(THREE, scene, "Singapore MRT Street Pylon White", [x - 7.5, 2.4, z - 4.05], [0.42, 0.17, 32], mat.shoes, Math.PI / 2);
+    addSignBoard(THREE, scene, "Singapore MRT Station Name", "MRT  EW", [x - 0.45, 3.92, z - 2.05], mat.signGreen, 0xffffff);
+    addFacingXSignBoard(THREE, scene, "Singapore MRT Road Facing Station Sign", "MRT  TANJONG", [x - 8.05, 3.45, z - 1.5], mat.signGreen, 0xffffff, 3.9, 0.95);
+    addText(THREE, scene, "HAWKER  MRT  HDB", [x - 6.2, 1.55, z - 2.45], 0.28, 0xffffff);
+    addBox(THREE, scene, "MRT Tactile Paving Strip", [x - 4.4, 0.205, z - 2.35], [7.6, 0.055, 0.38], mat.signGold, true);
+  }
+
+  function addSingaporeBusStop(THREE, scene, mat, origin) {
+    const [x, z] = origin;
+    addBox(THREE, scene, "LTA Bus Stop Shelter Floor", [x, 0.2, z], [7.2, 0.14, 2.4], mat.sidewalk, true);
+    addBox(THREE, scene, "LTA Bus Stop Green Roof", [x, 3.05, z], [7.6, 0.24, 2.7], mat.signGreen, true);
+    addBox(THREE, scene, "LTA Bus Stop Rain Screen", [x, 1.75, z + 1.25], [7.2, 2.35, 0.12], mat.glass);
+    [-3, -1.2, 1.2, 3].forEach((dx) => addCylinder(THREE, scene, "LTA Bus Stop Slim Column", [x + dx, 1.55, z - 1.15], [0.07, 3.1, 8], mat.metal));
+    addBox(THREE, scene, "LTA Bus Stop Priority Seat", [x - 1.9, 0.58, z - 0.3], [1.7, 0.25, 0.55], mat.signBlue);
+    addBox(THREE, scene, "LTA Bus Stop Priority Seat Back", [x - 1.9, 0.94, z + 0.04], [1.7, 0.62, 0.14], mat.signBlue);
+    addBox(THREE, scene, "LTA Bus Stop PIDS Panel", [x + 2.2, 1.85, z - 1.22], [1.35, 1.35, 0.14], mat.screen);
+    addText(THREE, scene, "BUS  65  190", [x + 1.62, 1.96, z - 1.42], 0.16, 0xffef84);
+    addSignBoard(THREE, scene, "LTA Bus Stop Sign", "BUS STOP", [x - 3.15, 3.82, z - 1.33], mat.signBlue, 0xffffff);
+    addFacingXSignBoard(THREE, scene, "LTA Bus Stop Road Facing Sign", "BUS STOP", [x + 4.4, 2.35, z - 1.22], mat.signBlue, 0xffffff, 2.35, 0.62);
+  }
+
+  function addSingaporeCoveredWalkway(THREE, scene, mat) {
+    for (let x = -8; x <= 30; x += 4.2) {
+      addBox(THREE, scene, "Singapore Sheltered Walkway Roof", [x, 3.35, -75.7], [4.45, 0.18, 2.1], mat.roofDark, true);
+      addCylinder(THREE, scene, "Singapore Sheltered Walkway Slim Column", [x - 1.85, 1.7, -76.55], [0.065, 3.25, 8], mat.metal);
+      addCylinder(THREE, scene, "Singapore Sheltered Walkway Slim Column", [x + 1.85, 1.7, -74.85], [0.065, 3.25, 8], mat.metal);
+    }
+    addBox(THREE, scene, "Singapore Sheltered Walkway Drain Line", [11, 0.185, -77.05], [41, 0.035, 0.12], mat.metal, true);
+  }
+
+  function addHawkerKopitiamFrontage(THREE, scene, mat) {
+    const stalls = [
+      [-9, -79.6, "KOPITIAM"],
+      [-2.5, -79.6, "NASI"],
+      [4.0, -79.6, "TEH"]
+    ];
+    stalls.forEach(([x, z, label], index) => {
+      const facadeMat = createSingaporeFacadeMaterial(THREE, {
+        type: "hawker",
+        wall: index % 2 ? "#c68b4a" : "#b87842",
+        accent: index % 2 ? "#257c5c" : "#d1a23e",
+        label
+      });
+      addBox(THREE, scene, `Singapore Hawker ${label} Textured Stall`, [x, 1.75, z], [5.2, 3.5, 2.0], facadeMat);
+      addBox(THREE, scene, `Singapore Hawker ${label} Metal Counter`, [x, 0.9, z - 1.14], [4.4, 0.55, 0.18], mat.metal);
+      addBox(THREE, scene, `Singapore Hawker ${label} Awning`, [x, 2.92, z - 1.28], [5.5, 0.2, 0.95], index % 2 ? mat.signGreen : mat.signGold, true);
+      addText(THREE, scene, label, [x - 1.95, 2.62, z - 1.42], 0.26, index % 2 ? 0xffffff : 0x111111);
+    });
+    addFacingXSignBoard(THREE, scene, "Singapore Hawker Centre Road Facing Sign", "KOPITIAM", [5.4, 3.0, -77.15], mat.signGold, 0x111111, 3.4, 0.8);
+    addBox(THREE, scene, "Hawker Centre Yellow Table Row", [1.5, 0.65, -75.4], [10.2, 0.24, 0.95], mat.signGold);
+    for (let i = 0; i < 5; i++) addCylinder(THREE, scene, "Hawker Centre Round Stool", [-3 + i * 2.2, 0.45, -74.4], [0.28, 0.22, 12], mat.mrt);
+  }
+
+  function addSingaporeRoadMarkings(THREE, scene, mat) {
+    addBox(THREE, scene, "Singapore Bus Lane Marking One", [-4.6, 0.18, -82.25], [6.4, 0.035, 0.18], mat.roadLine, true);
+    addBox(THREE, scene, "Singapore Bus Lane Marking Two", [-4.6, 0.18, -86.75], [6.4, 0.035, 0.18], mat.roadLine, true);
+    addFlatTextPlane(THREE, scene, "Singapore Bus Lane Road Text BUS", "BUS", [-7.2, 0.225, -86.25], [3.4, 1.35], 0xf2ead7, Math.PI / 2);
+    addFlatTextPlane(THREE, scene, "Singapore Bus Lane Road Text LANE", "LANE", [-6.9, 0.225, -82.9], [4.2, 1.2], 0xf2ead7, Math.PI / 2);
+    for (let x = 15; x <= 27; x += 1.2) addBox(THREE, scene, "Singapore Zebra Crossing Stripe", [x, 0.18, -82.1], [0.42, 0.04, 5.1], mat.shoes, true);
+    addBox(THREE, scene, "Singapore Yellow Box North", [15, 0.19, -87.3], [12, 0.04, 0.16], mat.signGold, true);
+    addBox(THREE, scene, "Singapore Yellow Box South", [15, 0.19, -81.7], [12, 0.04, 0.16], mat.signGold, true);
+    addBox(THREE, scene, "Singapore Yellow Box West", [9, 0.19, -84.5], [0.16, 0.04, 5.6], mat.signGold, true);
+    addBox(THREE, scene, "Singapore Yellow Box East", [21, 0.19, -84.5], [0.16, 0.04, 5.6], mat.signGold, true);
+    for (let i = -2; i <= 2; i++) addBox(THREE, scene, "Singapore Yellow Box Diagonal", [15 + i * 2.2, 0.2, -84.5], [0.14, 0.04, 6.3], mat.signGold, true).rotation.y = Math.PI / 4;
+  }
+
+  function addTropicalStreetEdge(THREE, scene, mat) {
+    [[-4, -72.8], [7, -72.4], [18, -74.2], [29, -75.0], [37, -80.4]].forEach(([x, z], index) => {
+      addCylinder(THREE, scene, "Singapore Rain Tree Trunk", [x, 1.25, z], [0.18, 2.5, 12], mat.trunk);
+      const crown = addCylinder(THREE, scene, "Singapore Rain Tree Broad Crown", [x, 3.2, z], [1.35 + (index % 2) * 0.25, 0.7, 18], mat.bush);
+      crown.scale.x = 1.45;
+      crown.scale.z = 1.2;
+    });
+    [[6.5, -80.3], [13.5, -80.1], [22.8, -80.8], [31.5, -81.4]].forEach(([x, z]) => addPlanterRow(THREE, scene, [x, z], 2, mat));
+  }
+
+  function addSingaporeStreetFurniture(THREE, scene, mat) {
+    for (let x = -6; x <= 32; x += 6.2) {
+      addCylinder(THREE, scene, "Singapore Black White Bollard", [x, 0.45, -78.2], [0.11, 0.9, 12], mat.lamp);
+      addCylinder(THREE, scene, "Singapore Street Lamp Pole", [x + 1.8, 2.35, -73.8], [0.08, 4.7, 10], mat.lamp);
+      addBox(THREE, scene, "Singapore Street Lamp Arm", [x + 2.25, 4.45, -74.1], [0.85, 0.07, 0.11], mat.lamp);
+      addCylinder(THREE, scene, "Singapore Street Lamp Glow", [x + 2.68, 4.4, -74.1], [0.16, 0.12, 12], mat.lampGlow);
+    }
+    addBox(THREE, scene, "Singapore Green Trash Bin", [13.8, 0.55, -75.05], [0.62, 1.1, 0.62], mat.signGreen);
+    addText(THREE, scene, "LITTER BIN", [13.38, 1.27, -75.42], 0.12, 0xffffff);
+    addBox(THREE, scene, "Singapore Pedestrian Railing", [20.5, 0.82, -80.4], [8.8, 0.12, 0.12], mat.metal);
+    for (let x = 16.4; x <= 24.6; x += 1.1) addCylinder(THREE, scene, "Singapore Pedestrian Railing Post", [x, 0.85, -80.4], [0.035, 1.7, 8], mat.metal);
+  }
+
+  function addSingaporeSkylineBackdrop(THREE, scene, mat) {
+    const material = createSingaporeSkylineMaterial(THREE);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(54, 18), material);
+    mesh.name = "Singapore Marina Bay Skyline Backdrop";
+    mesh.position.set(48, 9.0, -90.5);
+    mesh.rotation.y = Math.PI / 2;
+    mesh.renderOrder = -2;
+    scene.add(mesh);
+    addFacingXSignBoard(THREE, scene, "Singapore District Wayfinding Sign", "HDB  MRT  HAWKER  CBD", [18, 3.4, -76.55], mat.signGold, 0x111111, 5.1, 0.78);
+    addFacingXSignBoard(THREE, scene, "Singapore Town Centre Overhead Wayfinding Sign", "TANJONG MRT  /  HAWKER CENTRE", [21.8, 4.55, -82.15], mat.signGreen, 0xffffff, 8.2, 0.86);
+    addCylinder(THREE, scene, "Singapore Town Centre Wayfinding Gantry Pole", [21.8, 2.25, -78.35], [0.08, 4.5, 10], mat.metal);
+    addCylinder(THREE, scene, "Singapore Town Centre Wayfinding Gantry Pole", [21.8, 2.25, -85.95], [0.08, 4.5, 10], mat.metal);
+  }
+
+  function createSingaporeSkylineMaterial(THREE) {
+    const key = "sg:skyline:marina-bay";
+    if (facadeTextureCache.has(key)) return facadeTextureCache.get(key);
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 384;
+    const ctx = canvas.getContext("2d");
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "rgba(139,190,219,0.12)");
+    gradient.addColorStop(1, "rgba(18,32,42,0.28)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "rgba(34,45,55,0.58)";
+    const base = 326;
+    [
+      [40, 160, 58, 166], [112, 110, 44, 216], [176, 138, 70, 188], [270, 82, 52, 244],
+      [352, 124, 60, 202], [456, 96, 44, 230], [526, 118, 80, 208], [650, 78, 62, 248],
+      [742, 132, 50, 194], [824, 102, 74, 224], [930, 152, 64, 174]
+    ].forEach(([x, y, w, h]) => ctx.fillRect(x, y, w, h));
+    ctx.fillStyle = "rgba(24,34,42,0.72)";
+    ctx.beginPath();
+    ctx.moveTo(590, 250);
+    ctx.bezierCurveTo(620, 202, 670, 184, 712, 216);
+    ctx.bezierCurveTo(740, 238, 770, 246, 810, 232);
+    ctx.lineTo(826, 260);
+    ctx.lineTo(586, 260);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,235,170,0.82)";
+    ctx.lineWidth = 3;
+    for (let x = 48; x < 980; x += 32) {
+      for (let y = 130; y < 305; y += 28) {
+        if ((x + y) % 3 === 0) ctx.strokeRect(x, y, 9, 7);
+      }
+    }
+    ctx.fillStyle = "rgba(255,247,214,0.82)";
+    ctx.font = "900 46px system-ui, sans-serif";
+    ctx.fillText("MARINA BAY  /  CBD", 46, 76);
+    const texture = new THREE.CanvasTexture(canvas);
+    if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+    facadeTextureCache.set(key, material);
+    return material;
+  }
+
+  function createSingaporeFacadeMaterial(THREE, options = {}) {
+    const key = `sg:${options.type}:${options.wall}:${options.accent}:${options.label}`;
+    if (facadeTextureCache.has(key)) return facadeTextureCache.get(key);
+    const canvas = document.createElement("canvas");
+    canvas.width = 768;
+    canvas.height = 768;
+    const ctx = canvas.getContext("2d");
+    const wall = options.wall || "#d7d0bf";
+    const accent = options.accent || "#4c7f66";
+    ctx.fillStyle = wall;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 0.12;
+    for (let i = 0; i < 120; i++) {
+      ctx.fillStyle = i % 2 ? "#ffffff" : "#000000";
+      ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 1 + Math.random() * 2, 12 + Math.random() * 32);
+    }
+    ctx.globalAlpha = 1;
+    if (options.type === "hdb") {
+      for (let floor = 0; floor < 8; floor++) {
+        const y = 70 + floor * 76;
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.fillRect(0, y - 10, canvas.width, 6);
+        for (let col = 0; col < 5; col++) {
+          const x = 58 + col * 136;
+          ctx.fillStyle = "#2a3640";
+          ctx.fillRect(x, y, 70, 42);
+          ctx.fillStyle = "#8eb0bd";
+          ctx.fillRect(x + 5, y + 5, 60, 32);
+          ctx.fillStyle = accent;
+          ctx.fillRect(x - 20, y + 48, 112, 12);
+          if ((floor + col) % 2 === 0) {
+            ctx.fillStyle = "#b5b8b9";
+            ctx.fillRect(x + 8, y + 64, 38, 14);
+          }
+        }
+      }
+      ctx.fillStyle = accent;
+      ctx.fillRect(0, 0, canvas.width, 54);
+      ctx.fillStyle = "#111111";
+      ctx.font = "900 42px system-ui, sans-serif";
+      ctx.fillText(options.label || "BLK", 24, 41);
+      ctx.fillStyle = "rgba(0,0,0,0.36)";
+      ctx.fillRect(0, 645, canvas.width, 92);
+      ctx.fillStyle = "#f4efe2";
+      ctx.font = "800 26px system-ui, sans-serif";
+      ctx.fillText("VOID DECK", 28, 703);
+    } else {
+      ctx.fillStyle = accent;
+      ctx.fillRect(0, 0, canvas.width, 120);
+      ctx.fillStyle = "#111111";
+      ctx.font = "900 58px system-ui, sans-serif";
+      ctx.fillText(options.label || "SHOP", 36, 82);
+      for (let i = 0; i < 4; i++) {
+        const x = 50 + i * 175;
+        ctx.fillStyle = "#1f2528";
+        ctx.fillRect(x, 190, 118, 160);
+        ctx.fillStyle = "#bfd4d5";
+        ctx.fillRect(x + 8, 198, 102, 144);
+      }
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(0, 560, canvas.width, 160);
+      ctx.fillStyle = "#e6e1d4";
+      ctx.font = "800 32px system-ui, sans-serif";
+      ctx.fillText("HAWKER CENTRE", 36, 640);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      roughness: 0.82,
+      metalness: 0.02
+    });
+    facadeTextureCache.set(key, material);
+    return material;
+  }
+
   function addFineGrainUrbanFabric(THREE, scene, mat) {
     // Fine-grain Singapore town planning pass. The big map plane used to read
     // as empty ground between POIs; this fills it with secondary streets,
@@ -4096,6 +4371,11 @@
   function addSignBoard(THREE, scene, name, text, position, material, textColor) {
     addBox(THREE, scene, name, position, [3.2, 0.88, 0.16], material);
     addText(THREE, scene, text, [position[0] - 1.42, position[1] + 0.08, position[2] - 0.15], 0.44, textColor);
+  }
+
+  function addFacingXSignBoard(THREE, scene, name, text, position, material, textColor, width = 3.2, height = 0.88) {
+    addBox(THREE, scene, name, position, [0.16, height, width], material);
+    addText(THREE, scene, text, [position[0] - 0.22, position[1] + height * 0.12, position[2] - width * 0.42], Math.min(0.42, height * 0.48), textColor);
   }
 
   function addFlowerBed(THREE, scene, position, width, mat) {
@@ -4460,16 +4740,17 @@
 
   function addText(THREE, scene, text, position, size, color) {
     const canvas = document.createElement("canvas");
-    canvas.width = 512;
+    canvas.width = 768;
     canvas.height = 160;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.font = "900 72px system-ui, sans-serif";
+    const fontSize = Math.max(34, Math.min(72, Math.floor(780 / Math.max(10, String(text).length))));
+    ctx.font = `900 ${fontSize}px system-ui, sans-serif`;
     ctx.lineWidth = 8;
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
     ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
-    ctx.strokeText(text, 18, 96);
-    ctx.fillText(text, 18, 96);
+    ctx.strokeText(text, 24, 96);
+    ctx.fillText(text, 24, 96);
     const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
     const sprite = new THREE.Sprite(material);
@@ -4477,6 +4758,29 @@
     sprite.scale.set(size * 4.1, size * 1.25, 1);
     scene.add(sprite);
     return sprite;
+  }
+
+  function addFlatTextPlane(THREE, scene, name, text, position, scale, color, rotationZ = 0) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "900 118px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    const texture = new THREE.CanvasTexture(canvas);
+    if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(scale[0], scale[1]), material);
+    mesh.name = name;
+    mesh.position.set(position[0], position[1], position[2]);
+    mesh.rotation.set(-Math.PI / 2, 0, rotationZ);
+    mesh.renderOrder = 4;
+    scene.add(mesh);
+    return mesh;
   }
 
   function clamp(value, min, max) {

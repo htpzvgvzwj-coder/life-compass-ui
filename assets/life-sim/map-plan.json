@@ -1,5 +1,5 @@
 {
-  "version": "2026-07-22-lifeverse-singapore-official-planning-rebase-v3",
+  "version": "2026-07-22-lifeverse-singapore-identity-pass-v1",
   "title": "LifeVerse Singapore District Map Plan",
   "northStar": "A playable adult-life simulator where daily movement, choices, trade-offs, and consequences are readable in the world.",
   "planningReferences": [
@@ -24,6 +24,30 @@
       "lesson": "Green-blue corridors and park connectors should be part of everyday movement."
     }
   ],
+  "singaporeIdentityPass": {
+    "status": "enabled",
+    "purpose": "Make the first Life Sim camera cone visibly Singapore-inspired before large optimized Objaverse building replacements arrive.",
+    "visibleMarkers": [
+      "HDB block number and void deck",
+      "MRT roundel and station sign",
+      "LTA-style bus stop shelter with green roof and PIDS panel",
+      "Walk2Ride-style sheltered link",
+      "road-facing MRT pylon and wayfinding sign",
+      "hawker centre and kopitiam stall frontage",
+      "bus lane marking",
+      "yellow box junction",
+      "zebra crossing",
+      "tropical rain tree planting",
+      "pedestrian railing, bollards, lamps and bins",
+      "distant Marina Bay/CBD skyline backdrop"
+    ],
+    "sourceCues": [
+      "HDB void deck community spaces and barrier-free routes",
+      "LTA bus stop shelter weather protection, visibility and PIDS cues",
+      "LTA Walk2Ride sheltered walkways near MRT and bus nodes",
+      "URA sheltered public pedestrian links"
+    ]
+  },
   "camera": {
     "profile": "pubg-style-over-shoulder",
     "defaultEntrySpawn": "open-food-court-street-corridor",
