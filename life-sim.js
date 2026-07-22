@@ -61,6 +61,22 @@
     { id: "woodlands", name: "Woodlands", x: 0, z: 50, radius: 7.5 }
   ];
 
+  const LOCATION_SAFE_SPAWN_POINTS = {
+    // Spawn outside the hawker/food-court shell. Spawning at the exact zone
+    // center puts the camera under the roof or inside a wall on some saved
+    // states, which reads as an instant black screen.
+    food: [8, 0, -82],
+    mall: [0, 0, -42],
+    work: [-25, 0, -74],
+    home: [-30, 0, 32],
+    train: [-13, 0, 15],
+    airport: [104, 0, -4],
+    hospital: [75, 0, -48],
+    university: [-76, 0, 2],
+    gym: [-56, 0, 48],
+    cafe: [-47, 0, -31]
+  };
+
   const OVER_SHOULDER_CAMERA = {
     // PUBG-style life-sim view: close, low, and slightly over the right
     // shoulder so the player sits on the left third while the street opens up.
@@ -89,17 +105,20 @@
   const LIFE_SIM_PERFORMANCE = {
     // Mobile browser first: 2x rendering + 2048 shadows made the simulator
     // feel stuck on entry while shaders, textures, and models all uploaded.
-    maxPixelRatio: 1.35,
-    shadowSize: 1024,
+    maxPixelRatio: 1,
+    shadowSize: 512,
     shadowCameraSize: 34,
-    nearAssetConcurrency: 3,
-    farAssetConcurrency: 2,
-    farAssetDelayMs: 900,
-    roadPropsDelayMs: 900,
-    plazaPropsDelayMs: 1500,
-    urbanReplacementPropsDelayMs: 1900,
-    farPropsDelayMs: 700,
-    propYieldEvery: 5
+    shadowsEnabled: false,
+    nearAssetConcurrency: 1,
+    farAssetConcurrency: 1,
+    farAssetDelayMs: 6200,
+    roadPropsDelayMs: 4200,
+    plazaPropsDelayMs: 7200,
+    urbanReplacementPropsDelayMs: 9800,
+    farPropsDelayMs: 3000,
+    remoteCharacterDelayMs: 2600,
+    remoteCharacterTimeoutMs: 5500,
+    propYieldEvery: 2
   };
 
   function mount(root, options = {}) {
@@ -129,10 +148,10 @@
     const camera = new THREE.PerspectiveCamera(OVER_SHOULDER_CAMERA.fov, 1, 0.1, 180);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     if (window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.configureRenderer) {
-      window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.86, shadows: true, maxPixelRatio: LIFE_SIM_PERFORMANCE.maxPixelRatio });
+      window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.86, shadows: LIFE_SIM_PERFORMANCE.shadowsEnabled, maxPixelRatio: LIFE_SIM_PERFORMANCE.maxPixelRatio });
     } else {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LIFE_SIM_PERFORMANCE.maxPixelRatio));
-      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.enabled = LIFE_SIM_PERFORMANCE.shadowsEnabled;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace || renderer.outputColorSpace;
       renderer.toneMappingExposure = 0.86;
@@ -190,7 +209,8 @@
     if (options.initialLocationId) {
       const targetZone = locationZones.find((zone) => zone.id === options.initialLocationId);
       if (targetZone) {
-        player.group.position.set(targetZone.x, 0, targetZone.z);
+        const safeSpawn = safeSpawnPointForZone(targetZone);
+        player.group.position.set(safeSpawn[0], safeSpawn[1], safeSpawn[2]);
         resetOverShoulderCamera(THREE, state, player.group.position);
       }
     }
@@ -223,7 +243,7 @@
     let districtLoadingSafetyTimeout = window.setTimeout(() => {
       if (state.destroyed) return;
       clearDistrictLoadingHint(root);
-    }, 20000);
+    }, 6500);
     districtSamplesReady.then(() => {
       window.clearTimeout(districtLoadingSafetyTimeout);
       if (state.destroyed) return;
@@ -235,7 +255,7 @@
     Promise.all([roadPropsReady, plazaPropsReady, singaporeObjaversePropsReady]).catch((error) => {
       console.warn("[Life Sim] Background prop streaming failed:", error);
     });
-    loadCharacterAsset(THREE, state.assetManager, player, state, root).then((loaded) => {
+    deferWorldLoad(() => loadCharacterAsset(THREE, state.assetManager, player, state, root), LIFE_SIM_PERFORMANCE.remoteCharacterDelayMs).then((loaded) => {
       if (state.destroyed) return;
       state.realCharacterLoaded = loaded;
     });
@@ -435,7 +455,8 @@
 
     function updateCamera(target, delta, elapsed) {
       const rig = getOverShoulderCameraVectors(THREE, target, state.yaw, state.pitch, state.moveSpeed);
-      state.cameraPosition.lerp(rig.position, Math.min(1, delta * OVER_SHOULDER_CAMERA.positionDamping));
+      const cameraTarget = resolveCameraOcclusion(THREE, state.staticColliders, target, rig.position);
+      state.cameraPosition.lerp(cameraTarget, Math.min(1, delta * OVER_SHOULDER_CAMERA.positionDamping));
       state.cameraLookAt.lerp(rig.lookAt, Math.min(1, delta * OVER_SHOULDER_CAMERA.lookDamping));
       if (state.cameraShake > 0.002) {
         const shake = state.cameraShake;
@@ -555,6 +576,13 @@
       forward,
       right
     };
+  }
+
+  function safeSpawnPointForZone(zone) {
+    if (!zone || !zone.id) return [-19, 0, -10];
+    const override = LOCATION_SAFE_SPAWN_POINTS[zone.id];
+    if (override) return override;
+    return [zone.x, 0, zone.z];
   }
 
   function resetOverShoulderCamera(THREE, state, target) {
@@ -865,6 +893,58 @@
     return [resolvedX, resolvedZ];
   }
 
+  function resolveCameraOcclusion(THREE, colliders, target, desiredPosition) {
+    if (!colliders || !colliders.length) return desiredPosition;
+    const eye = target.clone();
+    eye.y += 1.35;
+    const dirX = desiredPosition.x - eye.x;
+    const dirZ = desiredPosition.z - eye.z;
+    let nearestT = 1;
+    const margin = 0.62;
+
+    for (const box of colliders) {
+      const minX = box.minX - margin;
+      const maxX = box.maxX + margin;
+      const minZ = box.minZ - margin;
+      const maxZ = box.maxZ + margin;
+      let tMin = 0;
+      let tMax = 1;
+      const axes = [
+        [eye.x, dirX, minX, maxX],
+        [eye.z, dirZ, minZ, maxZ]
+      ];
+      let hit = true;
+
+      for (const [origin, direction, min, max] of axes) {
+        if (Math.abs(direction) < 0.0001) {
+          if (origin < min || origin > max) hit = false;
+          continue;
+        }
+        const inv = 1 / direction;
+        let t1 = (min - origin) * inv;
+        let t2 = (max - origin) * inv;
+        if (t1 > t2) [t1, t2] = [t2, t1];
+        tMin = Math.max(tMin, t1);
+        tMax = Math.min(tMax, t2);
+        if (tMin > tMax) {
+          hit = false;
+          break;
+        }
+      }
+
+      if (hit && tMax >= 0 && tMin <= 1) {
+        nearestT = Math.min(nearestT, Math.max(0.28, tMin - 0.08));
+      }
+    }
+
+    if (nearestT >= 1) return desiredPosition;
+    return new THREE.Vector3(
+      eye.x + dirX * nearestT,
+      eye.y + (desiredPosition.y - eye.y) * nearestT,
+      eye.z + dirZ * nearestT
+    );
+  }
+
   // Cached by its own parameters so repeated calls with the same
   // color/floors/columns/style reuse one canvas instead of redrawing.
   const facadeTextureCache = new Map();
@@ -990,6 +1070,7 @@
         ambientIntensity: 0.95,
         sunIntensity: 1.08,
         sunPosition: [-12, 24, 12],
+        shadows: LIFE_SIM_PERFORMANCE.shadowsEnabled,
         shadowSize: LIFE_SIM_PERFORMANCE.shadowSize,
         shadowCameraSize: LIFE_SIM_PERFORMANCE.shadowCameraSize
       })
@@ -999,7 +1080,7 @@
     if (!rig) {
       scene.add(hemi);
       sun.position.set(-12, 24, 12);
-      sun.castShadow = true;
+      sun.castShadow = LIFE_SIM_PERFORMANCE.shadowsEnabled;
       sun.shadow.mapSize.set(LIFE_SIM_PERFORMANCE.shadowSize, LIFE_SIM_PERFORMANCE.shadowSize);
       sun.shadow.camera.left = -LIFE_SIM_PERFORMANCE.shadowCameraSize;
       sun.shadow.camera.right = LIFE_SIM_PERFORMANCE.shadowCameraSize;
@@ -1424,7 +1505,11 @@
         return false;
       }
       setAssetStatus(root, "Loading realistic character...", "loading");
-      const character = await assetManager.loadModel(manifest.character.url, manifest.character);
+      const character = await withTimeout(
+        assetManager.loadModel(manifest.character.url, manifest.character),
+        LIFE_SIM_PERFORMANCE.remoteCharacterTimeoutMs,
+        "remote character load timed out"
+      );
       if (!character || character.fallback) {
         setAssetStatus(root, "Realistic character could not load. Using the fallback rig.", "error");
         return false;
@@ -1779,6 +1864,22 @@
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
+  function withTimeout(promise, ms, label = "operation timed out") {
+    if (!(ms > 0)) return promise;
+    return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => reject(new Error(label)), ms);
+      Promise.resolve(promise)
+        .then((value) => {
+          window.clearTimeout(timeout);
+          resolve(value);
+        })
+        .catch((error) => {
+          window.clearTimeout(timeout);
+          reject(error);
+        });
+    });
+  }
+
   function yieldToBrowser() {
     return new Promise((resolve) => {
       if (typeof window.requestIdleCallback === "function") {
@@ -1930,6 +2031,7 @@
         hideNames: ["Tree Trunk", "Tree Crown"],
         positions: TREE_POSITIONS,
         scale: [2.4, 2.4, 2.4],
+        animateAsTree: true,
         isBuilding: false
       },
       // Orchard Road's dense rain-tree canopy - purely additive, denser than
@@ -1938,6 +2040,7 @@
         url: "assets/environment/tree-oak.glb",
         positions: ORCHARD_STREET_TREE_POSITIONS,
         scale: [2.2, 2.2, 2.2],
+        animateAsTree: true,
         isBuilding: false
       },
       // Orchard Road: extends the Mall zone with two more shopfronts along the
@@ -2010,12 +2113,14 @@
         url: "assets/environment/tree-palm.glb",
         positions: SENTOSA_PALM_POSITIONS,
         scale: [3.0, 3.0, 3.0],
+        animateAsTree: true,
         isBuilding: false
       },
       {
         url: "assets/environment/tree-palm-bend.glb",
         positions: SENTOSA_PALM_BEND_POSITIONS,
         scale: [3.0, 3.0, 3.0],
+        animateAsTree: true,
         isBuilding: false
       },
       // Woodlands pilot: real modeled+textured buildings (Quaternius's free
@@ -2335,7 +2440,7 @@
               // async load resolved) and only found the original procedural "Tree
               // Crown" groups this is about to hide. Register the replacement
               // directly so it keeps the same wind-sway animation instead of going static.
-              if (state && state.presentation && Array.isArray(state.presentation.treeCrowns)) {
+              if (swap.animateAsTree && state && state.presentation && Array.isArray(state.presentation.treeCrowns)) {
                 state.presentation.treeCrowns.push(instance);
               }
             });

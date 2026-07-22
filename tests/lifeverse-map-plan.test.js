@@ -100,8 +100,14 @@ assert.ok(replacementPass, "manifest includes singapore-urban-props-v1");
 });
 
 assert.ok(simSource.includes("LIFE_SIM_PERFORMANCE"), "Life Sim has a centralized performance profile");
-assert.ok(simSource.includes("maxPixelRatio: 1.35"), "Life Sim implementation matches map pixel-ratio budget");
-assert.ok(simSource.includes("shadowSize: 1024"), "Life Sim implementation matches map shadow budget");
+assert.ok(simSource.includes("maxPixelRatio: 1"), "Life Sim implementation matches the stability pixel-ratio budget");
+assert.ok(simSource.includes("shadowSize: 512"), "Life Sim implementation matches the stability shadow budget");
+assert.ok(simSource.includes("shadowsEnabled: false"), "Life Sim disables default shadow maps for stability");
+assert.ok(simSource.includes("safeSpawnPointForZone"), "Life Sim uses safe outdoor spawn points instead of building centers");
+assert.ok(simSource.includes("food: [8, 0, -82]"), "Food Court opens from a clear plaza spawn instead of a wall-facing spawn");
+assert.ok(simSource.includes("}, 6500);"), "Life Sim removes the optional model loading hint quickly");
+assert.ok(simSource.includes("resolveCameraOcclusion"), "Life Sim prevents the camera from clipping into building colliders");
+assert.ok(simSource.includes("animateAsTree"), "Life Sim only applies wind animation to tree assets");
 assert.ok(simSource.includes("loadEntry"), "Life Sim implementation supports lazy Objaverse prop loading");
 assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation throttles optional model loading");
 [
@@ -125,7 +131,7 @@ assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation thrott
 ].forEach((marker) => {
   assert.ok(simSource.includes(marker), `Life Sim renderer includes Singapore city infill marker: ${marker}`);
 });
-assert.ok(indexSource.includes("life-sim.js?v=real-scale-replacement-20260722-5"), "index cache key points at the Objaverse replacement build");
+assert.ok(indexSource.includes("life-sim.js?v=lifesim-stability-hotfix-20260722-1"), "index cache key points at the stability hotfix build");
 
 [
   "Purpose",
