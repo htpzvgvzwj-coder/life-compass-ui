@@ -198,7 +198,7 @@ assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation thrott
 ].forEach((marker) => {
   assert.ok(simSource.includes(marker), `Life Sim renderer includes Singapore city infill marker: ${marker}`);
 });
-assert.ok(indexSource.includes("life-sim.js?v=causeway-mall-lod-pipeline-20260722-1"), "index cache key points at the latest Life Sim build");
+assert.ok(indexSource.includes("life-sim.js?v=all-quaternius-buildings-lod-20260722-1"), "index cache key points at the latest Life Sim build");
 
 [
   "Purpose",

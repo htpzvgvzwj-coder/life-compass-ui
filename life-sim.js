@@ -2251,69 +2251,24 @@
         animateAsTree: true,
         isBuilding: false
       },
-      // Woodlands pilot: real modeled+textured buildings (Quaternius's free
-      // CC0 "Downtown City MegaKit") replacing the primitive-box HDB blocks
-      // and mall, per the art-direction reassessment in this session. Spread
-      // further apart than the boxes they replace since these models are
-      // larger and more detailed than a plain box footprint.
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.glb",
-        hideNamePrefixes: ["Woodlands HDB Block A"],
-        position: [-11, 0, 53],
-        scale: [1, 1, 1],
-        targetHeightMeters: 20
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Small_1.glb",
-        hideNamePrefixes: ["Woodlands HDB Block B"],
-        position: [-27, 0, 47],
-        scale: [1, 1, 1],
-        targetHeightMeters: 17
-      },
-      // Causeway Point Mall's raw Building_Large_2.glb swap (single instance,
-      // position [22,0,48]) was removed here (2026-07-22) - it's now covered
-      // by the optimized-building pipeline instead (objaverseBuildingAssets
-      // entry "causeway-point-mall-optimized-v1", loaded via
-      // loadOptimizedObjaverseBuildingSwaps()): Blender-equivalent decimate
+      // Woodlands pilot + estate expansion + Causeway Point Mall's raw
+      // Quaternius swaps (Building_Medium_2_001/Building_Small_1/
+      // Building_Large_2 - HDB Block A/B, Estate Blocks C-N, the mall) were
+      // ALL removed here (2026-07-22) - every one of them is now covered by
+      // the optimized-building pipeline instead (objaverseBuildingAssets:
+      // woodlands-hdb-block-a/b-optimized-v1, woodlands-estate-large/medium/
+      // small-optimized-v1, causeway-point-mall-optimized-v1), loaded via
+      // loadOptimizedObjaverseBuildingSwaps(). Blender-equivalent decimate
       // (gltf-transform simplify, Blender itself isn't installed in this
-      // environment) + texture resize + Draco + 3 real LODs, 5.63MB -> 820KB/
-      // 363KB/191KB depending on distance, instead of one fixed 5.63MB model
-      // always rendered at full detail regardless of how far away the
-      // player is. Leaving both registered would double-render this
-      // building - do not re-add this entry without also removing the
-      // manifest's optimized replacement, or vice versa.
-      // Woodlands estate expansion: 12 more blocks cycling through the same
-      // 3 Quaternius files as the mall/original 2 blocks above, grouped by
-      // file into 3 "positions" (plural, clone-based) entries - safe to
-      // reuse a url already used by a singular entry above (see the
-      // Punggol/Raffles Place comment for why singular+singular is the
-      // unsafe combination, not singular+plural).
-      // targetHeightMeters (not scale: [1,1,1]) on all three of these -
-      // the layout audit measured Building_Large_2.gltf's native/unscaled
-      // footprint at 20.6x16.6 units, comfortably wider than any grid slot
-      // regardless of spacing. normalizeToHeight() (lifeverse-asset-
-      // manager.js) scales uniformly from real height instead of leaving
-      // native GLB scale untouched, which is what every other real-asset
-      // swap on the map should probably be doing too, not just this one -
-      // flagged here since fixing all of them is out of scope for one pass.
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Large_2.glb",
-        hideNamePrefixes: ["Woodlands Estate Block C", "Woodlands Estate Block F", "Woodlands Estate Block I", "Woodlands Estate Block L"],
-        positions: [[-21, 14], [18, 14], [5, 27], [-8, 36]],
-        targetHeightMeters: 16
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.glb",
-        hideNamePrefixes: ["Woodlands Estate Block D", "Woodlands Estate Block G", "Woodlands Estate Block J", "Woodlands Estate Block M"],
-        positions: [[-8, 14], [-21, 27], [18, 27], [5, 36]],
-        targetHeightMeters: 16
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Small_1.glb",
-        hideNamePrefixes: ["Woodlands Estate Block E", "Woodlands Estate Block H", "Woodlands Estate Block K", "Woodlands Estate Block N"],
-        positions: [[5, 14], [-8, 27], [-21, 36], [18, 36]],
-        targetHeightMeters: 16
-      },
+      // environment) + texture resize + Draco + 3 real LODs per source file,
+      // reused across every placement of that file (14.6MB combined raw ->
+      // ~3.7MB combined LOD storage, with only one LOD actually rendered per
+      // instance at a time based on distance) instead of one fixed multi-MB
+      // model always rendered at full detail everywhere regardless of
+      // distance. Leaving both raw and optimized registered for the same
+      // building would double-render it - do not re-add any of these
+      // entries without also removing the matching manifest entry, or vice
+      // versa.
       // Real-model pass: swapping the remaining hand-built primitive-box
       // shophouses/buildings for real CC0 modeled buildings (Kenney "City Kit
       // Commercial" / "Modular Buildings" packs, kept in
@@ -2482,45 +2437,19 @@
         scale: [4.2, 4.2, 4.2],
         targetHeightMeters: 38
       },
-      // Realistic replacement pass: the Singapore infill rows below were the
-      // most visible remaining primitive-box buildings in the over-shoulder
-      // camera. Replace their visual shells with reusable GLB buildings while
-      // keeping the procedural shells as safe fallbacks if a model fails.
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Small_1.glb",
-        hideNamePrefixes: ["Main Street Mixed-Use Block"],
-        positions: [[-46, -25], [-37, -25], [-28, -25], [-18, -25], [3, -25], [12, -25], [23, -25], [34, -25], [46, -25], [58, -25]],
-        scale: [1, 1, 1],
-        targetHeightMeters: 12
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.glb",
-        hideNamePrefixes: ["South Main Street Block"],
-        positions: [[-42, -40], [-31, -40], [-20, -40], [-9, -40], [12, -40], [25, -40], [38, -40], [52, -40], [66, -40], [80, -40]],
-        scale: [1, 1, 1],
-        targetHeightMeters: 12
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.glb",
-        hideNamePrefixes: ["Heartland HDB Precinct Block"],
-        positions: [[-46, 38], [-38, 34], [-28, 49.5], [-15, 41]],
-        scale: [1, 1, 1],
-        targetHeightMeters: 19
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Large_2.glb",
-        hideNamePrefixes: ["CBD Infill Tower"],
-        positions: [[66, -16], [88, -17], [72, -47], [88, -46], [51, -43.2]],
-        scale: [1, 1, 1],
-        targetHeightMeters: 34
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Small_1.glb",
-        hideNamePrefixes: ["Town Centre Medical Block", "Town Centre Tuition Block", "Town Centre Kopitiam Block", "Campus Student Services Block", "Social Shophouse Infill", "Social Night Market Infill", "Airport Budget Travel Block", "Park Wellness Kiosk"],
-        positions: [[-22, -3], [-4, -3], [-20, -14], [-63, -26], [24, -62], [40, -62], [104, -59], [39, 24]],
-        scale: [1, 1, 1],
-        targetHeightMeters: 8
-      }
+      // Realistic replacement pass: the Singapore infill rows that used to
+      // be here (Main Street Mixed-Use Block, South Main Street Block,
+      // Heartland HDB Precinct Block, CBD Infill Tower, and the 8-prefix
+      // Town Centre small-blocks group) were removed here (2026-07-22) -
+      // all 5 groups are now covered by the optimized-building pipeline
+      // (objaverseBuildingAssets: main-street-mixed-use/south-main-street/
+      // heartland-hdb-precinct/cbd-infill-tower/town-centre-small-blocks-
+      // optimized-v1), reusing the same 3 shared LOD file sets generated
+      // for the Woodlands buildings above (Building_Large_2/Medium_2_001/
+      // Small_1 each only need decimating once, regardless of how many
+      // places on the map reuse that source file). See the comment above
+      // the Woodlands section for why raw and optimized must never both be
+      // registered for the same building at once.
     ];
     swaps.push(...optimizedObjaverseBuildingSwaps);
 

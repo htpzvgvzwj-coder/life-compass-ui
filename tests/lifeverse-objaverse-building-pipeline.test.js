@@ -83,6 +83,6 @@ assert.ok(Array.isArray(manifest.objaverseBuildingAssets), "manifest exposes obj
 assert.ok(readme.includes("Building replacement pipeline"), "Life Sim README documents the building replacement pipeline");
 assert.ok(readme.includes("tools/lifeverse_optimize_objaverse.py"), "Life Sim README points to the optimization script");
 assert.ok(indexSource.includes("lifeverse-asset-manager.js?v=lifeverse-objaverse-pipeline-20260722-1"), "index cache-busts the Draco-capable asset manager");
-assert.ok(indexSource.includes("life-sim.js?v=causeway-mall-lod-pipeline-20260722-1"), "index cache-busts the optimized building loader");
+assert.ok(indexSource.includes("life-sim.js?v=all-quaternius-buildings-lod-20260722-1"), "index cache-busts the optimized building loader");
 
 console.log("LifeVerse Objaverse building pipeline tests passed.");
