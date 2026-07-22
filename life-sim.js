@@ -125,6 +125,18 @@
     maxPixelRatio: 1,
     shadowSize: 512,
     shadowCameraSize: 34,
+    // Re-tested (2026-07-22): tried re-enabling shadows now that the LOD
+    // pipeline and far-plane fix cut draw calls a lot, since shadows are one
+    // of the biggest "looks like a real place, not a flat toy" visual cues
+    // a 3D scene has. Measured it properly with an A/B headless FPS
+    // comparison (same locations, same wait times, only this flag changed)
+    // instead of guessing: shadows cost a real, consistent 30-55% of frame
+    // rate even at the already mobile-tuned 512px/34-unit budget (e.g.
+    // default entry 9fps -&gt; 4fps). Given this whole pass exists BECAUSE of
+    // lag/heat complaints, reintroducing a measured performance hit for
+    // shadows specifically isn't worth it - staying off. Cheaper realism
+    // levers (a single lightweight post-process pass, environmental detail)
+    // cost far less per frame than a second shadow-map scene render.
     shadowsEnabled: false,
     nearAssetConcurrency: 1,
     farAssetConcurrency: 1,

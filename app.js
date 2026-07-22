@@ -5657,6 +5657,7 @@ const screens = {
   simulator: () => `
     <section class="life-sim-game" data-life-sim-game>
       <div id="life-sim-root" class="life-sim-root" aria-label="Realistic 3D Singapore adult-life simulator"></div>
+      <div class="life-sim-color-grade" aria-hidden="true"></div>
 
       <div class="life-sim-rotate" aria-hidden="true">
         <strong>Rotate your phone</strong>

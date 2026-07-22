@@ -5443,9 +5443,37 @@ body.life-sim-active .phone-shell::before {
 }
 
 .life-sim-game::before {
+  /* Vignette only (unchanged blend mode from before - just nudged the
+     opacity up slightly). The color-grade tint lives in a separate real
+     element (.life-sim-color-grade) below since it needs a different
+     mix-blend-mode (soft-light) than this vignette's normal darkening -
+     one pseudo-element can't cleanly carry two different blend modes. */
   background:
-    linear-gradient(180deg, rgba(5, 6, 7, 0.24), transparent 22%, transparent 72%, rgba(5, 6, 7, 0.38)),
-    radial-gradient(circle at 50% 50%, transparent 52%, rgba(2, 3, 5, 0.38));
+    linear-gradient(180deg, rgba(5, 6, 7, 0.28), transparent 22%, transparent 72%, rgba(5, 6, 7, 0.42)),
+    radial-gradient(circle at 50% 50%, transparent 48%, rgba(2, 3, 5, 0.42));
+}
+
+.life-sim-color-grade {
+  /* Cheap "post-processing" (2026-07-22): a real EffectComposer pass (SSAO/
+     bloom) would cost a second render per frame - measured shadows alone
+     costing 30-55% of frame rate on this same performance budget, so a
+     multi-pass composer isn't worth the risk. This is a static, GPU-
+     composited CSS layer instead (near-zero per-frame cost, no extra WebGL
+     render passes): a warm-to-cool grade (golden tropical highlight top-
+     left, cooler shadow bottom-right) mimicking real late-afternoon
+     Singapore light, instead of the flat, neutral default lighting a bare
+     renderer produces. soft-light keeps it a tint, not a wash.
+     Positioned above the vignette but below the topbar/HUD/controls (see
+     the z-index order among .life-sim-game's absolutely-positioned
+     children). */
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  background:
+    radial-gradient(circle at 22% 15%, rgba(255, 196, 120, 0.5), transparent 45%),
+    linear-gradient(135deg, rgba(255, 179, 102, 0.24), transparent 40%, transparent 60%, rgba(20, 40, 60, 0.4));
 }
 
 .life-sim-game::after {
@@ -5467,7 +5495,10 @@ body.life-sim-active .life-sim-root canvas {
   width: 100% !important;
   height: 100% !important;
   display: block;
-  filter: saturate(1.08) contrast(1.02);
+  /* Nudged up slightly (2026-07-22, part of the cheap-post-processing pass)
+     - a GPU-compositor filter, not a render pass, so this costs nothing
+     like a real render-to-texture post-process would. */
+  filter: saturate(1.15) contrast(1.06) brightness(1.02);
 }
 
 .life-sim-game-topbar {
