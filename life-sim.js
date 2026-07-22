@@ -3781,11 +3781,11 @@
       [-28, 29, 3.5, 3.0, "STUDY"]
     ]);
     addNeighbourhoodMicroBlocks(THREE, scene, mat, "Town Centre Active Frontage", [
-      [-24, -15.5, 3.4, 2.9, "CLINIC"],
-      [-16, -15.5, 3.2, 2.8, "TUITION"],
-      [-8, -15.5, 3.4, 2.9, "SERVICE"],
-      [1, -15.5, 3.5, 3.0, "SKILLS"],
-      [10, -15.5, 3.4, 2.9, "CAFE"]
+      [-24, -12.2, 3.4, 2.9, "CLINIC"],
+      [-16, -12.2, 3.2, 2.8, "TUITION"],
+      [-8, -12.2, 3.4, 2.9, "SERVICE"],
+      [1, -12.2, 3.5, 3.0, "SKILLS"],
+      [10, -12.2, 3.4, 2.9, "CAFE"]
     ]);
 
     [
