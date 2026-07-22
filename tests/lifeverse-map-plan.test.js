@@ -6,6 +6,7 @@ const root = path.join(__dirname, "..");
 const plan = JSON.parse(fs.readFileSync(path.join(root, "assets", "life-sim", "map-plan.json"), "utf8"));
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "assets", "life-sim", "asset-manifest.json"), "utf8"));
 const simSource = fs.readFileSync(path.join(root, "life-sim.js"), "utf8");
+const appSource = fs.readFileSync(path.join(root, "app.js"), "utf8");
 const docSource = fs.readFileSync(path.join(root, "docs", "lifeverse-life-sim-map-plan.md"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
@@ -140,6 +141,8 @@ assert.ok(!simSource.includes('hideNames: ["Food Court Roof", "Food Court Roof R
 assert.ok(simSource.includes("Hawker Apron Tile Seam X"), "Food Court plaza has tile seams instead of a blank plane");
 assert.ok(simSource.includes("player.group.position.set(8, 0, -82)"), "Life Sim default entry opens from a clear street corridor");
 assert.ok(simSource.includes("state.yaw = Math.PI / 2"), "Life Sim default entry camera faces along the street instead of into a wall");
+assert.ok(appSource.includes("const initialLocationId = pendingTeleportLocationId || null"), "Compass app does not force normal Life Sim entry back to Home");
+assert.ok(!appSource.includes('trackerState.lifeSim.currentLocation || "home"'), "Compass app avoids stale location restores that can spawn the camera beside a wall");
 assert.ok(simSource.includes("Town Centre Active Frontage"), "Life Sim still includes town-centre active frontage after scale corrections");
 assert.ok(simSource.includes("Pedestrian Apron"), "Life Sim planning frontage is scaled as a walkable street edge, not a tall wall");
 assert.ok(simSource.includes("[0.045, 3, 10], mat.metal"), "Street light poles are thin and light enough not to block the camera");

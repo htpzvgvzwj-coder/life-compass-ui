@@ -58,7 +58,7 @@ assert.ok(buildSection.includes("void enhanceBuildTrainingReply"), "Build Mode s
 assert.ok(buildSection.includes("Do NOT limit yourself to interview, study, or money"), "Build Mode explicitly avoids three-category limitation");
 assert.ok(appSource.includes('data-future-mirror-mode="build"'), "Build Mode appears inside the Future Mirror mode switcher");
 assert.ok(appSource.includes('futureMirrorMode === "build" ? buildModeEntrySection()'), "Future Mirror renders the Build Mode coach entry section");
-assert.ok(indexSource.includes("app.js?v=honesty-pass-20260722-1"), "Index busts cached app.js after the latest change");
+assert.ok(indexSource.includes("app.js?v=lifesim-entry-fix-20260722-1"), "Index busts cached app.js after the latest change");
 
 [
   "Proof Log",

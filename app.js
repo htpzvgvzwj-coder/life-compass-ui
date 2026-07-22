@@ -3271,17 +3271,22 @@ function mountLifeSim() {
     root.innerHTML = `<div class="sim-canvas-fallback"><strong>3D simulator is unavailable</strong><span>Refresh the page once, then open Life Sim again.</span></div>`;
     return;
   }
-  const initialLocationId = pendingTeleportLocationId || trackerState.lifeSim.currentLocation || "home";
+  // Normal Life Sim entry should open from the curated street-camera start in
+  // life-sim.js. Only explicit map travel should override that with a zone
+  // spawn; restoring `currentLocation` here made public builds reopen beside
+  // wall-like district meshes instead of the intended game view.
+  const initialLocationId = pendingTeleportLocationId || null;
   pendingTeleportLocationId = null;
-  lifeSimInstance = window.CompassLifeSim.mount(root, {
+  const mountOptions = {
     getLifeVerseState: () => lifeVerseState(),
-    initialLocationId,
     onLocationChange(location) {
       trackerState.lifeSim.currentLocation = location ? location.id : null;
       saveTrackerState();
       updateLifeSimDom();
     }
-  });
+  };
+  if (initialLocationId) mountOptions.initialLocationId = initialLocationId;
+  lifeSimInstance = window.CompassLifeSim.mount(root, mountOptions);
   window.__CompassLifeSimDebug = lifeSimInstance && typeof lifeSimInstance.getDebugState === "function"
     ? () => lifeSimInstance.getDebugState()
     : null;
