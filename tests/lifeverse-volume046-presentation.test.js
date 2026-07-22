@@ -62,6 +62,8 @@ assert.ok(simSource.includes("updateWorldPresentation"), "renderer updates world
 assert.ok(simSource.includes("createAudioPolish"), "renderer includes lightweight audio feedback");
 assert.ok(simSource.includes("createAmbience"), "renderer creates moving ambience");
 assert.ok(simSource.includes("camera.position.copy(state.cameraPosition)"), "camera uses damped presentation state");
+assert.ok(simSource.includes("OVER_SHOULDER_CAMERA"), "Life Sim uses an explicit over-shoulder camera rig");
+assert.ok(simSource.includes("getOverShoulderCameraVectors"), "Life Sim computes PUBG-style shoulder camera vectors");
 assert.ok(appSource.includes("getLifeVerseState: () => lifeVerseState()"), "renderer receives read-only LifeVerse state");
 assert.ok(appSource.includes("lifeVersePresentationPause(\"fast-forward\""), "Fast Forward uses a presentation transition before simulation");
 
@@ -83,6 +85,13 @@ assert.strictEqual(morning.phase, "morning", "default in-game time presents as m
 state.time.totalMinutes = 1300;
 const night = sim.presentationTest.getTimeOfDayPresentation(state);
 assert.strictEqual(night.phase, "night", "late time presents as night");
+
+const cameraRig = sim.presentationTest.getCameraRigPresentation();
+assert.strictEqual(cameraRig.mode, "over-shoulder", "Life Sim exposes the over-shoulder camera mode");
+assert.ok(cameraRig.fov >= 66, "over-shoulder camera uses a wider game-style FOV");
+assert.ok(cameraRig.distance <= 5.5, "over-shoulder camera stays close to the player");
+assert.ok(cameraRig.shoulderOffset > 0.8, "over-shoulder camera offsets player toward the left third");
+assert.ok(cameraRig.lookAhead >= 6, "over-shoulder camera looks down the street instead of centering the player");
 
 state.world.weather = "Rain";
 const rain = sim.presentationTest.getWeatherPresentation(state);

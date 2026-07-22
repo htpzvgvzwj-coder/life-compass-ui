@@ -61,6 +61,26 @@
     { id: "woodlands", name: "Woodlands", x: 0, z: 50, radius: 7.5 }
   ];
 
+  const OVER_SHOULDER_CAMERA = {
+    // PUBG-style life-sim view: close, low, and slightly over the right
+    // shoulder so the player sits on the left third while the street opens up.
+    fov: 68,
+    distance: 5.2,
+    movingDistance: 4.75,
+    height: 2.35,
+    pitchHeight: 1.05,
+    shoulderOffset: 1.18,
+    lookAhead: 7.25,
+    lookHeight: 1.62,
+    movingLookAhead: 1.15,
+    movingLookHeight: 0.12,
+    minPitch: 0.18,
+    maxPitch: 0.82,
+    defaultPitch: 0.38,
+    positionDamping: 8.6,
+    lookDamping: 10.4
+  };
+
   function mount(root, options = {}) {
     if (!root) return null;
     root.innerHTML = "";
@@ -85,7 +105,7 @@
       scene.fog = new THREE.Fog(0xcdd2c2, 38, 104);
     }
 
-    const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 180);
+    const camera = new THREE.PerspectiveCamera(OVER_SHOULDER_CAMERA.fov, 1, 0.1, 180);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     if (window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.configureRenderer) {
       window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.86, shadows: true, maxPixelRatio: 2 });
@@ -108,7 +128,7 @@
       lookStart: null,
       moveVector: { x: 0, y: 0 },
       yaw: Math.PI,
-      pitch: 0.6,
+      pitch: OVER_SHOULDER_CAMERA.defaultPitch,
       smoothMove: { x: 0, y: 0 },
       moveSpeed: 0,
       walkPhase: 0,
@@ -118,8 +138,8 @@
       realCharacterLoaded: false,
       assetManager: null,
       assetDebug: null,
-      cameraPosition: new THREE.Vector3(-19, 8, 0),
-      cameraLookAt: new THREE.Vector3(-19, 1.55, -10),
+      cameraPosition: new THREE.Vector3(),
+      cameraLookAt: new THREE.Vector3(),
       cameraShake: 0,
       presentation: null,
       outline: null
@@ -145,12 +165,12 @@
 
     const player = createPlayer(THREE, materials);
     player.group.position.set(-19, 0, -10);
+    resetOverShoulderCamera(THREE, state, player.group.position);
     if (options.initialLocationId) {
       const targetZone = locationZones.find((zone) => zone.id === options.initialLocationId);
       if (targetZone) {
         player.group.position.set(targetZone.x, 0, targetZone.z);
-        state.cameraPosition.set(targetZone.x, 8, targetZone.z - 12);
-        state.cameraLookAt.set(targetZone.x, 1.55, targetZone.z);
+        resetOverShoulderCamera(THREE, state, player.group.position);
       }
     }
     const debugParams = new URLSearchParams(location.search);
@@ -159,11 +179,13 @@
       const [sx, sy, sz] = spawnOverride.split(",").map(Number);
       if (Number.isFinite(sx) && Number.isFinite(sz)) {
         player.group.position.set(sx, Number.isFinite(sy) ? sy : 0, sz);
-        state.cameraPosition.set(sx, 8, sz - 12);
-        state.cameraLookAt.set(sx, 1.55, sz);
+        resetOverShoulderCamera(THREE, state, player.group.position);
       }
       const yawOverride = Number(debugParams.get("yaw"));
-      if (Number.isFinite(yawOverride)) state.yaw = yawOverride;
+      if (Number.isFinite(yawOverride)) {
+        state.yaw = yawOverride;
+        resetOverShoulderCamera(THREE, state, player.group.position);
+      }
     }
     const spawnX = player.group.position.x;
     const spawnZ = player.group.position.z;
@@ -247,7 +269,7 @@
         const dy = event.clientY - state.lookStart.y;
         state.lookStart = { x: event.clientX, y: event.clientY };
         state.yaw -= dx * 0.0065;
-        state.pitch = clamp(state.pitch + dy * 0.0045, 0.28, 0.95);
+        state.pitch = clamp(state.pitch + dy * 0.0045, OVER_SHOULDER_CAMERA.minPitch, OVER_SHOULDER_CAMERA.maxPitch);
       }
     };
     const pointerUp = (event) => {
@@ -386,17 +408,9 @@
     }
 
     function updateCamera(target, delta, elapsed) {
-      const distance = 9.4 - state.moveSpeed * 0.52;
-      const height = 3.75 + state.pitch * 3.05;
-      const offset = new THREE.Vector3(
-        Math.sin(state.yaw + Math.PI) * distance,
-        height,
-        Math.cos(state.yaw + Math.PI) * distance
-      );
-      const desiredPosition = target.clone().add(offset);
-      const lookTarget = new THREE.Vector3(target.x, target.y + 1.48 + state.moveSpeed * 0.12, target.z);
-      state.cameraPosition.lerp(desiredPosition, Math.min(1, delta * 5.8));
-      state.cameraLookAt.lerp(lookTarget, Math.min(1, delta * 7.2));
+      const rig = getOverShoulderCameraVectors(THREE, target, state.yaw, state.pitch, state.moveSpeed);
+      state.cameraPosition.lerp(rig.position, Math.min(1, delta * OVER_SHOULDER_CAMERA.positionDamping));
+      state.cameraLookAt.lerp(rig.lookAt, Math.min(1, delta * OVER_SHOULDER_CAMERA.lookDamping));
       if (state.cameraShake > 0.002) {
         const shake = state.cameraShake;
         state.cameraPosition.x += Math.sin(elapsed * 42) * shake;
@@ -454,6 +468,39 @@
         root.innerHTML = "";
       }
     };
+  }
+
+  function getOverShoulderCameraVectors(THREE, target, yaw, pitch, moveSpeed = 0) {
+    const speedBlend = clamp(moveSpeed, 0, 1);
+    const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
+    const right = new THREE.Vector3(Math.sin(yaw + Math.PI / 2), 0, Math.cos(yaw + Math.PI / 2)).normalize();
+    const distance = OVER_SHOULDER_CAMERA.distance - (OVER_SHOULDER_CAMERA.distance - OVER_SHOULDER_CAMERA.movingDistance) * speedBlend;
+    const height = OVER_SHOULDER_CAMERA.height + pitch * OVER_SHOULDER_CAMERA.pitchHeight - speedBlend * 0.08;
+    const shoulder = OVER_SHOULDER_CAMERA.shoulderOffset + speedBlend * 0.18;
+    const lookAhead = OVER_SHOULDER_CAMERA.lookAhead + speedBlend * OVER_SHOULDER_CAMERA.movingLookAhead;
+    const position = target.clone()
+      .addScaledVector(forward, -distance)
+      .addScaledVector(right, shoulder);
+    position.y += height;
+
+    const lookAt = target.clone()
+      .addScaledVector(forward, lookAhead)
+      .addScaledVector(right, OVER_SHOULDER_CAMERA.shoulderOffset * 0.2);
+    lookAt.y += OVER_SHOULDER_CAMERA.lookHeight + speedBlend * OVER_SHOULDER_CAMERA.movingLookHeight;
+
+    return {
+      mode: "over-shoulder",
+      position,
+      lookAt,
+      forward,
+      right
+    };
+  }
+
+  function resetOverShoulderCamera(THREE, state, target) {
+    const rig = getOverShoulderCameraVectors(THREE, target, state.yaw, state.pitch, state.moveSpeed || 0);
+    state.cameraPosition.copy(rig.position);
+    state.cameraLookAt.copy(rig.lookAt);
   }
 
   // Realistic-style pivot: flat MeshStandardMaterial colors (however correct
@@ -3428,7 +3475,8 @@
     locations: locationZones,
     presentationTest: {
       getTimeOfDayPresentation,
-      getWeatherPresentation
+      getWeatherPresentation,
+      getCameraRigPresentation: () => ({ ...OVER_SHOULDER_CAMERA, mode: "over-shoulder" })
     }
   };
 })();
