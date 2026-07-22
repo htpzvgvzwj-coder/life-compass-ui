@@ -10,21 +10,12 @@
     "never the live asset-swap mechanism anyway (life-sim.js's",
     "loadDistrictAssetSamples() is, and always runs regardless of this manifest).",
     "",
-    "character (Phase 2 finding): Objaverse's whole 'person' LVIS category is",
-    "only 78 objects, almost all static scans/art busts, not rigged game",
-    "characters. Exactly one license-eligible candidate had 2+ baked animations",
-    "(12, in fact) - but they were VTuber calibration/gesture clips (Head",
-    "Calibration, Dance, Explain1/2, Surprised), zero locomotion, so it can't",
-    "drive idle/walk/run for this game. Objaverse is not a good source for this",
-    "specific asset. Mixamo (free, Adobe, purpose-built for idle/walk/run/jump/",
-    "sit/eat/exercise rigged clips) is the standard fit here, but requires a",
-    "manual download through their web app (no scriptable API, login-gated) -",
-    "a human needs to pick a character + clips and drop the exported GLBs into",
-    "assets/characters/ + assets/characters/animations/ before this can be",
-    "populated for real. Left null below until that happens; the live game",
-    "keeps using the primitive capsule/sphere rig (createPlayer() in",
-    "life-sim.js) in the meantime - loadCharacterAsset() just returns false",
-    "when character is null, no crash, no broken state.",
+    "character (2026-07-22 update): Objaverse's person category was not a",
+    "reliable source for a rigged game character with locomotion, so the live",
+    "character slot now points at KhronosGroup's GitHub-hosted Cesium Man GLB",
+    "to validate the real-character pipeline with a textured humanoid asset.",
+    "This is still replaceable: swap the character.url for a properly licensed",
+    "youth/anime-realistic character GLB later without changing gameplay logic.",
     "",
     "Keep total first-load model + texture size under 45MB for mobile."
   ],
@@ -60,7 +51,24 @@
       ]
     }
   ],
-  "character": null,
+  "character": {
+    "id": "github-khronos-cesium-man",
+    "url": "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@main/Models/CesiumMan/glTF-Binary/CesiumMan.glb",
+    "label": "GitHub-hosted textured humanoid character",
+    "sourceUrl": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CesiumMan",
+    "license": "cc-by-4.0-with-trademark-limitations",
+    "targetHeightMeters": 1.72,
+    "rotation": [0, 3.141592653589793, 0],
+    "animationMap": {
+      "idle": ["idle", "rest"],
+      "walk": ["walk"],
+      "run": ["run"],
+      "jump": ["jump"],
+      "sit": ["idle"],
+      "eat": ["idle"],
+      "exercise": ["run"]
+    }
+  },
   "objaverseAssets": [
     {
       "id": "bench:91e9a8ae",

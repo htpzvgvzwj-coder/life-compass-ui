@@ -170,19 +170,37 @@
     // existing city-kit swap in life-sim.js's loadDistrictAssetSamples().
     function normalizeToHeight(model, targetMeters) {
       if (!model || typeof model.traverse !== "function" || typeof targetMeters !== "number" || !(targetMeters > 0)) return model;
+      if (typeof model.updateMatrixWorld === "function") model.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3();
       box.getSize(size);
       if (!(size.y > 0) || !Number.isFinite(size.y)) return model;
       const factor = targetMeters / size.y;
-      if (Number.isFinite(factor) && factor > 0) model.scale.setScalar(factor);
+      if (Number.isFinite(factor) && factor > 0) model.scale.multiplyScalar(factor);
       return model;
+    }
+
+    function alignBottomToGround(model, groundY = 0) {
+      if (!model || typeof model.traverse !== "function") return model;
+      if (typeof model.updateMatrixWorld === "function") model.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(model);
+      if (!Number.isFinite(box.min.y)) return model;
+      const offsetY = groundY - box.min.y;
+      if (Number.isFinite(offsetY) && Math.abs(offsetY) > 0.0001) model.position.y += offsetY;
+      return model;
+    }
+
+    function resolveGroundY(config = {}) {
+      if (typeof config.groundY === "number" && Number.isFinite(config.groundY)) return config.groundY;
+      if (Array.isArray(config.position) && Number.isFinite(Number(config.position[1]))) return Number(config.position[1]);
+      return 0;
     }
 
     function prepareModel(model, config = {}) {
       applyTransform(model, config);
       if (!model || typeof model.traverse !== "function") return model;
       if (typeof config.targetHeightMeters === "number") normalizeToHeight(model, config.targetHeightMeters);
+      if (typeof config.targetHeightMeters === "number" && config.alignToGround !== false) alignBottomToGround(model, resolveGroundY(config));
       model.traverse((node) => {
         if (!node || !node.isMesh) return;
         node.castShadow = true;
@@ -360,6 +378,7 @@
       loadLazy,
       prepareModel,
       normalizeToHeight,
+      alignBottomToGround,
       createMissingAsset,
       createDebugPanel,
       tickDebugFrame,

@@ -108,6 +108,7 @@ assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation thrott
   "addSingaporeObjaverseReplacementProps",
   "urbanReplacementPropsDelayMs",
   "Objaverse Singapore Replacement",
+  "food-court-real-props",
   "lifeVerseObjaverseReplacement",
   "hidePlaceholders",
   "singapore-urban-props-v1",
@@ -124,7 +125,7 @@ assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation thrott
 ].forEach((marker) => {
   assert.ok(simSource.includes(marker), `Life Sim renderer includes Singapore city infill marker: ${marker}`);
 });
-assert.ok(indexSource.includes("life-sim.js?v=objaverse-replacement-20260722-2"), "index cache key points at the Objaverse replacement build");
+assert.ok(indexSource.includes("life-sim.js?v=real-scale-replacement-20260722-5"), "index cache key points at the Objaverse replacement build");
 
 [
   "Purpose",

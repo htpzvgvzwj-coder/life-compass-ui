@@ -65,13 +65,13 @@
     // PUBG-style life-sim view: close, low, and slightly over the right
     // shoulder so the player sits on the left third while the street opens up.
     fov: 68,
-    distance: 5.2,
-    movingDistance: 4.75,
-    height: 2.35,
-    pitchHeight: 1.05,
-    shoulderOffset: 1.18,
-    lookAhead: 7.25,
-    lookHeight: 1.62,
+    distance: 4.25,
+    movingDistance: 3.9,
+    height: 1.82,
+    pitchHeight: 0.58,
+    shoulderOffset: 0.9,
+    lookAhead: 6.15,
+    lookHeight: 1.44,
     movingLookAhead: 1.15,
     movingLookHeight: 0.12,
     minPitch: 0.18,
@@ -79,6 +79,11 @@
     defaultPitch: 0.38,
     positionDamping: 8.6,
     lookDamping: 10.4
+  };
+
+  const PLAYER_VISUAL_REFERENCE = {
+    heightMeters: 1.72,
+    fallbackScale: 0.56
   };
 
   const LIFE_SIM_PERFORMANCE = {
@@ -471,8 +476,42 @@
 
     animate();
 
+    function readDebugState() {
+      return {
+          realCharacterLoaded: Boolean(state.realCharacterLoaded),
+          currentZoneId: state.currentZone ? state.currentZone.id : "",
+          playerChildren: player.group.children.map((child) => ({
+            name: child.name || child.type || "Object3D",
+            visible: child.visible !== false,
+            type: child.type || ""
+          })),
+          playerPosition: {
+            x: Number(player.group.position.x.toFixed(2)),
+            y: Number(player.group.position.y.toFixed(2)),
+            z: Number(player.group.position.z.toFixed(2))
+          },
+          cameraPosition: {
+            x: Number(state.cameraPosition.x.toFixed(2)),
+            y: Number(state.cameraPosition.y.toFixed(2)),
+            z: Number(state.cameraPosition.z.toFixed(2))
+          },
+          cameraLookAt: {
+            x: Number(state.cameraLookAt.x.toFixed(2)),
+            y: Number(state.cameraLookAt.y.toFixed(2)),
+            z: Number(state.cameraLookAt.z.toFixed(2))
+          },
+          assetDebug: state.assetManager && state.assetManager.getDebugSnapshot
+            ? state.assetManager.getDebugSnapshot(renderer, scene)
+            : null
+      };
+    }
+
+    window.CompassLifeSim.__lastDebugState = readDebugState;
+
     return {
+      getDebugState: readDebugState,
       destroy() {
+        if (window.CompassLifeSim.__lastDebugState === readDebugState) window.CompassLifeSim.__lastDebugState = null;
         state.destroyed = true;
         window.clearTimeout(districtLoadingSafetyTimeout);
         resizeObserver.disconnect();
@@ -1443,7 +1482,7 @@
   }
 
   function hideFallbackCharacter(player) {
-    ["body", "head", "hair", "leftArm", "rightArm", "leftLeg", "rightLeg"].forEach((key) => {
+    ["fallbackRoot", "body", "head", "hair", "leftArm", "rightArm", "leftLeg", "rightLeg"].forEach((key) => {
       if (player[key]) player[key].visible = false;
     });
     player.group.children.forEach((child) => {
@@ -1862,25 +1901,29 @@
         url: "assets/environment/hdb-block.glb",
         hideNamePrefixes: ["HDB Home Block A", "HDB Home Block B"],
         position: [-30, 0, 42.2],
-        scale: [5.5, 5.5, 5.5]
+        scale: [5.5, 5.5, 5.5],
+        targetHeightMeters: 24
       },
       {
         url: "assets/environment/office-tower.glb",
         hideNamePrefixes: ["Office Tower"],
         position: [-25, 0, -83],
-        scale: [5.5, 5.5, 5.5]
+        scale: [5.5, 5.5, 5.5],
+        targetHeightMeters: 38
       },
       {
         url: "assets/environment/library.glb",
         hideNames: ["Library Reading Hall", "Library Roof", "Library Quiet Glass"],
         position: [41, 0, 12],
-        scale: [2.5, 2.5, 2.5]
+        scale: [2.5, 2.5, 2.5],
+        targetHeightMeters: 9
       },
       {
         url: "assets/environment/city-kit-commercial/mall-building.glb",
         hideNames: ["Mall Main Atrium", "Mall Glass Front", "Mall Round Atrium"],
         position: [0, 0, -35],
-        scale: [6, 6, 6]
+        scale: [6, 6, 6],
+        targetHeightMeters: 15
       },
       {
         url: "assets/environment/tree-oak.glb",
@@ -1903,12 +1946,14 @@
       {
         url: "assets/environment/city-kit-commercial/orchard-shop-a.glb",
         position: [-8, 0, -35],
-        scale: [6.5, 6.5, 6.5]
+        scale: [6.5, 6.5, 6.5],
+        targetHeightMeters: 13
       },
       {
         url: "assets/environment/city-kit-commercial/orchard-shop-b.glb",
         position: [8, 0, -35],
-        scale: [4.2, 4.2, 4.2]
+        scale: [4.2, 4.2, 4.2],
+        targetHeightMeters: 12
       },
       // University Town: adds a lecture hall and a hostel block near the
       // existing University zone, purely additive like Orchard Road above.
@@ -1923,12 +1968,14 @@
         // stay as an outdoor campus plaza in front of it.
         hideNames: ["University Main Hall", "University Lecture Roof"],
         position: [-86, 0, -5],
-        scale: [3.5, 3.5, 3.5]
+        scale: [3.5, 3.5, 3.5],
+        targetHeightMeters: 13
       },
       {
         url: "assets/environment/university-hostel.glb",
         position: [-80, 0, -12],
-        scale: [3.2, 3.2, 3.2]
+        scale: [3.2, 3.2, 3.2],
+        targetHeightMeters: 20
       },
       // Marina Bay / CBD: three City Kit Commercial skyscrapers cluster around
       // the hand-built Marina-Bay-Sands-style landmark (addMarinaBayLandmark),
@@ -1943,17 +1990,20 @@
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
         position: [30, 0, -76],
-        scale: [4.9, 4.9, 4.9]
+        scale: [4.9, 4.9, 4.9],
+        targetHeightMeters: 48
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-c.glb",
         position: [58, 0, -56],
-        scale: [4.4, 4.4, 4.4]
+        scale: [4.4, 4.4, 4.4],
+        targetHeightMeters: 44
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
         position: [56, 0, -75],
-        scale: [3.9, 3.9, 3.9]
+        scale: [3.9, 3.9, 3.9],
+        targetHeightMeters: 38
       },
       // Sentosa: purely additive palm trees around the existing Beach zone.
       {
@@ -1977,19 +2027,22 @@
         url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.glb",
         hideNamePrefixes: ["Woodlands HDB Block A"],
         position: [-11, 0, 53],
-        scale: [1, 1, 1]
+        scale: [1, 1, 1],
+        targetHeightMeters: 20
       },
       {
         url: "assets/environment/city-kit-quaternius/Building_Small_1.glb",
         hideNamePrefixes: ["Woodlands HDB Block B"],
         position: [-27, 0, 47],
-        scale: [1, 1, 1]
+        scale: [1, 1, 1],
+        targetHeightMeters: 17
       },
       {
         url: "assets/environment/city-kit-quaternius/Building_Large_2.glb",
         hideNames: ["Causeway Point Mall", "Causeway Point Glass Front", "Causeway Point Roof"],
         position: [22, 0, 48],
-        scale: [1, 1, 1]
+        scale: [1, 1, 1],
+        targetHeightMeters: 18
       },
       // Woodlands estate expansion: 12 more blocks cycling through the same
       // 3 Quaternius files as the mall/original 2 blocks above, grouped by
@@ -2036,88 +2089,102 @@
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-a.glb",
         hideNamePrefixes: ["Chinatown Shophouse Rose"],
         position: [0, 0, -65],
-        scale: [5.2, 5.2, 5.2]
+        scale: [5.2, 5.2, 5.2],
+        targetHeightMeters: 12
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-b.glb",
         hideNamePrefixes: ["Chinatown Shophouse Ochre"],
         position: [5.5, 0, -65],
-        scale: [5.2, 5.2, 5.2]
+        scale: [5.2, 5.2, 5.2],
+        targetHeightMeters: 12
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-c.glb",
         hideNamePrefixes: ["Chinatown Shophouse Teal"],
         position: [11, 0, -65],
-        scale: [5.2, 5.2, 5.2]
+        scale: [5.2, 5.2, 5.2],
+        targetHeightMeters: 12
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-d.glb",
         hideNamePrefixes: ["Chinatown Shophouse Cream"],
         position: [16.5, 0, -65],
-        scale: [5.2, 5.2, 5.2]
+        scale: [5.2, 5.2, 5.2],
+        targetHeightMeters: 12
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-a.glb",
         hideNamePrefixes: ["Little India Shophouse Blue"],
         position: [17, 0, -19],
-        scale: [4.0, 4.0, 4.0]
+        scale: [4.0, 4.0, 4.0],
+        targetHeightMeters: 12
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-b.glb",
         hideNamePrefixes: ["Little India Shophouse Saffron"],
         position: [22.5, 0, -19],
-        scale: [3.5, 3.5, 3.5]
+        scale: [3.5, 3.5, 3.5],
+        targetHeightMeters: 11
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-c.glb",
         hideNamePrefixes: ["Little India Shophouse Magenta"],
         position: [28, 0, -19],
-        scale: [3.2, 3.2, 3.2]
+        scale: [3.2, 3.2, 3.2],
+        targetHeightMeters: 11
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-d.glb",
         hideNamePrefixes: ["Little India Shophouse Cream"],
         position: [33.5, 0, -19],
-        scale: [2.2, 3.2, 2.2]
+        scale: [2.2, 3.2, 2.2],
+        targetHeightMeters: 10
       },
       {
         url: "assets/environment/city-kit-commercial/bugis-shophouse-a.glb",
         hideNamePrefixes: ["Bugis Heritage Shophouse A"],
         position: [44, 0, -37],
-        scale: [2.6, 3.4, 2.6]
+        scale: [2.6, 3.4, 2.6],
+        targetHeightMeters: 11
       },
       {
         url: "assets/environment/city-kit-commercial/bugis-shophouse-b.glb",
         hideNamePrefixes: ["Bugis Heritage Shophouse B"],
         position: [49.2, 0, -37],
-        scale: [3.2, 3.2, 3.2]
+        scale: [3.2, 3.2, 3.2],
+        targetHeightMeters: 11
       },
       {
         url: "assets/environment/city-kit-commercial/hospital-block.glb",
         hideNamePrefixes: ["Hospital Clean Main Wing", "Hospital Ward Tower"],
         position: [80, 0, -52],
-        scale: [3.0, 3.0, 3.0]
+        scale: [3.0, 3.0, 3.0],
+        targetHeightMeters: 16
       },
       {
         url: "assets/environment/city-kit-commercial/airport-terminal.glb",
         hideNames: ["Airport Terminal", "Airport Glass Departures", "Airport Terminal Overhang"],
         hideNamePrefixes: ["Airport Facade Mullion"],
         position: [110, 0, -10],
-        scale: [8, 7, 8]
+        scale: [8, 7, 8],
+        targetHeightMeters: 12
       },
       {
         url: "assets/environment/city-kit-commercial/gym-building.glb",
         hideNames: ["Gym Roof"],
         hideNamePrefixes: ["Gym Fitness Studio"],
         position: [-60, 0, 54],
-        scale: [6, 3.2, 6]
+        scale: [6, 3.2, 6],
+        targetHeightMeters: 8
       },
       {
         url: "assets/environment/cafe-building.glb",
         hideNames: ["Cafe Roof"],
         hideNamePrefixes: ["Cafe Cozy Shop"],
         position: [-50, 0, -26.5],
-        scale: [2.6, 2.6, 2.6]
+        scale: [2.6, 2.6, 2.6],
+        targetHeightMeters: 7
       },
       // Real park bench (Kenney "Furniture Kit") city-wide, replacing every
       // primitive "Bench Seat"/"Bench Back" pair (Park x2, Beach x1,
@@ -2145,13 +2212,15 @@
         url: "assets/environment/hdb-block.glb",
         hideNamePrefixes: ["Punggol HDB Block A", "Punggol HDB Block B"],
         positions: [[78, 67], [70, 71]],
-        scale: [5.2, 5.2, 5.2]
+        scale: [5.2, 5.2, 5.2],
+        targetHeightMeters: 24
       },
       {
         url: "assets/environment/city-kit-commercial/mall-building.glb",
         hideNames: ["Waterway Point Mall", "Waterway Point Glass Front", "Waterway Point Roof"],
         positions: [[101, 68]],
-        scale: [6, 6, 6]
+        scale: [6, 6, 6],
+        targetHeightMeters: 15
       },
       // Raffles Place: two of Marina Bay's own generic City Kit Commercial
       // skyscrapers reused for background density around the hand-built
@@ -2166,12 +2235,53 @@
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
         positions: [[61, -35]],
-        scale: [4.6, 4.6, 4.6]
+        scale: [4.6, 4.6, 4.6],
+        targetHeightMeters: 42
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
         positions: [[95, -23]],
-        scale: [4.2, 4.2, 4.2]
+        scale: [4.2, 4.2, 4.2],
+        targetHeightMeters: 38
+      },
+      // Realistic replacement pass: the Singapore infill rows below were the
+      // most visible remaining primitive-box buildings in the over-shoulder
+      // camera. Replace their visual shells with reusable GLB buildings while
+      // keeping the procedural shells as safe fallbacks if a model fails.
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Small_1.glb",
+        hideNamePrefixes: ["Main Street Mixed-Use Block"],
+        positions: [[-46, -25], [-37, -25], [-28, -25], [-18, -25], [3, -25], [12, -25], [23, -25], [34, -25], [46, -25], [58, -25]],
+        scale: [1, 1, 1],
+        targetHeightMeters: 12
+      },
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.glb",
+        hideNamePrefixes: ["South Main Street Block"],
+        positions: [[-42, -40], [-31, -40], [-20, -40], [-9, -40], [12, -40], [25, -40], [38, -40], [52, -40], [66, -40], [80, -40]],
+        scale: [1, 1, 1],
+        targetHeightMeters: 12
+      },
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.glb",
+        hideNamePrefixes: ["Heartland HDB Precinct Block"],
+        positions: [[-46, 38], [-38, 34], [-28, 49.5], [-15, 41]],
+        scale: [1, 1, 1],
+        targetHeightMeters: 19
+      },
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Large_2.glb",
+        hideNamePrefixes: ["CBD Infill Tower"],
+        positions: [[66, -16], [88, -17], [72, -47], [88, -46], [51, -43.2]],
+        scale: [1, 1, 1],
+        targetHeightMeters: 34
+      },
+      {
+        url: "assets/environment/city-kit-quaternius/Building_Small_1.glb",
+        hideNamePrefixes: ["Town Centre Medical Block", "Town Centre Tuition Block", "Town Centre Kopitiam Block", "Campus Student Services Block", "Social Shophouse Infill", "Social Night Market Infill", "Airport Budget Travel Block", "Park Wellness Kiosk"],
+        positions: [[-22, -3], [-4, -3], [-20, -14], [-63, -26], [24, -62], [40, -62], [104, -59], [39, 24]],
+        scale: [1, 1, 1],
+        targetHeightMeters: 8
       }
     ];
 
@@ -2627,6 +2737,19 @@
           { category: "bench", position: [45.5, 0, -36.3], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
           { category: "coffee_table", position: [-42.5, 0, -37.8], rotation: 0.2 },
           { category: "coffee_table", position: [78.5, 0, -41.8], rotation: -0.3 }
+        ]
+      },
+      {
+        id: "food-court-real-props",
+        maxFarDistance: 68,
+        items: [
+          { category: "coffee_table", position: [14.8, 0, -94.5], rotation: 0.08, replace: ["Food Table", "Food Stool"] },
+          { category: "coffee_table", position: [19.4, 0, -92.2], rotation: -0.12 },
+          { category: "coffee_table", position: [25.6, 0, -95.2], rotation: 0.18 },
+          { category: "bench", position: [16.8, 0, -90.5], rotation: Math.PI * 0.5 },
+          { category: "bench", position: [27.5, 0, -91.1], rotation: Math.PI * 0.5 },
+          { category: "lantern", position: [20.5, 2.35, -99.2], rotation: 0.2 },
+          { category: "lantern", position: [25.8, 2.35, -99.2], rotation: -0.1 }
         ]
       },
       {
@@ -3635,10 +3758,12 @@
   }
 
   function addFoodStall(THREE, scene, position, label, mat) {
-    addBox(THREE, scene, "Food Stall Counter", [position[0], 0.9, position[1]], [2.7, 1.2, 0.9], mat.curbWarm);
-    addBox(THREE, scene, "Food Stall Menu Board", [position[0], 2.0, position[1] - 0.52], [2.45, 0.86, 0.12], mat.screen);
-    addText(THREE, scene, label, [position[0] - 1.08, 2.12, position[1] - 0.72], 0.28, 0xffef84);
-    addCylinder(THREE, scene, "Food Stall Hanging Light", [position[0], 2.75, position[1] + 0.15], [0.22, 0.16, 16], mat.lampGlow);
+    addBox(THREE, scene, "Food Stall Counter", [position[0], 0.52, position[1]], [2.35, 0.52, 0.58], mat.wood);
+    addBox(THREE, scene, "Food Stall Stainless Front", [position[0], 0.74, position[1] - 0.31], [2.08, 0.34, 0.06], mat.metal);
+    addBox(THREE, scene, "Food Stall Menu Board", [position[0], 1.72, position[1] - 0.5], [1.72, 0.48, 0.08], mat.screen);
+    addBox(THREE, scene, "Food Stall Awning", [position[0], 2.34, position[1] - 0.12], [2.72, 0.12, 1.05], mat.roofDark, true);
+    addText(THREE, scene, label, [position[0] - 0.74, 1.78, position[1] - 0.64], 0.2, 0xffef84);
+    addCylinder(THREE, scene, "Food Stall Hanging Light", [position[0], 2.16, position[1] + 0.18], [0.16, 0.12, 16], mat.lampGlow);
   }
 
   function addTray(THREE, scene, position, mat) {
@@ -3813,9 +3938,13 @@
   function createPlayer(THREE, mat) {
     const group = new THREE.Group();
     const parts = { group };
+    parts.fallbackRoot = new THREE.Group();
+    parts.fallbackRoot.name = `Fallback Player Visual ${PLAYER_VISUAL_REFERENCE.heightMeters}m`;
+    parts.fallbackRoot.scale.setScalar(PLAYER_VISUAL_REFERENCE.fallbackScale);
+    group.add(parts.fallbackRoot);
 
     parts.body = new THREE.Group();
-    group.add(parts.body);
+    parts.fallbackRoot.add(parts.body);
 
     const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.82, 8, 14), mat.outfit);
     torso.position.y = 1.18;
@@ -3829,7 +3958,7 @@
 
     parts.head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 16), mat.skin);
     parts.head.castShadow = true;
-    group.add(parts.head);
+    parts.fallbackRoot.add(parts.head);
 
     parts.hair = new THREE.Group();
     const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 12), mat.hair);
@@ -3838,19 +3967,19 @@
     fringe.position.set(0.16, -0.05, -0.25);
     fringe.rotation.x = Math.PI * 0.72;
     parts.hair.add(hairCap, fringe);
-    group.add(parts.hair);
+    parts.fallbackRoot.add(parts.hair);
 
     parts.leftArm = makeLimb(THREE, mat.skin, [-0.55, 1.25, 0], 0.12, 0.72);
     parts.rightArm = makeLimb(THREE, mat.skin, [0.55, 1.25, 0], 0.12, 0.72);
     parts.leftLeg = makeLimb(THREE, mat.outfit, [-0.2, 0.52, 0], 0.14, 0.86);
     parts.rightLeg = makeLimb(THREE, mat.outfit, [0.2, 0.52, 0], 0.14, 0.86);
-    group.add(parts.leftArm, parts.rightArm, parts.leftLeg, parts.rightLeg);
+    parts.fallbackRoot.add(parts.leftArm, parts.rightArm, parts.leftLeg, parts.rightLeg);
 
     const leftShoe = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.42), mat.shoes);
     leftShoe.position.set(-0.2, 0.06, -0.06);
     const rightShoe = leftShoe.clone();
     rightShoe.position.x = 0.2;
-    group.add(leftShoe, rightShoe);
+    parts.fallbackRoot.add(leftShoe, rightShoe);
     return parts;
   }
 

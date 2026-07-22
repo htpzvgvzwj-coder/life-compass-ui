@@ -146,6 +146,8 @@ assert.ok(realReplacementPass.categories.includes("bench"), "real replacement pa
 assert.ok(realReplacementPass.categories.includes("trash_can"), "real replacement pass includes trash cans");
 assert.ok(realManifest.objaverseAssets.some((entry) => entry.url.includes("assets/props/objaverse/") && entry.category === "lamppost"), "real manifest has local Objaverse lamppost GLB");
 assert.ok(realManifest.objaverseAssets.some((entry) => entry.url.includes("assets/props/objaverse/") && entry.category === "bench"), "real manifest has local Objaverse bench GLB");
+assert.ok(realManifest.character.url.includes("KhronosGroup/glTF-Sample-Assets"), "real manifest uses a GitHub-hosted humanoid GLB");
+assert.strictEqual(realManifest.character.targetHeightMeters, 1.72, "real character is normalized to adult human scale");
 
 const THREE = makeFakeThree();
 const materials = sandbox.window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" });
@@ -155,6 +157,8 @@ assert.ok(materials.snapshot().definitions.includes("glass"), "material library 
 
 const manager = sandbox.window.LifeVerseAssets.createAssetManager({ THREE, materialLibrary: materials, logger: { warn() {} } });
 assert.ok(manager.registerPrefab("prop:test", { url: "assets/props/test.glb" }), "prefab registration works");
+assert.strictEqual(typeof manager.normalizeToHeight, "function", "asset manager exposes real-world height normalization");
+assert.strictEqual(typeof manager.alignBottomToGround, "function", "asset manager exposes model ground alignment");
 
 (async () => {
   const manifest = await manager.loadManifest("assets/life-sim/asset-manifest.json");
