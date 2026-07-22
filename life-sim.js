@@ -2056,10 +2056,57 @@
     return { byCategory, loadedByUrl, loadEntry };
   }
 
+  async function loadOptimizedObjaverseBuildingSwaps() {
+    let manifest;
+    try {
+      const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
+      if (!response.ok) throw new Error(`manifest status ${response.status}`);
+      manifest = await response.json();
+    } catch (error) {
+      console.warn("[Life Sim] Could not load optimized building manifest:", error);
+      return [];
+    }
+    const buildingPassEnabled = (manifest.objaverseBuildingReplacementPasses || [])
+      .some((pass) => pass && pass.id === "singapore-realistic-buildings-v1" && pass.status === "enabled");
+    if (!buildingPassEnabled) return [];
+    return (manifest.objaverseBuildingAssets || [])
+      .filter(isOptimizedObjaverseBuildingEntry)
+      .map((entry) => ({
+        url: entry.url,
+        lods: entry.lods || [],
+        hideNames: Array.isArray(entry.hideNames) ? entry.hideNames : [],
+        hideNamePrefixes: Array.isArray(entry.hideNamePrefixes) ? entry.hideNamePrefixes : [],
+        position: Array.isArray(entry.position) ? entry.position : null,
+        positions: Array.isArray(entry.positions) ? entry.positions : null,
+        rotation: Array.isArray(entry.rotation) ? entry.rotation : [0, 0, 0],
+        scale: Array.isArray(entry.scale) ? entry.scale : [1, 1, 1],
+        targetHeightMeters: entry.targetHeightMeters,
+        isBuilding: true,
+        requireOptimizedObjaverse: true,
+        label: entry.label || entry.id || entry.url
+      }))
+      .filter((swap) => Array.isArray(swap.position) || Array.isArray(swap.positions));
+  }
+
+  function isOptimizedObjaverseBuildingEntry(entry) {
+    if (!entry || entry.optimized !== true) return false;
+    if (typeof entry.url !== "string" || !entry.url.endsWith(".glb")) return false;
+    if (!entry.url.includes("assets/environment/objaverse-optimized/")) return false;
+    if (entry.url.startsWith("http://") || entry.url.startsWith("https://")) return false;
+    if (!(Number(entry.targetHeightMeters) > 0)) return false;
+    const hasReplacementTarget = (Array.isArray(entry.hideNames) && entry.hideNames.length)
+      || (Array.isArray(entry.hideNamePrefixes) && entry.hideNamePrefixes.length);
+    if (!hasReplacementTarget) return false;
+    const lods = Array.isArray(entry.lods) ? entry.lods : [];
+    if (lods.length < 3) return false;
+    return lods.every((lod) => lod && typeof lod.url === "string" && lod.url.includes("assets/environment/objaverse-optimized/"));
+  }
+
   async function loadDistrictAssetSamples(THREE, scene, assetManager, state, spawnX, spawnZ) {
     if (!assetManager) return;
     const ready = await assetManager.ensureGltfLoader();
     if (!ready || (state && state.destroyed)) return;
+    const optimizedObjaverseBuildingSwaps = await loadOptimizedObjaverseBuildingSwaps();
 
     const swaps = [
       {
@@ -2457,6 +2504,7 @@
         targetHeightMeters: 8
       }
     ];
+    swaps.push(...optimizedObjaverseBuildingSwaps);
 
     // Loaded in parallel rather than one-at-a-time: this list grew from ~15
     // entries to ~30 in the real-model pass, and sequential `await` per swap
@@ -2471,10 +2519,14 @@
     async function runSwapBatch(list, concurrency) {
       await runLimitedBatch(list, concurrency, async (swap) => {
         try {
+          if (swap.requireOptimizedObjaverse && !String(swap.url || "").includes("assets/environment/objaverse-optimized/")) {
+            console.warn(`[Life Sim] Skipping raw Objaverse building swap: ${swap.url || "missing-url"}`);
+            return;
+          }
           const asset = await assetManager.loadModel(swap.url, {
             toonify: true,
             scale: swap.scale,
-            label: swap.url
+            label: swap.label || swap.url
           });
           if (state && state.destroyed) return;
           if (!asset || asset.fallback || !asset.scene) return;
@@ -2495,7 +2547,7 @@
           if (Array.isArray(swap.positions)) {
             swap.positions.forEach(([x, z], index) => {
               const instance = asset.scene.clone(true);
-              assetManager.prepareModel(instance, { toonify: true, position: [x, 0, z], scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
+              assetManager.prepareModel(instance, { toonify: true, position: [x, 0, z], rotation: swap.rotation, scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
               recenterOnGroundSlot(THREE, instance, x, z);
               scene.add(instance);
               if (isBuilding) {
@@ -2513,7 +2565,7 @@
               }
             });
           } else {
-            assetManager.prepareModel(asset.scene, { toonify: true, position: swap.position, scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
+            assetManager.prepareModel(asset.scene, { toonify: true, position: swap.position, rotation: swap.rotation, scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
             recenterOnGroundSlot(THREE, asset.scene, swap.position[0], swap.position[2]);
             scene.add(asset.scene);
             if (isBuilding) {

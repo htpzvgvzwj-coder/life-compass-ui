@@ -17,6 +17,7 @@
     const fallbackAssets = new Map();
     const lazyLoaders = new Map();
     const manifestUrl = options.manifestUrl || DEFAULT_MANIFEST_URL;
+    let dracoLoaderPromise = null;
 
     async function loadManifest(url = manifestUrl) {
       const response = await fetch(url, { cache: "no-store" });
@@ -50,6 +51,32 @@
       return false;
     }
 
+    async function ensureDracoLoader() {
+      if (dracoLoaderPromise) return dracoLoaderPromise;
+      dracoLoaderPromise = (async () => {
+        if (!THREE.DRACOLoader) {
+          const urls = [
+            "https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/DRACOLoader.js",
+            "https://unpkg.com/three@0.146.0/examples/js/loaders/DRACOLoader.js"
+          ];
+          for (const url of urls) {
+            try {
+              await injectScript(url);
+              if (THREE.DRACOLoader) break;
+            } catch (error) {
+              logger.warn && logger.warn(`[LifeVerse Assets] DRACOLoader failed from ${url}`, error);
+            }
+          }
+        }
+        if (!THREE.DRACOLoader) return null;
+        const loader = new THREE.DRACOLoader();
+        if (typeof loader.setDecoderPath === "function") loader.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
+        if (typeof loader.setDecoderConfig === "function") loader.setDecoderConfig({ type: "js" });
+        return loader;
+      })();
+      return dracoLoaderPromise;
+    }
+
     async function loadModel(url, config = {}) {
       if (!url) return createMissingAsset("missing-url", config);
       const type = String(config.type || url.split(".").pop() || "gltf").toLowerCase();
@@ -75,6 +102,10 @@
       const ready = await ensureGltfLoader();
       if (!ready || !THREE.GLTFLoader) throw new Error("GLTFLoader unavailable.");
       const loader = new THREE.GLTFLoader();
+      if (config.draco !== false && typeof loader.setDRACOLoader === "function") {
+        const dracoLoader = await ensureDracoLoader();
+        if (dracoLoader) loader.setDRACOLoader(dracoLoader);
+      }
       return new Promise((resolve, reject) => {
         loader.load(url, (gltf) => {
           if (gltf.scene) prepareModel(gltf.scene, config);
@@ -369,6 +400,7 @@
       loadManifest,
       registerManifestPrefabs,
       ensureGltfLoader,
+      ensureDracoLoader,
       loadModel,
       loadTexture,
       loadMaterial,

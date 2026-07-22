@@ -39,6 +39,30 @@ This pass uses the existing local GLBs in `assets/props/objaverse/` to replace o
 
 Procedural street lights, benches, and trash bins are hidden only after the matching Objaverse GLB successfully loads. Do not remove the procedural fallback first; public mobile browsers need a safe failure path.
 
+## Building replacement pipeline
+
+Large Objaverse buildings must use the production optimization chain before
+they can replace Life Sim buildings:
+
+`download -> Blender -> Decimate -> texture compression/resize -> Draco -> LOD -> export GLB -> manifest registration -> Three.js`
+
+Raw building scans belong in `assets/environment/objaverse/`. Public-ready
+outputs belong in `assets/environment/objaverse-optimized/`.
+
+Use `tools/lifeverse_optimize_objaverse.py` to create LOD GLBs and register
+the asset in `asset-manifest.json` under `objaverseBuildingAssets`.
+
+Example:
+
+```powershell
+python tools/lifeverse_optimize_objaverse.py --input assets/environment/objaverse/YOUR_UID.glb --asset-id hdb-realistic-block-a --target-height 32 --position "-30,0,42.2" --hide-prefix "HDB Home Block" --execute
+```
+
+`life-sim.js` only loads building entries when `optimized:true`, the URL is a
+local `assets/environment/objaverse-optimized/*.glb`, replacement target names
+are present, and three LOD entries exist. See
+`docs/lifeverse-objaverse-building-pipeline.md`.
+
 Performance rules from the plan:
 
 - First playable entry should stay under 18MB of critical assets.

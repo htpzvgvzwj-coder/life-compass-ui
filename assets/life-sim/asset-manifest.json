@@ -51,6 +51,57 @@
       ]
     }
   ],
+  "objaverseBuildingPipeline": {
+    "status": "enabled-no-raw-building-loads",
+    "sourceFolder": "assets/environment/objaverse",
+    "optimizedFolder": "assets/environment/objaverse-optimized",
+    "requiredStages": [
+      "download-model",
+      "blender-decimate",
+      "texture-compress-ktx2-basis-or-resize",
+      "draco-compress",
+      "generate-lod",
+      "export-glb",
+      "register-manifest"
+    ],
+    "rules": [
+      "Do not load raw Objaverse building scans directly in Life Sim.",
+      "Only building entries with optimized:true and a local assets/environment/objaverse-optimized/*.glb URL can replace district buildings.",
+      "Each building entry must define targetHeightMeters and at least one hideNames or hideNamePrefixes rule.",
+      "LOD0 may be detailed, but LOD1 and LOD2 must exist before a large building is enabled for public deployment.",
+      "Large buildings near the default camera must pass scale, collision, and camera checks before being enabled."
+    ],
+    "tools": {
+      "fetch": "python tools/objaverse_fetch.py",
+      "optimize": "python tools/lifeverse_optimize_objaverse.py",
+      "runtimeLoader": "loadOptimizedObjaverseBuildingSwaps() in life-sim.js"
+    }
+  },
+  "objaverseBuildingReplacementPasses": [
+    {
+      "id": "singapore-realistic-buildings-v1",
+      "status": "enabled",
+      "purpose": "Replace old kit/procedural building shells only with optimized local Objaverse building GLBs that have passed the Blender/Draco/LOD pipeline.",
+      "replacementPolicy": [
+        "Load optimized building swaps through asset-manifest.json, not hardcoded runtime downloads.",
+        "Skip any entry that is raw, remote, missing optimized:true, missing targetHeightMeters, or missing replacement targets.",
+        "Keep procedural district buildings as fallbacks if optimized assets fail.",
+        "Register measured static colliders from the loaded GLB footprint.",
+        "Keep gameplay logic attached to LifeVerse zones, never to decorative mesh names."
+      ],
+      "categories": [
+        "hdb",
+        "mixed_use",
+        "mall",
+        "mrt",
+        "food_court",
+        "office",
+        "hospital",
+        "university"
+      ]
+    }
+  ],
+  "objaverseBuildingAssets": [],
   "character": {
     "id": "github-khronos-cesium-man",
     "url": "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@main/Models/CesiumMan/glTF-Binary/CesiumMan.glb",

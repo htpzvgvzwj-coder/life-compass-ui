@@ -5,6 +5,6 @@
   "type": "commonjs",
   "scripts": {
     "start": "node local-server.js",
-    "test": "node tests/lifeverse-phase1.test.js && node tests/lifeverse-phase2.test.js && node tests/lifeverse-phase3.test.js && node tests/lifeverse-phase4.test.js && node tests/lifeverse-volume03-architecture.test.js && node tests/lifeverse-volume04-ux.test.js && node tests/lifeverse-volume045-polish.test.js && node tests/lifeverse-volume046-presentation.test.js && node tests/lifeverse-volume050-asset-pipeline.test.js && node tests/lifeverse-volume051-environment-remaster.test.js && node tests/lifeverse-map-plan.test.js && node tests/community-matching.test.js && node tests/build-mode.test.js && node tests/compass-provider-fallback.test.js"
+    "test": "node tests/lifeverse-phase1.test.js && node tests/lifeverse-phase2.test.js && node tests/lifeverse-phase3.test.js && node tests/lifeverse-phase4.test.js && node tests/lifeverse-volume03-architecture.test.js && node tests/lifeverse-volume04-ux.test.js && node tests/lifeverse-volume045-polish.test.js && node tests/lifeverse-volume046-presentation.test.js && node tests/lifeverse-volume050-asset-pipeline.test.js && node tests/lifeverse-volume051-environment-remaster.test.js && node tests/lifeverse-map-plan.test.js && node tests/lifeverse-objaverse-building-pipeline.test.js && node tests/community-matching.test.js && node tests/build-mode.test.js && node tests/compass-provider-fallback.test.js"
   }
 }
