@@ -2270,13 +2270,18 @@
         scale: [1, 1, 1],
         targetHeightMeters: 17
       },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Large_2.glb",
-        hideNames: ["Causeway Point Mall", "Causeway Point Glass Front", "Causeway Point Roof"],
-        position: [22, 0, 48],
-        scale: [1, 1, 1],
-        targetHeightMeters: 18
-      },
+      // Causeway Point Mall's raw Building_Large_2.glb swap (single instance,
+      // position [22,0,48]) was removed here (2026-07-22) - it's now covered
+      // by the optimized-building pipeline instead (objaverseBuildingAssets
+      // entry "causeway-point-mall-optimized-v1", loaded via
+      // loadOptimizedObjaverseBuildingSwaps()): Blender-equivalent decimate
+      // (gltf-transform simplify, Blender itself isn't installed in this
+      // environment) + texture resize + Draco + 3 real LODs, 5.63MB -> 820KB/
+      // 363KB/191KB depending on distance, instead of one fixed 5.63MB model
+      // always rendered at full detail regardless of how far away the
+      // player is. Leaving both registered would double-render this
+      // building - do not re-add this entry without also removing the
+      // manifest's optimized replacement, or vice versa.
       // Woodlands estate expansion: 12 more blocks cycling through the same
       // 3 Quaternius files as the mall/original 2 blocks above, grouped by
       // file into 3 "positions" (plural, clone-based) entries - safe to

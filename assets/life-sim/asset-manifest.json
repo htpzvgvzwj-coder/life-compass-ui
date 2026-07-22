@@ -107,7 +107,62 @@
       ]
     }
   ],
-  "objaverseBuildingAssets": [],
+  "objaverseBuildingAssets": [
+    {
+      "id": "causeway-point-mall-optimized-v1",
+      "label": "Causeway Point Mall (optimized)",
+      "category": "mall",
+      "url": "assets/environment/objaverse-optimized/causeway-point-mall/causeway-point-mall_lod0.glb",
+      "optimized": true,
+      "pipeline": "objaverse-blender-decimate-texture-draco-lod",
+      "sourceUrl": "https://kenney.nl",
+      "license": "cc0",
+      "author": "Quaternius",
+      "targetHeightMeters": 15.0,
+      "position": [
+        22.0,
+        0.0,
+        48.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "hideNames": [
+        "Causeway Point Mall",
+        "Causeway Point Glass Front",
+        "Causeway Point Roof"
+      ],
+      "hideNamePrefixes": [],
+      "lods": [
+        {
+          "url": "assets/environment/objaverse-optimized/causeway-point-mall/causeway-point-mall_lod0.glb",
+          "distance": 0.0,
+          "ratio": 1.0
+        },
+        {
+          "url": "assets/environment/objaverse-optimized/causeway-point-mall/causeway-point-mall_lod1.glb",
+          "distance": 35.0,
+          "ratio": 0.5
+        },
+        {
+          "url": "assets/environment/objaverse-optimized/causeway-point-mall/causeway-point-mall_lod2.glb",
+          "distance": 70.0,
+          "ratio": 0.2
+        }
+      ],
+      "budgets": {
+        "maxTextureSize": 1024,
+        "maxPublicFileMb": 1.0
+      }
+    }
+  ],
   "character": null,
   "objaverseAssets": [
     {
