@@ -51,8 +51,35 @@ The current map must feel closer to a planned Singapore district, not a group of
 - Walk-cycle-ride logic: the town centre, mall, library, food court, home, and park are connected by sheltered walkways, pedestrian paths, cycling paths, and an MRT/bus interchange.
 - City-in-nature logic: greenery is not only a park. The map includes a park connector, street trees, corner pocket spaces, planters, and a canal edge.
 
+## Official Planning Rebase
+
+Status: implemented as `addSingaporeOfficialPlanningRebase`.
+
+This rebase stops the map from being patched location by location. The world now starts from a city skeleton inspired by Singapore planning references:
+
+- URA Master Plan: liveable, sustainable, well-connected district structure.
+- HDB Town Design Guides: HDB neighbourhood identity, facilities, community spaces, and coherent town character.
+- URA Downtown Core guidance: mixed-use CBD edge with active pedestrian-friendly streets rather than standalone office towers.
+- URA City in Nature / NParks PCN: green-blue corridors and park connectors as everyday movement routes.
+
+Implemented structural envelopes:
+
+- `Official Planning Town Centre Envelope`
+- `HDB Neighbourhood Centre Catchment`
+- `Learning Campus Quiet Quarter`
+- `Work Money Mixed Use Spine`
+- `Health Green Blue Recovery Belt`
+- `Future Waterfront Gateway District`
+- `PCN Green-Blue Corridor`
+- `ABC Waters Canal Edge`
+
+Important correction:
+
+The Food Court first-screen experimental GLB building swaps have been removed. Those swaps could create scale/camera failures and make the public build look worse. Large first-screen building replacements now require scale, collision, and camera audits before they are allowed back into the spawn view.
+
 Implemented world layers:
 
+- `official-planning-rebase`: base city skeleton, planning envelopes, wayfinding plinths, green-blue corridor, and neighbourhood micro-blocks.
 - `fine-grain-urban-fabric`: secondary streets, paving, parking bays, drop-off areas, street-corner pockets, and small service blocks that reduce empty ground.
 - `transit-oriented-town-centre`: integrated MRT/bus interchange with sheltered pedestrian links.
 - `heartland-precinct-density`: HDB precinct with neighbourhood centre, void deck, pavilion, playground, and local services.

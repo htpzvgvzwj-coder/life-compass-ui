@@ -1,7 +1,29 @@
 {
-  "version": "2026-07-22-lifeverse-singapore-urban-plan-v2",
+  "version": "2026-07-22-lifeverse-singapore-official-planning-rebase-v1",
   "title": "LifeVerse Singapore District Map Plan",
   "northStar": "A playable adult-life simulator where daily movement, choices, trade-offs, and consequences are readable in the world.",
+  "planningReferences": [
+    {
+      "id": "ura-master-plan",
+      "source": "URA Master Plan",
+      "lesson": "Plan a liveable, sustainable, well-connected district instead of isolated locations."
+    },
+    {
+      "id": "hdb-town-design-guides",
+      "source": "HDB Town Design Guides",
+      "lesson": "Each town area needs identity, neighbourhood facilities, and coherent public spaces."
+    },
+    {
+      "id": "ura-downtown-core",
+      "source": "URA Downtown Core Urban Design Guidelines",
+      "lesson": "CBD areas should be mixed-use, pedestrian-friendly, and active beyond office towers."
+    },
+    {
+      "id": "city-in-nature-pcn",
+      "source": "URA City in Nature / NParks Park Connector Network",
+      "lesson": "Green-blue corridors and park connectors should be part of everyday movement."
+    }
+  ],
   "camera": {
     "profile": "pubg-style-over-shoulder",
     "orientation": "landscape-first",
@@ -125,6 +147,17 @@
     }
   ],
   "infillLayers": [
+    {
+      "id": "official-planning-rebase",
+      "purpose": "Create the base city skeleton before adding more assets: town-centre envelope, HDB neighbourhood catchment, campus quarter, work-money spine, recovery belt, waterfront future edge, and PCN green-blue corridor.",
+      "performanceTier": "critical-lightweight",
+      "futureAssetSlots": [
+        "town centre podium modules",
+        "HDB neighbourhood centre modules",
+        "MRT and bus interchange modules",
+        "green-blue corridor props"
+      ]
+    },
     {
       "id": "fine-grain-urban-fabric",
       "purpose": "Reduce blank ground by adding secondary streets, paving, parking bays, drop-off areas, and corner pockets.",
@@ -658,6 +691,7 @@
   "redLines": [
     "do not expand into a full Singapore map before the compact district feels alive",
     "do not add decorative Objaverse props that do not support a life choice or place identity",
+    "do not add first-screen building GLB replacements without scale, collision, and camera audits",
     "do not block gameplay while optional models load",
     "do not let UI cover the over-shoulder street view",
     "do not make game logic depend on decorative mesh names or downloaded asset success"

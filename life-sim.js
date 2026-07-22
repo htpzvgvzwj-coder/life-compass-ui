@@ -1750,6 +1750,7 @@
 
     addRoadNetwork(THREE, scene, mat);
     addStreetCompositionLayer(THREE, scene, mat);
+    addSingaporeOfficialPlanningRebase(THREE, scene, mat);
     addZoneAt(addHdbHome, THREE, scene, mat, "home");
     addZoneAt(addGym, THREE, scene, mat, "gym");
     addZoneAt(addWorkTower, THREE, scene, mat, "work");
@@ -2057,61 +2058,6 @@
     if (!ready || (state && state.destroyed)) return;
 
     const swaps = [
-      // Food Court first-screen real-model pass: the player spawns here often,
-      // so the hawker street edge must be the first thing that stops looking
-      // like placeholder boxes. These local GLBs are small enough for mobile,
-      // load through the Asset Manager, hide the procedural shophouse shells,
-      // and keep the awnings/sign text as light street-layer dressing.
-      {
-        url: "assets/environment/city-kit-commercial/chinatown-shophouse-a.glb",
-        hideNamePrefixes: ["Hawker Street Shop VALUE"],
-        position: [-6, 0, -90],
-        scale: [1, 1, 1],
-        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
-      },
-      {
-        url: "assets/environment/city-kit-commercial/chinatown-shophouse-b.glb",
-        hideNamePrefixes: ["Hawker Street Shop KOPI"],
-        position: [2, 0, -90],
-        scale: [1, 1, 1],
-        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
-      },
-      {
-        url: "assets/environment/city-kit-commercial/chinatown-shophouse-c.glb",
-        hideNamePrefixes: ["Hawker Street Shop NASI"],
-        position: [10, 0, -90],
-        scale: [1, 1, 1],
-        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
-      },
-      {
-        url: "assets/environment/city-kit-commercial/chinatown-shophouse-d.glb",
-        hideNamePrefixes: ["Hawker Street Shop FRUIT"],
-        position: [18, 0, -90],
-        scale: [1, 1, 1],
-        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
-      },
-      {
-        url: "assets/environment/city-kit-commercial/bugis-shophouse-a.glb",
-        hideNamePrefixes: ["Hawker Street Shop MART"],
-        position: [26, 0, -90],
-        scale: [1, 1, 1],
-        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
-      },
-      {
-        url: "assets/environment/city-kit-commercial/bugis-shophouse-b.glb",
-        hideNamePrefixes: ["Hawker Street Shop ATM"],
-        position: [34, 0, -90],
-        scale: [1, 1, 1],
-        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerShopHeightMeters
-      },
-      {
-        url: "assets/environment/cafe-building.glb",
-        hideNames: ["Food Court Roof", "Food Court Roof Ridge"],
-        hideNamePrefixes: ["Food Court Column"],
-        position: [20, 0, -96],
-        scale: [1, 1, 1],
-        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hawkerPavilionHeightMeters
-      },
       {
         url: "assets/environment/hdb-block.glb",
         hideNamePrefixes: ["HDB Home Block A", "HDB Home Block B"],
@@ -2716,12 +2662,12 @@
     for (let z = -81; z <= -73; z += 2) addBox(THREE, scene, "Hawker Apron Tile Seam Z", [15, 0.26, z], [48, 0.025, 0.025], mat.curbWarm, true);
 
     [
-      [-6, -90, "VALUE"], [2, -90, "KOPI"], [10, -90, "NASI"], [18, -90, "FRUIT"], [26, -90, "MART"], [34, -90, "ATM"]
+      [-6, -91.4, "VALUE"], [2, -91.4, "KOPI"], [10, -91.4, "NASI"], [18, -91.4, "FRUIT"], [26, -91.4, "MART"], [34, -91.4, "ATM"]
     ].forEach(([x, z, label], index) => {
-      addBuildingCore(THREE, scene, `Hawker Street Shop ${label}`, [x, 2.4, z], [5.8, 4.8, 3.2], index % 2 ? mat.cafe : mat.hdbAccent, mat, "shophouse");
-      addShopFront(THREE, scene, [x, z + 1.72], label, index % 2 ? mat.signGold : mat.signBlue, mat);
-      addBox(THREE, scene, `Hawker Street ${label} Awning`, [x, 2.95, z + 1.9], [5.4, 0.18, 0.95], index % 2 ? mat.signGold : mat.signGreen, true);
-      addBox(THREE, scene, `Hawker Street ${label} Sign Band`, [x, 3.65, z + 1.82], [4.5, 0.48, 0.12], index % 2 ? mat.signBlue : mat.signGold);
+      addBuildingCore(THREE, scene, `Hawker Street Shop ${label}`, [x, 1.75, z], [4.9, 3.5, 2.1], index % 2 ? mat.cafe : mat.hdbAccent, mat, "shophouse");
+      addShopFront(THREE, scene, [x, z + 1.18], label, index % 2 ? mat.signGold : mat.signBlue, mat);
+      addBox(THREE, scene, `Hawker Street ${label} Awning`, [x, 2.55, z + 1.35], [4.8, 0.16, 0.75], index % 2 ? mat.signGold : mat.signGreen, true);
+      addBox(THREE, scene, `Hawker Street ${label} Sign Band`, [x, 3.05, z + 1.28], [3.8, 0.36, 0.1], index % 2 ? mat.signBlue : mat.signGold);
     });
 
     [-8, 12, 32, 42].forEach((x, index) => {
@@ -3782,6 +3728,81 @@
     addMixedUseStreetWalls(THREE, scene, mat);
     addParkConnectorAndActiveMobility(THREE, scene, mat);
     addDowntownCommercialDensity(THREE, scene, mat);
+  }
+
+  function addSingaporeOfficialPlanningRebase(THREE, scene, mat) {
+    // URA Master Plan Rebase: do not treat the map as isolated attractions.
+    // This lightweight city-structure layer follows Singapore planning
+    // patterns - town centre core, HDB neighbourhood catchment, mixed-use CBD
+    // edge, green-blue connector, and walk-cycle-ride links. It deliberately
+    // avoids first-screen experimental GLB building swaps until each model
+    // passes scale/camera audits.
+    addPlane(THREE, scene, "Official Planning Town Centre Envelope", [-6, 0.012, -18], [54, 42], mat.sidewalk);
+    addSoftEdgeGroundPatch(THREE, scene, "Official Planning Town Centre Envelope", [-6, -0.006, -18], [54, 42], 0xd8d2c2, 0.18);
+    addPlane(THREE, scene, "HDB Neighbourhood Centre Catchment", [-38, 0.014, 39], [50, 36], mat.grass);
+    addSoftEdgeGroundPatch(THREE, scene, "HDB Neighbourhood Centre Catchment", [-38, -0.004, 39], [50, 36], 0xc7daba, 0.16);
+    addPlane(THREE, scene, "Learning Campus Quiet Quarter", [-70, 0.015, -15], [34, 30], mat.grass);
+    addSoftEdgeGroundPatch(THREE, scene, "Learning Campus Quiet Quarter", [-70, -0.003, -15], [34, 30], 0xd5dec6, 0.16);
+    addPlane(THREE, scene, "Work Money Mixed Use Spine", [27, 0.016, -40], [126, 28], mat.sidewalk);
+    addSoftEdgeGroundPatch(THREE, scene, "Work Money Mixed Use Spine", [27, -0.002, -40], [126, 28], 0xcfc6b7, 0.12);
+    addPlane(THREE, scene, "Health Green Blue Recovery Belt", [52, 0.017, 19], [86, 30], mat.park);
+    addSoftEdgeGroundPatch(THREE, scene, "Health Green Blue Recovery Belt", [52, 0.0, 19], [86, 30], 0xbdd6af, 0.2);
+    addPlane(THREE, scene, "Future Waterfront Gateway District", [76, 0.018, -72], [62, 28], mat.sand);
+    addSoftEdgeGroundPatch(THREE, scene, "Future Waterfront Gateway District", [76, 0.002, -72], [62, 28], 0xd6c596, 0.14);
+
+    addBox(THREE, scene, "URA Mixed Use Planning Spine", [14, 0.19, -22], [116, 0.12, 2.4], mat.path, true);
+    addBox(THREE, scene, "Walk Cycle Ride North South Connector", [-12, 0.2, 17], [2.2, 0.12, 76], mat.path, true);
+    addBox(THREE, scene, "PCN Green-Blue Corridor", [41, 0.18, 31], [94, 0.12, 4.6], mat.signGreen, true);
+    addBox(THREE, scene, "ABC Waters Canal Edge", [41, 0.13, 27.8], [94, 0.08, 2.2], mat.water, true);
+
+    [
+      [-48, 27, "HOME"],
+      [-16, 3, "MRT"],
+      [0, -31, "MALL"],
+      [20, -82, "FOOD"],
+      [45, 11, "LIBRARY"],
+      [78, -53, "HEALTH"],
+      [78, -32, "CBD"]
+    ].forEach(([x, z, label], index) => {
+      const markerMat = index % 2 ? mat.signGreen : mat.signGold;
+      addBox(THREE, scene, `Planning Wayfinding Plinth ${label}`, [x, 0.42, z], [2.6, 0.28, 1.2], mat.curbWarm, true);
+      addSignBoard(THREE, scene, `Planning Wayfinding Sign ${label}`, label, [x - 1.25, 1.3, z - 0.72], markerMat, index % 2 ? 0xffffff : 0x141414);
+    });
+
+    addNeighbourhoodMicroBlocks(THREE, scene, mat, "HDB Neighbourhood Micro Block", [
+      [-53, 34, 4.2, 6.2, "CARE"],
+      [-47, 31, 4.0, 5.6, "MINI"],
+      [-41, 29, 4.6, 5.8, "KOPI"],
+      [-34, 28, 4.2, 5.0, "BILLS"],
+      [-28, 29, 4.6, 5.6, "STUDY"]
+    ]);
+    addNeighbourhoodMicroBlocks(THREE, scene, mat, "Town Centre Active Frontage", [
+      [-23, -12, 4.6, 5.2, "CLINIC"],
+      [-15, -12, 4.4, 5.0, "TUITION"],
+      [-7, -12, 4.6, 5.2, "SERVICE"],
+      [2, -12, 4.8, 5.4, "SKILLS"],
+      [11, -12, 4.6, 5.2, "CAFE"]
+    ]);
+
+    [
+      [-47, 39], [-42, 39], [-37, 39], [-32, 39], [-27, 39],
+      [-18, 8], [-12, 8], [-6, 8], [0, 8],
+      [3, -25], [12, -25], [23, -25], [34, -25], [46, -25], [58, -25],
+      [13, 27], [22, 28], [31, 29], [40, 30], [49, 31], [58, 32]
+    ].forEach(([x, z]) => addTree(THREE, scene, [x, z], mat));
+    [
+      [-45, 25], [-36, 25], [-27, 25], [-17, 1], [-6, 1],
+      [6, -29], [19, -29], [32, -29], [45, -29], [58, -29],
+      [12, 35], [28, 35], [44, 35], [60, 35]
+    ].forEach(([x, z]) => addPlanterRow(THREE, scene, [x, z], 2, mat));
+  }
+
+  function addNeighbourhoodMicroBlocks(THREE, scene, mat, prefix, blocks) {
+    blocks.forEach(([x, z, width, height, label], index) => {
+      const material = index % 3 === 0 ? mat.hdbAccent : (index % 3 === 1 ? mat.cafe : mat.mall);
+      addBuildingCore(THREE, scene, `${prefix} ${label}`, [x, height / 2, z], [width, height, 3.6], material, mat, "shophouse");
+      addShopFront(THREE, scene, [x - 0.35, z - 1.92], label, index % 2 ? mat.signBlue : mat.signGreen, mat);
+    });
   }
 
   function addFineGrainUrbanFabric(THREE, scene, mat) {
