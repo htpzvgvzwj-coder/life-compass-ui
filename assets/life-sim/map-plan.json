@@ -1,5 +1,5 @@
 {
-  "version": "2026-07-22-lifeverse-map-plan-v1",
+  "version": "2026-07-22-lifeverse-singapore-urban-plan-v2",
   "title": "LifeVerse Singapore District Map Plan",
   "northStar": "A playable adult-life simulator where daily movement, choices, trade-offs, and consequences are readable in the world.",
   "camera": {
@@ -67,6 +67,131 @@
       "fallbackPolicy": "If an Objaverse asset fails, keep the procedural location and continue play."
     }
   },
+  "urbanPlanningPrinciples": [
+    {
+      "id": "polycentric-town",
+      "sourceModel": "Singapore decentralised town planning",
+      "rule": "Life Sim should read as one compact regional centre instead of isolated destinations on empty land.",
+      "implementedBy": [
+        "Integrated MRT and bus interchange",
+        "town centre plaza",
+        "CBD and regional commercial density",
+        "direct routes from housing to work, learning, and services"
+      ]
+    },
+    {
+      "id": "hdb-neighbourhood-centre",
+      "sourceModel": "HDB town and neighbourhood centre planning",
+      "rule": "Housing must be surrounded by everyday services and shared spaces, not only tall blocks.",
+      "implementedBy": [
+        "HDB precinct court",
+        "void deck activity space",
+        "clinic, minimart, coffee shop frontages",
+        "pavilion, playground, and parking/drop-off bays"
+      ]
+    },
+    {
+      "id": "active-ground-floor",
+      "sourceModel": "Singapore mixed-use street edges",
+      "rule": "Main streets should have continuous active frontages so the camera sees city depth.",
+      "implementedBy": [
+        "main street mixed-use blocks",
+        "five-foot-way arcades",
+        "shop signage",
+        "secondary service blocks"
+      ]
+    },
+    {
+      "id": "walk-cycle-ride",
+      "sourceModel": "walk, cycle, ride mobility planning",
+      "rule": "Movement should feel comfortable without a car: sheltered walking, cycling paths, and transit access.",
+      "implementedBy": [
+        "covered walkway links",
+        "park connector cycling path",
+        "pedestrian path",
+        "MRT and bus interchange"
+      ]
+    },
+    {
+      "id": "city-in-nature",
+      "sourceModel": "park connector and city-in-nature planning",
+      "rule": "Greenery must be part of everyday movement, not a separate decorative park only.",
+      "implementedBy": [
+        "PCN green corridor",
+        "street trees",
+        "corner pocket spaces",
+        "planter rows along plazas and main streets"
+      ]
+    }
+  ],
+  "infillLayers": [
+    {
+      "id": "fine-grain-urban-fabric",
+      "purpose": "Reduce blank ground by adding secondary streets, paving, parking bays, drop-off areas, and corner pockets.",
+      "performanceTier": "critical-lightweight",
+      "futureAssetSlots": [
+        "kerbside props",
+        "small shopfront modules",
+        "parking and service props",
+        "street corner furniture"
+      ]
+    },
+    {
+      "id": "transit-oriented-town-centre",
+      "purpose": "Make the central district feel like a Singapore mobility hub where daily routines converge.",
+      "performanceTier": "critical-lightweight",
+      "futureAssetSlots": [
+        "MRT entrance GLB",
+        "bus shelter GLB",
+        "wayfinding sign GLB",
+        "ticket gate GLB"
+      ]
+    },
+    {
+      "id": "heartland-precinct-density",
+      "purpose": "Turn the residential area into a lived-in HDB precinct with local services and social spaces.",
+      "performanceTier": "near",
+      "futureAssetSlots": [
+        "HDB block module",
+        "void deck furniture",
+        "playground prop",
+        "neighbourhood centre shopfront"
+      ]
+    },
+    {
+      "id": "mixed-use-street-walls",
+      "purpose": "Replace empty road edges with active frontages that support finance, study, career, food, and wellness choices.",
+      "performanceTier": "near",
+      "futureAssetSlots": [
+        "shophouse facade",
+        "clinic facade",
+        "co-working facade",
+        "small retail facade"
+      ]
+    },
+    {
+      "id": "park-connector-active-mobility",
+      "purpose": "Connect health, learning, and residential districts through a green walk/cycle corridor.",
+      "performanceTier": "critical-lightweight",
+      "futureAssetSlots": [
+        "bicycle prop",
+        "park connector sign",
+        "bench",
+        "street tree"
+      ]
+    },
+    {
+      "id": "downtown-commercial-density",
+      "purpose": "Make the work and future-opportunity zone feel like a denser CBD edge.",
+      "performanceTier": "background",
+      "futureAssetSlots": [
+        "office tower module",
+        "podium retail module",
+        "underpass entrance",
+        "CBD wayfinding sign"
+      ]
+    }
+  ],
   "districts": [
     {
       "id": "heartland-independence",

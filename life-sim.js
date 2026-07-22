@@ -1576,6 +1576,7 @@
     addZoneAt(addClarkeQuay, THREE, scene, mat, "clarke-quay");
     addZoneAt(addHdbHub, THREE, scene, mat, "hdb-hub");
     addStreetLife(THREE, scene, mat);
+    addSingaporeUrbanPlanningInfill(THREE, scene, mat);
     addWoodlands(THREE, scene, mat);
     addPunggol(THREE, scene, mat);
     addBox(THREE, scene, "Woodlands Access Road", [0, 0.025, 34], [5.2, 0.08, 32], mat.road, true);
@@ -3198,6 +3199,236 @@
     addFenceLine(THREE, scene, [13, -33], [36, -33], mat);
     addPlanterRow(THREE, scene, [-3, 7.9], 5, mat);
     addPlanterRow(THREE, scene, [10.5, -7.9], 4, mat);
+  }
+
+  // Singapore urban-planning infill pass: the earlier map had recognizable
+  // destinations, but far too much plain ground between them. Singapore does
+  // not read as isolated POIs in a field - it reads as transit-linked towns,
+  // mixed-use street walls, sheltered pedestrian routes, neighbourhood
+  // centres, and linear green connectors. These are light procedural
+  // planning masses that can be swapped for Objaverse/GLB assets later; game
+  // logic still depends on zones/routes, not on these decorative meshes.
+  function addSingaporeUrbanPlanningInfill(THREE, scene, mat) {
+    addFineGrainUrbanFabric(THREE, scene, mat);
+    addTransitOrientedTownCentre(THREE, scene, mat);
+    addHeartlandPrecinctDensity(THREE, scene, mat);
+    addMixedUseStreetWalls(THREE, scene, mat);
+    addParkConnectorAndActiveMobility(THREE, scene, mat);
+    addDowntownCommercialDensity(THREE, scene, mat);
+  }
+
+  function addFineGrainUrbanFabric(THREE, scene, mat) {
+    // Fine-grain Singapore town planning pass. The big map plane used to read
+    // as empty ground between POIs; this fills it with secondary streets,
+    // block edges, drop-off bays, plazas, and active frontages without adding
+    // heavy GLB assets on first entry.
+    [
+      ["Secondary Street Heartland", [-30, 0.035, 18], [44, 0.06, 3.1]],
+      ["Secondary Street Campus Link", [-58, 0.036, -18], [46, 0.06, 3.1]],
+      ["Secondary Street Downtown Lane", [69, 0.037, -24], [3.1, 0.06, 42]],
+      ["Secondary Street Social Lane", [30, 0.038, -55], [72, 0.06, 3.0]],
+      ["Secondary Street Airport Link", [96, 0.039, -53], [3.0, 0.06, 58]],
+      ["Secondary Street Punggol Edge", [-19, 0.04, 54], [78, 0.06, 3.0]]
+    ].forEach(([name, position, scale]) => addBox(THREE, scene, name, position, scale, mat.road, true));
+
+    [
+      [-30, 18, "x"], [-58, -18, "x"], [69, -24, "z"], [30, -55, "x"], [96, -53, "z"], [-19, 54, "x"]
+    ].forEach(([x, z, axis]) => {
+      if (axis === "x") {
+        for (let px = x - 20; px <= x + 20; px += 7) addBox(THREE, scene, "Secondary Road Lane Marking", [px, 0.15, z], [1.6, 0.035, 0.18], mat.roadLine, true);
+      } else {
+        for (let pz = z - 20; pz <= z + 20; pz += 7) addBox(THREE, scene, "Secondary Road Lane Marking", [x, 0.15, pz], [0.18, 0.035, 1.6], mat.roadLine, true);
+      }
+    });
+
+    [
+      ["Town Centre Plaza Paving", [-12, 0.17, -5], [18, 0.14, 12]],
+      ["HDB Precinct Paving", [-38, 0.17, 41], [32, 0.14, 17]],
+      ["Campus Forecourt Paving", [-74, 0.17, -15], [18, 0.14, 12]],
+      ["Food Court Apron Paving", [20, 0.17, -73], [28, 0.14, 16]],
+      ["Airport Kerbside Paving", [96, 0.17, -72], [25, 0.14, 9]],
+      ["Riverside Social Promenade", [35, 0.17, -66], [42, 0.14, 7]]
+    ].forEach(([name, position, scale]) => addBox(THREE, scene, name, position, scale, mat.sidewalk, true));
+
+    [
+      [-53, 38], [-48, 38], [-43, 38], [-38, 38], [-33, 38],
+      [76, -57], [82, -57], [88, -57],
+      [9, -67], [15, -67], [21, -67]
+    ].forEach(([x, z]) => addParkingBay(THREE, scene, [x, z], mat));
+
+    const compactBlocks = [
+      ["Town Centre Medical Block", -22, -3, 4.2, 5.0, 4.0, mat.hospital, "CLINIC"],
+      ["Town Centre Tuition Block", -4, -3, 4.0, 5.4, 3.8, mat.university, "TUITION"],
+      ["Town Centre Kopitiam Block", -20, -14, 4.4, 4.6, 4.0, mat.food, "KOPITIAM"],
+      ["Campus Student Services Block", -63, -26, 4.2, 5.2, 3.8, mat.library, "SCHOLARSHIP"],
+      ["Social Shophouse Infill", 24, -62, 4.6, 5.2, 4.2, mat.cafe, "MEET"],
+      ["Social Night Market Infill", 40, -62, 4.0, 4.6, 4.0, mat.food, "NIGHT FOOD"],
+      ["Airport Budget Travel Block", 104, -59, 4.4, 5.4, 4.0, mat.airport, "TRAVEL"],
+      ["Park Wellness Kiosk", 39, 24, 3.2, 3.8, 3.0, mat.park, "WELLNESS"]
+    ];
+    compactBlocks.forEach(([name, x, z, sx, sy, sz, material, label], index) => {
+      addBuildingCore(THREE, scene, name, [x, sy / 2, z], [sx, sy, sz], material, mat, index % 2 ? "modern" : "shophouse");
+      addShopFront(THREE, scene, [x, z - sz / 2 - 0.12], label, index % 2 ? mat.signBlue : mat.signGold, mat);
+    });
+
+    [
+      [-28, -8], [-10, -8], [-29, 24], [-17, 24], [-45, 32], [-31, 32],
+      [-69, -23], [-59, -10], [51, -26], [71, -40], [88, -25], [103, -43],
+      [7, -61], [31, -60], [51, -58], [82, -67]
+    ].forEach(([x, z]) => addUrbanPocket(THREE, scene, [x, z], mat));
+  }
+
+  function addTransitOrientedTownCentre(THREE, scene, mat) {
+    // Central MRT/bus interchange: a compact mobility node where Home,
+    // Mall, Park, Library, and Work routes visibly converge.
+    addBox(THREE, scene, "Integrated MRT Bus Interchange Deck", [-9, 0.22, 8], [17, 0.3, 8.5], mat.sidewalk, true);
+    addBox(THREE, scene, "Integrated Bus Interchange Canopy", [-9, 3.2, 9.4], [18, 0.28, 5.2], mat.roofDark, true);
+    [-16, -11, -6, -1].forEach((x, index) => {
+      addBox(THREE, scene, "Bus Bay Road Marking", [x, 0.18, 6.0], [3.4, 0.04, 0.28], mat.roadLine, true);
+      addBox(THREE, scene, "Bus Stop Queue Rail", [x, 0.72, 11.9], [2.4, 0.12, 0.16], mat.metal);
+      addBox(THREE, scene, "Bus Service Panel", [x + 0.6, 1.3, 12.05], [0.6, 1.1, 0.08], index % 2 ? mat.signBlue : mat.signGreen);
+    });
+    addSignBoard(THREE, scene, "Integrated Transport Hub Sign", "MRT + BUS", [-17, 4.2, 5.5], mat.signGold, 0x111111);
+
+    // Sheltered walkways: the most Singaporean way to make walking routes
+    // feel planned and usable in tropical rain/heat.
+    addShelteredWalkway(THREE, scene, [-30, 40], [-13, 8], mat, "Home-MRT Sheltered Link");
+    addShelteredWalkway(THREE, scene, [-13, 8], [0, -32], mat, "MRT-Mall Sheltered Link");
+    addShelteredWalkway(THREE, scene, [-13, 8], [41, 12], mat, "MRT-Library Link");
+    addShelteredWalkway(THREE, scene, [0, -32], [20, -95], mat, "Mall-Food Court Link");
+  }
+
+  function addHeartlandPrecinctDensity(THREE, scene, mat) {
+    // HDB precinct model: several residential slabs around shared court,
+    // neighbourhood centre, pavilion, playground, and daily services.
+    [
+      [-46, 6, 38, 5.2, 12, 4.0, mat.hdb],
+      [-38, 7.5, 34, 5.8, 15, 4.2, mat.hdbAccent],
+      [-21, 6.8, 48, 5.4, 13.6, 4.2, mat.hdb],
+      [-15, 5.7, 41, 4.8, 11.4, 3.8, mat.hdbAccent]
+    ].forEach(([x, y, z, sx, sy, sz, material], index) => {
+      addBuildingCore(THREE, scene, `Heartland HDB Precinct Block ${index + 1}`, [x, y, z], [sx, sy, sz], material, mat, "hdb");
+    });
+    addBox(THREE, scene, "Heartland Precinct Court", [-31, 0.16, 37.5], [13, 0.16, 8], mat.sidewalk, true);
+    addBox(THREE, scene, "Heartland Void Deck Activity Space", [-31, 1.1, 36.2], [8, 2.2, 2.8], mat.hdbBalcony);
+    addBox(THREE, scene, "Neighbourhood Centre Shops", [-41, 2.1, 27.5], [11, 4.2, 4.8], mat.mall);
+    addShopFront(THREE, scene, [-45, 24.9], "CLINIC", mat.signBlue, mat);
+    addShopFront(THREE, scene, [-41, 24.9], "MINIMART", mat.signGreen, mat);
+    addShopFront(THREE, scene, [-37, 24.9], "COFFEE", mat.signGold, mat);
+    addSignBoard(THREE, scene, "Neighbourhood Centre Sign", "NEIGHBOURHOOD CENTRE", [-45.2, 4.6, 24.6], mat.signGold, 0x111111);
+    addBox(THREE, scene, "Precinct Pavilion Roof", [-25, 2.4, 35.6], [5.6, 0.2, 4.2], mat.roofDark, true);
+    [[-27.2, 33.8], [-22.8, 33.8], [-27.2, 37.4], [-22.8, 37.4]].forEach(([x, z]) => {
+      addCylinder(THREE, scene, "Precinct Pavilion Post", [x, 1.2, z], [0.08, 2.4, 8], mat.metal);
+    });
+    addBox(THREE, scene, "Precinct Playground Soft Floor", [-19, 0.18, 34], [5, 0.18, 4.2], mat.signGold, true);
+    addCylinder(THREE, scene, "Precinct Playground Climber", [-19, 0.85, 34], [1.1, 1.2, 6], mat.signBlue);
+    addPlanterRow(THREE, scene, [-36, 31.4], 7, mat);
+  }
+
+  function addMixedUseStreetWalls(THREE, scene, mat) {
+    // Continuous ground-floor activity along the main east-west spine: shops,
+    // clinics, services, offices above. This fills the empty road edges and
+    // gives the over-shoulder camera real city depth.
+    const northRow = [
+      [-46, -25, "TUITION"], [-37, -25, "PHARMACY"], [-28, -25, "BANK"], [-18, -25, "LAUNDRY"],
+      [-8, -25, "BAKERY"], [12, -25, "RETAIL"], [23, -25, "SKILLS"], [34, -25, "CO-WORK"],
+      [46, -25, "DESIGN"], [58, -25, "TECH"]
+    ];
+    northRow.forEach(([x, z, label], index) => {
+      const material = index % 3 === 0 ? mat.hdb : (index % 3 === 1 ? mat.mall : mat.work);
+      addBuildingCore(THREE, scene, `Main Street Mixed-Use Block ${label}`, [x, 3.2 + (index % 2) * 0.7, z], [7.5, 6.4 + (index % 2) * 1.4, 5], material, mat, index % 2 ? "modern" : "shophouse");
+      addShopFront(THREE, scene, [x - 1.2, z - 2.7], label, index % 2 ? mat.signBlue : mat.signGreen, mat);
+    });
+
+    const southRow = [
+      [-42, -40, "KOPI"], [-31, -40, "VALUE"], [-20, -40, "DENTAL"], [-9, -40, "PHONE"],
+      [12, -40, "MART"], [25, -40, "GYM"], [38, -40, "CAREER"], [52, -40, "STUDY"],
+      [66, -40, "CLINIC"], [80, -40, "FOOD"]
+    ];
+    southRow.forEach(([x, z, label], index) => {
+      const material = index % 2 ? mat.cafe : mat.hdbAccent;
+      addBuildingCore(THREE, scene, `South Main Street Block ${label}`, [x, 2.8 + (index % 3) * 0.45, z], [7.8, 5.6 + (index % 3) * 0.9, 4.8], material, mat, "shophouse");
+      addShopFront(THREE, scene, [x - 1.4, z + 2.6], label, index % 2 ? mat.signGold : mat.signBlue, mat);
+    });
+
+    // Five-foot-way / covered arcade strips along the shopfront rows.
+    addBox(THREE, scene, "Main Street Five Foot Way North", [4, 0.2, -28.2], [108, 0.16, 2.2], mat.sidewalk, true);
+    addBox(THREE, scene, "Main Street Five Foot Way South", [14, 0.21, -36.8], [126, 0.16, 2.2], mat.sidewalk, true);
+    for (let x = -48; x <= 82; x += 8) {
+      addCylinder(THREE, scene, "Five Foot Way Column", [x, 1.25, -28.2], [0.06, 2.5, 8], mat.metal);
+      addCylinder(THREE, scene, "Five Foot Way Column", [x, 1.25, -36.8], [0.06, 2.5, 8], mat.metal);
+    }
+  }
+
+  function addParkConnectorAndActiveMobility(THREE, scene, mat) {
+    // Linear green corridor + cycling/footpath pair linking Heartland,
+    // Park, Library, and Punggol direction. This turns blank land into a
+    // Singapore-style PCN instead of unused grass.
+    addBoxRotated(THREE, scene, "Park Connector Cycling Path", [41, 0.12, 37], [2.2, 0.08, 94], mat.signGreen, Math.PI / 2, true);
+    addBoxRotated(THREE, scene, "Park Connector Pedestrian Path", [41, 0.13, 41], [1.4, 0.08, 94], mat.path, Math.PI / 2, true);
+    for (let x = -4; x <= 86; x += 9) {
+      addTree(THREE, scene, [x, 34], mat);
+      addBox(THREE, scene, "PCN Pedestrian Logo Marking", [x + 2.5, 0.2, 41], [1.1, 0.04, 0.22], mat.roadLine, true);
+      addBox(THREE, scene, "PCN Cycling Lane Marking", [x + 2.5, 0.21, 37], [1.4, 0.04, 0.18], mat.roadLine, true);
+    }
+    addSignBoard(THREE, scene, "Park Connector Sign", "PARK CONNECTOR", [18, 1.7, 35.2], mat.signGreen, 0xffffff);
+    addBox(THREE, scene, "Canal Drainage Channel", [46, 0.03, 30], [82, 0.08, 2.4], mat.water, true);
+    addBox(THREE, scene, "Canal Railing North", [46, 0.75, 31.4], [82, 0.12, 0.14], mat.metal);
+    addBox(THREE, scene, "Canal Railing South", [46, 0.75, 28.6], [82, 0.12, 0.14], mat.metal);
+  }
+
+  function addDowntownCommercialDensity(THREE, scene, mat) {
+    // CBD intensity around Raffles Place/Marina Bay: tighter tower spacing,
+    // podiums, plazas, and underpass entries so the southern/eastern map
+    // reads as a business district, not isolated landmarks.
+    [
+      [66, -16, 5.2, 17, 4.4],
+      [88, -17, 5.6, 20, 4.6],
+      [69, -48, 6.2, 22, 5.0],
+      [91, -48, 5.4, 18, 4.4],
+      [51, -47, 4.8, 15, 4.0]
+    ].forEach(([x, z, sx, sy, sz], index) => {
+      addBuildingCore(THREE, scene, `CBD Infill Tower ${index + 1}`, [x, sy / 2, z], [sx, sy, sz], index % 2 ? mat.work : mat.glass, mat, "modern");
+      addBox(THREE, scene, `CBD Podium ${index + 1}`, [x, 1.2, z + 3.8], [sx + 2, 2.4, 3], mat.mall);
+    });
+    addBox(THREE, scene, "CBD Pedestrian Plaza", [78, 0.18, -31], [27, 0.16, 11], mat.sidewalk, true);
+    addBox(THREE, scene, "CBD Underpass Entrance", [71, 1.2, -30], [4.5, 2.4, 2.2], mat.mrt);
+    addBox(THREE, scene, "CBD Underpass Roof", [71, 2.55, -30], [5.2, 0.24, 2.8], mat.roofDark);
+    addSignBoard(THREE, scene, "CBD Wayfinding Sign", "RAFFLES PLACE", [66, 3.2, -30], mat.signBlue, 0xffffff);
+    addPlanterRow(THREE, scene, [68, -25.2], 7, mat);
+    addPlanterRow(THREE, scene, [82, -25.2], 7, mat);
+  }
+
+  function addShelteredWalkway(THREE, scene, start, end, mat, name) {
+    const dx = end[0] - start[0];
+    const dz = end[1] - start[1];
+    const length = Math.hypot(dx, dz);
+    if (length < 1) return;
+    const angle = Math.atan2(dx, dz);
+    const mid = [(start[0] + end[0]) / 2, 2.35, (start[1] + end[1]) / 2];
+    addBoxRotated(THREE, scene, `${name} Roof`, mid, [2.4, 0.22, length], mat.roofDark, angle, true);
+    const steps = Math.max(2, Math.floor(length / 5));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = start[0] + dx * t;
+      const z = start[1] + dz * t;
+      addCylinder(THREE, scene, `${name} Post`, [x - Math.cos(angle) * 0.9, 1.15, z + Math.sin(angle) * 0.9], [0.055, 2.3, 8], mat.metal);
+      addCylinder(THREE, scene, `${name} Post`, [x + Math.cos(angle) * 0.9, 1.15, z - Math.sin(angle) * 0.9], [0.055, 2.3, 8], mat.metal);
+    }
+  }
+
+  function addParkingBay(THREE, scene, position, mat) {
+    addBox(THREE, scene, "Singapore Parking Bay", [position[0], 0.18, position[1]], [3.6, 0.04, 1.75], mat.sidewalk, true);
+    addBox(THREE, scene, "Parking Bay Front Line", [position[0], 0.22, position[1] - 0.84], [3.6, 0.035, 0.08], mat.roadLine, true);
+    addBox(THREE, scene, "Parking Bay Back Line", [position[0], 0.22, position[1] + 0.84], [3.6, 0.035, 0.08], mat.roadLine, true);
+    addBox(THREE, scene, "Parking Bay Divider", [position[0] - 1.78, 0.22, position[1]], [0.08, 0.035, 1.75], mat.roadLine, true);
+  }
+
+  function addUrbanPocket(THREE, scene, position, mat) {
+    addBox(THREE, scene, "Singapore Street Corner Pocket", [position[0], 0.17, position[1]], [4.8, 0.12, 3.2], mat.sidewalk, true);
+    addPlanterRow(THREE, scene, [position[0] - 1.25, position[1] + 1.2], 2, mat);
+    addBench(THREE, scene, [position[0] + 1.2, position[1] - 0.6], mat);
+    addStreetLight(THREE, scene, [position[0] + 2.0, position[1] + 1.2], mat);
   }
 
   function addPath(THREE, scene, start, end, width, material) {

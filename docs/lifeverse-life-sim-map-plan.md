@@ -41,6 +41,29 @@ The player should understand:
 - Chinatown, Little India, Bugis, and Clarke Quay are for culture, social connection, and balance.
 - Marina Bay and Airport are future-facing places tied to ambition and mobility.
 
+## Singapore Urban Planning Pass
+
+The current map must feel closer to a planned Singapore district, not a group of attractions placed on empty ground. The planning model now follows these rules:
+
+- Polycentric town logic: the map has a compact MRT/bus/town-centre core, with work, learning, services, food, and housing linked by short routes.
+- HDB neighbourhood logic: housing is surrounded by void deck space, pavilion, playground, clinic, minimart, coffee shop, parking/drop-off bays, and neighbourhood centre frontage.
+- Active frontage logic: main streets should have shopfronts, clinics, tuition, food, co-working, and service blocks on both sides so the over-shoulder camera sees city depth.
+- Walk-cycle-ride logic: the town centre, mall, library, food court, home, and park are connected by sheltered walkways, pedestrian paths, cycling paths, and an MRT/bus interchange.
+- City-in-nature logic: greenery is not only a park. The map includes a park connector, street trees, corner pocket spaces, planters, and a canal edge.
+
+Implemented world layers:
+
+- `fine-grain-urban-fabric`: secondary streets, paving, parking bays, drop-off areas, street-corner pockets, and small service blocks that reduce empty ground.
+- `transit-oriented-town-centre`: integrated MRT/bus interchange with sheltered pedestrian links.
+- `heartland-precinct-density`: HDB precinct with neighbourhood centre, void deck, pavilion, playground, and local services.
+- `mixed-use-street-walls`: continuous main-street blocks and five-foot-way arcades.
+- `park-connector-active-mobility`: PCN-style cycle/pedestrian corridor with greenery and canal railings.
+- `downtown-commercial-density`: CBD infill towers, podiums, plaza, underpass, and wayfinding.
+
+Future Objaverse/GLB replacement rule:
+
+Every layer above is a replaceable visual slot. Gameplay logic must stay attached to LifeVerse zones, commands, and simulation systems. The decorative world meshes can be swapped for real assets later without changing activity logic, Fast Forward, Life Report, or player progression.
+
 ## Camera Direction
 
 Use the current `OVER_SHOULDER_CAMERA` as the default Life Sim camera.

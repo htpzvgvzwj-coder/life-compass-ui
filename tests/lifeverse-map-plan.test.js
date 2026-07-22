@@ -53,16 +53,55 @@ assert.ok(plan.performanceBudget.firstEntryCriticalAssetBudgetMb <= 18, "map pla
 assert.ok(plan.performanceBudget.totalBackgroundAssetBudgetMb <= 45, "map plan limits total background asset budget");
 assert.ok(plan.performanceBudget.streamingRules.some((rule) => rule.includes("never preload")), "map plan forbids full Objaverse preloading");
 
+assert.ok(Array.isArray(plan.urbanPlanningPrinciples) && plan.urbanPlanningPrinciples.length >= 5, "map plan documents Singapore urban planning principles");
+[
+  "polycentric-town",
+  "hdb-neighbourhood-centre",
+  "active-ground-floor",
+  "walk-cycle-ride",
+  "city-in-nature"
+].forEach((principleId) => {
+  assert.ok(plan.urbanPlanningPrinciples.some((principle) => principle.id === principleId), `map plan includes ${principleId}`);
+});
+assert.ok(Array.isArray(plan.infillLayers) && plan.infillLayers.length >= 6, "map plan defines city infill layers");
+[
+  "fine-grain-urban-fabric",
+  "transit-oriented-town-centre",
+  "heartland-precinct-density",
+  "mixed-use-street-walls",
+  "park-connector-active-mobility",
+  "downtown-commercial-density"
+].forEach((layerId) => {
+  const layer = plan.infillLayers.find((entry) => entry.id === layerId);
+  assert.ok(layer, `map plan includes ${layerId}`);
+  assert.ok(Array.isArray(layer.futureAssetSlots) && layer.futureAssetSlots.length >= 3, `${layerId} has future asset slots`);
+});
+
 assert.ok(simSource.includes("LIFE_SIM_PERFORMANCE"), "Life Sim has a centralized performance profile");
 assert.ok(simSource.includes("maxPixelRatio: 1.35"), "Life Sim implementation matches map pixel-ratio budget");
 assert.ok(simSource.includes("shadowSize: 1024"), "Life Sim implementation matches map shadow budget");
 assert.ok(simSource.includes("loadEntry"), "Life Sim implementation supports lazy Objaverse prop loading");
 assert.ok(simSource.includes("runLimitedBatch"), "Life Sim implementation throttles optional model loading");
+[
+  "addSingaporeUrbanPlanningInfill",
+  "Fine-grain Singapore town planning pass",
+  "Integrated MRT Bus Interchange Deck",
+  "Home-MRT Sheltered Link",
+  "Neighbourhood Centre Shops",
+  "Main Street Mixed-Use Block",
+  "Park Connector Cycling Path",
+  "CBD Infill Tower",
+  "Secondary Street Heartland",
+  "Singapore Street Corner Pocket"
+].forEach((marker) => {
+  assert.ok(simSource.includes(marker), `Life Sim renderer includes Singapore city infill marker: ${marker}`);
+});
 
 [
   "Purpose",
   "Supported Product Pillars",
   "Supported Learning Outcomes",
+  "Singapore Urban Planning Pass",
   "Long-Term Consequences",
   "Reflection Opportunities",
   "Technical Considerations",
