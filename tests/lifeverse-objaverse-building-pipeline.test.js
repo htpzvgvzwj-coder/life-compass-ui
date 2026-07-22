@@ -9,6 +9,7 @@ const assetManagerSource = fs.readFileSync(path.join(root, "lifeverse-asset-mana
 const pipelineSource = fs.readFileSync(path.join(root, "tools", "lifeverse_optimize_objaverse.py"), "utf8");
 const pipelineDoc = fs.readFileSync(path.join(root, "docs", "lifeverse-objaverse-building-pipeline.md"), "utf8");
 const readme = fs.readFileSync(path.join(root, "assets", "life-sim", "README.md"), "utf8");
+const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
 assert.ok(fs.existsSync(path.join(root, "assets", "environment", "objaverse")), "raw Objaverse building folder exists");
 assert.ok(fs.existsSync(path.join(root, "assets", "environment", "objaverse-optimized")), "optimized Objaverse building folder exists");
@@ -81,5 +82,7 @@ assert.ok(Array.isArray(manifest.objaverseBuildingAssets), "manifest exposes obj
 
 assert.ok(readme.includes("Building replacement pipeline"), "Life Sim README documents the building replacement pipeline");
 assert.ok(readme.includes("tools/lifeverse_optimize_objaverse.py"), "Life Sim README points to the optimization script");
+assert.ok(indexSource.includes("lifeverse-asset-manager.js?v=lifeverse-objaverse-pipeline-20260722-1"), "index cache-busts the Draco-capable asset manager");
+assert.ok(indexSource.includes("life-sim.js?v=lifesim-singapore-replan-20260722-4"), "index cache-busts the optimized building loader");
 
 console.log("LifeVerse Objaverse building pipeline tests passed.");
