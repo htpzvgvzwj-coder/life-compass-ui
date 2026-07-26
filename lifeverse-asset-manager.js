@@ -17,6 +17,7 @@
     const fallbackAssets = new Map();
     const lazyLoaders = new Map();
     const manifestUrl = options.manifestUrl || DEFAULT_MANIFEST_URL;
+    let dracoLoaderPromise = null;
 
     async function loadManifest(url = manifestUrl) {
       const response = await fetch(url, { cache: "no-store" });
@@ -50,6 +51,32 @@
       return false;
     }
 
+    async function ensureDracoLoader() {
+      if (dracoLoaderPromise) return dracoLoaderPromise;
+      dracoLoaderPromise = (async () => {
+        if (!THREE.DRACOLoader) {
+          const urls = [
+            "https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/DRACOLoader.js",
+            "https://unpkg.com/three@0.146.0/examples/js/loaders/DRACOLoader.js"
+          ];
+          for (const url of urls) {
+            try {
+              await injectScript(url);
+              if (THREE.DRACOLoader) break;
+            } catch (error) {
+              logger.warn && logger.warn(`[LifeVerse Assets] DRACOLoader failed from ${url}`, error);
+            }
+          }
+        }
+        if (!THREE.DRACOLoader) return null;
+        const loader = new THREE.DRACOLoader();
+        if (typeof loader.setDecoderPath === "function") loader.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
+        if (typeof loader.setDecoderConfig === "function") loader.setDecoderConfig({ type: "js" });
+        return loader;
+      })();
+      return dracoLoaderPromise;
+    }
+
     async function loadModel(url, config = {}) {
       if (!url) return createMissingAsset("missing-url", config);
       const type = String(config.type || url.split(".").pop() || "gltf").toLowerCase();
@@ -75,6 +102,10 @@
       const ready = await ensureGltfLoader();
       if (!ready || !THREE.GLTFLoader) throw new Error("GLTFLoader unavailable.");
       const loader = new THREE.GLTFLoader();
+      if (config.draco !== false && typeof loader.setDRACOLoader === "function") {
+        const dracoLoader = await ensureDracoLoader();
+        if (dracoLoader) loader.setDRACOLoader(dracoLoader);
+      }
       return new Promise((resolve, reject) => {
         loader.load(url, (gltf) => {
           if (gltf.scene) prepareModel(gltf.scene, config);
@@ -161,9 +192,46 @@
       return promise;
     }
 
+    // Realistic-style pivot: Objaverse scans arrive at wildly inconsistent
+    // native scales (unlike a single hand-modeled kit, where one eyeballed
+    // multiplier could cover ~30 buildings). Given a real-world target height
+    // in meters, measure the model's actual bounding-box height post-rotation
+    // and derive the uniform scale factor that hits it exactly - replaces the
+    // "type in a scale multiplier and squint at it" pattern used for every
+    // existing city-kit swap in life-sim.js's loadDistrictAssetSamples().
+    function normalizeToHeight(model, targetMeters) {
+      if (!model || typeof model.traverse !== "function" || typeof targetMeters !== "number" || !(targetMeters > 0)) return model;
+      if (typeof model.updateMatrixWorld === "function") model.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      if (!(size.y > 0) || !Number.isFinite(size.y)) return model;
+      const factor = targetMeters / size.y;
+      if (Number.isFinite(factor) && factor > 0) model.scale.multiplyScalar(factor);
+      return model;
+    }
+
+    function alignBottomToGround(model, groundY = 0) {
+      if (!model || typeof model.traverse !== "function") return model;
+      if (typeof model.updateMatrixWorld === "function") model.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(model);
+      if (!Number.isFinite(box.min.y)) return model;
+      const offsetY = groundY - box.min.y;
+      if (Number.isFinite(offsetY) && Math.abs(offsetY) > 0.0001) model.position.y += offsetY;
+      return model;
+    }
+
+    function resolveGroundY(config = {}) {
+      if (typeof config.groundY === "number" && Number.isFinite(config.groundY)) return config.groundY;
+      if (Array.isArray(config.position) && Number.isFinite(Number(config.position[1]))) return Number(config.position[1]);
+      return 0;
+    }
+
     function prepareModel(model, config = {}) {
       applyTransform(model, config);
       if (!model || typeof model.traverse !== "function") return model;
+      if (typeof config.targetHeightMeters === "number") normalizeToHeight(model, config.targetHeightMeters);
+      if (typeof config.targetHeightMeters === "number" && config.alignToGround !== false) alignBottomToGround(model, resolveGroundY(config));
       model.traverse((node) => {
         if (!node || !node.isMesh) return;
         node.castShadow = true;
@@ -332,6 +400,7 @@
       loadManifest,
       registerManifestPrefabs,
       ensureGltfLoader,
+      ensureDracoLoader,
       loadModel,
       loadTexture,
       loadMaterial,
@@ -340,6 +409,8 @@
       registerLazy,
       loadLazy,
       prepareModel,
+      normalizeToHeight,
+      alignBottomToGround,
       createMissingAsset,
       createDebugPanel,
       tickDebugFrame,

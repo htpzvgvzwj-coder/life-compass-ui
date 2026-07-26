@@ -99,7 +99,7 @@ const FUTURE_SCAN_SYSTEM_PROMPT = "You are Future Scan, a module inside Compass'
 // growth goal (not just interview/study/money): the app keeps the coach
 // catalog and safety boundaries, while AI dynamically chooses the coach and
 // writes the training path from the user's real goal/context.
-const BUILD_MODE_SYSTEM_PROMPT = "You are Build Mode, a goal-based AI coach router inside Compass. The user may bring ANY practical growth goal: interview, study, money, family conversation, confidence, career direction, scholarship, entrepreneurship, independence, wellness, opportunity planning, or something unusual. First match the goal to the most useful coach; if no specialist fits, use Custom Growth Coach. Then create a training path, not a proof log and not a static checklist. Keep every training step concrete, interactive, and immediately usable. Ground everything only in the user's stated goal, saved profile/context, and current training conversation. Never invent memories, traits, achievements, mood, or history. Never guarantee outcomes; use possible/likely language. Do not diagnose mental health or act as a therapist, parent, teacher, employer, or emergency service. If the user mentions danger or serious self-harm risk, respond safely and encourage contacting a trusted person or emergency support. Return strict JSON whenever JSON is requested.";
+const BUILD_MODE_SYSTEM_PROMPT = "You are Build Mode, a goal-based AI coach router inside Compass. The user may bring ANY practical growth goal: interview, study, money, family conversation, confidence, career direction, scholarship, entrepreneurship, independence, wellness, opportunity planning, or something unusual. First match the goal to the most useful coach; if no specialist fits, use Custom Growth Coach. Then create a training path, not a proof log and not a static checklist. Keep every training step concrete, interactive, and immediately usable. Ground everything only in the user's stated goal, saved profile/context, and current training conversation. Never invent memories, traits, achievements, mood, or history. Never guarantee outcomes; use possible/likely language. When a training step is a roleplay or practice scenario, run it as a graduated exposure: start with an easier, lower-pressure version of the scenario, then once the user handles it, explicitly say you are raising the difficulty and escalate to a harder, more realistic version - never open with the hardest version cold. Do not diagnose mental health or act as a therapist, parent, teacher, employer, or emergency service. If the user mentions danger or serious self-harm risk, respond safely and encourage contacting a trusted person or emergency support. Return strict JSON whenever JSON is requested.";
 
 const BUILD_COACH_TYPES = [
   { id: "interview", name: "Interview Coach", use: "interviews, internships, scholarship interviews, job interviews, self-introduction, STAR stories" },
@@ -503,7 +503,9 @@ const defaultTrackerState = {
   },
   careerStudio: {
     interviewSessions: [],
-    resume: null
+    resume: null,
+    portfolio: null,
+    paycheckCheck: null
   },
   lifeVerse: createDefaultLifeVerseState(),
   lifeSim: {
@@ -604,31 +606,50 @@ const opportunityCategories = [
   "Learn & Earn"
 ];
 
+// Honesty pass (self-audit finding): every applyUrl used to be a generic
+// Google search dressed up as an individual "opportunity" with an "Apply"
+// button - there is no real listings feed behind this app, so pretending
+// otherwise was actively misleading. Two changes: (1) route each category
+// to the single best REAL, well-established, free directory/search engine
+// for that category where one clearly exists (Indeed for jobs/internships,
+// Fastweb for US-heavy scholarship search, Devpost for hackathons/
+// innovation challenges, VolunteerMatch for volunteering, freeCodeCamp/
+// Canva Design School/YouTube Creator Academy for the actual skill-learning
+// entries) instead of a bare Google query - a real, maintained directory is
+// a genuinely better starting point than a search string, even though it's
+// still a directory, not a specific posting. (2) Where no single dominant
+// global platform exists (international/university/government scholarships
+// are too jurisdiction-specific for one link; business competitions,
+// leadership programs, content creation, and entrepreneurship are too broad
+// for one site), a refined Google search stays the honest choice - this
+// intentionally does NOT force a link to a site whose current legitimacy
+// isn't well-established just to avoid using search. See opportunityCards()
+// for the matching "Search"/"Start learning" button-label honesty fix.
 const opportunityItems = [
-  { id: "part-time-jobs", category: "Jobs", type: "Part-time jobs", title: "Part-time job starter list", description: "Cafe, retail, event crew, tutoring, and campus helper roles that fit around study time.", tags: ["income", "student", "flexible"], applyUrl: "https://www.google.com/search?q=part+time+jobs+for+students+near+me" },
-  { id: "student-jobs", category: "Jobs", type: "Student jobs", title: "Student-friendly work options", description: "Roles that build confidence, communication, and basic money habits without overloading school.", tags: ["student", "confidence", "money"], applyUrl: "https://www.google.com/search?q=student+jobs+near+me" },
-  { id: "remote-jobs", category: "Jobs", type: "Remote jobs", title: "Remote beginner work", description: "Search for virtual assistant, transcription, social media, tutoring, and data entry roles carefully.", tags: ["remote", "skills", "income"], applyUrl: "https://www.google.com/search?q=remote+jobs+for+students" },
-  { id: "entry-level-jobs", category: "Jobs", type: "Entry-level jobs", title: "Entry-level career path", description: "Find roles that train beginners and help build a resume after school, college, or university.", tags: ["career", "entry-level", "resume"], applyUrl: "https://www.google.com/search?q=entry+level+jobs+for+fresh+graduates" },
-  { id: "business-internship", category: "Internships", type: "Business", title: "Business internship search", description: "Explore operations, admin, project coordination, and startup assistant internships.", tags: ["business", "career", "internship"], applyUrl: "https://www.google.com/search?q=business+internship+for+students" },
-  { id: "marketing-internship", category: "Internships", type: "Marketing", title: "Marketing internship search", description: "Practice content calendars, campaigns, copywriting, analytics, and brand communication.", tags: ["marketing", "content", "communication"], applyUrl: "https://www.google.com/search?q=marketing+internship+for+students" },
-  { id: "technology-internship", category: "Internships", type: "Technology", title: "Technology internship search", description: "Look for web, app, QA, IT support, data, and product internships with beginner-friendly teams.", tags: ["technology", "coding", "product"], applyUrl: "https://www.google.com/search?q=technology+internship+for+students" },
-  { id: "design-internship", category: "Internships", type: "Design", title: "Design internship search", description: "Build portfolio evidence through UI, graphic design, brand, product, or social content work.", tags: ["design", "portfolio", "creative"], applyUrl: "https://www.google.com/search?q=design+internship+for+students" },
-  { id: "social-impact-internship", category: "Internships", type: "Social Impact", title: "Social impact internship", description: "Explore NGOs, youth programs, education, environment, and community development placements.", tags: ["impact", "community", "leadership"], applyUrl: "https://www.google.com/search?q=social+impact+internship+for+students" },
-  { id: "local-scholarships", category: "Scholarships", type: "Local scholarships", title: "Local scholarship tracker", description: "Search local foundations, companies, universities, and community scholarship programs.", tags: ["scholarship", "local", "education"], applyUrl: "https://www.google.com/search?q=local+scholarships+for+students" },
-  { id: "international-scholarships", category: "Scholarships", type: "International scholarships", title: "International scholarship shortlist", description: "Find overseas scholarships and prepare requirements early: grades, essays, activities, and references.", tags: ["international", "education", "future"], applyUrl: "https://www.google.com/search?q=international+scholarships+for+students" },
+  { id: "part-time-jobs", category: "Jobs", type: "Part-time jobs", title: "Part-time job starter list", description: "Cafe, retail, event crew, tutoring, and campus helper roles that fit around study time.", tags: ["income", "student", "flexible"], applyUrl: "https://www.indeed.com/jobs?q=part-time&explvl=entry_level" },
+  { id: "student-jobs", category: "Jobs", type: "Student jobs", title: "Student-friendly work options", description: "Roles that build confidence, communication, and basic money habits without overloading school.", tags: ["student", "confidence", "money"], applyUrl: "https://www.indeed.com/jobs?q=student" },
+  { id: "remote-jobs", category: "Jobs", type: "Remote jobs", title: "Remote beginner work", description: "Search for virtual assistant, transcription, social media, tutoring, and data entry roles carefully.", tags: ["remote", "skills", "income"], applyUrl: "https://www.indeed.com/jobs?q=remote&explvl=entry_level" },
+  { id: "entry-level-jobs", category: "Jobs", type: "Entry-level jobs", title: "Entry-level career path", description: "Find roles that train beginners and help build a resume after school, college, or university.", tags: ["career", "entry-level", "resume"], applyUrl: "https://www.indeed.com/jobs?q=entry+level&explvl=entry_level" },
+  { id: "business-internship", category: "Internships", type: "Business", title: "Business internship search", description: "Explore operations, admin, project coordination, and startup assistant internships.", tags: ["business", "career", "internship"], applyUrl: "https://www.indeed.com/jobs?q=business+internship" },
+  { id: "marketing-internship", category: "Internships", type: "Marketing", title: "Marketing internship search", description: "Practice content calendars, campaigns, copywriting, analytics, and brand communication.", tags: ["marketing", "content", "communication"], applyUrl: "https://www.indeed.com/jobs?q=marketing+internship" },
+  { id: "technology-internship", category: "Internships", type: "Technology", title: "Technology internship search", description: "Look for web, app, QA, IT support, data, and product internships with beginner-friendly teams.", tags: ["technology", "coding", "product"], applyUrl: "https://www.indeed.com/jobs?q=technology+internship" },
+  { id: "design-internship", category: "Internships", type: "Design", title: "Design internship search", description: "Build portfolio evidence through UI, graphic design, brand, product, or social content work.", tags: ["design", "portfolio", "creative"], applyUrl: "https://www.indeed.com/jobs?q=design+internship" },
+  { id: "social-impact-internship", category: "Internships", type: "Social Impact", title: "Social impact internship", description: "Explore NGOs, youth programs, education, environment, and community development placements.", tags: ["impact", "community", "leadership"], applyUrl: "https://www.indeed.com/jobs?q=nonprofit+internship" },
+  { id: "local-scholarships", category: "Scholarships", type: "Local scholarships", title: "Local scholarship search", description: "Search local foundations, companies, universities, and community scholarship programs.", tags: ["scholarship", "local", "education"], applyUrl: "https://www.fastweb.com/college-scholarships" },
+  { id: "international-scholarships", category: "Scholarships", type: "International scholarships", title: "International scholarship search", description: "Find overseas scholarships and prepare requirements early: grades, essays, activities, and references.", tags: ["international", "education", "future"], applyUrl: "https://www.google.com/search?q=international+scholarships+for+students" },
   { id: "university-scholarships", category: "Scholarships", type: "University scholarships", title: "University financial aid", description: "Check each university's scholarship page, deadlines, required documents, and interview needs.", tags: ["university", "study", "financial aid"], applyUrl: "https://www.google.com/search?q=university+scholarships+financial+aid" },
   { id: "government-scholarships", category: "Scholarships", type: "Government scholarships", title: "Government scholarship prep", description: "Track eligibility, documents, leadership evidence, essays, and application deadlines.", tags: ["government", "education", "leadership"], applyUrl: "https://www.google.com/search?q=government+scholarships+for+students" },
-  { id: "innovation-challenges", category: "Competitions", type: "Innovation challenges", title: "Innovation challenge finder", description: "Pitch solutions for real problems and build proof for your portfolio or scholarship profile.", tags: ["innovation", "portfolio", "problem-solving"], applyUrl: "https://www.google.com/search?q=student+innovation+challenge" },
-  { id: "business-competitions", category: "Competitions", type: "Business competitions", title: "Business competition finder", description: "Practice pitching, market research, financial thinking, and team communication.", tags: ["business", "entrepreneurship", "pitching"], applyUrl: "https://www.google.com/search?q=student+business+competition" },
-  { id: "hackathons", category: "Competitions", type: "Hackathons", title: "Hackathon search", description: "Join beginner-friendly tech challenges to practice coding, design, product, and teamwork.", tags: ["hackathon", "coding", "teamwork"], applyUrl: "https://www.google.com/search?q=student+hackathons" },
-  { id: "leadership-programs", category: "Competitions", type: "Leadership programs", title: "Leadership program list", description: "Find youth councils, student leadership camps, fellowships, and public speaking programs.", tags: ["leadership", "confidence", "network"], applyUrl: "https://www.google.com/search?q=youth+leadership+programs" },
-  { id: "ngo-volunteer", category: "Volunteer Opportunities", type: "NGOs", title: "NGO volunteer roles", description: "Support education, food aid, mental health, disability, animal welfare, or community projects.", tags: ["volunteer", "ngo", "community"], applyUrl: "https://www.google.com/search?q=NGO+volunteer+opportunities+for+youth" },
-  { id: "community-service", category: "Volunteer Opportunities", type: "Community service", title: "Community service projects", description: "Help with tutoring, clean-ups, events, elderly support, food drives, or local campaigns.", tags: ["service", "community", "leadership"], applyUrl: "https://www.google.com/search?q=community+service+opportunities+for+students" },
-  { id: "environmental-projects", category: "Volunteer Opportunities", type: "Environmental projects", title: "Environmental action projects", description: "Explore recycling, beach clean-ups, tree planting, climate education, and local green teams.", tags: ["environment", "impact", "teamwork"], applyUrl: "https://www.google.com/search?q=environmental+volunteer+projects+for+youth" },
+  { id: "innovation-challenges", category: "Competitions", type: "Innovation challenges", title: "Innovation challenge search", description: "Pitch solutions for real problems and build proof for your portfolio or scholarship profile.", tags: ["innovation", "portfolio", "problem-solving"], applyUrl: "https://devpost.com/hackathons" },
+  { id: "business-competitions", category: "Competitions", type: "Business competitions", title: "Business competition search", description: "Practice pitching, market research, financial thinking, and team communication.", tags: ["business", "entrepreneurship", "pitching"], applyUrl: "https://www.google.com/search?q=student+business+competition" },
+  { id: "hackathons", category: "Competitions", type: "Hackathons", title: "Hackathon search", description: "Join beginner-friendly tech challenges to practice coding, design, product, and teamwork.", tags: ["hackathon", "coding", "teamwork"], applyUrl: "https://devpost.com/hackathons" },
+  { id: "leadership-programs", category: "Competitions", type: "Leadership programs", title: "Leadership program search", description: "Find youth councils, student leadership camps, fellowships, and public speaking programs.", tags: ["leadership", "confidence", "network"], applyUrl: "https://www.google.com/search?q=youth+leadership+programs" },
+  { id: "ngo-volunteer", category: "Volunteer Opportunities", type: "NGOs", title: "NGO volunteer roles", description: "Support education, food aid, mental health, disability, animal welfare, or community projects.", tags: ["volunteer", "ngo", "community"], applyUrl: "https://www.volunteermatch.org/search/" },
+  { id: "community-service", category: "Volunteer Opportunities", type: "Community service", title: "Community service projects", description: "Help with tutoring, clean-ups, events, elderly support, food drives, or local campaigns.", tags: ["service", "community", "leadership"], applyUrl: "https://www.volunteermatch.org/search/" },
+  { id: "environmental-projects", category: "Volunteer Opportunities", type: "Environmental projects", title: "Environmental action projects", description: "Explore recycling, beach clean-ups, tree planting, climate education, and local green teams.", tags: ["environment", "impact", "teamwork"], applyUrl: "https://www.volunteermatch.org/search/?k=environment" },
   { id: "youth-organizations", category: "Volunteer Opportunities", type: "Youth organizations", title: "Youth organization directory", description: "Join groups that build leadership, communication, teamwork, and social impact experience.", tags: ["youth", "leadership", "network"], applyUrl: "https://www.google.com/search?q=youth+organizations+near+me" },
-  { id: "canva-skills", category: "Learn & Earn", type: "Canva skills", title: "Canva design micro-skill", description: "Learn poster, social media, presentation, and resume design for small freelance tasks.", tags: ["canva", "design", "income"], applyUrl: "https://www.google.com/search?q=learn+Canva+skills+for+freelancing" },
-  { id: "video-editing", category: "Learn & Earn", type: "Video editing", title: "Video editing starter path", description: "Learn short-form editing, captions, pacing, thumbnails, and portfolio clips for creators.", tags: ["video", "content", "creative"], applyUrl: "https://www.google.com/search?q=learn+video+editing+for+beginners" },
-  { id: "coding-skills", category: "Learn & Earn", type: "Coding", title: "Coding beginner path", description: "Start with websites, small apps, automation, or school project tools that become portfolio work.", tags: ["coding", "technology", "portfolio"], applyUrl: "https://www.google.com/search?q=learn+coding+for+beginners+students" },
+  { id: "canva-skills", category: "Learn & Earn", type: "Canva skills", title: "Canva design micro-skill", description: "Learn poster, social media, presentation, and resume design for small freelance tasks.", tags: ["canva", "design", "income"], applyUrl: "https://www.canva.com/designschool/" },
+  { id: "video-editing", category: "Learn & Earn", type: "Video editing", title: "Video editing starter path", description: "Learn short-form editing, captions, pacing, thumbnails, and portfolio clips for creators.", tags: ["video", "content", "creative"], applyUrl: "https://creatoracademy.youtube.com/" },
+  { id: "coding-skills", category: "Learn & Earn", type: "Coding", title: "Coding beginner path", description: "Start with websites, small apps, automation, or school project tools that become portfolio work.", tags: ["coding", "technology", "portfolio"], applyUrl: "https://www.freecodecamp.org/" },
   { id: "content-creation", category: "Learn & Earn", type: "Content creation", title: "Content creation portfolio", description: "Build writing, filming, editing, and publishing skills around a topic you care about.", tags: ["content", "marketing", "creative"], applyUrl: "https://www.google.com/search?q=content+creation+skills+for+beginners" },
   { id: "entrepreneurship", category: "Learn & Earn", type: "Entrepreneurship", title: "Mini entrepreneurship project", description: "Test a small service, product, or community idea with low risk and honest feedback.", tags: ["entrepreneurship", "business", "income"], applyUrl: "https://www.google.com/search?q=student+entrepreneurship+ideas" }
 ];
@@ -1237,7 +1258,9 @@ function normalizeTrackerState(state) {
     },
     careerStudio: {
       interviewSessions: Array.isArray(state.careerStudio && state.careerStudio.interviewSessions) ? state.careerStudio.interviewSessions : fallback.careerStudio.interviewSessions,
-      resume: (state.careerStudio && state.careerStudio.resume && typeof state.careerStudio.resume === "object") ? state.careerStudio.resume : fallback.careerStudio.resume
+      resume: (state.careerStudio && state.careerStudio.resume && typeof state.careerStudio.resume === "object") ? state.careerStudio.resume : fallback.careerStudio.resume,
+      portfolio: (state.careerStudio && state.careerStudio.portfolio && typeof state.careerStudio.portfolio === "object") ? state.careerStudio.portfolio : fallback.careerStudio.portfolio,
+      paycheckCheck: (state.careerStudio && state.careerStudio.paycheckCheck && typeof state.careerStudio.paycheckCheck === "object") ? state.careerStudio.paycheckCheck : fallback.careerStudio.paycheckCheck
     },
     lifeVerse: normalizeLifeVerseState(state.lifeVerse || fallback.lifeVerse),
     lifeSim: normalizeLifeSimState(state.lifeSim || fallback.lifeSim),
@@ -1819,6 +1842,7 @@ function knowledgeVaultRoadmapSection() {
 function knowledgeVaultCareerSection() {
   const sessions = trackerState.careerStudio.interviewSessions;
   const resume = trackerState.careerStudio.resume;
+  const portfolio = trackerState.careerStudio.portfolio;
   const rows = [];
   if (sessions.length) {
     const done = sessions.filter((s) => s.completedAt).length;
@@ -1826,6 +1850,9 @@ function knowledgeVaultCareerSection() {
   }
   if (resume && resume.polishedText) {
     rows.push(`<div class="vault-entry-row"><strong>Resume</strong><span>Last updated ${escapeHTML(new Date(resume.updatedAt).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }))}</span><button class="text-action" type="button" data-open="careerStudio">View</button></div>`);
+  }
+  if (portfolio && portfolio.polishedText) {
+    rows.push(`<div class="vault-entry-row"><strong>Portfolio</strong><span>Last updated ${escapeHTML(new Date(portfolio.updatedAt).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }))}</span><button class="text-action" type="button" data-open="careerStudio">View</button></div>`);
   }
   if (!rows.length) {
     return `<div class="vault-empty-row"><span>No Career Studio activity yet.</span><button class="secondary-action compact-action" type="button" data-open="careerStudio">Start</button></div>`;
@@ -1849,7 +1876,8 @@ function knowledgeVaultExportText() {
   lines.push("CAREER STUDIO");
   const sessions = trackerState.careerStudio.interviewSessions;
   const resume = trackerState.careerStudio.resume;
-  lines.push(`Interview sessions: ${sessions.length}${resume && resume.polishedText ? "\nResume: saved" : ""}`, "");
+  const portfolio = trackerState.careerStudio.portfolio;
+  lines.push(`Interview sessions: ${sessions.length}${resume && resume.polishedText ? "\nResume: saved" : ""}${portfolio && portfolio.polishedText ? "\nPortfolio: saved" : ""}`, "");
   return lines.join("\n");
 }
 
@@ -2093,7 +2121,7 @@ function opportunityCards() {
         </div>
         <div class="opportunity-actions">
           <button class="${saved ? "secondary-action" : "primary-action"} compact-action" type="button" data-save-opportunity="${escapeHTML(item.id)}">${saved ? "Saved" : "Save for later"}</button>
-          <button class="secondary-action compact-action" type="button" data-open-link="${escapeHTML(item.applyUrl)}">Apply</button>
+          <button class="secondary-action compact-action" type="button" data-open-link="${escapeHTML(item.applyUrl)}">${item.category === "Learn & Earn" ? "Start learning" : "Search"}</button>
           <button class="text-action" type="button" data-share-opportunity="${escapeHTML(item.id)}">Share</button>
         </div>
       </article>
@@ -2101,8 +2129,11 @@ function opportunityCards() {
   }).join("");
 }
 
+// Honesty pass: this is a curated starting point (a real external directory
+// or search engine per category), not an individual posting, so "Apply"
+// overstated what pressing the button actually does - it opens a search.
 function shareOpportunityText(item) {
-  return `${item.title}\n${item.description}\nApply/search: ${item.applyUrl}`;
+  return `${item.title}\n${item.description}\nSearch: ${item.applyUrl}`;
 }
 
 function futureMirrorHomeHero() {
@@ -2315,6 +2346,47 @@ function bumpCommunityTrust(amount) {
   state.npcSimulation.communityTrust = window.LifeVerseGame.clamp(Number(state.npcSimulation.communityTrust || 0) + amount);
   saveTrackerState();
   syncCommunityProfileSnapshot();
+}
+
+// Idea from a GitHub research pass (Habitica-style): a real-life daily
+// check-in streak nourishes the same HP/Energy stats shown in the LifeVerse
+// HUD, instead of being a completely separate progress bar - so "I kept my
+// streak" and "my character is thriving" read as one system, not two.
+// Deliberately positive-only, no HP/Energy loss for a missed day - Build
+// Mode already stripped punitive "Proof Log"/"Feedback Scorecard" framing
+// from this app (see tests/build-mode.test.js), so a Habitica-style penalty
+// mechanic would cut against that established, deliberate design direction.
+// Guarded by a per-kind "already boosted today" date on the state itself so
+// logging a second mood entry (or a page re-render re-reading the streak)
+// the same day can't be farmed for free stats - only the FIRST check-in of
+// a given kind each calendar day actually nudges the stat.
+function applyGrowthCheckInBoost(kind, streak) {
+  const state = lifeVerseState();
+  state.growthSync = state.growthSync || {};
+  const dateKey = `${kind}BoostDate`;
+  const today = new Date().toDateString();
+  if (state.growthSync[dateKey] === today) return null;
+  state.growthSync[dateKey] = today;
+
+  const boost = Math.min(2 + Math.min(Math.max(streak, 1) - 1, 6) * 0.5, 5);
+  let statLabel;
+  if (kind === "mood") {
+    state.needs.energy = window.LifeVerseGame.clamp(Number(state.needs.energy || 0) + boost);
+    statLabel = "Energy";
+  } else {
+    state.health.physical = window.LifeVerseGame.clamp(Number(state.health.physical || 0) + boost);
+    statLabel = "HP";
+  }
+  if (streak >= 7) {
+    window.LifeVerseGame.addAchievement(
+      state,
+      `growth-${kind}-streak-7`,
+      "One Week Strong",
+      `Kept a 7-day ${kind === "mood" ? "mood check-in" : "daily reflection"} streak going.`
+    );
+  }
+  saveTrackerState();
+  return { boost: Math.round(boost * 10) / 10, statLabel };
 }
 
 async function syncCommunityProfileSnapshot() {
@@ -3405,6 +3477,7 @@ function destroyLifeSim() {
     lifeSimInstance.destroy();
   }
   lifeSimInstance = null;
+  window.__CompassLifeSimDebug = null;
 }
 
 function enterLifeSimMode() {
@@ -3456,17 +3529,25 @@ function mountLifeSim() {
     root.innerHTML = `<div class="sim-canvas-fallback"><strong>3D simulator is unavailable</strong><span>Refresh the page once, then open Life Sim again.</span></div>`;
     return;
   }
-  const initialLocationId = pendingTeleportLocationId;
+  // Normal Life Sim entry should open from the curated street-camera start in
+  // life-sim.js. Only explicit map travel should override that with a zone
+  // spawn; restoring `currentLocation` here made public builds reopen beside
+  // wall-like district meshes instead of the intended game view.
+  const initialLocationId = pendingTeleportLocationId || null;
   pendingTeleportLocationId = null;
-  lifeSimInstance = window.CompassLifeSim.mount(root, {
+  const mountOptions = {
     getLifeVerseState: () => lifeVerseState(),
-    initialLocationId,
     onLocationChange(location) {
       trackerState.lifeSim.currentLocation = location ? location.id : null;
       saveTrackerState();
       updateLifeSimDom();
     }
-  });
+  };
+  if (initialLocationId) mountOptions.initialLocationId = initialLocationId;
+  lifeSimInstance = window.CompassLifeSim.mount(root, mountOptions);
+  window.__CompassLifeSimDebug = lifeSimInstance && typeof lifeSimInstance.getDebugState === "function"
+    ? () => lifeSimInstance.getDebugState()
+    : null;
 }
 
 function lifeVersePresentationPause(kind = "soft", duration = 420) {
@@ -3618,11 +3699,70 @@ async function generateFutureSelfSnapshot(horizon) {
 // here rather than done silently.
 const REFLECTION_RESURFACE_DAYS = { daily: 30, weeklyLetter: 14, decisionJournal: 90, milestoneLetter: 90 };
 const DAILY_REFLECTION_PROMPTS = [
-  { id: "mood", label: "How would you describe your mood today, and why?" },
-  { id: "stress", label: "What's taking up the most mental space right now?" },
-  { id: "growth", label: "What's one thing you did today that your future self would thank you for?" },
-  { id: "procrastination", label: "What did you put off today, and what made it easy to avoid?" }
+  { id: "mood", label: "How would you describe your mood today, and why?", emoji: "🎭", starters: ["Honestly, today felt...", "My mood shifted when...", "I'm feeling this way because..."] },
+  { id: "stress", label: "What's taking up the most mental space right now?", emoji: "🧠", starters: ["The thing I can't stop thinking about is...", "I keep worrying that...", "It would help if..."] },
+  { id: "growth", label: "What's one thing you did today that your future self would thank you for?", emoji: "🌱", starters: ["I'm proud that I...", "Future me will thank me for...", "A small win today was..."] },
+  { id: "procrastination", label: "What did you put off today, and what made it easy to avoid?", emoji: "⏳", starters: ["I kept avoiding...", "It was easy to put off because...", "Next time I'll..."] }
 ];
+
+// Consecutive-day streak shared by Mood check-in and Daily Reflection - both
+// are meant to feel like a habit loop, not a form, so both read this the
+// same way: streak counts backward from today if there's already an entry
+// today, otherwise from yesterday (so a missed today doesn't erase yesterday's
+// run - it just flags the streak as "at risk" via checkedInToday: false).
+function consecutiveDayStreak(entries, getDate) {
+  const days = new Set((entries || []).map((entry) => new Date(getDate(entry)).toDateString()));
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const checkedInToday = days.has(today.toDateString());
+  const cursor = checkedInToday ? new Date(today) : yesterday;
+  let streak = 0;
+  while (days.has(cursor.toDateString())) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return { streak, checkedInToday };
+}
+
+function moodCheckInStreak() {
+  const entries = (trackerState.mood.entries || []).filter((entry) => entry.user_id === currentUserId() || !entry.user_id);
+  return consecutiveDayStreak(entries, (entry) => entry.created_at);
+}
+
+function reflectionCheckInStreak() {
+  const entries = (trackerState.reflectionEntries || []).filter((entry) => entry.user_id === currentUserId() && Array.isArray(entry.tags) && entry.tags.includes("daily"));
+  return consecutiveDayStreak(entries, (entry) => entry.createdAt);
+}
+
+function streakChipHTML(streakInfo, noun) {
+  if (streakInfo.streak <= 0) return `<span class="streak-chip is-fresh">🌟 Start your ${noun} streak today</span>`;
+  if (!streakInfo.checkedInToday) return `<span class="streak-chip is-at-risk">⚠️ ${streakInfo.streak}-day ${noun} streak - keep it alive today</span>`;
+  return `<span class="streak-chip is-active">🔥 ${streakInfo.streak}-day ${noun} streak</span>`;
+}
+
+function energyLabel(score) {
+  if (score < 25) return "Running on empty";
+  if (score < 50) return "Low battery";
+  if (score < 75) return "Holding steady";
+  return "Fully charged";
+}
+
+function energyEmoji(score) {
+  if (score < 25) return "🪫";
+  if (score < 50) return "🔋";
+  if (score < 75) return "⚡";
+  return "✨";
+}
+
+function triggerCheckInCelebration(message) {
+  const toast = document.createElement("div");
+  toast.className = "checkin-celebrate-toast";
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  window.setTimeout(() => toast.classList.add("is-leaving"), 1500);
+  window.setTimeout(() => toast.remove(), 1900);
+}
 
 function createReflectionEntry(mode, content, options = {}) {
   const now = new Date();
@@ -3764,6 +3904,7 @@ function resurfacingCard() {
 }
 
 let dailyReflectionPromptIndex = 0;
+let dailyReflectionDraft = "";
 
 // Life Roadmap (Future Mirror bible Ch.7) - one data model, three views
 // (timeline/calendar/long-horizon) rather than three separate features with
@@ -4475,6 +4616,173 @@ function resumeBuilderView() {
         <div class="modal-action-row"><strong>Preview</strong><button class="secondary-action compact-action" type="button" data-copy-resume>Copy text</button></div>
         <pre class="resume-preview-text">${escapeHTML(resume.polishedText)}</pre>
       </div>
+    ` : ""}
+  `;
+}
+
+// Career Studio - Portfolio Builder. Same trust model as the Resume Builder:
+// the user writes their real projects/work in plain language, AI only
+// organizes and polishes wording into a LinkedIn-style profile narrative
+// (headline, about, experience, projects, skills) - it never invents roles,
+// projects, or links that were not provided. No public page or hosting -
+// this app has no backend/multi-user layer to safely serve one, so the
+// output stays a preview/copy-text document like the resume.
+let isPortfolioLoading = false;
+let portfolioError = "";
+
+function savePortfolioDraft() {
+  const existing = trackerState.careerStudio.portfolio || {};
+  const fullNameInput = modalLayer.querySelector("#portfolio-full-name");
+  const headlineInput = modalLayer.querySelector("#portfolio-headline");
+  const aboutInput = modalLayer.querySelector("#portfolio-about");
+  const experienceInput = modalLayer.querySelector("#portfolio-experience");
+  const projectsInput = modalLayer.querySelector("#portfolio-projects");
+  const skillsInput = modalLayer.querySelector("#portfolio-skills");
+  const linksInput = modalLayer.querySelector("#portfolio-links");
+  const portfolio = {
+    fullName: fullNameInput ? fullNameInput.value.trim().slice(0, 80) : (existing.fullName || ""),
+    headline: headlineInput ? headlineInput.value.trim().slice(0, 120) : (existing.headline || ""),
+    rawAbout: aboutInput ? aboutInput.value.trim().slice(0, 1500) : (existing.rawAbout || ""),
+    rawExperience: experienceInput ? experienceInput.value.trim().slice(0, 3000) : (existing.rawExperience || ""),
+    rawProjects: projectsInput ? projectsInput.value.trim().slice(0, 3000) : (existing.rawProjects || ""),
+    rawSkills: skillsInput ? skillsInput.value.trim().slice(0, 500) : (existing.rawSkills || ""),
+    rawLinks: linksInput ? linksInput.value.trim().slice(0, 500) : (existing.rawLinks || ""),
+    polishedText: existing.polishedText || "",
+    updatedAt: new Date().toISOString()
+  };
+  trackerState.careerStudio.portfolio = portfolio;
+  saveTrackerState();
+  return portfolio;
+}
+
+async function polishPortfolioWithAI() {
+  const portfolio = savePortfolioDraft();
+  if (!portfolio.headline && !portfolio.rawAbout && !portfolio.rawExperience && !portfolio.rawProjects) {
+    portfolioError = "Add a headline, an about note, experience, or a project first - there's nothing to polish yet.";
+    openModal("portfolioBuilder");
+    return;
+  }
+  isPortfolioLoading = true;
+  portfolioError = "";
+  openModal("portfolioBuilder");
+  try {
+    const systemPrompt = "You are a professional personal-brand writer who builds LinkedIn-style portfolio profiles. Write clean, honest content using only the facts given - never invent employers, dates, titles, projects, achievements, or links that were not provided. Use confident, specific, plain language. Plain text only, no markdown symbols like ** or #.";
+    const userPrompt = `Candidate facts:\nName: ${portfolio.fullName || "(not given)"}\nHeadline: ${portfolio.headline || "(not given)"}\nAbout (raw notes):\n${portfolio.rawAbout || "(none provided)"}\nExperience (raw notes):\n${portfolio.rawExperience || "(none provided)"}\nProjects / work samples (raw notes):\n${portfolio.rawProjects || "(none provided)"}\nSkills (raw notes):\n${portfolio.rawSkills || "(none provided)"}\nLinks (raw notes, list as given - do not invent or guess URLs):\n${portfolio.rawLinks || "(none provided)"}\n\nOther real saved context about this person, for tone/emphasis only - do not invent portfolio content from it:\n${realGrowthFactsText()}\n\nWrite a plain-text LinkedIn-style portfolio profile with sections in this order: NAME/HEADLINE, ABOUT (3-4 sentences, first person, confident), EXPERIENCE (bullet points per role using dashes), PROJECTS (bullet points, what it is and what they did), SKILLS, LINKS (only if provided).`;
+    const reply = await requestCompassDirect(systemPrompt, userPrompt);
+    portfolio.polishedText = cleanText(reply, 4500);
+    portfolio.updatedAt = new Date().toISOString();
+    trackerState.careerStudio.portfolio = portfolio;
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Portfolio Builder] Polish failed", error);
+    portfolioError = "Couldn't polish the portfolio right now. Please try again.";
+  } finally {
+    isPortfolioLoading = false;
+    openModal("portfolioBuilder");
+  }
+}
+
+function portfolioBuilderView() {
+  const portfolio = trackerState.careerStudio.portfolio || {};
+  return `
+    <label>Full name<input type="text" id="portfolio-full-name" value="${escapeHTML(portfolio.fullName || "")}" placeholder="Your name"></label>
+    <label>Headline<input type="text" id="portfolio-headline" value="${escapeHTML(portfolio.headline || "")}" placeholder="e.g. Aspiring UX Designer | Video editor"></label>
+    <label>About you (plain language)<textarea id="portfolio-about" rows="3" placeholder="e.g. Design student who likes turning messy ideas into simple interfaces, currently building a portfolio of app redesigns">${escapeHTML(portfolio.rawAbout || "")}</textarea></label>
+    <label>Experience (roles, dates, what you did)<textarea id="portfolio-experience" rows="3" placeholder="e.g. Freelance video editor, 2024-now, edited 12 short videos for local small businesses">${escapeHTML(portfolio.rawExperience || "")}</textarea></label>
+    <label>Projects / work samples<textarea id="portfolio-projects" rows="3" placeholder="e.g. Redesigned a mock food-delivery app in Figma as a personal project - focused on simplifying checkout">${escapeHTML(portfolio.rawProjects || "")}</textarea></label>
+    <label>Skills (comma separated)<input type="text" id="portfolio-skills" value="${escapeHTML(portfolio.rawSkills || "")}" placeholder="e.g. Figma, video editing, Canva"></label>
+    <label>Links (optional, comma separated)<input type="text" id="portfolio-links" value="${escapeHTML(portfolio.rawLinks || "")}" placeholder="e.g. behance.net/yourname, github.com/yourname"></label>
+    ${portfolioError ? `<p class="form-error">${escapeHTML(portfolioError)}</p>` : ""}
+    <div class="modal-action-row">
+      <button class="secondary-action compact-action" type="button" data-save-portfolio-draft>Save draft</button>
+      <button class="primary-action compact-action" type="button" data-polish-portfolio ${isPortfolioLoading ? "disabled" : ""}>${isPortfolioLoading ? "Polishing..." : "Polish with AI"}</button>
+    </div>
+    ${portfolio.polishedText ? `
+      <div class="resume-preview-card portfolio-preview-card">
+        <div class="modal-action-row"><strong>Preview</strong><button class="secondary-action compact-action" type="button" data-copy-portfolio>Copy text</button></div>
+        <pre class="resume-preview-text">${escapeHTML(portfolio.polishedText)}</pre>
+      </div>
+    ` : ""}
+  `;
+}
+
+// Career Studio - Paycheck Reality Check (GitHub research idea, inspired by
+// PolicyEngine's approach of computing real policy numbers instead of
+// inventing plausible ones). "How much would I actually take home" is a
+// concrete, nameable version of a vague "adulting" fear (taxes/CPF are
+// confusing) - so this uses real, published Singapore figures (IRAS
+// resident individual tax brackets, CPF Ordinary Wage employee rate/
+// ceiling) rather than a fictional estimate, the same way the rest of
+// Career Studio never invents facts about the user. Deliberately simplified
+// (no bonus/relief/age-tier edge cases) and labeled as an estimate, not tax
+// advice - the goal is turning an abstract fear into a concrete ballpark
+// number, not filing an accurate return.
+const SG_RESIDENT_TAX_BRACKETS_2024 = [
+  { upTo: 20000, rate: 0 },
+  { upTo: 30000, rate: 0.02 },
+  { upTo: 40000, rate: 0.035 },
+  { upTo: 80000, rate: 0.07 },
+  { upTo: 120000, rate: 0.115 },
+  { upTo: 160000, rate: 0.15 },
+  { upTo: 200000, rate: 0.18 },
+  { upTo: 240000, rate: 0.19 },
+  { upTo: 280000, rate: 0.195 },
+  { upTo: 320000, rate: 0.2 },
+  { upTo: Infinity, rate: 0.22 }
+];
+const SG_CPF_EMPLOYEE_RATE = 0.2;
+const SG_CPF_OW_CEILING_MONTHLY = 6800;
+
+function computeSingaporeTakeHome(grossMonthly) {
+  const monthly = Math.max(0, Number(grossMonthly) || 0);
+  const cpfableMonthly = Math.min(monthly, SG_CPF_OW_CEILING_MONTHLY);
+  const employeeCpfMonthly = cpfableMonthly * SG_CPF_EMPLOYEE_RATE;
+  const annualIncome = monthly * 12;
+  const chargeableIncome = Math.max(0, annualIncome - employeeCpfMonthly * 12);
+  let annualTax = 0;
+  let lowerBound = 0;
+  for (const bracket of SG_RESIDENT_TAX_BRACKETS_2024) {
+    if (chargeableIncome <= lowerBound) break;
+    annualTax += (Math.min(chargeableIncome, bracket.upTo) - lowerBound) * bracket.rate;
+    lowerBound = bracket.upTo;
+  }
+  const monthlyTax = annualTax / 12;
+  return {
+    grossMonthly: monthly,
+    employeeCpfMonthly: Math.round(employeeCpfMonthly),
+    monthlyTax: Math.round(monthlyTax),
+    takeHomeMonthly: Math.round(monthly - employeeCpfMonthly - monthlyTax),
+    annualTax: Math.round(annualTax)
+  };
+}
+
+function calculatePaycheckReality() {
+  const monthlyInput = modalLayer.querySelector("#paycheck-monthly-input");
+  const grossMonthly = Number(monthlyInput ? monthlyInput.value : 0);
+  if (!grossMonthly || grossMonthly <= 0) {
+    trackerState.careerStudio.paycheckCheck = null;
+    openModal("paycheckCalculator");
+    return;
+  }
+  trackerState.careerStudio.paycheckCheck = { grossMonthly, result: computeSingaporeTakeHome(grossMonthly), updatedAt: new Date().toISOString() };
+  saveTrackerState();
+  openModal("paycheckCalculator");
+}
+
+function paycheckCalculatorView() {
+  const saved = trackerState.careerStudio.paycheckCheck;
+  const result = saved ? saved.result : null;
+  return `
+    <label>Gross monthly salary (S$)<input type="number" min="0" step="50" id="paycheck-monthly-input" value="${saved ? escapeHTML(String(saved.grossMonthly)) : ""}" placeholder="e.g. 3500"></label>
+    <button class="primary-action compact-action" type="button" data-calculate-paycheck>Show my real take-home</button>
+    ${result ? `
+      <div class="resume-preview-card paycheck-result-card">
+        <div class="paycheck-result-row"><span>Gross monthly pay</span><strong>S$${result.grossMonthly.toLocaleString()}</strong></div>
+        <div class="paycheck-result-row"><span>CPF (yours - not lost, it's your own retirement/housing savings)</span><strong>-S$${result.employeeCpfMonthly.toLocaleString()}</strong></div>
+        <div class="paycheck-result-row"><span>Estimated income tax</span><strong>-S$${result.monthlyTax.toLocaleString()}</strong></div>
+        <div class="paycheck-result-row paycheck-result-final"><span>What actually lands in your bank account</span><strong>S$${result.takeHomeMonthly.toLocaleString()}</strong></div>
+      </div>
+      <p class="tiny-note">Estimate based on published IRAS resident individual tax brackets and CPF Ordinary Wage employee rate/ceiling. Not tax advice - real reliefs, bonuses, and CPF age tiers can change your actual numbers.</p>
     ` : ""}
   `;
 }
@@ -5952,6 +6260,46 @@ function generateMoodSuggestion(label, score, note) {
     detail: "Self-determination theory highlights competence, autonomy, and relatedness. Pick one action you choose yourself, make it small enough to complete, then connect with someone if you need momentum.",
     technique: "Self-determination theory"
   };
+}
+
+// Self-audit finding: generateMoodSuggestion() above only ever matches a
+// handful of literal keywords ("money"/"tired"/"stress") against 4 fixed
+// outputs - anything the user actually wrote outside those keywords always
+// landed on the same generic "one win" text, despite the UI presenting it
+// as a suggestion based on what they wrote. Kept as the instant, offline
+// fallback (same role as buildTrainingAdaptiveReply in Build Mode), but the
+// real suggestion now comes from an actual AI read of the entry, refined in
+// the background the same way enhanceBuildTrainingReply already does for
+// Build Mode - the user sees the fast local suggestion immediately, then it
+// gets replaced once the live read comes back, instead of never reading
+// the entry's real content at all.
+async function requestMoodSuggestionFromAI(label, score, note) {
+  const systemPrompt = "You are a supportive, evidence-based wellbeing coach inside Compass. Read the user's actual mood entry and suggest ONE small, concrete, doable action grounded in a real psychological technique (behavioral activation, cognitive reappraisal, implementation intentions, self-determination theory, cognitive offloading, or another genuinely fitting technique - pick whichever actually fits what they wrote, don't force one). Never diagnose, never act as a therapist. If the note suggests danger or serious self-harm risk, keep the suggestion safe and gently point toward contacting a trusted person or emergency support instead of a generic technique. Return strict JSON only.";
+  const userPrompt = `Mood label: ${label}\nMood score (0-100): ${score}\nUser's own note: "${note}"\n\nRespond as strict JSON only: {"title":"string, under 8 words","summary":"string, one sentence, a concrete action","detail":"string, 1-3 sentences explaining why this helps, referencing the real technique","technique":"string, short name of the psychological technique used"}`;
+  const reply = await requestCompassDirect(systemPrompt, userPrompt);
+  const parsed = extractJsonObject(reply);
+  if (!parsed || !parsed.title || !parsed.summary) throw new Error("Mood suggestion reply was not valid JSON.");
+  return {
+    title: cleanText(parsed.title, 60),
+    summary: cleanText(parsed.summary, 200),
+    detail: cleanText(parsed.detail, 400),
+    technique: cleanText(parsed.technique, 80)
+  };
+}
+
+async function enhanceMoodSuggestionWithAI(label, score, note) {
+  try {
+    const suggestion = await requestMoodSuggestionFromAI(label, score, note);
+    // Only overwrite if this is still the current mood entry - the user
+    // may have logged a newer one while this request was in flight.
+    if (trackerState.mood.label === label && trackerState.mood.score === score && trackerState.mood.note === note) {
+      trackerState.moodSuggestion = suggestion;
+      saveTrackerState();
+      renderScreen(activeTab);
+    }
+  } catch (error) {
+    console.error("[Mood] Live AI suggestion failed; local suggestion kept.", error);
+  }
 }
 
 function supportContactCards() {
@@ -7452,7 +7800,7 @@ const screens = {
       icon: "icon-work.png",
       tone: "career-tone",
       items: [
-        { title: "Career Studio", text: "Interview practice, resume builder, and job matching.", modal: "careerStudio", icon: "icon-profile.png" },
+        { title: "Career Studio", text: "Interview practice, resume builder, portfolio builder, and job matching.", modal: "careerStudio", icon: "icon-profile.png" },
         { title: "Future Self Hiring", text: "Four future-you candidates interview for the job of who you become.", modal: "futureSelfHiring", icon: "icon-chat.png" },
         { title: "Jury Duty on Yourself", text: "Put a real decision on trial - prosecution, defense, and a verdict.", modal: "juryTrial", icon: "icon-balance.png" }
       ]
@@ -7497,7 +7845,8 @@ const screens = {
 
   simulator: () => `
     <section class="life-sim-game" data-life-sim-game>
-      <div id="life-sim-root" class="life-sim-root" aria-label="Anime-style 3D Singapore adult-life simulator"></div>
+      <div id="life-sim-root" class="life-sim-root" aria-label="Realistic 3D Singapore adult-life simulator"></div>
+      <div class="life-sim-color-grade" aria-hidden="true"></div>
 
       <div class="life-sim-rotate" aria-hidden="true">
         <strong>Rotate your phone</strong>
@@ -7528,6 +7877,8 @@ const screens = {
       <div class="sim-look-pad" data-sim-look-pad aria-hidden="true">
         <span>Drag to rotate</span>
       </div>
+
+      <button class="asset-credits-tag" type="button" data-open="assetCredits">Asset Credits</button>
     </section>
   `,
 
@@ -7545,7 +7896,7 @@ const screens = {
       <div>
         <p class="eyebrow">Future builder</p>
         <h3>Find the next door you can actually open.</h3>
-        <p>Save useful options, apply through external links, or ask Compass AI to recommend what fits your age, interests, goals, and career direction.</p>
+        <p>These are curated starting points, not individual postings - save what's useful, search real openings through trusted external sites, or ask Compass AI to recommend what fits your age, interests, goals, and career direction.</p>
       </div>
       ${opportunityStats()}
     </section>
@@ -7644,6 +7995,27 @@ const screens = {
     <button class="secondary-action signout-action" type="button" data-sign-out>Sign out</button>
   `
 };
+
+// Asset Credits (realistic-style pivot, Phase 1) - CC0 Objaverse assets need
+// no attribution at all, but CC-BY/CC-BY-SA/CC-BY-NC ones legally require
+// crediting the specific creator, so this can't just be one hardcoded corner
+// line - it has to be generated from the manifest's real license/author
+// fields, not hand-maintained, or it silently goes stale the moment a new
+// asset is added via tools/objaverse_fetch.py.
+let objaverseCreditsEntries = null;
+
+async function loadObjaverseCredits() {
+  if (objaverseCreditsEntries) return objaverseCreditsEntries;
+  try {
+    const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
+    const manifest = await response.json();
+    objaverseCreditsEntries = (manifest.objaverseAssets || []).filter((entry) => entry.license && entry.license !== "cc0");
+  } catch (error) {
+    console.error("[Asset Credits] Failed to load manifest", error);
+    objaverseCreditsEntries = [];
+  }
+  return objaverseCreditsEntries;
+}
 
 const modals = {
   username: () => `
@@ -7884,8 +8256,13 @@ const modals = {
         <span class="risk-pill light">Daily reflection - 3 minutes</span>
         <button class="ghost-circle light" type="button" data-close aria-label="Close">x</button>
       </div>
-      <h3 id="daily-reflection-title">${escapeHTML(prompt.label)}</h3>
-      <textarea id="daily-reflection-text" placeholder="A few honest sentences is enough."></textarea>
+      ${streakChipHTML(reflectionCheckInStreak(), "reflection")}
+      <h3 id="daily-reflection-title"><span aria-hidden="true">${prompt.emoji}</span> ${escapeHTML(prompt.label)}</h3>
+      <p class="reflection-stuck-label">Stuck? Tap one to start:</p>
+      <div class="reflection-starter-row">
+        ${prompt.starters.map((starter) => `<button type="button" class="reflection-starter-chip" data-reflection-starter="${escapeHTML(starter)}">${escapeHTML(starter)}</button>`).join("")}
+      </div>
+      <textarea id="daily-reflection-text" placeholder="A few honest sentences is enough.">${escapeHTML(dailyReflectionDraft)}</textarea>
       <button class="primary-action mint-action" type="button" data-save-daily-reflection="${escapeHTML(prompt.id)}">Save reflection</button>
     </div>
   `;
@@ -8087,7 +8464,7 @@ const modals = {
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="career-studio-title">Practice for the real thing</h3>
-      <p class="muted">Three tools that work together - practice how you sound, write what you've done, and see which roles fit your Blueprint.</p>
+      <p class="muted">Five tools that work together - practice how you sound, write what you've done, build a profile, see which roles fit your Blueprint, and check what a salary actually becomes.</p>
       <div class="action-stack">
         <button class="wide-action" type="button" data-open="interviewPractice">
           <img src="assets/icon-boundary.png" alt="">
@@ -8097,9 +8474,17 @@ const modals = {
           <img src="assets/icon-work.png" alt="">
           <span><strong>Resume Builder</strong><small>Write your real experience - AI cleans up wording, never invents facts.</small></span>
         </button>
+        <button class="wide-action" type="button" data-open="portfolioBuilder">
+          <img src="assets/icon-spark.png" alt="">
+          <span><strong>Portfolio Builder</strong><small>A LinkedIn-style profile - about, projects, and skills, written from what you give it.</small></span>
+        </button>
         <button class="wide-action" type="button" data-open="jobMatching">
           <img src="assets/icon-learn.png" alt="">
           <span><strong>Job Matching</strong><small>See which role archetypes fit your saved Personal Blueprint.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="paycheckCalculator">
+          <img src="assets/icon-work.png" alt="">
+          <span><strong>Paycheck Reality Check</strong><small>See what a salary actually becomes after CPF and tax - real Singapore numbers, not a guess.</small></span>
         </button>
       </div>
     </div>
@@ -8115,6 +8500,34 @@ const modals = {
       <p class="muted">Write your real experience and education in your own words - Compass AI cleans up the wording and structure, without inventing anything you didn't provide.</p>
       <div class="admin-form">
         ${resumeBuilderView()}
+      </div>
+    </div>
+  `,
+
+  portfolioBuilder: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="portfolio-builder-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Portfolio Builder</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="portfolio-builder-title">Build your portfolio</h3>
+      <p class="muted">Write your real about, experience, and projects in your own words - Compass AI organizes it into a LinkedIn-style profile, without inventing anything you didn't provide.</p>
+      <div class="admin-form">
+        ${portfolioBuilderView()}
+      </div>
+    </div>
+  `,
+
+  paycheckCalculator: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="paycheck-calculator-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Paycheck Reality Check</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="paycheck-calculator-title">What does that salary actually become?</h3>
+      <p class="muted">Type a monthly salary offer and see what actually lands in your bank account after CPF and income tax - real Singapore numbers, not a made-up estimate.</p>
+      <div class="admin-form">
+        ${paycheckCalculatorView()}
       </div>
     </div>
   `,
@@ -8249,21 +8662,34 @@ const modals = {
     `;
   },
 
-  mood: () => `
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mood-title">
+  mood: () => {
+    const moodTiles = [
+      { label: "Calm", emoji: "😌", tone: "calm" },
+      { label: "Okay", emoji: "🙂", tone: "okay" },
+      { label: "Tired", emoji: "😴", tone: "tired" },
+      { label: "Stressed", emoji: "😣", tone: "stressed" }
+    ];
+    const score = Number(trackerState.mood.score) || 0;
+    return `
+    <div class="modal-card mood-modal" role="dialog" aria-modal="true" aria-labelledby="mood-title">
       <div class="modal-top">
         <span class="risk-pill calm">Mood tracker</span>
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="mood-title">How are you feeling today?</h3>
-      <div class="mood-choice-grid">
-        ${["Calm", "Okay", "Tired", "Stressed"].map((label) => `
-          <button class="mood-choice ${trackerState.mood.label === label ? "is-selected" : ""}" type="button" data-mood-choice="${label}">
-            <img src="assets/icon-mood.png" alt=""><span>${label}</span>
+      ${streakChipHTML(moodCheckInStreak(), "check-in")}
+      <div class="mood-emoji-grid">
+        ${moodTiles.map((tile) => `
+          <button class="mood-choice mood-tone-${tile.tone} ${trackerState.mood.label === tile.label ? "is-selected" : ""}" type="button" data-mood-choice="${tile.label}">
+            <span class="mood-emoji" aria-hidden="true">${tile.emoji}</span><span>${tile.label}</span>
           </button>
         `).join("")}
       </div>
-      <div class="slider-row"><span>Energy</span><input id="mood-score" type="range" min="0" max="100" value="${trackerState.mood.score}"></div>
+      <div class="mood-energy-card">
+        <div class="mood-energy-head"><span>Energy</span><strong id="mood-score-emoji">${energyEmoji(score)}</strong></div>
+        <input id="mood-score" type="range" min="0" max="100" value="${score}">
+        <p id="mood-score-label" class="mood-energy-caption">${energyLabel(score)}</p>
+      </div>
       <label class="mood-reflection-label">What happened today?<textarea id="mood-note" aria-label="What happened today">${escapeHTML(trackerState.mood.note)}</textarea></label>
       <label class="mood-reflection-label">What did it affect - a choice, a conversation, your plans?<textarea id="mood-affected" aria-label="What it affected" placeholder="Optional"></textarea></label>
       <label class="mood-reflection-label">How will you adjust tomorrow?<textarea id="mood-adjustment" aria-label="Tomorrow's adjustment" placeholder="Optional"></textarea></label>
@@ -8285,7 +8711,8 @@ const modals = {
         </div>
       ` : ""}
     </div>
-  `,
+  `;
+  },
 
   receipt: () => `
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
@@ -8475,7 +8902,7 @@ const modals = {
           ["icon-stories.png", "Inspire Hub", "Read successful people stories and use AI Reflection to apply lessons realistically."],
           ["icon-support.png", "Community", "Join growth communities, goal groups, partner matching, and anonymous support."],
           ["icon-work.png", "Opportunity Hub", "Explore scholarships, internships, competitions, volunteering, and learn-and-earn resources."],
-          ["icon-balance.png", "Life Sim", "Play the anime-style adult-life simulator, choose daily activities, and fast-forward consequences."],
+          ["icon-balance.png", "Life Sim", "Play the realistic 3D adult-life simulator, choose daily activities, and fast-forward consequences."],
           ["icon-chat.png", "Compass AI", "Discuss decisions, story lessons, reality checks, and action plans."],
           ["icon-support.png", "Support Circle", "Save trusted people for moments when decisions feel heavy."],
           ["icon-settings.png", "Profile", "Manage account, guide, permissions, and admin tools."],
@@ -8775,6 +9202,47 @@ const modals = {
     </div>
   `,
 
+  assetCredits: () => {
+    if (objaverseCreditsEntries === null) {
+      loadObjaverseCredits().then(() => {
+        if (modalLayer.classList.contains("is-open")) openModal("assetCredits");
+      });
+      return `
+        <div class="modal-card asset-credits-modal" role="dialog" aria-modal="true" aria-labelledby="asset-credits-title">
+          <div class="modal-top">
+            <span class="risk-pill calm">Asset Credits</span>
+            <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+          </div>
+          <h3 id="asset-credits-title">3D asset credits</h3>
+          <p class="muted">Loading...</p>
+        </div>
+      `;
+    }
+    return `
+      <div class="modal-card asset-credits-modal" role="dialog" aria-modal="true" aria-labelledby="asset-credits-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Asset Credits</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="asset-credits-title">3D asset credits</h3>
+        <p class="muted">Real-world 3D objects sourced from Objaverse (Creative Commons-licensed Sketchfab uploads). CC0 pieces need no credit; everything below is CC-BY / CC-BY-SA / CC-BY-NC, which does.</p>
+        ${objaverseCreditsEntries.length ? `
+          <div class="asset-credits-list">
+            ${objaverseCreditsEntries.map((entry) => `
+              <div class="asset-credits-row">
+                <div>
+                  <strong>${escapeHTML(entry.label || entry.category || "3D asset")}</strong>
+                  <span>by ${escapeHTML(entry.author || "unknown")} - ${escapeHTML((entry.license || "").toUpperCase())}</span>
+                </div>
+                ${entry.sourceUrl ? `<button class="text-action" type="button" data-open-link="${escapeHTML(entry.sourceUrl)}">Source</button>` : ""}
+              </div>
+            `).join("")}
+          </div>
+        ` : `<p class="muted">No attribution-required assets in use right now.</p>`}
+      </div>
+    `;
+  },
+
   growthProgress: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="growth-progress-title">
       <div class="modal-top">
@@ -9007,6 +9475,9 @@ function openModal(name, payload) {
   }
   if (name === "resumeBuilder" && !modalLayer.classList.contains("is-open")) {
     resumeError = "";
+  }
+  if (name === "portfolioBuilder" && !modalLayer.classList.contains("is-open")) {
+    portfolioError = "";
   }
   if (name === "roadmapView" && !modalLayer.classList.contains("is-open")) {
     roadmapView = "timeline";
@@ -10181,6 +10652,7 @@ function localBuildTrainingPath(goal, coach) {
       title: "Clarify Your Real Situation",
       purpose: `Make "${shortGoal}" specific enough to practice instead of staying vague.`,
       trainingType: "coach conversation",
+      difficulty: "Warm-up",
       openingPrompt: `Tell me the real situation behind "${shortGoal}". What is happening now, and what result would feel successful?`,
       coachInstructions: `${coachName} should ask one useful question at a time, identify the real barrier, and turn the answer into a practical next move.`,
       nextStep: "Share the real situation in your own words."
@@ -10188,10 +10660,11 @@ function localBuildTrainingPath(goal, coach) {
     {
       id: "practice-one-scenario",
       title: "Practice One Real Scenario",
-      purpose: "Turn the goal into a realistic practice conversation, decision, or planning drill.",
+      purpose: "Turn the goal into a realistic practice conversation, decision, or planning drill - starting easy, then turning up the pressure.",
       trainingType: "guided practice",
-      openingPrompt: `Let's practice one realistic moment connected to "${shortGoal}". Describe the moment you want to handle better, or ask me for an example first.`,
-      coachInstructions: `${coachName} should roleplay, give examples, or adapt the practice based on what the user asks for.`,
+      difficulty: "Escalating",
+      openingPrompt: `Let's practice one realistic moment connected to "${shortGoal}". We'll start with an easier, lower-stakes version first. Describe the moment you want to handle better, or ask me for an example first.`,
+      coachInstructions: `${coachName} should roleplay this in two passes: first a calmer, lower-pressure version of the scenario so the user can find their footing, then - once they handle it reasonably - a harder, more realistic version (more resistance, less time, higher stakes). Say plainly when moving to the harder version so the escalation is visible, not sprung on the user. Adapt or slow back down if the user asks.`,
       nextStep: "Choose one real situation to rehearse."
     },
     {
@@ -10199,6 +10672,7 @@ function localBuildTrainingPath(goal, coach) {
       title: "Build the Next Step",
       purpose: "Create one small action the user can actually do this week.",
       trainingType: "action planning",
+      difficulty: "Wrap-up",
       openingPrompt: `What is one small step you could take this week for "${shortGoal}"? If you are unsure, I can suggest a low-pressure first step.`,
       coachInstructions: `${coachName} should make the plan realistic, safe, and flexible. Avoid pressure and avoid fake guarantees.`,
       nextStep: "Pick one action small enough to complete this week."
@@ -10228,7 +10702,23 @@ function createLocalBuildEntry(goal, reason = "") {
   });
 }
 
-function normalizeTrainingModule(module, index, usedIds = new Set()) {
+// Graduated difficulty (GitHub research idea): a roleplay that starts at
+// full difficulty trains panic, not skill - real exposure-practice design
+// starts with an easier version of a hard scenario and escalates once the
+// user handles it. DIFFICULTY_LADDER is the position-based fallback label
+// (module 1 = warm-up, last module = hardest) used whenever the AI-
+// generated or local-fallback path doesn't supply its own; live AI paths
+// can still set a more specific one via the JSON schema.
+const DIFFICULTY_LADDER = ["Warm-up", "Real practice", "Under pressure"];
+function difficultyForIndex(index, total) {
+  if (total <= 1) return DIFFICULTY_LADDER[1];
+  const ratio = index / (total - 1);
+  if (ratio <= 0.15) return DIFFICULTY_LADDER[0];
+  if (ratio >= 0.85) return DIFFICULTY_LADDER[2];
+  return DIFFICULTY_LADDER[1];
+}
+
+function normalizeTrainingModule(module, index, usedIds = new Set(), total = 1) {
   const rawTitle = cleanText(module && module.title ? module.title : `Training ${index + 1}`, 80);
   const fallbackId = buildSafeId(rawTitle, `training-${index + 1}`);
   const rawId = buildSafeId(module && module.id ? module.id : fallbackId, fallbackId);
@@ -10244,6 +10734,7 @@ function normalizeTrainingModule(module, index, usedIds = new Set()) {
     title: rawTitle,
     purpose: cleanText(module && module.purpose ? module.purpose : "Practice one useful step for this goal.", 220),
     trainingType: cleanText(module && module.trainingType ? module.trainingType : "custom", 40),
+    difficulty: cleanText(module && module.difficulty ? module.difficulty : difficultyForIndex(index, total), 24),
     openingPrompt: cleanText(module && module.openingPrompt ? module.openingPrompt : "Tell me what you have tried so far, and I will guide the next practice step.", 280),
     coachInstructions: cleanText(module && module.coachInstructions ? module.coachInstructions : "Guide the user through one practical training step. Ask one question at a time.", 360),
     nextStep: cleanText(module && module.nextStep ? module.nextStep : "Start this training when you are ready.", 180)
@@ -10252,9 +10743,8 @@ function normalizeTrainingModule(module, index, usedIds = new Set()) {
 
 function normalizeTrainingPath(items, maxItems = 6) {
   const usedIds = new Set();
-  return (Array.isArray(items) ? items : [])
-    .slice(0, maxItems)
-    .map((item, index) => normalizeTrainingModule(item, index, usedIds));
+  const trimmed = (Array.isArray(items) ? items : []).slice(0, maxItems);
+  return trimmed.map((item, index) => normalizeTrainingModule(item, index, usedIds, trimmed.length));
 }
 
 function normalizeBuildTrainingSession(session) {
@@ -10393,6 +10883,7 @@ function buildTrainingPathSection(entry) {
       ${entry.trainingPath.map((module, index) => `
         <article class="build-training-card">
           <span>${String(index + 1).padStart(2, "0")} - ${escapeHTML(module.trainingType)}</span>
+          ${module.difficulty ? `<span class="difficulty-chip">${escapeHTML(module.difficulty)}</span>` : ""}
           <h4>${escapeHTML(module.title)}</h4>
           <p>${escapeHTML(module.purpose)}</p>
           <button class="secondary-action compact-action" type="button" data-start-build-training="${escapeHTML(module.id)}">Start training</button>
@@ -10506,10 +10997,10 @@ ${realGrowthFactsText()}
 Coach catalog:
 ${buildCoachCatalogText()}
 
-Match the best coach for this goal. Do NOT limit yourself to interview, study, or money; choose the coach that fits the user's actual need, or Custom Growth Coach if no specialist fits. Create a training path with 3 to 5 interactive trainings. Training modules should be things the user can actually practice with AI: roleplay, script-builder, planning drill, active recall, decision simulation, application planner, routine builder, confidence exposure, etc. Avoid proof logs, scores, badges, and generic advice.
+Match the best coach for this goal. Do NOT limit yourself to interview, study, or money; choose the coach that fits the user's actual need, or Custom Growth Coach if no specialist fits. Create a training path with 3 to 5 interactive trainings. Training modules should be things the user can actually practice with AI: roleplay, script-builder, planning drill, active recall, decision simulation, application planner, routine builder, confidence exposure, etc. Avoid proof logs, scores, badges, and generic advice. Order the path so difficulty rises across modules ("Warm-up" first, hardest last), and for any roleplay/practice module set coachInstructions to run it in an easy pass first before escalating to a harder, higher-pressure version - never open with the hardest version of a scenario.
 
 Respond as strict JSON only:
-{"coachType":"string","coachReason":"string","goalSummary":"string","missingContext":["string"],"trainingPath":[{"id":"short-kebab-id","title":"string","purpose":"string","trainingType":"string","openingPrompt":"string","coachInstructions":"string","nextStep":"string"}],"nextStep":"string"}`;
+{"coachType":"string","coachReason":"string","goalSummary":"string","missingContext":["string"],"trainingPath":[{"id":"short-kebab-id","title":"string","purpose":"string","trainingType":"string","difficulty":"string","openingPrompt":"string","coachInstructions":"string","nextStep":"string"}],"nextStep":"string"}`;
     const reply = await requestCompassDirect(BUILD_MODE_SYSTEM_PROMPT, prompt);
     const parsed = extractJsonObject(reply);
     if (!parsed || !Array.isArray(parsed.trainingPath)) throw new Error("Coach router reply was not valid JSON.");
@@ -10600,6 +11091,7 @@ function buildTrainingModal(sessionId) {
     `;
   }
   const messages = (session.messages || []).filter((message) => cleanText(message && message.message, 900));
+  const module = buildTrainingModuleById(entry, session.trainingId);
   return `
     <div class="modal-card assessment-modal future-self-modal build-training-modal" role="dialog" aria-modal="true" aria-labelledby="build-training-title">
       <div class="modal-top">
@@ -10607,6 +11099,7 @@ function buildTrainingModal(sessionId) {
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="build-training-title">${escapeHTML(session.title)}</h3>
+      ${module && module.difficulty ? `<span class="difficulty-chip">${escapeHTML(module.difficulty)}</span>` : ""}
       <p class="muted">${escapeHTML(entry.goalSummary)}</p>
       <section class="build-free-coach-note">
         <strong>You are not locked into this exercise.</strong>
@@ -10625,9 +11118,13 @@ function buildTrainingModal(sessionId) {
         <div class="build-coach-prompt-row">
           ${buildCoachFreedomPrompts().map((prompt) => `<button type="button" data-build-coach-prompt="${escapeHTML(prompt)}" ${isBuildTrainingLoading ? "disabled" : ""}>${escapeHTML(prompt)}</button>`).join("")}
         </div>
-        <textarea id="build-training-input" placeholder="Say anything. Add context, ask a question, or tell the coach to change direction." data-build-training-draft>${escapeHTML(buildTrainingDraft)}</textarea>
+        <div class="build-training-input-row">
+          <button class="voice-button" type="button" data-voice-build-training aria-label="Record your answer" ${isBuildTrainingLoading ? "disabled" : ""}>Mic</button>
+          <textarea id="build-training-input" placeholder="Say anything. Add context, ask a question, or tell the coach to change direction." data-build-training-draft>${escapeHTML(buildTrainingDraft)}</textarea>
+        </div>
+        <p class="tiny-note build-voice-status" data-build-voice-status aria-live="polite"></p>
         <button class="primary-action mirror-run-action" type="button" data-send-build-training ${isBuildTrainingLoading ? "disabled" : ""}>${isBuildTrainingLoading ? "Training..." : "Send freely"}</button>
-        <p class="tiny-note">Tip: Ctrl + Enter sends without losing your text.</p>
+        <p class="tiny-note">Tip: Ctrl + Enter sends without losing your text. Or tap Mic and say your answer out loud - real interviews and hard conversations happen out loud, not typed.</p>
       `}
       <div class="profile-actions">
         <button class="secondary-action compact-action" type="button" data-open-build-entry="${escapeHTML(entry.id)}">Back to plan</button>
@@ -10746,6 +11243,43 @@ async function enhanceBuildTrainingReply(entryId, sessionId, assistantCreatedAt,
   } catch (error) {
     console.error("[Build Mode] Live coach refinement failed; local coach reply kept.", error);
   }
+}
+
+// Voice practice (GitHub research idea): real interviews, hard phone calls,
+// and asking-for-help conversations happen out loud, not typed - typing a
+// roleplay answer trains a different skill than saying it. Reuses the exact
+// SpeechRecognition feature-detection pattern already used for the main
+// Compass chat's voice input (data-voice-chat, above) rather than a new
+// pattern, transcribing into the same #build-training-input textarea so it
+// flows through the existing review-then-send path unchanged - voice is
+// just an alternate way to fill the box, not a bypass of it.
+function startBuildTrainingVoiceInput() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const input = modalLayer.querySelector("#build-training-input");
+  const status = modalLayer.querySelector("[data-build-voice-status]");
+  if (!SpeechRecognition) {
+    if (status) status.textContent = "Voice input is not available in this browser. You can type your answer instead.";
+    return;
+  }
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  if (status) status.textContent = "Listening... say your answer out loud.";
+  recognition.onresult = (result) => {
+    const transcript = result.results[0][0].transcript;
+    if (input) {
+      input.value = transcript;
+      buildTrainingDraft = transcript;
+      input.focus();
+    }
+    if (status) status.textContent = "Got it - review your answer below, then send when ready.";
+  };
+  recognition.onerror = () => {
+    if (status) status.textContent = "Voice input had trouble listening. You can type your answer instead.";
+  };
+  recognition.onend = () => {
+    if (status && status.textContent === "Listening... say your answer out loud.") status.textContent = "";
+  };
+  recognition.start();
 }
 
 async function sendBuildTrainingReply(forcedText = "") {
@@ -10965,12 +11499,14 @@ document.addEventListener("click", async (event) => {
   const startBuildTrainingButton = event.target.closest("[data-start-build-training]");
   const openBuildTrainingButton = event.target.closest("[data-open-build-training]");
   const sendBuildTrainingButton = event.target.closest("[data-send-build-training]");
+  const voiceBuildTrainingButton = event.target.closest("[data-voice-build-training]");
   const buildCoachPromptButton = event.target.closest("[data-build-coach-prompt]");
   const finishBuildTrainingButton = event.target.closest("[data-finish-build-training]");
   const saveFutureReflection = event.target.closest("[data-save-future-reflection]");
   const copyCommunityPrompt = event.target.closest("[data-copy-community-prompt]");
   const clearChat = event.target.closest("[data-clear-chat]");
   const moodChoice = event.target.closest("[data-mood-choice]");
+  const reflectionStarter = event.target.closest("[data-reflection-starter]");
   const sendChat = event.target.closest("[data-send-chat]");
   const voiceChat = event.target.closest("[data-voice-chat]");
   const submitAssessment = event.target.closest("[data-submit-assessment]");
@@ -10997,6 +11533,10 @@ document.addEventListener("click", async (event) => {
   const saveResumeDraftButton = event.target.closest("[data-save-resume-draft]");
   const polishResumeButton = event.target.closest("[data-polish-resume]");
   const copyResumeButton = event.target.closest("[data-copy-resume]");
+  const savePortfolioDraftButton = event.target.closest("[data-save-portfolio-draft]");
+  const polishPortfolioButton = event.target.closest("[data-polish-portfolio]");
+  const copyPortfolioButton = event.target.closest("[data-copy-portfolio]");
+  const calculatePaycheckButton = event.target.closest("[data-calculate-paycheck]");
   const exportVaultButton = event.target.closest("[data-export-vault]");
   const saveMood = event.target.closest("[data-save-mood]");
   const demoReceipt = event.target.closest("[data-demo-receipt]");
@@ -11648,6 +12188,17 @@ document.addEventListener("click", async (event) => {
     modalLayer.querySelectorAll("[data-mood-choice]").forEach((button) => button.classList.toggle("is-selected", button === moodChoice));
   }
 
+  if (reflectionStarter) {
+    const textarea = modalLayer.querySelector("#daily-reflection-text");
+    if (textarea) {
+      const starter = reflectionStarter.dataset.reflectionStarter;
+      textarea.value = textarea.value.trim() ? `${textarea.value.trim()}\n${starter} ` : `${starter} `;
+      dailyReflectionDraft = textarea.value;
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    }
+  }
+
   if (nextAssessment) {
     captureAssessmentDraft();
     assessmentStep = Math.min(assessmentItems.length + 1, assessmentStep + 1);
@@ -11752,6 +12303,7 @@ document.addEventListener("click", async (event) => {
   if (startBuildTrainingButton) startBuildTraining(startBuildTrainingButton.dataset.startBuildTraining);
   if (openBuildTrainingButton) openBuildTraining(openBuildTrainingButton.dataset.openBuildTraining);
   if (sendBuildTrainingButton) await sendBuildTrainingReply();
+  if (voiceBuildTrainingButton) startBuildTrainingVoiceInput();
   if (buildCoachPromptButton) await sendBuildTrainingReply(buildCoachPromptButton.dataset.buildCoachPrompt || "");
   if (finishBuildTrainingButton) finishBuildTrainingSession();
 
@@ -11812,9 +12364,14 @@ document.addEventListener("click", async (event) => {
     if (content) {
       createReflectionEntry("daily", content, { tags: ["daily", saveDailyReflectionButton.dataset.saveDailyReflection] });
       dailyReflectionPromptIndex += 1;
+      dailyReflectionDraft = "";
       closeModal();
       renderScreen(activeTab);
       refreshStaticScreens();
+      const newStreak = reflectionCheckInStreak().streak;
+      const growthBoost = applyGrowthCheckInBoost("reflection", newStreak);
+      const boostSuffix = growthBoost ? ` · +${growthBoost.boost} ${growthBoost.statLabel} in Life Sim` : "";
+      triggerCheckInCelebration((newStreak > 1 ? `🌱 Saved! ${newStreak}-day reflection streak` : "🌱 Reflection saved") + boostSuffix);
     }
   }
 
@@ -11915,6 +12472,30 @@ document.addEventListener("click", async (event) => {
     }
   }
 
+  if (savePortfolioDraftButton) {
+    savePortfolioDraft();
+    openModal("portfolioBuilder");
+  }
+
+  if (polishPortfolioButton) {
+    await polishPortfolioWithAI();
+  }
+
+  if (calculatePaycheckButton) {
+    calculatePaycheckReality();
+  }
+
+  if (copyPortfolioButton) {
+    const portfolio = trackerState.careerStudio.portfolio;
+    if (portfolio && portfolio.polishedText && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(portfolio.polishedText);
+      } catch (error) {
+        console.error("[Portfolio Builder] Clipboard copy failed", error);
+      }
+    }
+  }
+
   if (exportVaultButton) {
     downloadKnowledgeVaultExport();
   }
@@ -11996,6 +12577,11 @@ document.addEventListener("click", async (event) => {
     closeModal();
     renderScreen(activeTab);
     refreshStaticScreens();
+    void enhanceMoodSuggestionWithAI(trackerState.mood.label, score, note);
+    const newStreak = moodCheckInStreak().streak;
+    const growthBoost = applyGrowthCheckInBoost("mood", newStreak);
+    const boostSuffix = growthBoost ? ` · +${growthBoost.boost} ${growthBoost.statLabel} in Life Sim` : "";
+    triggerCheckInCelebration((newStreak > 1 ? `🔥 Logged! ${newStreak}-day streak` : "✅ Mood logged for today") + boostSuffix);
   }
 
   if (saveAiProfile) {
@@ -12623,6 +13209,9 @@ document.addEventListener("input", (event) => {
   if (event.target && event.target.matches("[data-build-training-draft]")) {
     buildTrainingDraft = event.target.value;
   }
+  if (event.target && event.target.id === "daily-reflection-text") {
+    dailyReflectionDraft = event.target.value;
+  }
   if (event.target && event.target.id === "inspire-search") {
     inspireSearch = event.target.value;
     renderScreen("stories");
@@ -12631,6 +13220,13 @@ document.addEventListener("input", (event) => {
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
     }
+  }
+  if (event.target && event.target.id === "mood-score") {
+    const score = Number(event.target.value) || 0;
+    const emoji = modalLayer.querySelector("#mood-score-emoji");
+    const label = modalLayer.querySelector("#mood-score-label");
+    if (emoji) emoji.textContent = energyEmoji(score);
+    if (label) label.textContent = energyLabel(score);
   }
 });
 

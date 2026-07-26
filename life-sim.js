@@ -61,6 +61,95 @@
     { id: "woodlands", name: "Woodlands", x: 0, z: 50, radius: 7.5 }
   ];
 
+  const LOCATION_SAFE_SPAWN_POINTS = {
+    // Spawn outside the hawker/food-court shell. Spawning at the exact zone
+    // center puts the camera under the roof or inside a wall on some saved
+    // states, which reads as an instant black screen.
+    food: [8, 0, -82],
+    mall: [0, 0, -42],
+    work: [-25, 0, -74],
+    home: [-30, 0, 32],
+    train: [-13, 0, 15],
+    airport: [104, 0, -4],
+    hospital: [75, 0, -48],
+    university: [-76, 0, 2],
+    gym: [-56, 0, 48],
+    cafe: [-47, 0, -31]
+  };
+
+  const LOCATION_SAFE_SPAWN_YAWS = {
+    food: Math.PI / 2,
+    mall: Math.PI / 2,
+    home: Math.PI * 0.78,
+    train: Math.PI * 0.62
+  };
+
+  const OVER_SHOULDER_CAMERA = {
+    // PUBG-style life-sim view: close, low, and slightly over the right
+    // shoulder so the player sits on the left third while the street opens up.
+    fov: 68,
+    distance: 4.25,
+    movingDistance: 3.9,
+    height: 1.82,
+    pitchHeight: 0.58,
+    shoulderOffset: 0.9,
+    lookAhead: 6.15,
+    lookHeight: 1.44,
+    movingLookAhead: 1.15,
+    movingLookHeight: 0.12,
+    minPitch: 0.18,
+    maxPitch: 0.82,
+    defaultPitch: 0.38,
+    positionDamping: 8.6,
+    lookDamping: 10.4
+  };
+
+  const PLAYER_VISUAL_REFERENCE = {
+    heightMeters: 1.72,
+    fallbackScale: 0.56
+  };
+
+  const LIFE_SIM_SCALE_BUDGETS = {
+    playerHeightMeters: PLAYER_VISUAL_REFERENCE.heightMeters,
+    hawkerPavilionHeightMeters: 6.2,
+    hawkerShopHeightMeters: 5.6,
+    shophouseHeightMeters: 11.5,
+    hdbBlockHeightMeters: 24,
+    roadLaneWidthMeters: 3.5,
+    sidewalkMinWidthMeters: 1.6
+  };
+
+  const LIFE_SIM_PERFORMANCE = {
+    // Mobile browser first: 2x rendering + 2048 shadows made the simulator
+    // feel stuck on entry while shaders, textures, and models all uploaded.
+    maxPixelRatio: 1,
+    shadowSize: 512,
+    shadowCameraSize: 34,
+    // Re-tested (2026-07-22): tried re-enabling shadows now that the LOD
+    // pipeline and far-plane fix cut draw calls a lot, since shadows are one
+    // of the biggest "looks like a real place, not a flat toy" visual cues
+    // a 3D scene has. Measured it properly with an A/B headless FPS
+    // comparison (same locations, same wait times, only this flag changed)
+    // instead of guessing: shadows cost a real, consistent 30-55% of frame
+    // rate even at the already mobile-tuned 512px/34-unit budget (e.g.
+    // default entry 9fps -&gt; 4fps). Given this whole pass exists BECAUSE of
+    // lag/heat complaints, reintroducing a measured performance hit for
+    // shadows specifically isn't worth it - staying off. Cheaper realism
+    // levers (a single lightweight post-process pass, environmental detail)
+    // cost far less per frame than a second shadow-map scene render.
+    shadowsEnabled: false,
+    nearAssetConcurrency: 1,
+    farAssetConcurrency: 1,
+    farAssetDelayMs: 6200,
+    roadPropsDelayMs: 4200,
+    plazaPropsDelayMs: 7200,
+    urbanReplacementPropsDelayMs: 9800,
+    farPropsDelayMs: 3000,
+    remoteCharacterDelayMs: 2600,
+    remoteCharacterTimeoutMs: 5500,
+    propYieldEvery: 2
+  };
+
   function mount(root, options = {}) {
     if (!root) return null;
     root.innerHTML = "";
@@ -85,13 +174,25 @@
       scene.fog = new THREE.Fog(0xcdd2c2, 38, 104);
     }
 
-    const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 180);
+    // Performance fix: the camera's far plane used to be 180 units while fog
+    // reaches full opacity at 104 - everything between 104 and 180 units was
+    // fully invisible (fogged out) but three.js's automatic frustum culling
+    // still submitted it for rendering, since fog is a post-process visual
+    // effect, not a culling distance. Across a ~200x157 unit map with 20+
+    // districts, that meant huge amounts of completely-invisible geometry
+    // were still costing real draw calls and GPU time every frame - a real,
+    // measured contributor to the lag/heat complaints (draw calls climbing
+    // into the thousands, FPS dropping to single digits, on a real recorded
+    // production test). Matching the far plane to just past the fog
+    // distance lets three.js skip that geometry entirely with zero visual
+    // difference (it was never visible anyway).
+    const camera = new THREE.PerspectiveCamera(OVER_SHOULDER_CAMERA.fov, 1, 0.1, 112);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     if (window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.configureRenderer) {
-      window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.86, shadows: true, maxPixelRatio: 2 });
+      window.LifeVerseRenderPipeline.configureRenderer(THREE, renderer, { exposure: 0.86, shadows: LIFE_SIM_PERFORMANCE.shadowsEnabled, maxPixelRatio: LIFE_SIM_PERFORMANCE.maxPixelRatio });
     } else {
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.shadowMap.enabled = true;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LIFE_SIM_PERFORMANCE.maxPixelRatio));
+      renderer.shadowMap.enabled = LIFE_SIM_PERFORMANCE.shadowsEnabled;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace || renderer.outputColorSpace;
       renderer.toneMappingExposure = 0.86;
@@ -108,18 +209,18 @@
       lookStart: null,
       moveVector: { x: 0, y: 0 },
       yaw: Math.PI,
-      pitch: 0.6,
+      pitch: OVER_SHOULDER_CAMERA.defaultPitch,
       smoothMove: { x: 0, y: 0 },
       moveSpeed: 0,
       walkPhase: 0,
       footstepTimer: 0,
       isMoving: false,
       mixers: [],
-      productionAssetsLoaded: false,
+      realCharacterLoaded: false,
       assetManager: null,
       assetDebug: null,
-      cameraPosition: new THREE.Vector3(-19, 8, 0),
-      cameraLookAt: new THREE.Vector3(-19, 1.55, -10),
+      cameraPosition: new THREE.Vector3(),
+      cameraLookAt: new THREE.Vector3(),
       cameraShake: 0,
       presentation: null,
       outline: null
@@ -144,13 +245,19 @@
     if (state.assetManager) state.assetDebug = state.assetManager.createDebugPanel(host, renderer, scene);
 
     const player = createPlayer(THREE, materials);
-    player.group.position.set(-19, 0, -10);
+    // Default Life Sim entry now opens from a clear street corridor instead of
+    // the town-centre frontage, which could place the camera directly against
+    // a wall-like planning mass on public builds with restored player data.
+    state.yaw = Math.PI / 2;
+    player.group.position.set(8, 0, -82);
+    resetOverShoulderCamera(THREE, state, player.group.position);
     if (options.initialLocationId) {
       const targetZone = locationZones.find((zone) => zone.id === options.initialLocationId);
       if (targetZone) {
-        player.group.position.set(targetZone.x, 0, targetZone.z);
-        state.cameraPosition.set(targetZone.x, 8, targetZone.z - 12);
-        state.cameraLookAt.set(targetZone.x, 1.55, targetZone.z);
+        const safeSpawn = safeSpawnPointForZone(targetZone);
+        state.yaw = safeSpawnYawForZone(targetZone);
+        player.group.position.set(safeSpawn[0], safeSpawn[1], safeSpawn[2]);
+        resetOverShoulderCamera(THREE, state, player.group.position);
       }
     }
     const debugParams = new URLSearchParams(location.search);
@@ -159,49 +266,57 @@
       const [sx, sy, sz] = spawnOverride.split(",").map(Number);
       if (Number.isFinite(sx) && Number.isFinite(sz)) {
         player.group.position.set(sx, Number.isFinite(sy) ? sy : 0, sz);
-        state.cameraPosition.set(sx, 8, sz - 12);
-        state.cameraLookAt.set(sx, 1.55, sz);
+        resetOverShoulderCamera(THREE, state, player.group.position);
       }
       const yawOverride = Number(debugParams.get("yaw"));
-      if (Number.isFinite(yawOverride)) state.yaw = yawOverride;
-    }
-    scene.add(player.group);
-    loadProductionAssets(THREE, scene, materials, player, state, root, state.assetManager).then((loaded) => {
-      if (state.destroyed) return;
-      state.productionAssetsLoaded = loaded;
-      if (!loaded) {
-        createDistrict(THREE, scene, materials);
-        setAssetStatus(root, "Stylized remastered district active.", "success");
-        window.setTimeout(() => clearAssetStatus(root), 2600);
-        loadDistrictAssetSamples(THREE, scene, state.assetManager, state);
+      if (Number.isFinite(yawOverride)) {
+        state.yaw = yawOverride;
+        resetOverShoulderCamera(THREE, state, player.group.position);
       }
-      registerPresentationObjects(scene, state.presentation);
+    }
+    const spawnX = player.group.position.x;
+    const spawnZ = player.group.position.z;
+    scene.add(player.group);
+    activeStaticColliders = state.staticColliders = [];
+    createDistrict(THREE, scene, materials);
+    warnOnColliderOverlaps(activeStaticColliders);
+    setDistrictLoadingHint(root, "Loading nearby area…");
+    const objaverseIndexReady = loadObjaverseManifestAssets(state.assetManager, state);
+    const districtSamplesReady = loadDistrictAssetSamples(THREE, scene, state.assetManager, state, spawnX, spawnZ);
+    const roadPropsReady = deferWorldLoad(() => addRoadDetailProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady), LIFE_SIM_PERFORMANCE.roadPropsDelayMs);
+    const plazaPropsReady = deferWorldLoad(() => addDistrictPlazaProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady), LIFE_SIM_PERFORMANCE.plazaPropsDelayMs);
+    const singaporeObjaversePropsReady = deferWorldLoad(() => addSingaporeObjaverseReplacementProps(THREE, scene, state.assetManager, state, spawnX, spawnZ, objaverseIndexReady), LIFE_SIM_PERFORMANCE.urbanReplacementPropsDelayMs);
+    let districtLoadingSafetyTimeout = window.setTimeout(() => {
+      if (state.destroyed) return;
+      clearDistrictLoadingHint(root);
+    }, 6500);
+    districtSamplesReady.then(() => {
+      window.clearTimeout(districtLoadingSafetyTimeout);
+      if (state.destroyed) return;
+      clearDistrictLoadingHint(root);
+      if (isLayoutAuditEnabled()) {
+        auditSceneLayout(THREE, scene);
+      }
     });
+    Promise.all([roadPropsReady, plazaPropsReady, singaporeObjaversePropsReady]).catch((error) => {
+      console.warn("[Life Sim] Background prop streaming failed:", error);
+    });
+    deferWorldLoad(() => loadCharacterAsset(THREE, state.assetManager, player, state, root), LIFE_SIM_PERFORMANCE.remoteCharacterDelayMs).then((loaded) => {
+      if (state.destroyed) return;
+      state.realCharacterLoaded = loaded;
+    });
+    registerPresentationObjects(scene, state.presentation);
 
     const clock = new THREE.Clock();
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(root);
     resize();
 
-    // The Volume 5 anime cel-shading pass (docs/volume5-asset-pipeline.md) was
-    // superseded by a semi-realistic "Stylized Low Poly City" PBR direction -
-    // the outline pipeline stays intact below (?cel=1 still re-enables it for
-    // comparison) but is now opt-in rather than the default.
-    const celOutlineEnabled = new URLSearchParams(location.search).get("cel") === "1";
-    if (celOutlineEnabled && window.LifeVerseRenderPipeline && window.LifeVerseRenderPipeline.createOutlinePipeline) {
-      window.LifeVerseRenderPipeline.createOutlinePipeline(THREE, renderer, scene, camera, {
-        width: Math.max(320, root.clientWidth || window.innerWidth || 320),
-        height: Math.max(240, root.clientHeight || window.innerHeight || 240)
-      }).then((outline) => {
-        if (state.destroyed) {
-          outline.dispose();
-          return;
-        }
-        state.outline = outline;
-      }).catch((error) => {
-        console.warn("[LifeVerse] Cel outline pipeline unavailable, falling back to plain render.", error);
-      });
-    }
+    // The Volume 5 anime cel-shading outline pass (docs/volume5-asset-pipeline.md)
+    // is retired for good as of the realistic-style pivot - it's no longer even
+    // an opt-in ?cel=1 toggle, since state.outline is always undefined now and
+    // the guarded `if (state.outline)` call sites below (resize/render/destroy)
+    // are simply permanent no-ops.
 
     const keydown = (event) => {
       if (isTyping(event.target)) return;
@@ -246,7 +361,7 @@
         const dy = event.clientY - state.lookStart.y;
         state.lookStart = { x: event.clientX, y: event.clientY };
         state.yaw -= dx * 0.0065;
-        state.pitch = clamp(state.pitch + dy * 0.0045, 0.28, 0.95);
+        state.pitch = clamp(state.pitch + dy * 0.0045, OVER_SHOULDER_CAMERA.minPitch, OVER_SHOULDER_CAMERA.maxPitch);
       }
     };
     const pointerUp = (event) => {
@@ -288,7 +403,6 @@
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      if (state.outline) state.outline.setSize(width, height);
     }
 
     function animate() {
@@ -302,8 +416,7 @@
       if (state.assetDebug) state.assetDebug.update();
       updateCamera(player.group.position, delta, elapsed);
       updateZone(player.group.position);
-      if (state.outline) state.outline.render();
-      else renderer.render(scene, camera);
+      renderer.render(scene, camera);
       requestAnimationFrame(animate);
     }
 
@@ -350,6 +463,11 @@
         // to give real modeled buildings enough clearance from each other.
         player.group.position.x = clamp(player.group.position.x, -88, 118);
         player.group.position.z = clamp(player.group.position.z, -103, 60);
+        if (state.staticColliders && state.staticColliders.length) {
+          const [resolvedX, resolvedZ] = resolveStaticCollision(state.staticColliders, player.group.position.x, player.group.position.z, 0.42);
+          player.group.position.x = resolvedX;
+          player.group.position.z = resolvedZ;
+        }
         const targetAngle = Math.atan2(direction.x, direction.z);
         player.group.rotation.y = lerpAngle(player.group.rotation.y, targetAngle, Math.min(1, delta * 8.5));
         state.footstepTimer -= delta * state.moveSpeed;
@@ -382,17 +500,10 @@
     }
 
     function updateCamera(target, delta, elapsed) {
-      const distance = 9.4 - state.moveSpeed * 0.52;
-      const height = 3.75 + state.pitch * 3.05;
-      const offset = new THREE.Vector3(
-        Math.sin(state.yaw + Math.PI) * distance,
-        height,
-        Math.cos(state.yaw + Math.PI) * distance
-      );
-      const desiredPosition = target.clone().add(offset);
-      const lookTarget = new THREE.Vector3(target.x, target.y + 1.48 + state.moveSpeed * 0.12, target.z);
-      state.cameraPosition.lerp(desiredPosition, Math.min(1, delta * 5.8));
-      state.cameraLookAt.lerp(lookTarget, Math.min(1, delta * 7.2));
+      const rig = getOverShoulderCameraVectors(THREE, target, state.yaw, state.pitch, state.moveSpeed);
+      const cameraTarget = resolveCameraOcclusion(THREE, state.staticColliders, target, rig.position);
+      state.cameraPosition.lerp(cameraTarget, Math.min(1, delta * OVER_SHOULDER_CAMERA.positionDamping));
+      state.cameraLookAt.lerp(rig.lookAt, Math.min(1, delta * OVER_SHOULDER_CAMERA.lookDamping));
       if (state.cameraShake > 0.002) {
         const shake = state.cameraShake;
         state.cameraPosition.x += Math.sin(elapsed * 42) * shake;
@@ -432,9 +543,44 @@
 
     animate();
 
+    function readDebugState() {
+      return {
+          realCharacterLoaded: Boolean(state.realCharacterLoaded),
+          currentZoneId: state.currentZone ? state.currentZone.id : "",
+          playerChildren: player.group.children.map((child) => ({
+            name: child.name || child.type || "Object3D",
+            visible: child.visible !== false,
+            type: child.type || ""
+          })),
+          playerPosition: {
+            x: Number(player.group.position.x.toFixed(2)),
+            y: Number(player.group.position.y.toFixed(2)),
+            z: Number(player.group.position.z.toFixed(2))
+          },
+          cameraPosition: {
+            x: Number(state.cameraPosition.x.toFixed(2)),
+            y: Number(state.cameraPosition.y.toFixed(2)),
+            z: Number(state.cameraPosition.z.toFixed(2))
+          },
+          cameraLookAt: {
+            x: Number(state.cameraLookAt.x.toFixed(2)),
+            y: Number(state.cameraLookAt.y.toFixed(2)),
+            z: Number(state.cameraLookAt.z.toFixed(2))
+          },
+          assetDebug: state.assetManager && state.assetManager.getDebugSnapshot
+            ? state.assetManager.getDebugSnapshot(renderer, scene)
+            : null
+      };
+    }
+
+    window.CompassLifeSim.__lastDebugState = readDebugState;
+
     return {
+      getDebugState: readDebugState,
       destroy() {
+        if (window.CompassLifeSim.__lastDebugState === readDebugState) window.CompassLifeSim.__lastDebugState = null;
         state.destroyed = true;
+        window.clearTimeout(districtLoadingSafetyTimeout);
         resizeObserver.disconnect();
         window.removeEventListener("keydown", keydown);
         window.removeEventListener("keyup", keyup);
@@ -445,11 +591,89 @@
         host.removeEventListener("click", clickFeedback);
         if (state.presentation) state.presentation.audio.destroy();
         if (state.assetManager) state.assetManager.dispose();
-        if (state.outline) state.outline.dispose();
         renderer.dispose();
         root.innerHTML = "";
       }
     };
+  }
+
+  function getOverShoulderCameraVectors(THREE, target, yaw, pitch, moveSpeed = 0) {
+    const speedBlend = clamp(moveSpeed, 0, 1);
+    const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
+    const right = new THREE.Vector3(Math.sin(yaw + Math.PI / 2), 0, Math.cos(yaw + Math.PI / 2)).normalize();
+    const distance = OVER_SHOULDER_CAMERA.distance - (OVER_SHOULDER_CAMERA.distance - OVER_SHOULDER_CAMERA.movingDistance) * speedBlend;
+    const height = OVER_SHOULDER_CAMERA.height + pitch * OVER_SHOULDER_CAMERA.pitchHeight - speedBlend * 0.08;
+    const shoulder = OVER_SHOULDER_CAMERA.shoulderOffset + speedBlend * 0.18;
+    const lookAhead = OVER_SHOULDER_CAMERA.lookAhead + speedBlend * OVER_SHOULDER_CAMERA.movingLookAhead;
+    const position = target.clone()
+      .addScaledVector(forward, -distance)
+      .addScaledVector(right, shoulder);
+    position.y += height;
+
+    const lookAt = target.clone()
+      .addScaledVector(forward, lookAhead)
+      .addScaledVector(right, OVER_SHOULDER_CAMERA.shoulderOffset * 0.2);
+    lookAt.y += OVER_SHOULDER_CAMERA.lookHeight + speedBlend * OVER_SHOULDER_CAMERA.movingLookHeight;
+
+    return {
+      mode: "over-shoulder",
+      position,
+      lookAt,
+      forward,
+      right
+    };
+  }
+
+  function safeSpawnPointForZone(zone) {
+    if (!zone || !zone.id) return [-19, 0, -10];
+    const override = LOCATION_SAFE_SPAWN_POINTS[zone.id];
+    if (override) return override;
+    return [zone.x, 0, zone.z];
+  }
+
+  function safeSpawnYawForZone(zone) {
+    if (!zone || !zone.id) return Math.PI;
+    return LOCATION_SAFE_SPAWN_YAWS[zone.id] || Math.PI;
+  }
+
+  function resetOverShoulderCamera(THREE, state, target) {
+    const rig = getOverShoulderCameraVectors(THREE, target, state.yaw, state.pitch, state.moveSpeed || 0);
+    state.cameraPosition.copy(rig.position);
+    state.cameraLookAt.copy(rig.lookAt);
+  }
+
+  // Realistic-style pivot: flat MeshStandardMaterial colors (however correct
+  // the PBR roughness/metalness numbers) read as "flat plastic toy," not
+  // real - a surface needs actual photographic micro-detail (bump/grain/
+  // roughness variation) to read as real, which a solid color literally
+  // cannot provide regardless of lighting quality. These are real CC0
+  // photogrammetry PBR texture sets from ambientCG (no login required to
+  // download - see assets/textures/ambientcg/ for the ones fetched so far),
+  // 1K JPG resolution, Color/NormalGL/Roughness maps only (skipping
+  // Displacement/preview/source files ambientCG bundles, to stay light).
+  const pbrTextureCache = new Map();
+  function loadPbrTexture(THREE, assetId, suffix, repeatX, repeatY) {
+    const cacheKey = `${assetId}:${suffix}:${repeatX}:${repeatY}`;
+    if (pbrTextureCache.has(cacheKey)) return pbrTextureCache.get(cacheKey);
+    const texture = new THREE.TextureLoader().load(`assets/textures/ambientcg/${assetId}_1K-JPG_${suffix}.jpg`);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(repeatX, repeatY);
+    if (suffix === "Color" && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    pbrTextureCache.set(cacheKey, texture);
+    return texture;
+  }
+
+  // Full photographic material (color + normal + roughness) for large,
+  // continuously-visible ground-plane surfaces where the photographed base
+  // tone IS the desired look, not just a tint carrier.
+  function pbrGroundMaterial(THREE, assetId, repeatX, repeatY, options = {}) {
+    return new THREE.MeshStandardMaterial({
+      map: loadPbrTexture(THREE, assetId, "Color", repeatX, repeatY),
+      normalMap: loadPbrTexture(THREE, assetId, "NormalGL", repeatX, repeatY),
+      roughnessMap: loadPbrTexture(THREE, assetId, "Roughness", repeatX, repeatY),
+      roughness: 1,
+      ...options
+    });
   }
 
   function createMaterials(THREE) {
@@ -465,7 +689,21 @@
       ? window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" })
       : null;
     const shared = (key, fallback) => library && library.get ? library.get(key) : fallback();
-    const make = (color, emissive = 0x000000, roughness = 0.7, metalness = 0.03) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness });
+    // Realistic-style pivot, Phase 5: every "make()" material (every building
+    // wall/structure color in the game) now carries real photographic
+    // PaintedPlaster017 Color+NormalGL+Roughness maps - not just normal/
+    // roughness bump-under-flat-color like the first material pass, actual
+    // photographed painted-concrete albedo tinted by `color` - since Objaverse
+    // (and every free/loginless CC0 kit checked) has nothing building-shaped
+    // to source real geometry from, this is the achievable version of "make
+    // buildings look real": real material, not new geometry. addBuildingCore()
+    // only ever put a texture on a building's front face via its canvas-drawn
+    // window facade, so this is what fixes the other 5 flat faces on every
+    // single building at once instead of one texture assignment per type.
+    const wallColorMap = loadPbrTexture(THREE, "PaintedPlaster017", "Color", 2.4, 2.4);
+    const wallNormal = loadPbrTexture(THREE, "PaintedPlaster017", "NormalGL", 2.4, 2.4);
+    const wallRoughness = loadPbrTexture(THREE, "PaintedPlaster017", "Roughness", 2.4, 2.4);
+    const make = (color, emissive = 0x000000, roughness = 0.7, metalness = 0.03) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness, map: wallColorMap, normalMap: wallNormal, roughnessMap: wallRoughness, normalScale: new THREE.Vector2(0.4, 0.4) });
     const standard = (color, emissive = 0x000000, roughness = 0.68, metalness = 0.02) => new THREE.MeshStandardMaterial({ color, emissive, roughness, metalness });
     const glass = (color) => new THREE.MeshPhysicalMaterial({
       color,
@@ -479,12 +717,12 @@
 
     return {
       library,
-      grass: shared("grass", () => make(0x5f8f52)),
-      ground: make(0xb6ad97),
+      grass: pbrGroundMaterial(THREE, "Grass005", 60, 60, { color: 0xc7d9bd }),
+      ground: pbrGroundMaterial(THREE, "Concrete034", 70, 55, { color: 0xd8d2c2 }),
       warmGround: make(0xcbb290),
-      road: shared("road", () => standard(0x2b2e33)),
-      roadLine: make(0xd9d4c4, 0x0a0906, 0.55),
-      sidewalk: shared("concrete", () => make(0xb2a98f)),
+      road: pbrGroundMaterial(THREE, "Asphalt031", 34, 6, { color: 0x4f5655 }),
+      roadLine: make(0xf0ead6, 0x0a0906, 0.55),
+      sidewalk: pbrGroundMaterial(THREE, "Concrete034", 6, 6, { color: 0xd8d1bd }),
       curb: shared("stone", () => make(0xa89d87)),
       curbWarm: make(0xc9bfa2),
       hdb: make(0xe1dccd),
@@ -521,6 +759,19 @@
       signBlue: make(0x2f5fa8, 0x00102e),
       signGreen: make(0x2f8a5e, 0x001c10),
       signGold: make(0xc99a3f, 0x1c1200),
+      // Little India temple gopuram - dedicated, deliberately muted versions
+      // of the bright sign/flower/MRT colors it used to borrow. Reusing
+      // those shared materials directly (emissive glow included) made the
+      // temple read as a saturated, glowing "layer cake" with nothing
+      // visually bridging it to the muted city around it - found via an
+      // actual recorded playthrough, not a screenshot at a flattering angle.
+      // These keep the same warm-toned identity (a real Little India temple
+      // should still visibly be the most colorful thing on the block) but
+      // toned down and with no emissive glow, so it reads as sun-worn stone
+      // architecture instead of a lit-up prop.
+      templeBase: make(0xb8814a, 0x000000, 0.85, 0.02),
+      templeAccent: make(0xc07d84, 0x000000, 0.85, 0.02),
+      templeSpire: make(0x9c4a3e, 0x000000, 0.82, 0.02),
       roofDark: make(0x3a3f47, 0x000000, 0.55, 0.15),
       window: standard(0xf2dfa0, 0x6b5400),
       glass: shared("glass", () => glass(0x9fc4d1)),
@@ -544,15 +795,40 @@
 
   function createSkyTexture(THREE) {
     const canvas = document.createElement("canvas");
-    canvas.width = 32;
-    canvas.height = 256;
+    canvas.width = 1024;
+    canvas.height = 512;
     const ctx = canvas.getContext("2d");
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, "#4f8fc7");
-    gradient.addColorStop(0.55, "#a8cfe0");
-    gradient.addColorStop(1, "#dcd8c8");
+    gradient.addColorStop(0, "#3f82bf");
+    gradient.addColorStop(0.42, "#8fc5df");
+    gradient.addColorStop(0.72, "#d9d5be");
+    gradient.addColorStop(1, "#f1dcc0");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const sunGlow = ctx.createRadialGradient(760, 145, 8, 760, 145, 190);
+    sunGlow.addColorStop(0, "rgba(255, 244, 194, 0.84)");
+    sunGlow.addColorStop(0.28, "rgba(255, 214, 143, 0.28)");
+    sunGlow.addColorStop(1, "rgba(255, 214, 143, 0)");
+    ctx.fillStyle = sunGlow;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "rgba(255, 255, 246, 0.78)";
+    [
+      [130, 118, 78, 20], [192, 108, 92, 25], [254, 124, 70, 18],
+      [470, 84, 82, 22], [540, 96, 110, 28], [620, 82, 74, 18],
+      [820, 218, 105, 26], [905, 205, 82, 20]
+    ].forEach(([x, y, w, h]) => {
+      ctx.beginPath();
+      ctx.ellipse(x, y, w, h, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.fillStyle = "rgba(255, 244, 218, 0.32)";
+    for (let i = 0; i < 9; i += 1) {
+      const y = 300 + i * 14;
+      ctx.fillRect(0, y, canvas.width, 2);
+    }
     const texture = new THREE.CanvasTexture(canvas);
     texture.mapping = THREE.EquirectangularReflectionMapping;
     return texture;
@@ -567,6 +843,184 @@
   //   windows, a collapsible laundry pole angled out near the corridor edge.
   // - "modern": plain glass-curtain-wall grid, no ornamentation - office/
   //   mall/hospital-scale commercial buildings.
+  // Realistic-style pivot, Phase 4: static collision registry. There was
+  // zero collision detection anywhere in this file before this - retrofitting
+  // one onto every addBox call across ~20 zone-builder functions wasn't
+  // practical in scope, but every real building shell (HDB blocks, gym, work
+  // tower, hospital, library, university, mall, shophouses, etc.) already
+  // funnels through the single addBuildingCore() function below, so
+  // registering colliders there covers the walls a player would actually
+  // notice walking through, with exact precision (no scene-traversal
+  // heuristics needed). Reset per mount() - a stale collider list from a
+  // previous mount/remount must never block the new scene.
+  let activeStaticColliders = [];
+  function registerStaticCollider(name, centerX, centerZ, sizeX, sizeZ) {
+    activeStaticColliders.push({
+      name,
+      minX: centerX - sizeX / 2,
+      maxX: centerX + sizeX / 2,
+      minZ: centerZ - sizeZ / 2,
+      maxZ: centerZ + sizeZ / 2
+    });
+  }
+
+  // Authoring-time diagnostic (the automated version of the one clipping bug
+  // already found and hand-fixed in this file - a GLB lecture hall and a
+  // leftover primitive box rendering as two overlapping buildings, life-
+  // sim.js history) - logs instead of silently tolerating overlaps.
+  function warnOnColliderOverlaps(colliders) {
+    for (let i = 0; i < colliders.length; i += 1) {
+      for (let j = i + 1; j < colliders.length; j += 1) {
+        const a = colliders[i];
+        const b = colliders[j];
+        const overlapX = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);
+        const overlapZ = Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ);
+        if (overlapX > 0.15 && overlapZ > 0.15) {
+          console.warn(`[Life Sim] Static colliders overlap: "${a.name}" and "${b.name}" (${overlapX.toFixed(2)}x${overlapZ.toFixed(2)} units)`);
+        }
+      }
+    }
+  }
+
+  // Whole-map layout audit (broader than warnOnColliderOverlaps, which only
+  // covers addBuildingCore() shells). Walks scene.children - top-level
+  // objects only, not a deep traverse - so a GLB swap's dozens of internal
+  // submeshes (window frames overlapping their own wall, etc.) don't produce
+  // false positives; every addBox/addBuildingCore call and every swapped-in
+  // GLB group is already a direct scene child. Runs once, after district
+  // samples + road props both finish loading, logging real coordinates so
+  // findings are directly actionable, not just names.
+  const LAYOUT_AUDIT_EXCLUDE_NAME_PATTERN = /ground|road|path|line|crosswalk|zone.*ring|sidewalk|sand|^water|grass|green|flower|bed$|dust|cloud|rain|balcony/i;
+  function isLayoutAuditEnabled() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("lifeSimAudit") === "1" || window.localStorage?.getItem("lifeSimLayoutAudit") === "1";
+    } catch (error) {
+      return false;
+    }
+  }
+  function pushLayoutAuditCandidate(THREE, candidates, node, labelPrefix) {
+    const box = new THREE.Box3().setFromObject(node);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    if (size.y < 0.8 || size.x * size.z < 1.5) return;
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const label = labelPrefix ? `${labelPrefix} > ${node.name || "(unnamed)"}` : (node.name || "(unnamed)");
+    candidates.push({ name: label, box, center, size });
+  }
+  function auditSceneLayout(THREE, scene) {
+    const candidates = [];
+    scene.children.forEach((node) => {
+      if (!node.visible) return;
+      // "Zone Offset Group: x" wrapper groups (addZoneAt()) are containers,
+      // not real obstacles - their bounding box is the union of everything
+      // inside them, so every building inside its own zone trivially
+      // "overlaps" the wrapper. Recurse into them one level instead of
+      // treating the wrapper itself as a candidate, tagging each child with
+      // its zone so an ambiguous swapped-GLB name like "Scene" is still
+      // traceable back to a specific place on the map.
+      if (node.name && node.name.startsWith("Zone Offset Group")) {
+        const zoneLabel = node.name.replace("Zone Offset Group: ", "");
+        node.children.forEach((child) => {
+          if (!child.visible) return;
+          if (child.name && LAYOUT_AUDIT_EXCLUDE_NAME_PATTERN.test(child.name)) return;
+          pushLayoutAuditCandidate(THREE, candidates, child, zoneLabel);
+        });
+        return;
+      }
+      if (node.name && LAYOUT_AUDIT_EXCLUDE_NAME_PATTERN.test(node.name)) return;
+      pushLayoutAuditCandidate(THREE, candidates, node);
+    });
+    console.info(`[Life Sim] Layout audit: ${candidates.length} significant top-level objects scanned.`);
+    let overlapCount = 0;
+    for (let i = 0; i < candidates.length; i += 1) {
+      for (let j = i + 1; j < candidates.length; j += 1) {
+        const a = candidates[i];
+        const b = candidates[j];
+        const overlapX = Math.min(a.box.max.x, b.box.max.x) - Math.max(a.box.min.x, b.box.min.x);
+        const overlapZ = Math.min(a.box.max.z, b.box.max.z) - Math.max(a.box.min.z, b.box.min.z);
+        if (overlapX > 0.3 && overlapZ > 0.3) {
+          overlapCount += 1;
+          console.warn(`[Layout Audit] OVERLAP "${a.name}" @(${a.center.x.toFixed(1)},${a.center.z.toFixed(1)}) size ${a.size.x.toFixed(1)}x${a.size.z.toFixed(1)} vs "${b.name}" @(${b.center.x.toFixed(1)},${b.center.z.toFixed(1)}) size ${b.size.x.toFixed(1)}x${b.size.z.toFixed(1)} - overlap ${overlapX.toFixed(1)}x${overlapZ.toFixed(1)}`);
+        }
+      }
+    }
+    console.info(`[Life Sim] Layout audit: ${overlapCount} overlapping pair(s) found.`);
+  }
+
+  // Cheap axis-aligned circle-vs-rect push-out, run once per axis so the
+  // player slides along a wall instead of stopping dead on any contact.
+  function resolveStaticCollision(colliders, x, z, radius) {
+    let resolvedX = x;
+    let resolvedZ = z;
+    for (const box of colliders) {
+      const closestX = Math.max(box.minX, Math.min(resolvedX, box.maxX));
+      const closestZ = Math.max(box.minZ, Math.min(resolvedZ, box.maxZ));
+      const dx = resolvedX - closestX;
+      const dz = resolvedZ - closestZ;
+      const distSq = dx * dx + dz * dz;
+      if (distSq >= radius * radius || distSq === 0) continue;
+      const dist = Math.sqrt(distSq) || 0.0001;
+      const push = radius - dist;
+      resolvedX += (dx / dist) * push;
+      resolvedZ += (dz / dist) * push;
+    }
+    return [resolvedX, resolvedZ];
+  }
+
+  function resolveCameraOcclusion(THREE, colliders, target, desiredPosition) {
+    if (!colliders || !colliders.length) return desiredPosition;
+    const eye = target.clone();
+    eye.y += 1.35;
+    const dirX = desiredPosition.x - eye.x;
+    const dirZ = desiredPosition.z - eye.z;
+    let nearestT = 1;
+    const margin = 0.62;
+
+    for (const box of colliders) {
+      const minX = box.minX - margin;
+      const maxX = box.maxX + margin;
+      const minZ = box.minZ - margin;
+      const maxZ = box.maxZ + margin;
+      let tMin = 0;
+      let tMax = 1;
+      const axes = [
+        [eye.x, dirX, minX, maxX],
+        [eye.z, dirZ, minZ, maxZ]
+      ];
+      let hit = true;
+
+      for (const [origin, direction, min, max] of axes) {
+        if (Math.abs(direction) < 0.0001) {
+          if (origin < min || origin > max) hit = false;
+          continue;
+        }
+        const inv = 1 / direction;
+        let t1 = (min - origin) * inv;
+        let t2 = (max - origin) * inv;
+        if (t1 > t2) [t1, t2] = [t2, t1];
+        tMin = Math.max(tMin, t1);
+        tMax = Math.min(tMax, t2);
+        if (tMin > tMax) {
+          hit = false;
+          break;
+        }
+      }
+
+      if (hit && tMax >= 0 && tMin <= 1) {
+        nearestT = Math.min(nearestT, Math.max(0.28, tMin - 0.08));
+      }
+    }
+
+    if (nearestT >= 1) return desiredPosition;
+    return new THREE.Vector3(
+      eye.x + dirX * nearestT,
+      eye.y + (desiredPosition.y - eye.y) * nearestT,
+      eye.z + dirZ * nearestT
+    );
+  }
+
   // Cached by its own parameters so repeated calls with the same
   // color/floors/columns/style reuse one canvas instead of redrawing.
   const facadeTextureCache = new Map();
@@ -692,8 +1146,9 @@
         ambientIntensity: 0.95,
         sunIntensity: 1.08,
         sunPosition: [-12, 24, 12],
-        shadowSize: 2048,
-        shadowCameraSize: 38
+        shadows: LIFE_SIM_PERFORMANCE.shadowsEnabled,
+        shadowSize: LIFE_SIM_PERFORMANCE.shadowSize,
+        shadowCameraSize: LIFE_SIM_PERFORMANCE.shadowCameraSize
       })
       : null;
     const hemi = rig ? rig.hemi : new THREE.HemisphereLight(0xffffff, 0x91ad82, 0.95);
@@ -701,12 +1156,12 @@
     if (!rig) {
       scene.add(hemi);
       sun.position.set(-12, 24, 12);
-      sun.castShadow = true;
-      sun.shadow.mapSize.set(2048, 2048);
-      sun.shadow.camera.left = -38;
-      sun.shadow.camera.right = 38;
-      sun.shadow.camera.top = 38;
-      sun.shadow.camera.bottom = -38;
+      sun.castShadow = LIFE_SIM_PERFORMANCE.shadowsEnabled;
+      sun.shadow.mapSize.set(LIFE_SIM_PERFORMANCE.shadowSize, LIFE_SIM_PERFORMANCE.shadowSize);
+      sun.shadow.camera.left = -LIFE_SIM_PERFORMANCE.shadowCameraSize;
+      sun.shadow.camera.right = LIFE_SIM_PERFORMANCE.shadowCameraSize;
+      sun.shadow.camera.top = LIFE_SIM_PERFORMANCE.shadowCameraSize;
+      sun.shadow.camera.bottom = -LIFE_SIM_PERFORMANCE.shadowCameraSize;
       scene.add(sun);
     }
 
@@ -754,6 +1209,16 @@
     for (let i = 0; i < 8; i++) {
       clouds.add(createCloud(THREE, mat.cloud, -28 + i * 8, 12 + (i % 3) * 1.2, -27 + (i % 4) * 15, 1.15 + (i % 2) * 0.32));
     }
+    [
+      [-22, 17.5, -82, 1.5],
+      [-4, 18.6, -94, 1.85],
+      [16, 17.2, -78, 1.35],
+      [30, 19.0, -88, 1.7]
+    ].forEach(([x, y, z, scale]) => {
+      const cloud = createCloud(THREE, mat.cloud, x, y, z, scale);
+      cloud.name = "Food Court Horizon Cloud";
+      clouds.add(cloud);
+    });
     scene.add(clouds);
 
     const dust = createParticleField(THREE, mat.dust, 56, 32, 7.5, "Presentation Floating Dust");
@@ -1104,50 +1569,44 @@
     window.setTimeout(() => host.classList.remove("is-lifeverse-action-feedback"), 520);
   }
 
-  async function loadProductionAssets(THREE, scene, mat, player, state, root, assetManager) {
+  // Realistic-style pivot, Phase 2: this used to be loadProductionAssets(),
+  // which gated character AND environment/locationModels loading behind the
+  // same manifest.enabled flag, and the call site only ran createDistrict()/
+  // loadDistrictAssetSamples() (the world's roads/buildings/ground) when this
+  // returned false - meaning a real character with nothing else populated
+  // would have loaded into a completely empty scene. environment/
+  // locationModels pointed at files that never existed and aren't the live
+  // asset-swap mechanism anyway (loadDistrictAssetSamples() is), so that path
+  // is dropped entirely: this now only ever handles the character, and the
+  // call site always builds the district regardless of whether a real
+  // character was available.
+  async function loadCharacterAsset(THREE, assetManager, player, state, root) {
     if (!assetManager) return false;
     try {
       const manifest = await assetManager.loadManifest("assets/life-sim/asset-manifest.json");
-      if (!manifest || !manifest.enabled) return false;
+      if (!manifest || !manifest.enabled || !manifest.character || !manifest.character.url) return false;
       const loaderReady = await assetManager.ensureGltfLoader();
       if (!loaderReady) {
-        setAssetStatus(root, "Production assets are enabled, but GLTFLoader did not load. Check the GLTFLoader script in index.html.", "error");
+        setAssetStatus(root, "Realistic character is enabled, but GLTFLoader did not load. Check the GLTFLoader script in index.html.", "error");
         return false;
       }
-
-      setAssetStatus(root, "Loading production 3D assets...", "loading");
-
-      let loadedCount = 0;
-      if (manifest.environment && manifest.environment.url) {
-        const environment = await assetManager.instantiatePrefab("environment:main", scene, manifest.environment);
-        if (environment && !environment.fallback) loadedCount += 1;
+      setAssetStatus(root, "Loading realistic character...", "loading");
+      const character = await withTimeout(
+        assetManager.loadModel(manifest.character.url, manifest.character),
+        LIFE_SIM_PERFORMANCE.remoteCharacterTimeoutMs,
+        "remote character load timed out"
+      );
+      if (!character || character.fallback) {
+        setAssetStatus(root, "Realistic character could not load. Using the fallback rig.", "error");
+        return false;
       }
-
-      const locations = Array.isArray(manifest.locationModels) ? manifest.locationModels : [];
-      for (const location of locations) {
-        if (!location || !location.url) continue;
-        const loaded = await assetManager.instantiatePrefab(`location:${location.id || location.label || location.url}`, scene, location);
-        if (loaded && !loaded.fallback) loadedCount += 1;
-      }
-
-      if (manifest.character && manifest.character.url) {
-        const character = await assetManager.loadModel(manifest.character.url, manifest.character);
-        if (character && !character.fallback) {
-          await installCharacterAsset(THREE, assetManager, player, character, manifest.character, state, mat);
-          loadedCount += 1;
-        }
-      }
-
-      addZones(THREE, scene, mat);
-      if (loadedCount > 0) {
-        setAssetStatus(root, "Production asset mode active", "success");
-        window.setTimeout(() => clearAssetStatus(root), 2600);
-        return true;
-      }
-      return false;
+      await installCharacterAsset(THREE, assetManager, player, character, manifest.character, state);
+      setAssetStatus(root, "Realistic character active.", "success");
+      window.setTimeout(() => clearAssetStatus(root), 2600);
+      return true;
     } catch (error) {
-      console.warn("[Life Sim] Production asset loading failed:", error);
-      setAssetStatus(root, "Production assets could not load. Check file paths in assets/life-sim/asset-manifest.json.", "error");
+      console.warn("[Life Sim] Character asset loading failed:", error);
+      setAssetStatus(root, "Realistic character could not load. Using the fallback rig.", "error");
       return false;
     }
   }
@@ -1194,7 +1653,7 @@
   }
 
   function hideFallbackCharacter(player) {
-    ["body", "head", "hair", "leftArm", "rightArm", "leftLeg", "rightLeg"].forEach((key) => {
+    ["fallbackRoot", "body", "head", "hair", "leftArm", "rightArm", "leftLeg", "rightLeg"].forEach((key) => {
       if (player[key]) player[key].visible = false;
     });
     player.group.children.forEach((child) => {
@@ -1233,6 +1692,28 @@
   function clearAssetStatus(root) {
     const status = root && root.querySelector("[data-life-sim-asset-status]");
     if (status) status.remove();
+  }
+
+  // Distance-tiered load pass: a separate, dedicated status element (not a
+  // reuse of setAssetStatus/clearAssetStatus above) since that one is a
+  // singleton already claimed by the character-loading path - even though
+  // that path is dormant today (manifest.character is null), reusing it
+  // here would silently collide the moment a real character is wired up.
+  function setDistrictLoadingHint(root, message) {
+    if (!root) return;
+    let hint = root.querySelector("[data-life-sim-district-status]");
+    if (!hint) {
+      hint = document.createElement("div");
+      hint.dataset.lifeSimDistrictStatus = "";
+      hint.className = "life-sim-district-loading";
+      root.appendChild(hint);
+    }
+    hint.textContent = message;
+  }
+
+  function clearDistrictLoadingHint(root) {
+    const hint = root && root.querySelector("[data-life-sim-district-status]");
+    if (hint) hint.remove();
   }
 
   // Urban planning pass: each zone's building function still uses the
@@ -1286,12 +1767,19 @@
     // tripled from the original compact map).
     addPlane(THREE, scene, "Soft Anime Town Ground", [15, -0.04, -21.5], [210, 165], mat.ground);
     addPlane(THREE, scene, "North Residential Green", [-45, -0.02, 46], [55, 35], mat.grass);
+    addSoftEdgeGroundPatch(THREE, scene, "North Residential Green", [-45, -0.02, 46], [55, 35], 0xcfe0c6);
     addPlane(THREE, scene, "Campus Green", [-80, -0.015, -5], [26, 26], mat.grass);
+    addSoftEdgeGroundPatch(THREE, scene, "Campus Green", [-80, -0.015, -5], [26, 26], 0xcfe0c6);
     addPlane(THREE, scene, "Park Green", [13, -0.01, 23], [24, 20], mat.park);
+    addSoftEdgeGroundPatch(THREE, scene, "Park Green", [13, -0.01, 23], [24, 20], 0x3f7a52);
     addPlane(THREE, scene, "Beach Sand", [75, 0, -82], [26, 11], mat.sand);
+    addSoftEdgeGroundPatch(THREE, scene, "Beach Sand", [75, 0, -82], [26, 11], 0xd8c184);
     addPlane(THREE, scene, "Shallow Anime Sea", [75, 0.015, -90], [28, 9], mat.water);
 
     addRoadNetwork(THREE, scene, mat);
+    addStreetCompositionLayer(THREE, scene, mat);
+    addSingaporeOfficialPlanningRebase(THREE, scene, mat);
+    addSingaporeIdentityPass(THREE, scene, mat);
     addZoneAt(addHdbHome, THREE, scene, mat, "home");
     addZoneAt(addGym, THREE, scene, mat, "gym");
     addZoneAt(addWorkTower, THREE, scene, mat, "work");
@@ -1313,6 +1801,7 @@
     addZoneAt(addClarkeQuay, THREE, scene, mat, "clarke-quay");
     addZoneAt(addHdbHub, THREE, scene, mat, "hdb-hub");
     addStreetLife(THREE, scene, mat);
+    addSingaporeUrbanPlanningInfill(THREE, scene, mat);
     addWoodlands(THREE, scene, mat);
     addPunggol(THREE, scene, mat);
     addBox(THREE, scene, "Woodlands Access Road", [0, 0.025, 34], [5.2, 0.08, 32], mat.road, true);
@@ -1418,48 +1907,277 @@
   const SENTOSA_PALM_POSITIONS = [[65, -84], [67, -77.5], [74, -77], [82, -80.5]];
   const SENTOSA_PALM_BEND_POSITIONS = [[71, -86.5], [79, -85]];
 
-  async function loadDistrictAssetSamples(THREE, scene, assetManager, state) {
+  // Layout pass: swapped-in GLBs get positioned by their own origin/pivot,
+  // not their visible bounding-box center - the whole-map overlap audit
+  // (auditSceneLayout()) traced a whole cluster of overlaps to exactly this,
+  // most visibly the 4 "Building_Large_2.gltf" clones (reused for both
+  // Causeway Point Mall and part of the Woodlands estate grid) landing with
+  // their real footprint's center offset by several units from the slot
+  // they were placed at, because that file's geometry isn't centered on its
+  // own local origin. Re-centering the XZ bounding-box onto the intended
+  // slot after positioning fixes every current and future use of an
+  // off-center source file at once, instead of hand-tuning coordinates per
+  // symptom. Y is left alone - these are all ground-level placements and
+  // the existing position[1]=0 convention already gets that right.
+  function recenterOnGroundSlot(THREE, instance, targetX, targetZ) {
+    const box = new THREE.Box3().setFromObject(instance);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    instance.position.x += targetX - center.x;
+    instance.position.z += targetZ - center.z;
+  }
+
+  // Whole-map load reliability pass: everything the district/road/plaza
+  // loaders fetch used to fire in one giant parallel batch regardless of
+  // distance from the player, so a fresh spawn competed for the same
+  // limited browser connection pool as districts on the far side of the
+  // 200x157-unit map (Woodlands, Airport, Sentosa) - nothing rendered fast,
+  // everything rendered slowly together (confirmed via a live-production
+  // timing check: the asset-debug panel's count was still climbing 45+
+  // seconds after load). Splitting into a near tier (loaded first, gates
+  // nothing but itself) and a far tier (streamed in afterward, in the
+  // background, blocking nothing) fixes "time to a populated-looking
+  // world" without touching total payload size. A fixed radius is used
+  // instead of "N nearest zones" because zone density is uneven - the
+  // downtown ring packs 5 zones within the map's own ~28-unit minimum
+  // clearance, while Punggol/Woodlands/Airport sit 60-135 units out; "N
+  // nearest" would still pull in a distant zone from a sparse area. 40
+  // units comfortably covers the spawn zone's own footprint plus the 1-2
+  // truly adjacent zones (verified against the default spawn at (-19,-10):
+  // train is 19.0 units out, mall 29.1, cafe 34.4, then a real gap to
+  // little-india at 44.2 - a 40-unit radius cleanly captures that first
+  // cluster and excludes the rest).
+  const NEAR_TIER_RADIUS = 40;
+
+  function delayMs(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  function withTimeout(promise, ms, label = "operation timed out") {
+    if (!(ms > 0)) return promise;
+    return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => reject(new Error(label)), ms);
+      Promise.resolve(promise)
+        .then((value) => {
+          window.clearTimeout(timeout);
+          resolve(value);
+        })
+        .catch((error) => {
+          window.clearTimeout(timeout);
+          reject(error);
+        });
+    });
+  }
+
+  function yieldToBrowser() {
+    return new Promise((resolve) => {
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(() => resolve(), { timeout: 80 });
+        return;
+      }
+      window.requestAnimationFrame ? window.requestAnimationFrame(() => resolve()) : window.setTimeout(resolve, 0);
+    });
+  }
+
+  async function deferWorldLoad(task, delay) {
+    await delayMs(delay);
+    await yieldToBrowser();
+    return task();
+  }
+
+  async function runLimitedBatch(items, limit, worker) {
+    const queue = [...items];
+    const workers = Array.from({ length: Math.max(1, limit) }, async () => {
+      while (queue.length) {
+        const item = queue.shift();
+        await worker(item);
+        await yieldToBrowser();
+      }
+    });
+    await Promise.all(workers);
+  }
+
+  function classifyByDistance(entries, spawnX, spawnZ, getAnchorPoint, nearRadius) {
+    const near = [];
+    const far = [];
+    entries.forEach((entry) => {
+      const anchor = getAnchorPoint(entry);
+      if (!anchor) {
+        far.push(entry);
+        return;
+      }
+      const dist = Math.hypot(anchor[0] - spawnX, anchor[1] - spawnZ);
+      (dist <= nearRadius ? near : far).push(entry);
+    });
+    return { near, far };
+  }
+
+  // For a "positions" (plural, clone-based) swap entry, use the CLOSEST
+  // instance as the tiering anchor rather than the first one. Every
+  // instance clones one already-fetched GLB, so tiering only decides WHEN
+  // that single shared fetch is scheduled, not how many fetches happen -
+  // being generous here (near tier if ANY instance is close) means, e.g., a
+  // tree right next to spawn renders immediately even though most of
+  // TREE_POSITIONS is scattered across the whole map, at zero extra cost.
+  function swapAnchorPoint(swap, spawnX, spawnZ) {
+    if (Array.isArray(swap.position)) return [swap.position[0], swap.position[2]];
+    if (Array.isArray(swap.positions) && swap.positions.length) {
+      let closest = swap.positions[0];
+      let closestDist = Infinity;
+      swap.positions.forEach(([x, z]) => {
+        const dist = Math.hypot(x - spawnX, z - spawnZ);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closest = [x, z];
+        }
+      });
+      return closest;
+    }
+    return null;
+  }
+
+  // Shared by addRoadDetailProps() and addDistrictPlazaProps(): both used to
+  // independently fetch+parse asset-manifest.json and preload the same
+  // shared Objaverse prop GLBs, risking duplicate concurrent fetches for the
+  // same URL since both loaders kick off back-to-back from mount() before
+  // either's internal cache is populated. One shared load, called once.
+  async function loadObjaverseManifestAssets(assetManager, state) {
+    if (!assetManager) return { byCategory: {}, loadedByUrl: new Map(), loadEntry: async () => null };
+    let manifest;
+    try {
+      const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
+      manifest = await response.json();
+    } catch (error) {
+      console.warn("[Life Sim] Could not load asset manifest for props:", error);
+      return { byCategory: {}, loadedByUrl: new Map(), loadEntry: async () => null };
+    }
+    const byCategory = {};
+    (manifest.objaverseAssets || []).forEach((entry) => {
+      (byCategory[entry.category] = byCategory[entry.category] || []).push(entry);
+    });
+    const loadedByUrl = new Map();
+    const loadingByUrl = new Map();
+    async function loadEntry(entry) {
+      if (!entry || (state && state.destroyed)) return null;
+      if (loadedByUrl.has(entry.url)) return loadedByUrl.get(entry.url);
+      if (!loadingByUrl.has(entry.url)) {
+        loadingByUrl.set(entry.url, assetManager.loadModel(entry.url, {
+          id: entry.id,
+          label: entry.label,
+          targetHeightMeters: entry.targetHeightMeters
+        }).then((asset) => {
+          loadedByUrl.set(entry.url, asset);
+          loadingByUrl.delete(entry.url);
+          return asset;
+        }).catch((error) => {
+          loadingByUrl.delete(entry.url);
+          console.warn(`[Life Sim] Optional prop asset failed: ${entry.url}`, error);
+          return null;
+        }));
+      }
+      return loadingByUrl.get(entry.url);
+    }
+    if (state && state.destroyed) return { byCategory, loadedByUrl, loadEntry };
+    return { byCategory, loadedByUrl, loadEntry };
+  }
+
+  async function loadOptimizedObjaverseBuildingSwaps() {
+    let manifest;
+    try {
+      const response = await fetch("assets/life-sim/asset-manifest.json", { cache: "no-store" });
+      if (!response.ok) throw new Error(`manifest status ${response.status}`);
+      manifest = await response.json();
+    } catch (error) {
+      console.warn("[Life Sim] Could not load optimized building manifest:", error);
+      return [];
+    }
+    const buildingPassEnabled = (manifest.objaverseBuildingReplacementPasses || [])
+      .some((pass) => pass && pass.id === "singapore-realistic-buildings-v1" && pass.status === "enabled");
+    if (!buildingPassEnabled) return [];
+    return (manifest.objaverseBuildingAssets || [])
+      .filter(isOptimizedObjaverseBuildingEntry)
+      .map((entry) => ({
+        url: entry.url,
+        lods: entry.lods || [],
+        hideNames: Array.isArray(entry.hideNames) ? entry.hideNames : [],
+        hideNamePrefixes: Array.isArray(entry.hideNamePrefixes) ? entry.hideNamePrefixes : [],
+        position: Array.isArray(entry.position) ? entry.position : null,
+        positions: Array.isArray(entry.positions) ? entry.positions : null,
+        rotation: Array.isArray(entry.rotation) ? entry.rotation : [0, 0, 0],
+        scale: Array.isArray(entry.scale) ? entry.scale : [1, 1, 1],
+        targetHeightMeters: entry.targetHeightMeters,
+        isBuilding: true,
+        requireOptimizedObjaverse: true,
+        label: entry.label || entry.id || entry.url
+      }))
+      .filter((swap) => Array.isArray(swap.position) || Array.isArray(swap.positions));
+  }
+
+  function isOptimizedObjaverseBuildingEntry(entry) {
+    if (!entry || entry.optimized !== true) return false;
+    if (typeof entry.url !== "string" || !entry.url.endsWith(".glb")) return false;
+    if (!entry.url.includes("assets/environment/objaverse-optimized/")) return false;
+    if (entry.url.startsWith("http://") || entry.url.startsWith("https://")) return false;
+    if (!(Number(entry.targetHeightMeters) > 0)) return false;
+    const hasReplacementTarget = (Array.isArray(entry.hideNames) && entry.hideNames.length)
+      || (Array.isArray(entry.hideNamePrefixes) && entry.hideNamePrefixes.length);
+    if (!hasReplacementTarget) return false;
+    const lods = Array.isArray(entry.lods) ? entry.lods : [];
+    if (lods.length < 3) return false;
+    return lods.every((lod) => lod && typeof lod.url === "string" && lod.url.includes("assets/environment/objaverse-optimized/"));
+  }
+
+  async function loadDistrictAssetSamples(THREE, scene, assetManager, state, spawnX, spawnZ) {
     if (!assetManager) return;
     const ready = await assetManager.ensureGltfLoader();
     if (!ready || (state && state.destroyed)) return;
+    const optimizedObjaverseBuildingSwaps = await loadOptimizedObjaverseBuildingSwaps();
 
     const swaps = [
       {
         url: "assets/environment/hdb-block.glb",
         hideNamePrefixes: ["HDB Home Block A", "HDB Home Block B"],
         position: [-30, 0, 42.2],
-        scale: [5.5, 5.5, 5.5]
+        scale: [5.5, 5.5, 5.5],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.hdbBlockHeightMeters
       },
       {
         url: "assets/environment/office-tower.glb",
         hideNamePrefixes: ["Office Tower"],
         position: [-25, 0, -83],
-        scale: [5.5, 5.5, 5.5]
+        scale: [5.5, 5.5, 5.5],
+        targetHeightMeters: 38
       },
       {
         url: "assets/environment/library.glb",
         hideNames: ["Library Reading Hall", "Library Roof", "Library Quiet Glass"],
         position: [41, 0, 12],
-        scale: [2.5, 2.5, 2.5]
+        scale: [2.5, 2.5, 2.5],
+        targetHeightMeters: 9
       },
       {
         url: "assets/environment/city-kit-commercial/mall-building.glb",
         hideNames: ["Mall Main Atrium", "Mall Glass Front", "Mall Round Atrium"],
         position: [0, 0, -35],
-        scale: [6, 6, 6]
+        scale: [6, 6, 6],
+        targetHeightMeters: 15
       },
       {
         url: "assets/environment/tree-oak.glb",
         hideNames: ["Tree Trunk", "Tree Crown"],
         positions: TREE_POSITIONS,
-        scale: [2.4, 2.4, 2.4]
+        scale: [2.4, 2.4, 2.4],
+        animateAsTree: true,
+        isBuilding: false
       },
       // Orchard Road's dense rain-tree canopy - purely additive, denser than
       // the city-wide tree scatter above.
       {
         url: "assets/environment/tree-oak.glb",
         positions: ORCHARD_STREET_TREE_POSITIONS,
-        scale: [2.2, 2.2, 2.2]
+        scale: [2.2, 2.2, 2.2],
+        animateAsTree: true,
+        isBuilding: false
       },
       // Orchard Road: extends the Mall zone with two more shopfronts along the
       // same street instead of replacing anything, so the existing shop
@@ -1467,12 +2185,14 @@
       {
         url: "assets/environment/city-kit-commercial/orchard-shop-a.glb",
         position: [-8, 0, -35],
-        scale: [6.5, 6.5, 6.5]
+        scale: [6.5, 6.5, 6.5],
+        targetHeightMeters: 13
       },
       {
         url: "assets/environment/city-kit-commercial/orchard-shop-b.glb",
         position: [8, 0, -35],
-        scale: [4.2, 4.2, 4.2]
+        scale: [4.2, 4.2, 4.2],
+        targetHeightMeters: 12
       },
       // University Town: adds a lecture hall and a hostel block near the
       // existing University zone, purely additive like Orchard Road above.
@@ -1487,91 +2207,80 @@
         // stay as an outdoor campus plaza in front of it.
         hideNames: ["University Main Hall", "University Lecture Roof"],
         position: [-86, 0, -5],
-        scale: [3.5, 3.5, 3.5]
+        scale: [3.5, 3.5, 3.5],
+        targetHeightMeters: 13
       },
       {
         url: "assets/environment/university-hostel.glb",
         position: [-80, 0, -12],
-        scale: [3.2, 3.2, 3.2]
+        scale: [3.2, 3.2, 3.2],
+        targetHeightMeters: 20
       },
       // Marina Bay / CBD: three City Kit Commercial skyscrapers cluster around
       // the hand-built Marina-Bay-Sands-style landmark (addMarinaBayLandmark),
       // which uses the same primitive-box style as every other district
       // building rather than a downloaded model - there's no free CC0 model
       // of that specific silhouette.
+      // Layout pass: nudged away from the hand-built Marina Bay Sands towers
+      // (33-47,-66..-60) and ArtScience Museum (19.8-28.2,-70.2..-61.8) - the
+      // layout audit found all three overlapping one or both landmarks at
+      // their original positions. Still clustered nearby for background
+      // density, just pushed clear of the landmarks' actual footprints.
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
-        position: [30, 0, -67],
-        scale: [4.9, 4.9, 4.9]
+        // This used to sit at [30,-76] with a 48m target height, which loaded
+        // inside the Food Court first camera cone as a giant black wall. Keep
+        // the CBD tower, but move it back into the Marina/CBD cluster and
+        // lower its first-screen pressure.
+        position: [46, 0, -62],
+        scale: [3.7, 3.7, 3.7],
+        targetHeightMeters: 28
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-c.glb",
-        position: [40, 0, -59],
-        scale: [4.4, 4.4, 4.4]
+        position: [64, 0, -51],
+        scale: [3.6, 3.6, 3.6],
+        targetHeightMeters: 30
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
-        position: [50, 0, -67],
-        scale: [3.9, 3.9, 3.9]
+        position: [66, 0, -66],
+        scale: [3.2, 3.2, 3.2],
+        targetHeightMeters: 28
       },
       // Sentosa: purely additive palm trees around the existing Beach zone.
       {
         url: "assets/environment/tree-palm.glb",
         positions: SENTOSA_PALM_POSITIONS,
-        scale: [3.0, 3.0, 3.0]
+        scale: [3.0, 3.0, 3.0],
+        animateAsTree: true,
+        isBuilding: false
       },
       {
         url: "assets/environment/tree-palm-bend.glb",
         positions: SENTOSA_PALM_BEND_POSITIONS,
-        scale: [3.0, 3.0, 3.0]
+        scale: [3.0, 3.0, 3.0],
+        animateAsTree: true,
+        isBuilding: false
       },
-      // Woodlands pilot: real modeled+textured buildings (Quaternius's free
-      // CC0 "Downtown City MegaKit") replacing the primitive-box HDB blocks
-      // and mall, per the art-direction reassessment in this session. Spread
-      // further apart than the boxes they replace since these models are
-      // larger and more detailed than a plain box footprint.
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.gltf",
-        hideNamePrefixes: ["Woodlands HDB Block A"],
-        position: [-11, 0, 53],
-        scale: [1, 1, 1]
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Small_1.gltf",
-        hideNamePrefixes: ["Woodlands HDB Block B"],
-        position: [-27, 0, 47],
-        scale: [1, 1, 1]
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Large_2.gltf",
-        hideNames: ["Causeway Point Mall", "Causeway Point Glass Front", "Causeway Point Roof"],
-        position: [22, 0, 48],
-        scale: [1, 1, 1]
-      },
-      // Woodlands estate expansion: 12 more blocks cycling through the same
-      // 3 Quaternius files as the mall/original 2 blocks above, grouped by
-      // file into 3 "positions" (plural, clone-based) entries - safe to
-      // reuse a url already used by a singular entry above (see the
-      // Punggol/Raffles Place comment for why singular+singular is the
-      // unsafe combination, not singular+plural).
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Large_2.gltf",
-        hideNamePrefixes: ["Woodlands Estate Block C", "Woodlands Estate Block F", "Woodlands Estate Block I", "Woodlands Estate Block L"],
-        positions: [[-16, 30], [5, 30], [-2, 37], [-9, 44]],
-        scale: [1, 1, 1]
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Medium_2_001.gltf",
-        hideNamePrefixes: ["Woodlands Estate Block D", "Woodlands Estate Block G", "Woodlands Estate Block J", "Woodlands Estate Block M"],
-        positions: [[-9, 30], [-16, 37], [5, 37], [-2, 44]],
-        scale: [1, 1, 1]
-      },
-      {
-        url: "assets/environment/city-kit-quaternius/Building_Small_1.gltf",
-        hideNamePrefixes: ["Woodlands Estate Block E", "Woodlands Estate Block H", "Woodlands Estate Block K", "Woodlands Estate Block N"],
-        positions: [[-2, 30], [-9, 37], [-16, 44], [5, 44]],
-        scale: [1, 1, 1]
-      },
+      // Woodlands pilot + estate expansion + Causeway Point Mall's raw
+      // Quaternius swaps (Building_Medium_2_001/Building_Small_1/
+      // Building_Large_2 - HDB Block A/B, Estate Blocks C-N, the mall) were
+      // ALL removed here (2026-07-22) - every one of them is now covered by
+      // the optimized-building pipeline instead (objaverseBuildingAssets:
+      // woodlands-hdb-block-a/b-optimized-v1, woodlands-estate-large/medium/
+      // small-optimized-v1, causeway-point-mall-optimized-v1), loaded via
+      // loadOptimizedObjaverseBuildingSwaps(). Blender-equivalent decimate
+      // (gltf-transform simplify, Blender itself isn't installed in this
+      // environment) + texture resize + Draco + 3 real LODs per source file,
+      // reused across every placement of that file (14.6MB combined raw ->
+      // ~3.7MB combined LOD storage, with only one LOD actually rendered per
+      // instance at a time based on distance) instead of one fixed multi-MB
+      // model always rendered at full detail everywhere regardless of
+      // distance. Leaving both raw and optimized registered for the same
+      // building would double-render it - do not re-add any of these
+      // entries without also removing the matching manifest entry, or vice
+      // versa.
       // Real-model pass: swapping the remaining hand-built primitive-box
       // shophouses/buildings for real CC0 modeled buildings (Kenney "City Kit
       // Commercial" / "Modular Buildings" packs, kept in
@@ -1584,89 +2293,103 @@
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-a.glb",
         hideNamePrefixes: ["Chinatown Shophouse Rose"],
-        position: [3.8, 0, -65],
-        scale: [5.2, 5.2, 5.2]
+        position: [0, 0, -65],
+        scale: [5.2, 5.2, 5.2],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.shophouseHeightMeters
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-b.glb",
         hideNamePrefixes: ["Chinatown Shophouse Ochre"],
-        position: [7.8, 0, -65],
-        scale: [5.2, 5.2, 5.2]
+        position: [5.5, 0, -65],
+        scale: [5.2, 5.2, 5.2],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.shophouseHeightMeters
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-c.glb",
         hideNamePrefixes: ["Chinatown Shophouse Teal"],
-        position: [11.8, 0, -65],
-        scale: [5.2, 5.2, 5.2]
+        position: [11, 0, -65],
+        scale: [5.2, 5.2, 5.2],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.shophouseHeightMeters
       },
       {
         url: "assets/environment/city-kit-commercial/chinatown-shophouse-d.glb",
         hideNamePrefixes: ["Chinatown Shophouse Cream"],
-        position: [15.8, 0, -65],
-        scale: [5.2, 5.2, 5.2]
+        position: [16.5, 0, -65],
+        scale: [5.2, 5.2, 5.2],
+        targetHeightMeters: LIFE_SIM_SCALE_BUDGETS.shophouseHeightMeters
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-a.glb",
         hideNamePrefixes: ["Little India Shophouse Blue"],
-        position: [18.8, 0, -19],
-        scale: [4.0, 4.0, 4.0]
+        position: [17, 0, -19],
+        scale: [4.0, 4.0, 4.0],
+        targetHeightMeters: 12
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-b.glb",
         hideNamePrefixes: ["Little India Shophouse Saffron"],
-        position: [22.8, 0, -19],
-        scale: [3.5, 3.5, 3.5]
+        position: [22.5, 0, -19],
+        scale: [3.5, 3.5, 3.5],
+        targetHeightMeters: 11
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-c.glb",
         hideNamePrefixes: ["Little India Shophouse Magenta"],
-        position: [26.8, 0, -19],
-        scale: [3.2, 3.2, 3.2]
+        position: [28, 0, -19],
+        scale: [3.2, 3.2, 3.2],
+        targetHeightMeters: 11
       },
       {
         url: "assets/environment/city-kit-commercial/little-india-shophouse-d.glb",
         hideNamePrefixes: ["Little India Shophouse Cream"],
-        position: [30.8, 0, -19],
-        scale: [2.2, 3.2, 2.2]
+        position: [33.5, 0, -19],
+        scale: [2.2, 3.2, 2.2],
+        targetHeightMeters: 10
       },
       {
         url: "assets/environment/city-kit-commercial/bugis-shophouse-a.glb",
         hideNamePrefixes: ["Bugis Heritage Shophouse A"],
         position: [44, 0, -37],
-        scale: [2.6, 3.4, 2.6]
+        scale: [2.6, 3.4, 2.6],
+        targetHeightMeters: 11
       },
       {
         url: "assets/environment/city-kit-commercial/bugis-shophouse-b.glb",
         hideNamePrefixes: ["Bugis Heritage Shophouse B"],
-        position: [47.6, 0, -37],
-        scale: [3.2, 3.2, 3.2]
+        position: [49.2, 0, -37],
+        scale: [3.2, 3.2, 3.2],
+        targetHeightMeters: 11
       },
       {
         url: "assets/environment/city-kit-commercial/hospital-block.glb",
         hideNamePrefixes: ["Hospital Clean Main Wing", "Hospital Ward Tower"],
         position: [80, 0, -52],
-        scale: [3.0, 3.0, 3.0]
+        scale: [3.0, 3.0, 3.0],
+        targetHeightMeters: 16
       },
       {
         url: "assets/environment/city-kit-commercial/airport-terminal.glb",
         hideNames: ["Airport Terminal", "Airport Glass Departures", "Airport Terminal Overhang"],
         hideNamePrefixes: ["Airport Facade Mullion"],
         position: [110, 0, -10],
-        scale: [8, 7, 8]
+        scale: [8, 7, 8],
+        targetHeightMeters: 12
       },
       {
         url: "assets/environment/city-kit-commercial/gym-building.glb",
         hideNames: ["Gym Roof"],
         hideNamePrefixes: ["Gym Fitness Studio"],
         position: [-60, 0, 54],
-        scale: [6, 3.2, 6]
+        scale: [6, 3.2, 6],
+        targetHeightMeters: 8
       },
       {
         url: "assets/environment/cafe-building.glb",
         hideNames: ["Cafe Roof"],
         hideNamePrefixes: ["Cafe Cozy Shop"],
         position: [-50, 0, -26.5],
-        scale: [2.6, 2.6, 2.6]
+        scale: [2.6, 2.6, 2.6],
+        targetHeightMeters: 7
       },
       // Real park bench (Kenney "Furniture Kit") city-wide, replacing every
       // primitive "Bench Seat"/"Bench Back" pair (Park x2, Beach x1,
@@ -1677,7 +2400,8 @@
         url: "assets/environment/park-bench.glb",
         hideNames: ["Bench Seat", "Bench Back"],
         positions: [[8, 20.2], [18, 25.8], [72.3, -80.1], [0, 40.5], [5, 43], [82, -18], [70, -20], [68, 2], [87, 2], [84, 74.5], [96, 74.5], [27, 44], [37, 44], [-5, 33.5], [1, 40.5]],
-        scale: [4, 2, 3]
+        scale: [4, 2, 3],
+        isBuilding: false
       },
       // Punggol: reuses the same real HDB block model as Home, and the same
       // mall model as Orchard Road. Both use the "positions" (plural, clone-
@@ -1693,13 +2417,15 @@
         url: "assets/environment/hdb-block.glb",
         hideNamePrefixes: ["Punggol HDB Block A", "Punggol HDB Block B"],
         positions: [[78, 67], [70, 71]],
-        scale: [5.2, 5.2, 5.2]
+        scale: [5.2, 5.2, 5.2],
+        targetHeightMeters: 24
       },
       {
         url: "assets/environment/city-kit-commercial/mall-building.glb",
         hideNames: ["Waterway Point Mall", "Waterway Point Glass Front", "Waterway Point Roof"],
         positions: [[101, 68]],
-        scale: [6, 6, 6]
+        scale: [6, 6, 6],
+        targetHeightMeters: 15
       },
       // Raffles Place: two of Marina Bay's own generic City Kit Commercial
       // skyscrapers reused for background density around the hand-built
@@ -1709,67 +2435,142 @@
       // below - see the Punggol comment above for why reusing a url via two
       // singular entries is unsafe but two "positions" entries (or one
       // singular + one "positions") are not.
+      // Layout pass: nudged away from Raffles Place's own hand-built towers
+      // (addRafflesPlace()) - the audit found Tower A/C overlapping these.
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-a.glb",
-        positions: [[68, -30]],
-        scale: [4.6, 4.6, 4.6]
+        positions: [[61, -35]],
+        scale: [4.6, 4.6, 4.6],
+        targetHeightMeters: 42
       },
       {
         url: "assets/environment/city-kit-commercial/marina-skyscraper-e.glb",
-        positions: [[88, -28]],
-        scale: [4.2, 4.2, 4.2]
-      }
+        positions: [[95, -23]],
+        scale: [4.2, 4.2, 4.2],
+        targetHeightMeters: 38
+      },
+      // Realistic replacement pass: the Singapore infill rows that used to
+      // be here (Main Street Mixed-Use Block, South Main Street Block,
+      // Heartland HDB Precinct Block, CBD Infill Tower, and the 8-prefix
+      // Town Centre small-blocks group) were removed here (2026-07-22) -
+      // all 5 groups are now covered by the optimized-building pipeline
+      // (objaverseBuildingAssets: main-street-mixed-use/south-main-street/
+      // heartland-hdb-precinct/cbd-infill-tower/town-centre-small-blocks-
+      // optimized-v1), reusing the same 3 shared LOD file sets generated
+      // for the Woodlands buildings above (Building_Large_2/Medium_2_001/
+      // Small_1 each only need decimating once, regardless of how many
+      // places on the map reuse that source file). See the comment above
+      // the Woodlands section for why raw and optimized must never both be
+      // registered for the same building at once.
     ];
+    swaps.push(...optimizedObjaverseBuildingSwaps);
 
     // Loaded in parallel rather than one-at-a-time: this list grew from ~15
     // entries to ~30 in the real-model pass, and sequential `await` per swap
     // made total load time (each fetch+parse ~1-1.5s) stack up to 40s+ before
     // the last buildings appeared. Each swap is still independently
     // try/caught so one failed/slow model can't block or break the others.
-    await Promise.all(swaps.map(async (swap) => {
-      try {
-        const asset = await assetManager.loadModel(swap.url, {
-          toonify: true,
-          scale: swap.scale,
-          label: swap.url
-        });
-        if (state && state.destroyed) return;
-        if (!asset || asset.fallback || !asset.scene) return;
+    // Distance-tiered load pass: run the near-tier batch (swaps close to the
+    // player's spawn point) to completion first, THEN start the far-tier
+    // batch - splits ~30 simultaneous fetches into two smaller waves so the
+    // handful nearest the player aren't competing for connections with
+    // distant districts like Woodlands.
+    async function runSwapBatch(list, concurrency) {
+      await runLimitedBatch(list, concurrency, async (swap) => {
+        try {
+          if (swap.requireOptimizedObjaverse && !String(swap.url || "").includes("assets/environment/objaverse-optimized/")) {
+            console.warn(`[Life Sim] Skipping raw Objaverse building swap: ${swap.url || "missing-url"}`);
+            return;
+          }
+          const asset = await assetManager.loadModel(swap.url, {
+            toonify: true,
+            scale: swap.scale,
+            label: swap.label || swap.url
+          });
+          if (state && state.destroyed) return;
+          if (!asset || asset.fallback || !asset.scene) return;
 
-        if (Array.isArray(swap.positions)) {
-          swap.positions.forEach(([x, z]) => {
-            const instance = asset.scene.clone(true);
-            assetManager.prepareModel(instance, { toonify: true, position: [x, 0, z], scale: swap.scale });
-            scene.add(instance);
-            // registerPresentationObjects() already ran (synchronously, before this
-            // async load resolved) and only found the original procedural "Tree
-            // Crown" groups this is about to hide. Register the replacement
-            // directly so it keeps the same wind-sway animation instead of going static.
-            if (state && state.presentation && Array.isArray(state.presentation.treeCrowns)) {
-              state.presentation.treeCrowns.push(instance);
+          // Collision-fix pass: found via an actual recorded playthrough (the
+          // static layout audit and warnOnColliderOverlaps only ever check
+          // bounding-box overlap between OBJECTS - neither ever verified
+          // player-vs-collider correctness). registerStaticCollider() is only
+          // called from addBuildingCore(), which builds the primitive-box
+          // placeholders - once a swap here hides that primitive (or, for a
+          // purely-additive swap, never had one to begin with), the real GLB
+          // on screen had NO matching collider, so the player could walk
+          // straight through every "realistic" building this session added.
+          // isBuilding defaults to true (most swaps are buildings); only
+          // trees/benches opt out with isBuilding: false.
+          const isBuilding = swap.isBuilding !== false;
+
+          if (Array.isArray(swap.positions)) {
+            swap.positions.forEach(([x, z], index) => {
+              const instance = asset.scene.clone(true);
+              assetManager.prepareModel(instance, { toonify: true, position: [x, 0, z], rotation: swap.rotation, scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
+              recenterOnGroundSlot(THREE, instance, x, z);
+              scene.add(instance);
+              if (isBuilding) {
+                const box = new THREE.Box3().setFromObject(instance);
+                const size = new THREE.Vector3();
+                box.getSize(size);
+                registerStaticCollider(`${swap.url} #${index}`, x, z, size.x, size.z);
+              }
+              // registerPresentationObjects() already ran (synchronously, before this
+              // async load resolved) and only found the original procedural "Tree
+              // Crown" groups this is about to hide. Register the replacement
+              // directly so it keeps the same wind-sway animation instead of going static.
+              if (swap.animateAsTree && state && state.presentation && Array.isArray(state.presentation.treeCrowns)) {
+                state.presentation.treeCrowns.push(instance);
+              }
+            });
+          } else {
+            assetManager.prepareModel(asset.scene, { toonify: true, position: swap.position, rotation: swap.rotation, scale: swap.scale, targetHeightMeters: swap.targetHeightMeters });
+            recenterOnGroundSlot(THREE, asset.scene, swap.position[0], swap.position[2]);
+            scene.add(asset.scene);
+            if (isBuilding) {
+              const box = new THREE.Box3().setFromObject(asset.scene);
+              const size = new THREE.Vector3();
+              box.getSize(size);
+              registerStaticCollider(swap.url, swap.position[0], swap.position[2], size.x, size.z);
+            }
+          }
+
+          const hideNames = swap.hideNames || [];
+          const hidePrefixes = swap.hideNamePrefixes || [];
+          if (isBuilding) {
+            // The primitive(s) being hidden below already have a collider
+            // registered at their OWN position/size - stale the moment the
+            // real GLB (registered above, at ITS real measured footprint)
+            // takes over the visuals. Remove by name match, same matching
+            // rule as the visibility hide right below.
+            for (let i = activeStaticColliders.length - 1; i >= 0; i -= 1) {
+              const colliderName = activeStaticColliders[i].name;
+              if (hideNames.includes(colliderName) || hidePrefixes.some((prefix) => colliderName.startsWith(prefix))) {
+                activeStaticColliders.splice(i, 1);
+              }
+            }
+          }
+          // Zones now build into a per-zone offset Group (see addZoneAt) rather
+          // than straight into `scene`, so the procedural placeholders this is
+          // hiding sit one level deeper than they used to - traverse() finds
+          // them at any depth instead of only scene's direct children.
+          scene.traverse((child) => {
+            if (!child.name) return;
+            if (hideNames.includes(child.name) || hidePrefixes.some((prefix) => child.name.startsWith(prefix))) {
+              child.visible = false;
             }
           });
-        } else {
-          assetManager.prepareModel(asset.scene, { toonify: true, position: swap.position, scale: swap.scale });
-          scene.add(asset.scene);
+        } catch (error) {
+          console.warn(`[Life Sim] Optional district asset swap failed: ${swap.url}`, error);
         }
+      });
+    }
 
-        const hideNames = swap.hideNames || [];
-        const hidePrefixes = swap.hideNamePrefixes || [];
-        // Zones now build into a per-zone offset Group (see addZoneAt) rather
-        // than straight into `scene`, so the procedural placeholders this is
-        // hiding sit one level deeper than they used to - traverse() finds
-        // them at any depth instead of only scene's direct children.
-        scene.traverse((child) => {
-          if (!child.name) return;
-          if (hideNames.includes(child.name) || hidePrefixes.some((prefix) => child.name.startsWith(prefix))) {
-            child.visible = false;
-          }
-        });
-      } catch (error) {
-        console.warn(`[Life Sim] Optional district asset swap failed: ${swap.url}`, error);
-      }
-    }));
+    const { near, far } = classifyByDistance(swaps, spawnX, spawnZ, (swap) => swapAnchorPoint(swap, spawnX, spawnZ), NEAR_TIER_RADIUS);
+    await runSwapBatch(near, LIFE_SIM_PERFORMANCE.nearAssetConcurrency);
+    if (state && state.destroyed) return;
+    await delayMs(LIFE_SIM_PERFORMANCE.farAssetDelayMs);
+    await runSwapBatch(far, LIFE_SIM_PERFORMANCE.farAssetConcurrency);
   }
 
   // Rebuilt for the real-asset spacing replan: the old cross-shaped road
@@ -1780,40 +2581,517 @@
   // at the Mall zone as a natural central hub. Every other zone gets a
   // direct addPath connector into this spine or into a nearby zone, so the
   // whole 18-zone map is one connected network, not scattered islands.
+  // Shared with addRoadDetailProps() (realistic-style pivot, Phase 3) so
+  // Objaverse street-furniture props line up with the actual rendered road
+  // geometry instead of a second, hand-copied coordinate list drifting out
+  // of sync with this one.
+  const ROAD_MAIN_SEGMENTS = [
+    { x1: 0, z1: -42, x2: 0, z2: 58, width: 7 },
+    { x1: -51, z1: -32, x2: 111, z2: -32, width: 7 }
+  ];
+  const ROAD_CONNECTOR_PATHS = [
+    // North residential branch
+    [-30, 40, 0, 40],
+    [-60, 52, -30, 40],
+    // Central spine spurs
+    [-13, 8, 0, 8],
+    [13, 23, 0, 23],
+    [41, 12, 0, 12],
+    [25, -14, 0, -14],
+    // Downtown ring, hanging off Main Road EW
+    [10, -61, 10, -32],
+    [40, -61, 40, -32],
+    // East/southeast coastal chain
+    [80, -53, 80, -32],
+    [75, -82, 80, -53],
+    [110, -10, 110, -32],
+    // West cluster
+    [-80, -5, -50, -25],
+    [-50, -25, -50, -32],
+    // South cluster
+    [-25, -85, 0, -32],
+    [20, -95, -25, -85]
+  ];
+
   function addRoadNetwork(THREE, scene, mat) {
     [
       ["Main Road NS", [0, 0.01, 8], [7, 0.08, 100]],
       ["Main Road EW", [30, 0.02, -32], [162, 0.08, 7]]
     ].forEach(([name, position, scale]) => addBox(THREE, scene, name, position, scale, mat.road, true));
 
-    [
-      // North residential branch
-      [-30, 40, 0, 40],
-      [-60, 52, -30, 40],
-      // Central spine spurs
-      [-13, 8, 0, 8],
-      [13, 23, 0, 23],
-      [41, 12, 0, 12],
-      [25, -14, 0, -14],
-      // Downtown ring, hanging off Main Road EW
-      [10, -61, 10, -32],
-      [40, -61, 40, -32],
-      // East/southeast coastal chain
-      [80, -53, 80, -32],
-      [75, -82, 80, -53],
-      [110, -10, 110, -32],
-      // West cluster
-      [-80, -5, -50, -25],
-      [-50, -25, -50, -32],
-      // South cluster
-      [-25, -85, 0, -32],
-      [20, -95, -25, -85]
-    ].forEach(([x1, z1, x2, z2]) => addPath(THREE, scene, [x1, z1], [x2, z2], 1.3, mat.path));
+    ROAD_CONNECTOR_PATHS.forEach(([x1, z1, x2, z2]) => addPath(THREE, scene, [x1, z1], [x2, z2], 1.3, mat.path));
 
     for (let z = -35; z <= 57; z += 6) addBox(THREE, scene, "Road Center Line NS", [0, 0.13, z], [0.25, 0.04, 2.15], mat.roadLine, true);
     for (let x = -50; x <= 110; x += 6) addBox(THREE, scene, "Road Center Line EW", [x, 0.14, -32], [2.15, 0.04, 0.25], mat.roadLine, true);
     addCrosswalk(THREE, scene, [0, -28], mat, "x");
     addCrosswalk(THREE, scene, [-4, -32], mat, "z");
+  }
+
+  function addStreetCompositionLayer(THREE, scene, mat) {
+    ROAD_MAIN_SEGMENTS.forEach((segment) => addRoadEdgesAndStreetRhythm(THREE, scene, segment, mat, "main"));
+    ROAD_CONNECTOR_PATHS.forEach(([x1, z1, x2, z2]) => {
+      addRoadEdgesAndStreetRhythm(THREE, scene, { x1, z1, x2, z2, width: 2.2 }, mat, "connector");
+    });
+    addFoodCourtStreetComposition(THREE, scene, mat);
+  }
+
+  function addRoadEdgesAndStreetRhythm(THREE, scene, segment, mat, density = "main") {
+    const { x1, z1, x2, z2, width } = segment;
+    const edgeOffset = width / 2 + 0.18;
+    [-edgeOffset, edgeOffset].forEach((offset) => {
+      const startOffset = segmentPerpendicularOffset(x1, z1, x2, z2, offset);
+      addPath(
+        THREE,
+        scene,
+        [x1 + startOffset[0], z1 + startOffset[1]],
+        [x2 + startOffset[0], z2 + startOffset[1]],
+        density === "main" ? 0.24 : 0.15,
+        mat.curbWarm
+      );
+    });
+
+    const spacing = density === "main" ? 12 : 20;
+    const points = sampleSegmentPoints(x1, z1, x2, z2, spacing);
+    points.forEach((point, index) => {
+      const side = index % 2 === 0 ? 1 : -1;
+      const offset = segmentPerpendicularOffset(x1, z1, x2, z2, side * (width / 2 + 1.65));
+      const px = point[0] + offset[0];
+      const pz = point[1] + offset[1];
+      if (density === "main" && index % 3 === 0) addStreetLight(THREE, scene, [px, pz], mat);
+      else if (index % 3 === 1) addTree(THREE, scene, [px, pz], mat);
+      else addPlanterRow(THREE, scene, [px - 0.65, pz], 2, mat);
+    });
+  }
+
+  function addFoodCourtStreetComposition(THREE, scene, mat) {
+    // First-impression repair: the food-court spawn used to open onto a wide,
+    // empty concrete slab. This frames it as a Singapore street edge instead:
+    // darker road, kerb, shop row, planters, lights, and crosswalk rhythm.
+    addBox(THREE, scene, "Hawker Street Road Surface", [15, 0.055, -84.5], [48, 0.07, 4.6], mat.road, true);
+    addBox(THREE, scene, "Hawker Street North Kerb", [15, 0.18, -81.95], [48, 0.18, 0.28], mat.curbWarm, true);
+    addBox(THREE, scene, "Hawker Street South Kerb", [15, 0.18, -87.05], [48, 0.18, 0.28], mat.curbWarm, true);
+    for (let x = -5; x <= 34; x += 7) addBox(THREE, scene, "Hawker Street Lane Dash", [x, 0.17, -84.5], [2.2, 0.035, 0.18], mat.roadLine, true);
+    addCrosswalk(THREE, scene, [2, -84.5], mat, "z");
+    addCrosswalk(THREE, scene, [31, -84.5], mat, "z");
+    for (let x = -8; x <= 39; x += 4) addBox(THREE, scene, "Hawker Apron Tile Seam X", [x, 0.255, -77.2], [0.025, 0.025, 8.2], mat.curbWarm, true);
+    for (let z = -81; z <= -73; z += 2) addBox(THREE, scene, "Hawker Apron Tile Seam Z", [15, 0.26, z], [48, 0.025, 0.025], mat.curbWarm, true);
+
+    [
+      [-6, -91.4, "VALUE"], [2, -91.4, "KOPI"], [10, -91.4, "NASI"], [18, -91.4, "FRUIT"], [26, -91.4, "MART"], [34, -91.4, "ATM"]
+    ].forEach(([x, z, label], index) => {
+      addBuildingCore(THREE, scene, `Hawker Street Shop ${label}`, [x, 1.75, z], [4.9, 3.5, 2.1], index % 2 ? mat.cafe : mat.hdbAccent, mat, "shophouse");
+      addShopFront(THREE, scene, [x, z + 1.18], label, index % 2 ? mat.signGold : mat.signBlue, mat);
+      addBox(THREE, scene, `Hawker Street ${label} Awning`, [x, 2.55, z + 1.35], [4.8, 0.16, 0.75], index % 2 ? mat.signGold : mat.signGreen, true);
+      addBox(THREE, scene, `Hawker Street ${label} Sign Band`, [x, 3.05, z + 1.28], [3.8, 0.36, 0.1], index % 2 ? mat.signBlue : mat.signGold);
+    });
+
+    [-8, 12, 32, 42].forEach((x, index) => {
+      addStreetLight(THREE, scene, [x, -77.4], mat);
+      addPlanterRow(THREE, scene, [x - 0.8, -78.9], 2, mat);
+      if (index % 2 === 0) addBench(THREE, scene, [x + 1.7, -79.6], mat);
+    });
+    [[-2, -76], [8, -76], [18, -76], [28, -76]].forEach(([x, z]) => addTree(THREE, scene, [x, z], mat));
+    addSignBoard(THREE, scene, "Hawker Street Direction Sign", "FOOD COURT  MRT  MALL", [-8, 2.4, -79.2], mat.signGreen, 0xffffff);
+  }
+
+  function segmentPoint(x1, z1, x2, z2, t) {
+    return [x1 + (x2 - x1) * t, z1 + (z2 - z1) * t];
+  }
+
+  function segmentPerpendicularOffset(x1, z1, x2, z2, distance) {
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const length = Math.hypot(dx, dz) || 1;
+    return [(-dz / length) * distance, (dx / length) * distance];
+  }
+
+  function sampleSegmentPoints(x1, z1, x2, z2, spacing) {
+    const length = Math.hypot(x2 - x1, z2 - z1);
+    const count = Math.max(1, Math.floor(length / spacing));
+    const points = [];
+    for (let i = 1; i < count; i += 1) points.push(segmentPoint(x1, z1, x2, z2, i / count));
+    return points;
+  }
+
+  // Realistic-style pivot, Phase 3: places real Objaverse street-furniture
+  // along the same road topology addRoadNetwork() renders (ROAD_MAIN_SEGMENTS
+  // + ROAD_CONNECTOR_PATHS above), using each manifest entry's
+  // targetHeightMeters (via assetManager's normalizeToHeight) for correct
+  // real-world scale. The drivable road SURFACE itself stays the existing
+  // primitive PBR-textured geometry - Objaverse's LVIS index has no road/
+  // pavement/asphalt/tile category at all (checked all 1156 categories), so
+  // there is nothing to swap the surface itself to. This is deliberately
+  // props-only, per the plan's flagged fallback for that gap.
+  async function addRoadDetailProps(THREE, scene, assetManager, state, spawnX, spawnZ, objaverseIndexReady) {
+    if (!assetManager) return;
+    const ready = await assetManager.ensureGltfLoader();
+    if (!ready || (state && state.destroyed)) return;
+
+    // Manifest fetch + shared-prop preload now lives in
+    // loadObjaverseManifestAssets() (called once from mount()) rather than
+    // duplicated here and in addDistrictPlazaProps() - both loaders used to
+    // independently fetch the same manifest and preload the same ~13 shared
+    // GLBs, risking duplicate concurrent fetches for the same URL.
+    const { byCategory, loadedByUrl, loadEntry } = await objaverseIndexReady;
+    if (state && state.destroyed) return;
+
+    let placementCount = 0;
+    async function place(entry, position, rotationY = 0) {
+      if (!entry) return;
+      const asset = loadedByUrl.get(entry.url) || (typeof loadEntry === "function" ? await loadEntry(entry) : null);
+      if (!asset || asset.fallback || !asset.scene) return;
+      const instance = asset.scene.clone(true);
+      instance.position.set(position[0], position[1] || 0, position[2]);
+      instance.rotation.y = rotationY;
+      scene.add(instance);
+      placementCount += 1;
+      if (placementCount % LIFE_SIM_PERFORMANCE.propYieldEvery === 0) await yieldToBrowser();
+    }
+
+    const roundRobin = {};
+    function nextEntry(...categories) {
+      for (const category of categories) {
+        const list = byCategory[category];
+        if (list && list.length) {
+          roundRobin[category] = (roundRobin[category] || 0) + 1;
+          return list[(roundRobin[category] - 1) % list.length];
+        }
+      }
+      return null;
+    }
+
+    const allSegments = [
+      ...ROAD_MAIN_SEGMENTS,
+      ...ROAD_CONNECTOR_PATHS.map(([x1, z1, x2, z2]) => ({ x1, z1, x2, z2, width: 1.3 }))
+    ];
+
+    function segmentMidpoint(segment) {
+      return [(segment.x1 + segment.x2) / 2, (segment.z1 + segment.z2) / 2];
+    }
+
+    async function placeStreetFurniture(segment) {
+      const sidewalkDistance = segment.width / 2 + 1.4;
+      const [lightDx, lightDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, sidewalkDistance);
+      const [poleDx, poleDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, -sidewalkDistance);
+      const lightPoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 20);
+      for (const [px, pz] of lightPoints) {
+        await place(nextEntry("lamppost", "streetlight"), [px + lightDx, 0, pz + lightDz]);
+      }
+      const polePoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 30);
+      for (const [px, pz] of polePoints) {
+        await place(nextEntry("telephone_pole"), [px + poleDx, 0, pz + poleDz]);
+      }
+    }
+
+    async function placeMainSpineFurniture(segment) {
+      const sidewalkDistance = segment.width / 2 + 2.4;
+      const [sideDx, sideDz] = segmentPerpendicularOffset(segment.x1, segment.z1, segment.x2, segment.z2, sidewalkDistance);
+      const benchPoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 40);
+      for (const [px, pz] of benchPoints) {
+        await place(nextEntry("bench"), [px + sideDx, 0, pz + sideDz]);
+        await place(nextEntry("trash_can"), [px + sideDx * 1.4, 0, pz + sideDz * 1.4]);
+      }
+      const manholePoints = sampleSegmentPoints(segment.x1, segment.z1, segment.x2, segment.z2, 25);
+      for (const [px, pz] of manholePoints) {
+        await place(nextEntry("manhole"), [px, 0.02, pz], Math.random() * Math.PI * 2);
+      }
+    }
+
+    // Streetlights and telephone poles down opposite sidewalks of every
+    // segment - real streets have both, and alternating sides reads as a
+    // planned street rather than one row of identical clutter. Near-tier
+    // segments (closest to spawn) are placed first, far-tier afterward -
+    // same distance-tiered pattern as loadDistrictAssetSamples().
+    const segmentTiers = classifyByDistance(allSegments, spawnX, spawnZ, segmentMidpoint, NEAR_TIER_RADIUS);
+    for (const segment of segmentTiers.near) {
+      if (state && state.destroyed) return;
+      await placeStreetFurniture(segment);
+    }
+    await delayMs(LIFE_SIM_PERFORMANCE.farPropsDelayMs);
+    for (const segment of segmentTiers.far) {
+      if (state && state.destroyed) return;
+      await placeStreetFurniture(segment);
+    }
+
+    // Benches, trash cans, and manholes only along the two main spine roads -
+    // keeps the busiest, most-walked stretch feeling detailed without
+    // scattering the same handful of props across all 17 segments.
+    const mainSpineTiers = classifyByDistance(ROAD_MAIN_SEGMENTS, spawnX, spawnZ, segmentMidpoint, NEAR_TIER_RADIUS);
+    for (const segment of mainSpineTiers.near) {
+      if (state && state.destroyed) return;
+      await placeMainSpineFurniture(segment);
+    }
+    await delayMs(LIFE_SIM_PERFORMANCE.farPropsDelayMs);
+    for (const segment of mainSpineTiers.far) {
+      if (state && state.destroyed) return;
+      await placeMainSpineFurniture(segment);
+    }
+
+    // Stop signs and a couple of traffic cones at the busiest junctions only
+    // - one per real-world intersection, not swept across every segment.
+    await place(nextEntry("stop_sign"), [0 + 4.5, 0, 8 + 4.5]);
+    await place(nextEntry("stop_sign"), [30 - 4.5, 0, -32 - 4.5], Math.PI);
+    await place(nextEntry("cone"), [6, 0, -30]);
+    await place(nextEntry("cone"), [7.4, 0, -30.6]);
+  }
+
+  // Realistic-style pivot: user feedback ("很多空白" - a lot of blank space)
+  // after fixing the Little India temple pointed at a wider problem - every
+  // district's open plaza ground has nothing scattered on it beyond the
+  // buildings themselves. Scatters real Objaverse props (flowerpot, statue,
+  // bicycle, mailbox, umbrella) in a ring around each district's center,
+  // reusing the same manifest/parallel-preload pattern as
+  // addRoadDetailProps() rather than duplicating it. Deliberately placed at
+  // 1.3x-1.7x each zone's own interaction radius - inside that ring is where
+  // the zone's actual buildings/interaction trigger live, so staying outside
+  // it keeps these decorative-only props from sitting on top of a building.
+  // "Use more Objaverse resources" pass: instead of the same 5-category
+  // rotation on every zone regardless of what it actually is, zones with a
+  // distinctive real-world identity get one themed prop layered into their
+  // ring (replacing 1 of the 3 generic slots, not adding a 4th - keeps
+  // total city-wide placement count unchanged at 3 x 22 = 66, so the only
+  // new payload is the themed GLBs themselves, fetched once and shared
+  // across every zone using that category). Every category below was
+  // confirmed to exist in Objaverse's LVIS taxonomy via
+  // `python tools/objaverse_fetch.py --list-categories <keyword>` before
+  // being relied on here - Objaverse's category list is quirky (e.g.
+  // "picnic"/"luggage"/"fountain"/"planter" all return zero matches), so
+  // nothing here is guessed.
+  const ZONE_THEME_CATEGORIES = {
+    hospital: ["wheelchair"],
+    university: ["backpack"],
+    gym: ["dumbbell"],
+    airport: ["suitcase"],
+    chinatown: ["lantern"],
+    "little-india": ["lantern"],
+    bugis: ["lantern"],
+    beach: ["deck_chair"],
+    "clarke-quay": ["coffee_table"],
+    cafe: ["coffee_table"],
+    mall: ["shopping_cart"]
+  };
+
+  async function addDistrictPlazaProps(THREE, scene, assetManager, state, spawnX, spawnZ, objaverseIndexReady) {
+    if (!assetManager) return;
+    const ready = await assetManager.ensureGltfLoader();
+    if (!ready || (state && state.destroyed)) return;
+
+    // Manifest fetch + shared-prop preload now lives in
+    // loadObjaverseManifestAssets() (called once from mount()) - see the
+    // comment in addRoadDetailProps() for why this used to be duplicated.
+    const { byCategory, loadedByUrl, loadEntry } = await objaverseIndexReady;
+    if (state && state.destroyed) return;
+
+    let placementCount = 0;
+    async function place(entry, position, rotationY = 0) {
+      if (!entry) return;
+      const asset = loadedByUrl.get(entry.url) || (typeof loadEntry === "function" ? await loadEntry(entry) : null);
+      if (!asset || asset.fallback || !asset.scene) return;
+      const instance = asset.scene.clone(true);
+      instance.position.set(position[0], position[1] || 0, position[2]);
+      instance.rotation.y = rotationY;
+      scene.add(instance);
+      placementCount += 1;
+      if (placementCount % LIFE_SIM_PERFORMANCE.propYieldEvery === 0) await yieldToBrowser();
+    }
+
+    const plazaCategories = ["flowerpot", "statue", "bicycle", "mailbox", "umbrella"];
+    const roundRobin = {};
+    function nextEntry(category) {
+      const list = byCategory[category];
+      if (!list || !list.length) return null;
+      roundRobin[category] = (roundRobin[category] || 0) + 1;
+      return list[(roundRobin[category] - 1) % list.length];
+    }
+
+    function categoryForSlot(zone, slotIndex, genericCategory) {
+      const themes = ZONE_THEME_CATEGORIES[zone.id];
+      if (slotIndex === 0 && themes && themes.length && byCategory[themes[0]] && byCategory[themes[0]].length) {
+        return themes[0];
+      }
+      return genericCategory;
+    }
+
+    let categoryCursor = 0;
+    async function placeZoneProps(zone) {
+      const propsPerZone = 3;
+      for (let i = 0; i < propsPerZone; i += 1) {
+        const genericCategory = plazaCategories[categoryCursor % plazaCategories.length];
+        categoryCursor += 1;
+        const category = categoryForSlot(zone, i, genericCategory);
+        const angle = (i / propsPerZone) * Math.PI * 2 + zone.x * 0.37;
+        const ringRadius = zone.radius * (1.3 + (i % 2) * 0.4);
+        const px = zone.x + Math.cos(angle) * ringRadius;
+        const pz = zone.z + Math.sin(angle) * ringRadius;
+        await place(nextEntry(category), [px, 0, pz], angle);
+      }
+    }
+
+    const zoneTiers = classifyByDistance(locationZones, spawnX, spawnZ, (zone) => [zone.x, zone.z], NEAR_TIER_RADIUS);
+    for (const zone of zoneTiers.near) {
+      if (state && state.destroyed) return;
+      await placeZoneProps(zone);
+    }
+    await delayMs(LIFE_SIM_PERFORMANCE.farPropsDelayMs);
+    for (const zone of zoneTiers.far) {
+      if (state && state.destroyed) return;
+      await placeZoneProps(zone);
+    }
+  }
+
+  async function addSingaporeObjaverseReplacementProps(THREE, scene, assetManager, state, spawnX, spawnZ, objaverseIndexReady) {
+    if (!assetManager) return;
+    const ready = await assetManager.ensureGltfLoader();
+    if (!ready || (state && state.destroyed)) return;
+
+    const { byCategory, loadedByUrl, loadEntry } = await objaverseIndexReady;
+    if (state && state.destroyed) return;
+
+    const hiddenPlaceholderNames = new Set();
+    const placementGroups = [
+      {
+        id: "town-centre-transit",
+        maxFarDistance: 58,
+        items: [
+          { category: "lamppost", position: [-19.5, 0, 4.2], rotation: 0.1, replace: ["Street Light Pole", "Street Light Glow"] },
+          { category: "lamppost", position: [-4.2, 0, 4.4], rotation: -0.2, replace: ["Street Light Pole", "Street Light Glow"] },
+          { category: "bench", position: [-17.8, 0, -4.2], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "bench", position: [-7.2, 0, -7.6], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "trash_can", position: [-15.8, 0, -7.2], replace: ["Street Trash Bin"] },
+          { category: "cone", position: [-13.4, 0, 6.4], rotation: 0.2 },
+          { category: "cone", position: [-8.2, 0, 6.2], rotation: -0.1 },
+          { category: "stop_sign", position: [-19.2, 0, 9.8], rotation: Math.PI * 0.5 }
+        ]
+      },
+      {
+        id: "hdb-neighbourhood-centre",
+        maxFarDistance: 70,
+        items: [
+          { category: "mailbox", position: [-35.8, 0, 35.4], rotation: Math.PI * 0.5 },
+          { category: "bench", position: [-29.4, 0, 39.4], rotation: Math.PI * 0.5, replace: ["Bench Seat", "Bench Back"] },
+          { category: "bench", position: [-22.4, 0, 34.7], rotation: 0, replace: ["Bench Seat", "Bench Back"] },
+          { category: "trash_can", position: [-42.8, 0, 30.7], replace: ["Street Trash Bin"] },
+          { category: "bicycle", position: [-37.8, 0, 31.5], rotation: Math.PI * 0.7 },
+          { category: "flowerpot", position: [-47.5, 0, 31.6] },
+          { category: "flowerpot", position: [-33.2, 0, 31.3] }
+        ]
+      },
+      {
+        id: "main-street-active-frontage",
+        maxFarDistance: 90,
+        items: [
+          { category: "shopping_cart", position: [12.5, 0, -35.4], rotation: -0.4 },
+          { category: "shopping_cart", position: [79.2, 0, -35.9], rotation: 0.35 },
+          { category: "trash_can", position: [-8.8, 0, -29.2], replace: ["Street Trash Bin"] },
+          { category: "trash_can", position: [36.7, 0, -37.4], replace: ["Street Trash Bin"] },
+          { category: "bench", position: [4.5, 0, -28.9], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "bench", position: [45.5, 0, -36.3], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "coffee_table", position: [-42.5, 0, -37.8], rotation: 0.2 },
+          { category: "coffee_table", position: [78.5, 0, -41.8], rotation: -0.3 }
+        ]
+      },
+      {
+        id: "food-court-real-props",
+        maxFarDistance: 68,
+        items: [
+          { category: "coffee_table", position: [14.8, 0, -94.5], rotation: 0.08, replace: ["Food Table", "Food Stool"] },
+          { category: "coffee_table", position: [19.4, 0, -92.2], rotation: -0.12 },
+          { category: "coffee_table", position: [25.6, 0, -95.2], rotation: 0.18 },
+          { category: "bench", position: [16.8, 0, -90.5], rotation: Math.PI * 0.5 },
+          { category: "bench", position: [27.5, 0, -91.1], rotation: Math.PI * 0.5 },
+          { category: "lantern", position: [20.5, 2.35, -99.2], rotation: 0.2 },
+          { category: "lantern", position: [25.8, 2.35, -99.2], rotation: -0.1 }
+        ]
+      },
+      {
+        id: "park-connector-active-mobility",
+        maxFarDistance: 100,
+        items: [
+          { category: "bicycle", position: [8.2, 0, 36.1], rotation: Math.PI * 0.5 },
+          { category: "bicycle", position: [33.7, 0, 38.5], rotation: Math.PI * 0.52 },
+          { category: "bicycle", position: [67.2, 0, 37.2], rotation: Math.PI * 0.48 },
+          { category: "bench", position: [18.5, 0, 42.8], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "bench", position: [54.5, 0, 42.8], rotation: Math.PI / 2, replace: ["Bench Seat", "Bench Back"] },
+          { category: "trash_can", position: [31.5, 0, 43.2], replace: ["Street Trash Bin"] }
+        ]
+      },
+      {
+        id: "life-service-specific-props",
+        maxFarDistance: 120,
+        items: [
+          { category: "wheelchair", position: [76.2, 0, -49.4], rotation: Math.PI * 0.1 },
+          { category: "dumbbell", position: [-59.6, 0, 49.3], rotation: Math.PI * 0.25 },
+          { category: "suitcase", position: [105.5, 0, -8.6], rotation: Math.PI * 0.08 },
+          { category: "backpack", position: [-78.2, 0, -10.4], rotation: -0.35 },
+          { category: "deck_chair", position: [71.8, 0, -84.8], rotation: Math.PI * 0.5 },
+          { category: "lantern", position: [12.4, 0, -66.5], rotation: 0.2 },
+          { category: "lantern", position: [24.6, 0, -17.5], rotation: -0.1 }
+        ]
+      }
+    ];
+
+    const roundRobin = {};
+    function nextEntry(category) {
+      const list = byCategory[category];
+      if (!list || !list.length) return null;
+      roundRobin[category] = (roundRobin[category] || 0) + 1;
+      return list[(roundRobin[category] - 1) % list.length];
+    }
+
+    function hidePlaceholders(names) {
+      if (!Array.isArray(names) || !names.length) return;
+      names.forEach((name) => {
+        if (hiddenPlaceholderNames.has(name)) return;
+        let hidden = 0;
+        scene.traverse((node) => {
+          if (node && node.name === name) {
+            node.visible = false;
+            hidden += 1;
+          }
+        });
+        if (hidden) hiddenPlaceholderNames.add(name);
+      });
+    }
+
+    let placementCount = 0;
+    async function place(item) {
+      const entry = nextEntry(item.category);
+      if (!entry) return false;
+      const asset = loadedByUrl.get(entry.url) || (typeof loadEntry === "function" ? await loadEntry(entry) : null);
+      if (!asset || asset.fallback || !asset.scene) return false;
+      const instance = asset.scene.clone(true);
+      instance.name = `Objaverse Singapore Replacement: ${item.category}`;
+      instance.userData.lifeVerseObjaverseReplacement = {
+        pass: "singapore-urban-props-v1",
+        category: item.category,
+        sourceUrl: entry.sourceUrl,
+        license: entry.license
+      };
+      instance.position.set(item.position[0], item.position[1] || 0, item.position[2]);
+      instance.rotation.y = Number(item.rotation || 0);
+      scene.add(instance);
+      hidePlaceholders(item.replace);
+      placementCount += 1;
+      if (placementCount % LIFE_SIM_PERFORMANCE.propYieldEvery === 0) await yieldToBrowser();
+      return true;
+    }
+
+    const tiers = classifyByDistance(placementGroups, spawnX, spawnZ, (group) => {
+      const first = group.items && group.items[0] && group.items[0].position;
+      return first ? [first[0], first[2]] : [0, 0];
+    }, NEAR_TIER_RADIUS);
+
+    for (const group of tiers.near) {
+      if (state && state.destroyed) return;
+      for (const item of group.items) await place(item);
+    }
+    await delayMs(LIFE_SIM_PERFORMANCE.farPropsDelayMs);
+    for (const group of tiers.far) {
+      if (state && state.destroyed) return;
+      const nearestItemDistance = Math.min(...group.items.map((item) => Math.hypot(item.position[0] - spawnX, item.position[2] - spawnZ)));
+      if (nearestItemDistance > group.maxFarDistance) continue;
+      for (const item of group.items) await place(item);
+    }
   }
 
   function addHdbHome(THREE, scene, mat) {
@@ -2043,13 +3321,23 @@
   // two isolated candy-colored boxes. Paifang gate keeps its vivid red/gold -
   // that IS the real color of Chinatown's gate, not a stylization to mute.
   function addChinatown(THREE, scene, mat) {
-    addPlane(THREE, scene, "Chinatown Street Floor", [-10, 0.02, -14], [15, 10], mat.curbWarm);
+    addPlane(THREE, scene, "Chinatown Street Floor", [-12.5, 0.02, -14], [19, 10], mat.curbWarm);
 
+    // Layout pass: widened from 4-unit to 5.5-unit spacing - the whole-map
+    // overlap audit (auditSceneLayout()) found the real swapped-in GLBs
+    // (loadDistrictAssetSamples() below) overlapping their immediate
+    // neighbors at the old spacing, since those real models are wider than
+    // the 3.6-unit primitive placeholders they replace.
+    // Shifted 2 more units west (on top of the 5.5-unit widening) - Cream
+    // (the east end) sits right against ArtScience Museum's territory in
+    // the neighboring marina-bay zone, and pulling Cream back alone just
+    // squeezed it into Teal instead. Shifting the whole row preserves the
+    // internal 5.5-unit spacing while clearing both neighbors.
     const shophouses = [
-      { name: "Chinatown Shophouse Rose", x: -16.2, height: 6.6, color: mat.gym },
-      { name: "Chinatown Shophouse Ochre", x: -12.2, height: 7.0, color: mat.signGold },
-      { name: "Chinatown Shophouse Teal", x: -8.2, height: 6.4, color: mat.hospitalAccent },
-      { name: "Chinatown Shophouse Cream", x: -4.2, height: 6.8, color: mat.hdb }
+      { name: "Chinatown Shophouse Rose", x: -20, height: 6.6, color: mat.gym },
+      { name: "Chinatown Shophouse Ochre", x: -14.5, height: 7.0, color: mat.signGold },
+      { name: "Chinatown Shophouse Teal", x: -9, height: 6.4, color: mat.hospitalAccent },
+      { name: "Chinatown Shophouse Cream", x: -3.5, height: 6.8, color: mat.hdb }
     ];
     shophouses.forEach((house) => {
       // addBuildingCore's window/balcony grid faces -z (the back of this row,
@@ -2086,13 +3374,16 @@
   // Little India's shophouses really are painted in saturated blue/saffron/
   // magenta), plus the Sri Veeramakaliamman-style temple kept at the far end.
   function addLittleIndia(THREE, scene, mat) {
-    addPlane(THREE, scene, "Little India Street Floor", [10, 0.02, 14], [15, 10], mat.curbWarm);
+    addPlane(THREE, scene, "Little India Street Floor", [10.25, 0.02, 14], [19, 10], mat.curbWarm);
 
+    // Layout pass: widened from 4-unit to 5.5-unit spacing, same fix and
+    // same reason as Chinatown's row above - the audit found the real
+    // swapped-in GLBs overlapping their neighbors at the old spacing.
     const shophouses = [
-      { name: "Little India Shophouse Blue", x: 3.8, height: 6.6, color: mat.hdbAccent },
-      { name: "Little India Shophouse Saffron", x: 7.8, height: 7.0, color: mat.signGold },
-      { name: "Little India Shophouse Magenta", x: 11.8, height: 6.4, color: mat.mall },
-      { name: "Little India Shophouse Cream", x: 15.8, height: 6.8, color: mat.hdb }
+      { name: "Little India Shophouse Blue", x: 2, height: 6.6, color: mat.hdbAccent },
+      { name: "Little India Shophouse Saffron", x: 7.5, height: 7.0, color: mat.signGold },
+      { name: "Little India Shophouse Magenta", x: 13, height: 6.4, color: mat.mall },
+      { name: "Little India Shophouse Cream", x: 18.5, height: 6.8, color: mat.hdb }
     ];
     shophouses.forEach((house) => {
       addBuildingCore(THREE, scene, house.name, [house.x, house.height / 2, 9], [3.6, house.height, 4.2], house.color, mat, "shophouse");
@@ -2107,9 +3398,30 @@
       addCylinder(THREE, scene, "Little India Arcade Column", [2.4 + i * 3.0, 1.5, 11.8], [0.14, 3.0, 8], mat.hdb);
     }
 
-    addBox(THREE, scene, "Little India Temple Base", [10, 1.1, 17.3], [3.2, 2.2, 3.0], mat.signGold);
-    addCylinder(THREE, scene, "Little India Temple Spire", [10, 3.4, 17.3], [1.1, 2.6, 4], mat.mrt);
+    // Sri Veeramakaliamman-style temple: was a single gold box + a red
+    // cylinder dropped on top, which reads as two random floating primitives,
+    // not a temple (user feedback: "what is this"). A gopuram's actual
+    // silhouette is a tapering stack of tiers - swapping to 4 narrowing tiers
+    // plus a spire and finial reads as a temple tower from primitives alone,
+    // no model needed.
+    addBox(THREE, scene, "Little India Temple Base", [10, 1.1, 17.3], [3.8, 2.2, 3.6], mat.templeBase);
+    addBox(THREE, scene, "Little India Temple Tier 2", [10, 3.05, 17.3], [3.1, 1.7, 2.9], mat.templeAccent);
+    addBox(THREE, scene, "Little India Temple Tier 3", [10, 4.55, 17.3], [2.4, 1.3, 2.2], mat.templeBase);
+    addBox(THREE, scene, "Little India Temple Tier 4", [10, 5.75, 17.3], [1.7, 0.9, 1.5], mat.templeAccent);
+    addCylinder(THREE, scene, "Little India Temple Spire", [10, 6.85, 17.3], [0.55, 1.1, 8], mat.templeSpire);
+    addBox(THREE, scene, "Little India Temple Finial", [10, 7.55, 17.3], [0.4, 0.4, 0.4], mat.templeBase);
+
+    // Filled in some of the open plaza in front of the arcade/temple - the
+    // layout audit's screenshots (and user feedback: "很多空白", a lot of
+    // blank space) showed a lot of bare ground between the shophouse row and
+    // the temple with nothing placed on it.
     addFlowerBed(THREE, scene, [3.4, 9.2], 3.2, mat);
+    addFlowerBed(THREE, scene, [10, 13.5], 2.6, mat);
+    addFlowerBed(THREE, scene, [16, 15], 2.4, mat);
+    addBox(THREE, scene, "Little India Market Stall", [5.5, 0.9, 16], [2.2, 1.2, 0.9], mat.curbWarm);
+    addBox(THREE, scene, "Little India Market Awning", [5.5, 1.9, 15.4], [2.6, 0.16, 1.4], mat.flowerYellow);
+    addBox(THREE, scene, "Little India Market Stall 2", [14.5, 0.9, 16], [2.2, 1.2, 0.9], mat.curbWarm);
+    addBox(THREE, scene, "Little India Market Awning 2", [14.5, 1.9, 15.4], [2.6, 0.16, 1.4], mat.flowerPurple);
     addSignBoard(THREE, scene, "Little India Sign", "LITTLE INDIA", [3, 4.6, 8.2], mat.hdbAccent, 0x160018);
   }
 
@@ -2122,8 +3434,8 @@
     addBox(THREE, scene, "Bugis Junction Glass Front", [28, 3.2, 1.6], [5.4, 4.2, 0.16], mat.glass);
     addBuildingCore(THREE, scene, "Bugis Heritage Shophouse A", [18, 3.4, -3], [4, 6.8, 4], mat.gym, mat, "shophouse");
     addBox(THREE, scene, "Bugis Heritage Shophouse A Roof", [18, 7.0, -3], [4.4, 0.4, 4.4], mat.roofDark);
-    addBuildingCore(THREE, scene, "Bugis Heritage Shophouse B", [21.6, 3.0, -3], [3.6, 6.0, 3.8], mat.signGold, mat, "shophouse");
-    addBox(THREE, scene, "Bugis Heritage Shophouse B Roof", [21.6, 6.2, -3], [4.0, 0.4, 4.2], mat.roofDark);
+    addBuildingCore(THREE, scene, "Bugis Heritage Shophouse B", [23.2, 3.0, -3], [3.6, 6.0, 3.8], mat.signGold, mat, "shophouse");
+    addBox(THREE, scene, "Bugis Heritage Shophouse B Roof", [23.2, 6.2, -3], [4.0, 0.4, 4.2], mat.roofDark);
     addBox(THREE, scene, "Bugis Market Stall", [19.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
     addBox(THREE, scene, "Bugis Market Stall", [21.5, 0.9, 4], [2.4, 1.2, 0.9], mat.curbWarm);
     addBox(THREE, scene, "Bugis Market Awning", [20.5, 1.9, 3.4], [5.4, 0.16, 1.6], mat.signBlue);
@@ -2267,14 +3579,23 @@
     const baseX = 0;
     const baseZ = 50;
 
-    // Integrated transport hub (MRT + bus interchange)
-    addBox(THREE, scene, "Woodlands Interchange Platform", [baseX, 0.32, baseZ], [10, 0.64, 6], mat.mrt);
-    addBox(THREE, scene, "Woodlands Interchange Roof", [baseX, 3.1, baseZ], [11, 0.45, 7], mat.roofDark);
-    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX - 4, 1.5, baseZ - 2.5], [0.2, 3, 8], mat.metal);
-    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX + 4, 1.5, baseZ - 2.5], [0.2, 3, 8], mat.metal);
-    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX - 4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
-    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [baseX + 4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
-    addSignBoard(THREE, scene, "Woodlands Interchange Sign", "WOODLANDS", [baseX - 4.5, 4.4, baseZ - 3.6], mat.signBlue, 0xffffff);
+    // Integrated transport hub (MRT + bus interchange). Layout fix: this
+    // used to be centered at baseX (x=0), dead on the "Main Road NS"
+    // centerline (x=0, 7 units wide) that runs right through Woodlands -
+    // the platform (10 units wide) and roof (11 units wide) both fully
+    // spanned the road, reading as a building sitting in the middle of
+    // traffic. Shifted west of the road by interchangeX and narrowed to fit
+    // the gap between the road's left edge (x=-3.5) and HDB Block A's right
+    // edge (x=-10, per its own position/scale below) without overlapping
+    // either.
+    const interchangeX = baseX - 6.5;
+    addBox(THREE, scene, "Woodlands Interchange Platform", [interchangeX, 0.32, baseZ], [6, 0.64, 6], mat.mrt);
+    addBox(THREE, scene, "Woodlands Interchange Roof", [interchangeX, 3.1, baseZ], [6.6, 0.45, 7], mat.roofDark);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [interchangeX - 2.4, 1.5, baseZ - 2.5], [0.2, 3, 8], mat.metal);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [interchangeX + 2.4, 1.5, baseZ - 2.5], [0.2, 3, 8], mat.metal);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [interchangeX - 2.4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
+    addCylinder(THREE, scene, "Woodlands Interchange Pillar", [interchangeX + 2.4, 1.5, baseZ + 2.5], [0.2, 3, 8], mat.metal);
+    addSignBoard(THREE, scene, "Woodlands Interchange Sign", "WOODLANDS", [interchangeX - 2.7, 4.4, baseZ - 3.6], mat.signBlue, 0xffffff);
 
     // Causeway Point mall, right next to the interchange (as it is in reality).
     // The visible mall volume itself is swapped for a real modeled building in
@@ -2290,7 +3611,7 @@
     // swapped for real modeled buildings in loadDistrictAssetSamples() (at
     // [-11,0,53] and [-27,0,47]) - these stay only as hidden placeholders.
     addBuildingCore(THREE, scene, "Woodlands HDB Block A", [baseX - 13, 9, baseZ + 3], [6, 18, 4.6], mat.hdb, mat, "hdb");
-    addBuildingCore(THREE, scene, "Woodlands HDB Block B", [baseX - 19, 7.5, baseZ - 3], [5.2, 15, 4.2], mat.hdbAccent, mat, "hdb");
+    addBuildingCore(THREE, scene, "Woodlands HDB Block B", [baseX - 19, 7.5, baseZ - 1], [5.2, 15, 4.2], mat.hdbAccent, mat, "hdb");
     addFlowerBed(THREE, scene, [baseX - 13, baseZ + 8], 4, mat);
 
     // Estate expansion: a real multi-block neighbourhood instead of just the
@@ -2299,19 +3620,36 @@
     // footprint further southwest). Swapped for real modelled buildings in
     // loadDistrictAssetSamples(), cycling through the same 3 Quaternius
     // Downtown City MegaKit files as the original 2 blocks/mall above.
+    // Realistic-style pivot, layout pass: this grid used 7-unit spacing
+    // against 5.4-unit primitive placeholders (a plausible 1.6-unit gap),
+    // but the real swapped-in GLB models (loadDistrictAssetSamples() below)
+    // are not scale-normalized to that footprint at all (scale: [1,1,1],
+    // native GLB size) - the whole-map layout audit (auditSceneLayout())
+    // found the real "Scene"-named replacements heavily overlapping each
+    // other once swapped in, the single densest cluster of overlaps on the
+    // map. Widened to 9-unit spacing and shifted south (away from Causeway
+    // Point Mall/the Woodlands interchange, both near baseZ+0..-1) - verified
+    // against the audit after this change.
+    // Second widening pass: the first pass (9-unit spacing) was based on an
+    // assumed model size before normalizeToHeight() was wired in for these
+    // swaps - once the swapped GLBs were correctly measured at their real,
+    // normalized ~10-12 unit footprint (not the original 20+ unit native
+    // scale, but still bigger than 9-unit spacing allows), the audit still
+    // showed residual overlap. 13-unit spacing, still shifted south clear of
+    // Causeway Point Mall/the Woodlands interchange.
     const estateGrid = [
-      { name: "Woodlands Estate Block C", x: -16, z: -20, color: mat.hdb },
-      { name: "Woodlands Estate Block D", x: -9, z: -20, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block E", x: -2, z: -20, color: mat.hdb },
-      { name: "Woodlands Estate Block F", x: 5, z: -20, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block G", x: -16, z: -13, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block H", x: -9, z: -13, color: mat.hdb },
-      { name: "Woodlands Estate Block I", x: -2, z: -13, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block J", x: 5, z: -13, color: mat.hdb },
-      { name: "Woodlands Estate Block K", x: -16, z: -6, color: mat.hdb },
-      { name: "Woodlands Estate Block L", x: -9, z: -6, color: mat.hdbAccent },
-      { name: "Woodlands Estate Block M", x: -2, z: -6, color: mat.hdb },
-      { name: "Woodlands Estate Block N", x: 5, z: -6, color: mat.hdbAccent }
+      { name: "Woodlands Estate Block C", x: -21, z: -36, color: mat.hdb },
+      { name: "Woodlands Estate Block D", x: -8, z: -36, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block E", x: 5, z: -36, color: mat.hdb },
+      { name: "Woodlands Estate Block F", x: 18, z: -36, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block G", x: -21, z: -23, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block H", x: -8, z: -23, color: mat.hdb },
+      { name: "Woodlands Estate Block I", x: 5, z: -23, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block J", x: 18, z: -23, color: mat.hdb },
+      { name: "Woodlands Estate Block K", x: -21, z: -14, color: mat.hdb },
+      { name: "Woodlands Estate Block L", x: -8, z: -14, color: mat.hdbAccent },
+      { name: "Woodlands Estate Block M", x: 5, z: -14, color: mat.hdb },
+      { name: "Woodlands Estate Block N", x: 18, z: -14, color: mat.hdbAccent }
     ];
     estateGrid.forEach((block, index) => {
       const height = 14 + (index % 3) * 2.5;
@@ -2400,6 +3738,588 @@
     addPlanterRow(THREE, scene, [10.5, -7.9], 4, mat);
   }
 
+  // Singapore urban-planning infill pass: the earlier map had recognizable
+  // destinations, but far too much plain ground between them. Singapore does
+  // not read as isolated POIs in a field - it reads as transit-linked towns,
+  // mixed-use street walls, sheltered pedestrian routes, neighbourhood
+  // centres, and linear green connectors. These are light procedural
+  // planning masses that can be swapped for Objaverse/GLB assets later; game
+  // logic still depends on zones/routes, not on these decorative meshes.
+  function addSingaporeUrbanPlanningInfill(THREE, scene, mat) {
+    addFineGrainUrbanFabric(THREE, scene, mat);
+    addTransitOrientedTownCentre(THREE, scene, mat);
+    addHeartlandPrecinctDensity(THREE, scene, mat);
+    addMixedUseStreetWalls(THREE, scene, mat);
+    addParkConnectorAndActiveMobility(THREE, scene, mat);
+    addDowntownCommercialDensity(THREE, scene, mat);
+  }
+
+  function addSingaporeOfficialPlanningRebase(THREE, scene, mat) {
+    // URA Master Plan Rebase: do not treat the map as isolated attractions.
+    // This lightweight city-structure layer follows Singapore planning
+    // patterns - town centre core, HDB neighbourhood catchment, mixed-use CBD
+    // edge, green-blue connector, and walk-cycle-ride links. It deliberately
+    // avoids first-screen experimental GLB building swaps until each model
+    // passes scale/camera audits.
+    addPlane(THREE, scene, "Official Planning Town Centre Envelope", [-6, 0.012, -18], [54, 42], mat.sidewalk);
+    addSoftEdgeGroundPatch(THREE, scene, "Official Planning Town Centre Envelope", [-6, -0.006, -18], [54, 42], 0xd8d2c2, 0.18);
+    addPlane(THREE, scene, "HDB Neighbourhood Centre Catchment", [-38, 0.014, 39], [50, 36], mat.grass);
+    addSoftEdgeGroundPatch(THREE, scene, "HDB Neighbourhood Centre Catchment", [-38, -0.004, 39], [50, 36], 0xc7daba, 0.16);
+    addPlane(THREE, scene, "Learning Campus Quiet Quarter", [-70, 0.015, -15], [34, 30], mat.grass);
+    addSoftEdgeGroundPatch(THREE, scene, "Learning Campus Quiet Quarter", [-70, -0.003, -15], [34, 30], 0xd5dec6, 0.16);
+    addPlane(THREE, scene, "Work Money Mixed Use Spine", [27, 0.016, -40], [126, 28], mat.sidewalk);
+    addSoftEdgeGroundPatch(THREE, scene, "Work Money Mixed Use Spine", [27, -0.002, -40], [126, 28], 0xcfc6b7, 0.12);
+    addPlane(THREE, scene, "Health Green Blue Recovery Belt", [52, 0.017, 19], [86, 30], mat.park);
+    addSoftEdgeGroundPatch(THREE, scene, "Health Green Blue Recovery Belt", [52, 0.0, 19], [86, 30], 0xbdd6af, 0.2);
+    addPlane(THREE, scene, "Future Waterfront Gateway District", [76, 0.018, -72], [62, 28], mat.sand);
+    addSoftEdgeGroundPatch(THREE, scene, "Future Waterfront Gateway District", [76, 0.002, -72], [62, 28], 0xd6c596, 0.14);
+
+    addBox(THREE, scene, "URA Mixed Use Planning Spine", [14, 0.19, -22], [116, 0.12, 2.4], mat.path, true);
+    addBox(THREE, scene, "Walk Cycle Ride North South Connector", [-12, 0.2, 17], [2.2, 0.12, 76], mat.path, true);
+    addBox(THREE, scene, "PCN Green-Blue Corridor", [41, 0.18, 31], [94, 0.12, 4.6], mat.signGreen, true);
+    addBox(THREE, scene, "ABC Waters Canal Edge", [41, 0.13, 27.8], [94, 0.08, 2.2], mat.water, true);
+
+    [
+      [-48, 27, "HOME"],
+      [-16, 3, "MRT"],
+      [0, -31, "MALL"],
+      [20, -82, "FOOD"],
+      [45, 11, "LIBRARY"],
+      [78, -53, "HEALTH"],
+      [78, -32, "CBD"]
+    ].forEach(([x, z, label], index) => {
+      const markerMat = index % 2 ? mat.signGreen : mat.signGold;
+      addBox(THREE, scene, `Planning Wayfinding Plinth ${label}`, [x, 0.42, z], [2.6, 0.28, 1.2], mat.curbWarm, true);
+      addSignBoard(THREE, scene, `Planning Wayfinding Sign ${label}`, label, [x - 1.25, 1.3, z - 0.72], markerMat, index % 2 ? 0xffffff : 0x141414);
+    });
+
+    addNeighbourhoodMicroBlocks(THREE, scene, mat, "HDB Neighbourhood Micro Block", [
+      [-53, 34, 3.4, 3.1, "CARE"],
+      [-47, 31, 3.2, 2.9, "MINI"],
+      [-41, 29, 3.5, 3.0, "KOPI"],
+      [-34, 28, 3.3, 2.8, "BILLS"],
+      [-28, 29, 3.5, 3.0, "STUDY"]
+    ]);
+    addNeighbourhoodMicroBlocks(THREE, scene, mat, "Town Centre Active Frontage", [
+      [-24, -12.2, 3.4, 2.9, "CLINIC"],
+      [-16, -12.2, 3.2, 2.8, "TUITION"],
+      [-8, -12.2, 3.4, 2.9, "SERVICE"],
+      [1, -12.2, 3.5, 3.0, "SKILLS"],
+      [10, -12.2, 3.4, 2.9, "CAFE"]
+    ]);
+
+    [
+      [-47, 39], [-42, 39], [-37, 39], [-32, 39], [-27, 39],
+      [-18, 8], [-12, 8], [-6, 8], [0, 8],
+      [3, -25], [12, -25], [23, -25], [34, -25], [46, -25], [58, -25],
+      [13, 27], [22, 28], [31, 29], [40, 30], [49, 31], [58, 32]
+    ].forEach(([x, z]) => addTree(THREE, scene, [x, z], mat));
+    [
+      [-45, 25], [-36, 25], [-27, 25], [-17, 1], [-6, 1],
+      [6, -29], [19, -29], [32, -29], [45, -29], [58, -29],
+      [12, 35], [28, 35], [44, 35], [60, 35]
+    ].forEach(([x, z]) => addPlanterRow(THREE, scene, [x, z], 2, mat));
+  }
+
+  function addNeighbourhoodMicroBlocks(THREE, scene, mat, prefix, blocks) {
+    blocks.forEach(([x, z, width, height, label], index) => {
+      const material = index % 3 === 0 ? mat.hdbAccent : (index % 3 === 1 ? mat.cafe : mat.mall);
+      const kioskDepth = 2.25;
+      addBuildingCore(THREE, scene, `${prefix} ${label}`, [x, height / 2, z], [width, height, kioskDepth], material, mat, "shophouse");
+      addBox(THREE, scene, `${prefix} ${label} Pedestrian Apron`, [x, 0.21, z - 1.75], [width + 0.8, 0.1, 1.6], mat.sidewalk, true);
+      addBox(THREE, scene, `${prefix} ${label} Awning`, [x, height - 0.45, z - 1.25], [width + 0.65, 0.16, 0.75], index % 2 ? mat.signBlue : mat.signGreen, true);
+      addShopFront(THREE, scene, [x - 0.35, z - 1.28], label, index % 2 ? mat.signBlue : mat.signGreen, mat);
+    });
+  }
+
+  function addSingaporeIdentityPass(THREE, scene, mat) {
+    // Visual identity pass for the first Life Sim camera cone: Singapore should
+    // read before the player touches controls. These are lightweight authored
+    // elements based on real local infrastructure cues - HDB void decks, block
+    // numbers, LTA bus shelters, Walk2Ride-style sheltered links, MRT signage,
+    // hawker/kopitiam frontage, yellow-box road marking, and tropical planting.
+    addSingaporeSkylineBackdrop(THREE, scene, mat);
+    addHdbVoidDeckStreetWall(THREE, scene, mat, [9.5, -76.4]);
+    addMrtEntranceLandmark(THREE, scene, mat, [28, -79.6]);
+    addSingaporeBusStop(THREE, scene, mat, [2.2, -78.6]);
+    addSingaporeCoveredWalkway(THREE, scene, mat);
+    addHawkerKopitiamFrontage(THREE, scene, mat);
+    addSingaporeRoadMarkings(THREE, scene, mat);
+    addTropicalStreetEdge(THREE, scene, mat);
+    addSingaporeStreetFurniture(THREE, scene, mat);
+  }
+
+  function addHdbVoidDeckStreetWall(THREE, scene, mat, origin) {
+    const [x, z] = origin;
+    const facadeMat = createSingaporeFacadeMaterial(THREE, {
+      type: "hdb",
+      wall: "#d9d4c7",
+      accent: "#6f8fa0",
+      label: "BLK 219"
+    });
+    addBox(THREE, scene, "Singapore HDB Blk 219 Facade", [x, 7.4, z], [11.5, 14.8, 2.6], facadeMat);
+    addBox(THREE, scene, "Singapore HDB Blk 219 Street Side Facade", [x + 5.92, 7.1, z - 3.2], [0.3, 14.2, 5.2], facadeMat);
+    addBox(THREE, scene, "Singapore HDB Blk 219 Void Deck Opening", [x, 1.35, z - 1.45], [9.8, 2.7, 0.22], mat.glass);
+    addBox(THREE, scene, "Singapore HDB Void Deck Floor", [x, 0.18, z - 3.1], [12.2, 0.16, 4.2], mat.sidewalk, true);
+    addBox(THREE, scene, "Singapore HDB Void Deck Bench", [x - 3.7, 0.52, z - 3.45], [2.4, 0.28, 0.48], mat.wood);
+    addBox(THREE, scene, "Singapore HDB Void Deck Backrest", [x - 3.7, 0.9, z - 3.72], [2.4, 0.58, 0.16], mat.wood);
+    addBox(THREE, scene, "Singapore HDB Lift Lobby Yellow Wall", [x + 3.45, 1.8, z - 3.45], [2.3, 3.0, 0.2], mat.signGold);
+    addText(THREE, scene, "BLK 219", [x - 5.4, 5.2, z - 1.65], 0.4, 0x111111);
+    addText(THREE, scene, "VOID DECK", [x - 4.9, 2.15, z - 3.85], 0.26, 0x111111);
+    addFacingXSignBoard(THREE, scene, "Singapore HDB Block Number Street Sign", "BLK 219", [x + 6.12, 5.25, z - 4.1], mat.signGold, 0x111111, 2.7, 0.8);
+    for (let i = 0; i < 5; i++) {
+      addCylinder(THREE, scene, "Singapore HDB Void Deck Column", [x - 4.8 + i * 2.4, 1.45, z - 3.2], [0.12, 2.9, 10], mat.hdbBalcony);
+    }
+    for (let i = 0; i < 5; i++) {
+      addCylinder(THREE, scene, "Singapore HDB Laundry Pole", [x + 6.18, 4.2 + i * 1.6, z - 2.2], [0.035, 1.9, 8], mat.metal, Math.PI / 2);
+    }
+  }
+
+  function addMrtEntranceLandmark(THREE, scene, mat, origin) {
+    const [x, z] = origin;
+    addBox(THREE, scene, "Singapore MRT Entrance Glass Box", [x, 1.55, z], [4.6, 3.1, 3.3], mat.glass);
+    addBox(THREE, scene, "Singapore MRT Entrance Roof", [x, 3.25, z], [5.4, 0.28, 4.0], mat.roofDark, true);
+    addBox(THREE, scene, "Singapore MRT Escalator Well", [x - 0.65, 0.55, z - 0.1], [2.6, 0.26, 2.2], mat.metal, true);
+    addCylinder(THREE, scene, "Singapore MRT Roundel Red", [x - 2.85, 2.6, z - 1.95], [0.58, 0.12, 28], mat.mrt, Math.PI / 2);
+    addCylinder(THREE, scene, "Singapore MRT Roundel White", [x - 2.85, 2.6, z - 1.88], [0.34, 0.13, 28], mat.shoes, Math.PI / 2);
+    addCylinder(THREE, scene, "Singapore MRT Street Pylon Red", [x - 7.5, 2.4, z - 4.2], [0.76, 0.16, 32], mat.mrt, Math.PI / 2);
+    addCylinder(THREE, scene, "Singapore MRT Street Pylon White", [x - 7.5, 2.4, z - 4.05], [0.42, 0.17, 32], mat.shoes, Math.PI / 2);
+    addSignBoard(THREE, scene, "Singapore MRT Station Name", "MRT  EW", [x - 0.45, 3.92, z - 2.05], mat.signGreen, 0xffffff);
+    addFacingXSignBoard(THREE, scene, "Singapore MRT Road Facing Station Sign", "MRT  TANJONG", [x - 8.05, 3.45, z - 1.5], mat.signGreen, 0xffffff, 3.9, 0.95);
+    addText(THREE, scene, "HAWKER  MRT  HDB", [x - 6.2, 1.55, z - 2.45], 0.28, 0xffffff);
+    addBox(THREE, scene, "MRT Tactile Paving Strip", [x - 4.4, 0.205, z - 2.35], [7.6, 0.055, 0.38], mat.signGold, true);
+  }
+
+  function addSingaporeBusStop(THREE, scene, mat, origin) {
+    const [x, z] = origin;
+    addBox(THREE, scene, "LTA Bus Stop Shelter Floor", [x, 0.2, z], [7.2, 0.14, 2.4], mat.sidewalk, true);
+    addBox(THREE, scene, "LTA Bus Stop Green Roof", [x, 3.05, z], [7.6, 0.24, 2.7], mat.signGreen, true);
+    addBox(THREE, scene, "LTA Bus Stop Rain Screen", [x, 1.75, z + 1.25], [7.2, 2.35, 0.12], mat.glass);
+    [-3, -1.2, 1.2, 3].forEach((dx) => addCylinder(THREE, scene, "LTA Bus Stop Slim Column", [x + dx, 1.55, z - 1.15], [0.07, 3.1, 8], mat.metal));
+    addBox(THREE, scene, "LTA Bus Stop Priority Seat", [x - 1.9, 0.58, z - 0.3], [1.7, 0.25, 0.55], mat.signBlue);
+    addBox(THREE, scene, "LTA Bus Stop Priority Seat Back", [x - 1.9, 0.94, z + 0.04], [1.7, 0.62, 0.14], mat.signBlue);
+    addBox(THREE, scene, "LTA Bus Stop PIDS Panel", [x + 2.2, 1.85, z - 1.22], [1.35, 1.35, 0.14], mat.screen);
+    addText(THREE, scene, "BUS  65  190", [x + 1.62, 1.96, z - 1.42], 0.16, 0xffef84);
+    addSignBoard(THREE, scene, "LTA Bus Stop Sign", "BUS STOP", [x - 3.15, 3.82, z - 1.33], mat.signBlue, 0xffffff);
+    addFacingXSignBoard(THREE, scene, "LTA Bus Stop Road Facing Sign", "BUS STOP", [x + 4.4, 2.35, z - 1.22], mat.signBlue, 0xffffff, 2.35, 0.62);
+  }
+
+  function addSingaporeCoveredWalkway(THREE, scene, mat) {
+    for (let x = -8; x <= 30; x += 4.2) {
+      addBox(THREE, scene, "Singapore Sheltered Walkway Roof", [x, 3.35, -75.7], [4.45, 0.18, 2.1], mat.roofDark, true);
+      addCylinder(THREE, scene, "Singapore Sheltered Walkway Slim Column", [x - 1.85, 1.7, -76.55], [0.065, 3.25, 8], mat.metal);
+      addCylinder(THREE, scene, "Singapore Sheltered Walkway Slim Column", [x + 1.85, 1.7, -74.85], [0.065, 3.25, 8], mat.metal);
+    }
+    addBox(THREE, scene, "Singapore Sheltered Walkway Drain Line", [11, 0.185, -77.05], [41, 0.035, 0.12], mat.metal, true);
+  }
+
+  function addHawkerKopitiamFrontage(THREE, scene, mat) {
+    const stalls = [
+      [-9, -79.6, "KOPITIAM"],
+      [-2.5, -79.6, "NASI"],
+      [4.0, -79.6, "TEH"]
+    ];
+    stalls.forEach(([x, z, label], index) => {
+      const facadeMat = createSingaporeFacadeMaterial(THREE, {
+        type: "hawker",
+        wall: index % 2 ? "#c68b4a" : "#b87842",
+        accent: index % 2 ? "#257c5c" : "#d1a23e",
+        label
+      });
+      addBox(THREE, scene, `Singapore Hawker ${label} Textured Stall`, [x, 1.75, z], [5.2, 3.5, 2.0], facadeMat);
+      addBox(THREE, scene, `Singapore Hawker ${label} Metal Counter`, [x, 0.9, z - 1.14], [4.4, 0.55, 0.18], mat.metal);
+      addBox(THREE, scene, `Singapore Hawker ${label} Awning`, [x, 2.92, z - 1.28], [5.5, 0.2, 0.95], index % 2 ? mat.signGreen : mat.signGold, true);
+      addText(THREE, scene, label, [x - 1.95, 2.62, z - 1.42], 0.26, index % 2 ? 0xffffff : 0x111111);
+    });
+    addFacingXSignBoard(THREE, scene, "Singapore Hawker Centre Road Facing Sign", "KOPITIAM", [5.4, 3.0, -77.15], mat.signGold, 0x111111, 3.4, 0.8);
+    addBox(THREE, scene, "Hawker Centre Yellow Table Row", [1.5, 0.65, -75.4], [10.2, 0.24, 0.95], mat.signGold);
+    for (let i = 0; i < 5; i++) addCylinder(THREE, scene, "Hawker Centre Round Stool", [-3 + i * 2.2, 0.45, -74.4], [0.28, 0.22, 12], mat.mrt);
+  }
+
+  function addSingaporeRoadMarkings(THREE, scene, mat) {
+    addBox(THREE, scene, "Singapore Bus Lane Marking One", [-4.6, 0.18, -82.25], [6.4, 0.035, 0.18], mat.roadLine, true);
+    addBox(THREE, scene, "Singapore Bus Lane Marking Two", [-4.6, 0.18, -86.75], [6.4, 0.035, 0.18], mat.roadLine, true);
+    addFlatTextPlane(THREE, scene, "Singapore Bus Lane Road Text BUS", "BUS", [-7.2, 0.225, -86.25], [3.4, 1.35], 0xf2ead7, Math.PI / 2);
+    addFlatTextPlane(THREE, scene, "Singapore Bus Lane Road Text LANE", "LANE", [-6.9, 0.225, -82.9], [4.2, 1.2], 0xf2ead7, Math.PI / 2);
+    for (let x = 15; x <= 27; x += 1.2) addBox(THREE, scene, "Singapore Zebra Crossing Stripe", [x, 0.18, -82.1], [0.42, 0.04, 5.1], mat.shoes, true);
+    addBox(THREE, scene, "Singapore Yellow Box North", [15, 0.19, -87.3], [12, 0.04, 0.16], mat.signGold, true);
+    addBox(THREE, scene, "Singapore Yellow Box South", [15, 0.19, -81.7], [12, 0.04, 0.16], mat.signGold, true);
+    addBox(THREE, scene, "Singapore Yellow Box West", [9, 0.19, -84.5], [0.16, 0.04, 5.6], mat.signGold, true);
+    addBox(THREE, scene, "Singapore Yellow Box East", [21, 0.19, -84.5], [0.16, 0.04, 5.6], mat.signGold, true);
+    for (let i = -2; i <= 2; i++) addBox(THREE, scene, "Singapore Yellow Box Diagonal", [15 + i * 2.2, 0.2, -84.5], [0.14, 0.04, 6.3], mat.signGold, true).rotation.y = Math.PI / 4;
+  }
+
+  function addTropicalStreetEdge(THREE, scene, mat) {
+    [[-4, -72.8], [7, -72.4], [18, -74.2], [29, -75.0], [37, -80.4]].forEach(([x, z], index) => {
+      addCylinder(THREE, scene, "Singapore Rain Tree Trunk", [x, 1.25, z], [0.18, 2.5, 12], mat.trunk);
+      const crown = addCylinder(THREE, scene, "Singapore Rain Tree Broad Crown", [x, 3.2, z], [1.35 + (index % 2) * 0.25, 0.7, 18], mat.bush);
+      crown.scale.x = 1.45;
+      crown.scale.z = 1.2;
+    });
+    [[6.5, -80.3], [13.5, -80.1], [22.8, -80.8], [31.5, -81.4]].forEach(([x, z]) => addPlanterRow(THREE, scene, [x, z], 2, mat));
+  }
+
+  function addSingaporeStreetFurniture(THREE, scene, mat) {
+    for (let x = -6; x <= 32; x += 6.2) {
+      addCylinder(THREE, scene, "Singapore Black White Bollard", [x, 0.45, -78.2], [0.11, 0.9, 12], mat.lamp);
+      addCylinder(THREE, scene, "Singapore Street Lamp Pole", [x + 1.8, 2.35, -73.8], [0.08, 4.7, 10], mat.lamp);
+      addBox(THREE, scene, "Singapore Street Lamp Arm", [x + 2.25, 4.45, -74.1], [0.85, 0.07, 0.11], mat.lamp);
+      addCylinder(THREE, scene, "Singapore Street Lamp Glow", [x + 2.68, 4.4, -74.1], [0.16, 0.12, 12], mat.lampGlow);
+    }
+    addBox(THREE, scene, "Singapore Green Trash Bin", [13.8, 0.55, -75.05], [0.62, 1.1, 0.62], mat.signGreen);
+    addText(THREE, scene, "LITTER BIN", [13.38, 1.27, -75.42], 0.12, 0xffffff);
+    addBox(THREE, scene, "Singapore Pedestrian Railing", [20.5, 0.82, -80.4], [8.8, 0.12, 0.12], mat.metal);
+    for (let x = 16.4; x <= 24.6; x += 1.1) addCylinder(THREE, scene, "Singapore Pedestrian Railing Post", [x, 0.85, -80.4], [0.035, 1.7, 8], mat.metal);
+  }
+
+  function addSingaporeSkylineBackdrop(THREE, scene, mat) {
+    const material = createSingaporeSkylineMaterial(THREE);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(54, 18), material);
+    mesh.name = "Singapore Marina Bay Skyline Backdrop";
+    mesh.position.set(48, 9.0, -90.5);
+    mesh.rotation.y = Math.PI / 2;
+    mesh.renderOrder = -2;
+    scene.add(mesh);
+    addFacingXSignBoard(THREE, scene, "Singapore District Wayfinding Sign", "HDB  MRT  HAWKER  CBD", [18, 3.4, -76.55], mat.signGold, 0x111111, 5.1, 0.78);
+    addFacingXSignBoard(THREE, scene, "Singapore Town Centre Overhead Wayfinding Sign", "TANJONG MRT  /  HAWKER CENTRE", [21.8, 4.55, -82.15], mat.signGreen, 0xffffff, 8.2, 0.86);
+    addCylinder(THREE, scene, "Singapore Town Centre Wayfinding Gantry Pole", [21.8, 2.25, -78.35], [0.08, 4.5, 10], mat.metal);
+    addCylinder(THREE, scene, "Singapore Town Centre Wayfinding Gantry Pole", [21.8, 2.25, -85.95], [0.08, 4.5, 10], mat.metal);
+  }
+
+  function createSingaporeSkylineMaterial(THREE) {
+    const key = "sg:skyline:marina-bay";
+    if (facadeTextureCache.has(key)) return facadeTextureCache.get(key);
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 384;
+    const ctx = canvas.getContext("2d");
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "rgba(139,190,219,0.12)");
+    gradient.addColorStop(1, "rgba(18,32,42,0.28)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "rgba(34,45,55,0.58)";
+    const base = 326;
+    [
+      [40, 160, 58, 166], [112, 110, 44, 216], [176, 138, 70, 188], [270, 82, 52, 244],
+      [352, 124, 60, 202], [456, 96, 44, 230], [526, 118, 80, 208], [650, 78, 62, 248],
+      [742, 132, 50, 194], [824, 102, 74, 224], [930, 152, 64, 174]
+    ].forEach(([x, y, w, h]) => ctx.fillRect(x, y, w, h));
+    ctx.fillStyle = "rgba(24,34,42,0.72)";
+    ctx.beginPath();
+    ctx.moveTo(590, 250);
+    ctx.bezierCurveTo(620, 202, 670, 184, 712, 216);
+    ctx.bezierCurveTo(740, 238, 770, 246, 810, 232);
+    ctx.lineTo(826, 260);
+    ctx.lineTo(586, 260);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,235,170,0.82)";
+    ctx.lineWidth = 3;
+    for (let x = 48; x < 980; x += 32) {
+      for (let y = 130; y < 305; y += 28) {
+        if ((x + y) % 3 === 0) ctx.strokeRect(x, y, 9, 7);
+      }
+    }
+    ctx.fillStyle = "rgba(255,247,214,0.82)";
+    ctx.font = "900 46px system-ui, sans-serif";
+    ctx.fillText("MARINA BAY  /  CBD", 46, 76);
+    const texture = new THREE.CanvasTexture(canvas);
+    if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+    facadeTextureCache.set(key, material);
+    return material;
+  }
+
+  function createSingaporeFacadeMaterial(THREE, options = {}) {
+    const key = `sg:${options.type}:${options.wall}:${options.accent}:${options.label}`;
+    if (facadeTextureCache.has(key)) return facadeTextureCache.get(key);
+    const canvas = document.createElement("canvas");
+    canvas.width = 768;
+    canvas.height = 768;
+    const ctx = canvas.getContext("2d");
+    const wall = options.wall || "#d7d0bf";
+    const accent = options.accent || "#4c7f66";
+    ctx.fillStyle = wall;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 0.12;
+    for (let i = 0; i < 120; i++) {
+      ctx.fillStyle = i % 2 ? "#ffffff" : "#000000";
+      ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 1 + Math.random() * 2, 12 + Math.random() * 32);
+    }
+    ctx.globalAlpha = 1;
+    if (options.type === "hdb") {
+      for (let floor = 0; floor < 8; floor++) {
+        const y = 70 + floor * 76;
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.fillRect(0, y - 10, canvas.width, 6);
+        for (let col = 0; col < 5; col++) {
+          const x = 58 + col * 136;
+          ctx.fillStyle = "#2a3640";
+          ctx.fillRect(x, y, 70, 42);
+          ctx.fillStyle = "#8eb0bd";
+          ctx.fillRect(x + 5, y + 5, 60, 32);
+          ctx.fillStyle = accent;
+          ctx.fillRect(x - 20, y + 48, 112, 12);
+          if ((floor + col) % 2 === 0) {
+            ctx.fillStyle = "#b5b8b9";
+            ctx.fillRect(x + 8, y + 64, 38, 14);
+          }
+        }
+      }
+      ctx.fillStyle = accent;
+      ctx.fillRect(0, 0, canvas.width, 54);
+      ctx.fillStyle = "#111111";
+      ctx.font = "900 42px system-ui, sans-serif";
+      ctx.fillText(options.label || "BLK", 24, 41);
+      ctx.fillStyle = "rgba(0,0,0,0.36)";
+      ctx.fillRect(0, 645, canvas.width, 92);
+      ctx.fillStyle = "#f4efe2";
+      ctx.font = "800 26px system-ui, sans-serif";
+      ctx.fillText("VOID DECK", 28, 703);
+    } else {
+      ctx.fillStyle = accent;
+      ctx.fillRect(0, 0, canvas.width, 120);
+      ctx.fillStyle = "#111111";
+      ctx.font = "900 58px system-ui, sans-serif";
+      ctx.fillText(options.label || "SHOP", 36, 82);
+      for (let i = 0; i < 4; i++) {
+        const x = 50 + i * 175;
+        ctx.fillStyle = "#1f2528";
+        ctx.fillRect(x, 190, 118, 160);
+        ctx.fillStyle = "#bfd4d5";
+        ctx.fillRect(x + 8, 198, 102, 144);
+      }
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(0, 560, canvas.width, 160);
+      ctx.fillStyle = "#e6e1d4";
+      ctx.font = "800 32px system-ui, sans-serif";
+      ctx.fillText("HAWKER CENTRE", 36, 640);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      roughness: 0.82,
+      metalness: 0.02
+    });
+    facadeTextureCache.set(key, material);
+    return material;
+  }
+
+  function addFineGrainUrbanFabric(THREE, scene, mat) {
+    // Fine-grain Singapore town planning pass. The big map plane used to read
+    // as empty ground between POIs; this fills it with secondary streets,
+    // block edges, drop-off bays, plazas, and active frontages without adding
+    // heavy GLB assets on first entry.
+    [
+      ["Secondary Street Heartland", [-30, 0.035, 18], [44, 0.06, 3.1]],
+      ["Secondary Street Campus Link", [-58, 0.036, -18], [46, 0.06, 3.1]],
+      ["Secondary Street Downtown Lane", [69, 0.037, -24], [3.1, 0.06, 42]],
+      ["Secondary Street Social Lane", [30, 0.038, -55], [72, 0.06, 3.0]],
+      ["Secondary Street Airport Link", [96, 0.039, -53], [3.0, 0.06, 58]],
+      ["Secondary Street Punggol Edge", [-19, 0.04, 54], [78, 0.06, 3.0]]
+    ].forEach(([name, position, scale]) => addBox(THREE, scene, name, position, scale, mat.road, true));
+
+    [
+      [-30, 18, "x"], [-58, -18, "x"], [69, -24, "z"], [30, -55, "x"], [96, -53, "z"], [-19, 54, "x"]
+    ].forEach(([x, z, axis]) => {
+      if (axis === "x") {
+        for (let px = x - 20; px <= x + 20; px += 7) addBox(THREE, scene, "Secondary Road Lane Marking", [px, 0.15, z], [1.6, 0.035, 0.18], mat.roadLine, true);
+      } else {
+        for (let pz = z - 20; pz <= z + 20; pz += 7) addBox(THREE, scene, "Secondary Road Lane Marking", [x, 0.15, pz], [0.18, 0.035, 1.6], mat.roadLine, true);
+      }
+    });
+
+    [
+      ["Town Centre Plaza Paving", [-12, 0.17, -5], [18, 0.14, 12]],
+      ["HDB Precinct Paving", [-38, 0.17, 41], [32, 0.14, 17]],
+      ["Campus Forecourt Paving", [-74, 0.17, -15], [18, 0.14, 12]],
+      ["Food Court Apron Paving", [20, 0.17, -73], [28, 0.14, 16]],
+      ["Airport Kerbside Paving", [96, 0.17, -72], [25, 0.14, 9]],
+      ["Riverside Social Promenade", [35, 0.17, -66], [42, 0.14, 7]]
+    ].forEach(([name, position, scale]) => addBox(THREE, scene, name, position, scale, mat.sidewalk, true));
+
+    [
+      [-53, 38], [-48, 38], [-43, 38], [-38, 38], [-33, 38],
+      [76, -57], [82, -57], [88, -57],
+      [9, -67], [15, -67], [21, -67]
+    ].forEach(([x, z]) => addParkingBay(THREE, scene, [x, z], mat));
+
+    const compactBlocks = [
+      ["Town Centre Medical Block", -22, -3, 4.2, 5.0, 4.0, mat.hospital, "CLINIC"],
+      ["Town Centre Tuition Block", -4, -3, 4.0, 5.4, 3.8, mat.university, "TUITION"],
+      ["Town Centre Kopitiam Block", -20, -14, 4.4, 4.6, 4.0, mat.food, "KOPITIAM"],
+      ["Campus Student Services Block", -63, -26, 4.2, 5.2, 3.8, mat.library, "SCHOLARSHIP"],
+      ["Social Shophouse Infill", 24, -62, 4.6, 5.2, 4.2, mat.cafe, "MEET"],
+      ["Social Night Market Infill", 40, -62, 4.0, 4.6, 4.0, mat.food, "NIGHT FOOD"],
+      ["Airport Budget Travel Block", 104, -59, 4.4, 5.4, 4.0, mat.airport, "TRAVEL"],
+      ["Park Wellness Kiosk", 39, 24, 3.2, 3.8, 3.0, mat.park, "WELLNESS"]
+    ];
+    compactBlocks.forEach(([name, x, z, sx, sy, sz, material, label], index) => {
+      addBuildingCore(THREE, scene, name, [x, sy / 2, z], [sx, sy, sz], material, mat, index % 2 ? "modern" : "shophouse");
+      addShopFront(THREE, scene, [x, z - sz / 2 - 0.12], label, index % 2 ? mat.signBlue : mat.signGold, mat);
+    });
+
+    [
+      [-28, -8], [-10, -8], [-29, 24], [-17, 24], [-45, 32], [-31, 32],
+      [-69, -23], [-59, -10], [51, -26], [71, -40], [88, -25], [103, -43],
+      [7, -61], [31, -60], [51, -58], [82, -67]
+    ].forEach(([x, z]) => addUrbanPocket(THREE, scene, [x, z], mat));
+  }
+
+  function addTransitOrientedTownCentre(THREE, scene, mat) {
+    // Central MRT/bus interchange: a compact mobility node where Home,
+    // Mall, Park, Library, and Work routes visibly converge.
+    addBox(THREE, scene, "Integrated MRT Bus Interchange Deck", [-9, 0.22, 8], [17, 0.3, 8.5], mat.sidewalk, true);
+    addBox(THREE, scene, "Integrated Bus Interchange Canopy", [-9, 3.2, 9.4], [18, 0.28, 5.2], mat.roofDark, true);
+    [-16, -11, -6, -1].forEach((x, index) => {
+      addBox(THREE, scene, "Bus Bay Road Marking", [x, 0.18, 6.0], [3.4, 0.04, 0.28], mat.roadLine, true);
+      addBox(THREE, scene, "Bus Stop Queue Rail", [x, 0.72, 11.9], [2.4, 0.12, 0.16], mat.metal);
+      addBox(THREE, scene, "Bus Service Panel", [x + 0.6, 1.3, 12.05], [0.6, 1.1, 0.08], index % 2 ? mat.signBlue : mat.signGreen);
+    });
+    addSignBoard(THREE, scene, "Integrated Transport Hub Sign", "MRT + BUS", [-17, 4.2, 5.5], mat.signGold, 0x111111);
+
+    // Sheltered walkways: the most Singaporean way to make walking routes
+    // feel planned and usable in tropical rain/heat.
+    addShelteredWalkway(THREE, scene, [-30, 40], [-13, 8], mat, "Home-MRT Sheltered Link");
+    addShelteredWalkway(THREE, scene, [-13, 8], [0, -32], mat, "MRT-Mall Sheltered Link");
+    addShelteredWalkway(THREE, scene, [-13, 8], [41, 12], mat, "MRT-Library Link");
+    addShelteredWalkway(THREE, scene, [0, -32], [20, -95], mat, "Mall-Food Court Link");
+  }
+
+  function addHeartlandPrecinctDensity(THREE, scene, mat) {
+    // HDB precinct model: several residential slabs around shared court,
+    // neighbourhood centre, pavilion, playground, and daily services.
+    [
+      [-46, 6, 38, 5.2, 12, 4.0, mat.hdb],
+      [-38, 7.5, 34, 5.8, 15, 4.2, mat.hdbAccent],
+      [-28, 6.8, 49.5, 5.4, 13.6, 4.2, mat.hdb],
+      [-15, 5.7, 41, 4.8, 11.4, 3.8, mat.hdbAccent]
+    ].forEach(([x, y, z, sx, sy, sz, material], index) => {
+      addBuildingCore(THREE, scene, `Heartland HDB Precinct Block ${index + 1}`, [x, y, z], [sx, sy, sz], material, mat, "hdb");
+    });
+    addBox(THREE, scene, "Heartland Precinct Court", [-31, 0.16, 37.5], [13, 0.16, 8], mat.sidewalk, true);
+    addBox(THREE, scene, "Heartland Void Deck Activity Space", [-31, 1.1, 36.2], [8, 2.2, 2.8], mat.hdbBalcony);
+    addBox(THREE, scene, "Neighbourhood Centre Shops", [-41, 2.1, 27.5], [11, 4.2, 4.8], mat.mall);
+    addShopFront(THREE, scene, [-45, 24.9], "CLINIC", mat.signBlue, mat);
+    addShopFront(THREE, scene, [-41, 24.9], "MINIMART", mat.signGreen, mat);
+    addShopFront(THREE, scene, [-37, 24.9], "COFFEE", mat.signGold, mat);
+    addSignBoard(THREE, scene, "Neighbourhood Centre Sign", "NEIGHBOURHOOD CENTRE", [-45.2, 4.6, 24.6], mat.signGold, 0x111111);
+    addBox(THREE, scene, "Precinct Pavilion Roof", [-25, 2.4, 35.6], [5.6, 0.2, 4.2], mat.roofDark, true);
+    [[-27.2, 33.8], [-22.8, 33.8], [-27.2, 37.4], [-22.8, 37.4]].forEach(([x, z]) => {
+      addCylinder(THREE, scene, "Precinct Pavilion Post", [x, 1.2, z], [0.08, 2.4, 8], mat.metal);
+    });
+    addBox(THREE, scene, "Precinct Playground Soft Floor", [-19, 0.18, 34], [5, 0.18, 4.2], mat.signGold, true);
+    addCylinder(THREE, scene, "Precinct Playground Climber", [-19, 0.85, 34], [1.1, 1.2, 6], mat.signBlue);
+    addPlanterRow(THREE, scene, [-36, 31.4], 7, mat);
+  }
+
+  function addMixedUseStreetWalls(THREE, scene, mat) {
+    // Continuous ground-floor activity along the main east-west spine: shops,
+    // clinics, services, offices above. This fills the empty road edges and
+    // gives the over-shoulder camera real city depth.
+    const northRow = [
+      [-46, -25, "TUITION"], [-37, -25, "PHARMACY"], [-28, -25, "BANK"], [-18, -25, "LAUNDRY"],
+      [3, -25, "BAKERY"], [12, -25, "RETAIL"], [23, -25, "SKILLS"], [34, -25, "CO-WORK"],
+      [46, -25, "DESIGN"], [58, -25, "TECH"]
+    ];
+    northRow.forEach(([x, z, label], index) => {
+      const material = index % 3 === 0 ? mat.hdb : (index % 3 === 1 ? mat.mall : mat.work);
+      addBuildingCore(THREE, scene, `Main Street Mixed-Use Block ${label}`, [x, 3.2 + (index % 2) * 0.7, z], [7.5, 6.4 + (index % 2) * 1.4, 5], material, mat, index % 2 ? "modern" : "shophouse");
+      addShopFront(THREE, scene, [x - 1.2, z - 2.7], label, index % 2 ? mat.signBlue : mat.signGreen, mat);
+    });
+
+    const southRow = [
+      [-42, -40, "KOPI"], [-31, -40, "VALUE"], [-20, -40, "DENTAL"], [-9, -40, "PHONE"],
+      [12, -40, "MART"], [25, -40, "GYM"], [38, -40, "CAREER"], [52, -40, "STUDY"],
+      [66, -40, "CLINIC"], [80, -40, "FOOD"]
+    ];
+    southRow.forEach(([x, z, label], index) => {
+      const material = index % 2 ? mat.cafe : mat.hdbAccent;
+      addBuildingCore(THREE, scene, `South Main Street Block ${label}`, [x, 2.8 + (index % 3) * 0.45, z], [7.8, 5.6 + (index % 3) * 0.9, 4.8], material, mat, "shophouse");
+      addShopFront(THREE, scene, [x - 1.4, z + 2.6], label, index % 2 ? mat.signGold : mat.signBlue, mat);
+    });
+
+    // Five-foot-way / covered arcade strips along the shopfront rows.
+    addBox(THREE, scene, "Main Street Five Foot Way North", [4, 0.2, -28.2], [108, 0.16, 2.2], mat.sidewalk, true);
+    addBox(THREE, scene, "Main Street Five Foot Way South", [14, 0.21, -36.8], [126, 0.16, 2.2], mat.sidewalk, true);
+    for (let x = -48; x <= 82; x += 8) {
+      addCylinder(THREE, scene, "Five Foot Way Column", [x, 1.25, -28.2], [0.06, 2.5, 8], mat.metal);
+      addCylinder(THREE, scene, "Five Foot Way Column", [x, 1.25, -36.8], [0.06, 2.5, 8], mat.metal);
+    }
+  }
+
+  function addParkConnectorAndActiveMobility(THREE, scene, mat) {
+    // Linear green corridor + cycling/footpath pair linking Heartland,
+    // Park, Library, and Punggol direction. This turns blank land into a
+    // Singapore-style PCN instead of unused grass.
+    addBoxRotated(THREE, scene, "Park Connector Cycling Path", [41, 0.12, 37], [2.2, 0.08, 94], mat.signGreen, Math.PI / 2, true);
+    addBoxRotated(THREE, scene, "Park Connector Pedestrian Path", [41, 0.13, 41], [1.4, 0.08, 94], mat.path, Math.PI / 2, true);
+    for (let x = -4; x <= 86; x += 9) {
+      addTree(THREE, scene, [x, 34], mat);
+      addBox(THREE, scene, "PCN Pedestrian Logo Marking", [x + 2.5, 0.2, 41], [1.1, 0.04, 0.22], mat.roadLine, true);
+      addBox(THREE, scene, "PCN Cycling Lane Marking", [x + 2.5, 0.21, 37], [1.4, 0.04, 0.18], mat.roadLine, true);
+    }
+    addSignBoard(THREE, scene, "Park Connector Sign", "PARK CONNECTOR", [18, 1.7, 35.2], mat.signGreen, 0xffffff);
+    addBox(THREE, scene, "Canal Drainage Channel", [46, 0.03, 30], [82, 0.08, 2.4], mat.water, true);
+    addBox(THREE, scene, "Canal Railing North", [46, 0.75, 31.4], [82, 0.12, 0.14], mat.metal);
+    addBox(THREE, scene, "Canal Railing South", [46, 0.75, 28.6], [82, 0.12, 0.14], mat.metal);
+  }
+
+  function addDowntownCommercialDensity(THREE, scene, mat) {
+    // CBD intensity around Raffles Place/Marina Bay: tighter tower spacing,
+    // podiums, plazas, and underpass entries so the southern/eastern map
+    // reads as a business district, not isolated landmarks.
+    [
+      [66, -16, 5.2, 17, 4.4],
+      [88, -17, 5.6, 20, 4.6],
+      [69, -48, 6.2, 22, 5.0],
+      [91, -48, 5.4, 18, 4.4],
+      [51, -47, 4.8, 15, 4.0]
+    ].forEach(([x, z, sx, sy, sz], index) => {
+      addBuildingCore(THREE, scene, `CBD Infill Tower ${index + 1}`, [x, sy / 2, z], [sx, sy, sz], index % 2 ? mat.work : mat.glass, mat, "modern");
+      addBox(THREE, scene, `CBD Podium ${index + 1}`, [x, 1.2, z + 3.8], [sx + 2, 2.4, 3], mat.mall);
+    });
+    addBox(THREE, scene, "CBD Pedestrian Plaza", [78, 0.18, -31], [27, 0.16, 11], mat.sidewalk, true);
+    addBox(THREE, scene, "CBD Underpass Entrance", [71, 1.2, -30], [4.5, 2.4, 2.2], mat.mrt);
+    addBox(THREE, scene, "CBD Underpass Roof", [71, 2.55, -30], [5.2, 0.24, 2.8], mat.roofDark);
+    addSignBoard(THREE, scene, "CBD Wayfinding Sign", "RAFFLES PLACE", [66, 3.2, -30], mat.signBlue, 0xffffff);
+    addPlanterRow(THREE, scene, [68, -25.2], 7, mat);
+    addPlanterRow(THREE, scene, [82, -25.2], 7, mat);
+  }
+
+  function addShelteredWalkway(THREE, scene, start, end, mat, name) {
+    const dx = end[0] - start[0];
+    const dz = end[1] - start[1];
+    const length = Math.hypot(dx, dz);
+    if (length < 1) return;
+    const angle = Math.atan2(dx, dz);
+    const mid = [(start[0] + end[0]) / 2, 2.35, (start[1] + end[1]) / 2];
+    addBoxRotated(THREE, scene, `${name} Roof`, mid, [2.4, 0.22, length], mat.roofDark, angle, true);
+    const steps = Math.max(2, Math.floor(length / 5));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = start[0] + dx * t;
+      const z = start[1] + dz * t;
+      addCylinder(THREE, scene, `${name} Post`, [x - Math.cos(angle) * 0.9, 1.15, z + Math.sin(angle) * 0.9], [0.055, 2.3, 8], mat.metal);
+      addCylinder(THREE, scene, `${name} Post`, [x + Math.cos(angle) * 0.9, 1.15, z - Math.sin(angle) * 0.9], [0.055, 2.3, 8], mat.metal);
+    }
+  }
+
+  function addParkingBay(THREE, scene, position, mat) {
+    addBox(THREE, scene, "Singapore Parking Bay", [position[0], 0.18, position[1]], [3.6, 0.04, 1.75], mat.sidewalk, true);
+    addBox(THREE, scene, "Parking Bay Front Line", [position[0], 0.22, position[1] - 0.84], [3.6, 0.035, 0.08], mat.roadLine, true);
+    addBox(THREE, scene, "Parking Bay Back Line", [position[0], 0.22, position[1] + 0.84], [3.6, 0.035, 0.08], mat.roadLine, true);
+    addBox(THREE, scene, "Parking Bay Divider", [position[0] - 1.78, 0.22, position[1]], [0.08, 0.035, 1.75], mat.roadLine, true);
+  }
+
+  function addUrbanPocket(THREE, scene, position, mat) {
+    addBox(THREE, scene, "Singapore Street Corner Pocket", [position[0], 0.17, position[1]], [4.8, 0.12, 3.2], mat.sidewalk, true);
+    addPlanterRow(THREE, scene, [position[0] - 1.25, position[1] + 1.2], 2, mat);
+    addBench(THREE, scene, [position[0] + 1.2, position[1] - 0.6], mat);
+    addStreetLight(THREE, scene, [position[0] + 2.0, position[1] + 1.2], mat);
+  }
+
   function addPath(THREE, scene, start, end, width, material) {
     const dx = end[0] - start[0];
     const dz = end[1] - start[1];
@@ -2418,6 +4338,11 @@
   function addSignBoard(THREE, scene, name, text, position, material, textColor) {
     addBox(THREE, scene, name, position, [3.2, 0.88, 0.16], material);
     addText(THREE, scene, text, [position[0] - 1.42, position[1] + 0.08, position[2] - 0.15], 0.44, textColor);
+  }
+
+  function addFacingXSignBoard(THREE, scene, name, text, position, material, textColor, width = 3.2, height = 0.88) {
+    addBox(THREE, scene, name, position, [0.16, height, width], material);
+    addText(THREE, scene, text, [position[0] - 0.22, position[1] + height * 0.12, position[2] - width * 0.42], Math.min(0.42, height * 0.48), textColor);
   }
 
   function addFlowerBed(THREE, scene, position, width, mat) {
@@ -2450,10 +4375,12 @@
   }
 
   function addFoodStall(THREE, scene, position, label, mat) {
-    addBox(THREE, scene, "Food Stall Counter", [position[0], 0.9, position[1]], [2.7, 1.2, 0.9], mat.curbWarm);
-    addBox(THREE, scene, "Food Stall Menu Board", [position[0], 2.0, position[1] - 0.52], [2.45, 0.86, 0.12], mat.screen);
-    addText(THREE, scene, label, [position[0] - 1.08, 2.12, position[1] - 0.72], 0.28, 0xffef84);
-    addCylinder(THREE, scene, "Food Stall Hanging Light", [position[0], 2.75, position[1] + 0.15], [0.22, 0.16, 16], mat.lampGlow);
+    addBox(THREE, scene, "Food Stall Counter", [position[0], 0.52, position[1]], [2.35, 0.52, 0.58], mat.wood);
+    addBox(THREE, scene, "Food Stall Stainless Front", [position[0], 0.74, position[1] - 0.31], [2.08, 0.34, 0.06], mat.metal);
+    addBox(THREE, scene, "Food Stall Menu Board", [position[0], 1.72, position[1] - 0.5], [1.72, 0.48, 0.08], mat.screen);
+    addBox(THREE, scene, "Food Stall Awning", [position[0], 2.34, position[1] - 0.12], [2.72, 0.12, 1.05], mat.roofDark, true);
+    addText(THREE, scene, label, [position[0] - 0.74, 1.78, position[1] - 0.64], 0.2, 0xffef84);
+    addCylinder(THREE, scene, "Food Stall Hanging Light", [position[0], 2.16, position[1] + 0.18], [0.16, 0.12, 16], mat.lampGlow);
   }
 
   function addTray(THREE, scene, position, mat) {
@@ -2577,6 +4504,7 @@
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
+    registerStaticCollider(name, position[0], position[2], scale[0], scale[2]);
 
     if (style !== "modern") {
       for (let floor = 0; floor < floors; floor++) {
@@ -2595,7 +4523,7 @@
   }
 
   function addStreetLight(THREE, scene, position, mat) {
-    addCylinder(THREE, scene, "Street Light Pole", [position[0], 1.5, position[1]], [0.08, 3, 10], mat.lamp);
+    addCylinder(THREE, scene, "Street Light Pole", [position[0], 1.5, position[1]], [0.045, 3, 10], mat.metal);
     addCylinder(THREE, scene, "Street Light Glow", [position[0], 3.1, position[1]], [0.34, 0.32, 16], mat.lampGlow);
   }
 
@@ -2627,9 +4555,13 @@
   function createPlayer(THREE, mat) {
     const group = new THREE.Group();
     const parts = { group };
+    parts.fallbackRoot = new THREE.Group();
+    parts.fallbackRoot.name = `Fallback Player Visual ${PLAYER_VISUAL_REFERENCE.heightMeters}m`;
+    parts.fallbackRoot.scale.setScalar(PLAYER_VISUAL_REFERENCE.fallbackScale);
+    group.add(parts.fallbackRoot);
 
     parts.body = new THREE.Group();
-    group.add(parts.body);
+    parts.fallbackRoot.add(parts.body);
 
     const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.82, 8, 14), mat.outfit);
     torso.position.y = 1.18;
@@ -2643,7 +4575,7 @@
 
     parts.head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 16), mat.skin);
     parts.head.castShadow = true;
-    group.add(parts.head);
+    parts.fallbackRoot.add(parts.head);
 
     parts.hair = new THREE.Group();
     const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 12), mat.hair);
@@ -2652,19 +4584,19 @@
     fringe.position.set(0.16, -0.05, -0.25);
     fringe.rotation.x = Math.PI * 0.72;
     parts.hair.add(hairCap, fringe);
-    group.add(parts.hair);
+    parts.fallbackRoot.add(parts.hair);
 
     parts.leftArm = makeLimb(THREE, mat.skin, [-0.55, 1.25, 0], 0.12, 0.72);
     parts.rightArm = makeLimb(THREE, mat.skin, [0.55, 1.25, 0], 0.12, 0.72);
     parts.leftLeg = makeLimb(THREE, mat.outfit, [-0.2, 0.52, 0], 0.14, 0.86);
     parts.rightLeg = makeLimb(THREE, mat.outfit, [0.2, 0.52, 0], 0.14, 0.86);
-    group.add(parts.leftArm, parts.rightArm, parts.leftLeg, parts.rightLeg);
+    parts.fallbackRoot.add(parts.leftArm, parts.rightArm, parts.leftLeg, parts.rightLeg);
 
     const leftShoe = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.42), mat.shoes);
     leftShoe.position.set(-0.2, 0.06, -0.06);
     const rightShoe = leftShoe.clone();
     rightShoe.position.x = 0.2;
-    group.add(leftShoe, rightShoe);
+    parts.fallbackRoot.add(leftShoe, rightShoe);
     return parts;
   }
 
@@ -2684,6 +4616,63 @@
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(position[0], position[1], position[2]);
     mesh.receiveShadow = true;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  // Found via the same recorded playthrough as the collision bug: a large
+  // grass/park/sand patch (addPlane above) is a flat rectangle laid directly
+  // on top of the base ground plane with a completely different material -
+  // no transition, so walking near its edge shows a razor-straight color
+  // seam that reads as a rendering bug rather than a deliberate boundary.
+  // Cheapest real fix that doesn't require a custom shader: draw a "frame"
+  // shape on a canvas (solid color band, transparent hole in the middle so
+  // it doesn't cover the patch's own photographic texture, transparent
+  // outside so the base ground shows through), blur it, and lay that as a
+  // transparent overlay slightly larger than the patch. The blur softens
+  // both the inner edge (fading into the patch's real texture) and the
+  // outer edge (fading into the base ground) in one pass.
+  function createGroundBlendTexture(THREE, colorHex, innerRatio, blurPx, canvasSize = 256) {
+    const shape = document.createElement("canvas");
+    shape.width = canvasSize;
+    shape.height = canvasSize;
+    const shapeCtx = shape.getContext("2d");
+    shapeCtx.fillStyle = `#${colorHex.toString(16).padStart(6, "0")}`;
+    shapeCtx.fillRect(0, 0, canvasSize, canvasSize);
+    const holeMargin = (canvasSize * (1 - innerRatio)) / 2;
+    shapeCtx.globalCompositeOperation = "destination-out";
+    shapeCtx.fillRect(holeMargin, holeMargin, canvasSize - holeMargin * 2, canvasSize - holeMargin * 2);
+
+    const blurred = document.createElement("canvas");
+    blurred.width = canvasSize;
+    blurred.height = canvasSize;
+    const blurredCtx = blurred.getContext("2d");
+    blurredCtx.filter = `blur(${blurPx}px)`;
+    blurredCtx.drawImage(shape, 0, 0);
+
+    const texture = new THREE.CanvasTexture(blurred);
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  function addSoftEdgeGroundPatch(THREE, scene, name, position, scale, colorHex, marginRatio = 0.3) {
+    const overlayWidth = scale[0] * (1 + marginRatio);
+    const overlayDepth = scale[1] * (1 + marginRatio);
+    const innerRatio = 1 / (1 + marginRatio);
+    const texture = createGroundBlendTexture(THREE, colorHex, innerRatio, 22);
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      roughness: 1,
+      metalness: 0
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(overlayWidth, overlayDepth), material);
+    mesh.name = `${name} Soft Edge`;
+    mesh.rotation.x = -Math.PI / 2;
+    // Just above the patch it's blending, comfortably below anything a
+    // player-height object would render at, so it never fights or floats.
+    mesh.position.set(position[0], position[1] + 0.006, position[2]);
     scene.add(mesh);
     return mesh;
   }
@@ -2718,16 +4707,17 @@
 
   function addText(THREE, scene, text, position, size, color) {
     const canvas = document.createElement("canvas");
-    canvas.width = 512;
+    canvas.width = 768;
     canvas.height = 160;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.font = "900 72px system-ui, sans-serif";
+    const fontSize = Math.max(34, Math.min(72, Math.floor(780 / Math.max(10, String(text).length))));
+    ctx.font = `900 ${fontSize}px system-ui, sans-serif`;
     ctx.lineWidth = 8;
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
     ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
-    ctx.strokeText(text, 18, 96);
-    ctx.fillText(text, 18, 96);
+    ctx.strokeText(text, 24, 96);
+    ctx.fillText(text, 24, 96);
     const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
     const sprite = new THREE.Sprite(material);
@@ -2735,6 +4725,29 @@
     sprite.scale.set(size * 4.1, size * 1.25, 1);
     scene.add(sprite);
     return sprite;
+  }
+
+  function addFlatTextPlane(THREE, scene, name, text, position, scale, color, rotationZ = 0) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "900 118px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    const texture = new THREE.CanvasTexture(canvas);
+    if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(scale[0], scale[1]), material);
+    mesh.name = name;
+    mesh.position.set(position[0], position[1], position[2]);
+    mesh.rotation.set(-Math.PI / 2, 0, rotationZ);
+    mesh.renderOrder = 4;
+    scene.add(mesh);
+    return mesh;
   }
 
   function clamp(value, min, max) {
@@ -2762,7 +4775,8 @@
     locations: locationZones,
     presentationTest: {
       getTimeOfDayPresentation,
-      getWeatherPresentation
+      getWeatherPresentation,
+      getCameraRigPresentation: () => ({ ...OVER_SHOULDER_CAMERA, mode: "over-shoulder" })
     }
   };
 })();

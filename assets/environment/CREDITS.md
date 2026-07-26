@@ -24,9 +24,10 @@
 
 License: CC0 1.0 (public domain). Free for personal, educational, and commercial use. Attribution to Kenney (www.kenney.nl) is appreciated but not required.
 
-## city-kit-quaternius/
+## environment/objaverse-optimized/ (originally city-kit-quaternius/)
 
-- `Building_Small_1.gltf`, `Building_Medium_2_001.gltf`, `Building_Large_2.gltf`, `Sidewalk_Straight_3m.gltf`, `Street_2Lane.gltf` (+ shared `.bin`/`T_*.png` texture files) — from Quaternius's "Downtown City MegaKit" (free/CC0 standard version), https://quaternius.itch.io/downtown-city-megakit
-- Real modeled+textured buildings (brick/window/trim detail) used to replace the primitive-box HDB/mall placeholders in Woodlands, per the art-direction reassessment in this session - this is the pilot district for that swap.
+- Source geometry: `Building_Small_1.glb`, `Building_Medium_2_001.glb`, `Building_Large_2.glb` from Quaternius's "Downtown City MegaKit" (free/CC0 standard version), https://quaternius.itch.io/downtown-city-megakit. Real modeled+textured buildings (brick/window/trim detail) used to replace the primitive-box HDB/mall/mixed-use placeholders across Woodlands, the CBD, Main Street, and Town Centre.
+- Load-reliability pass (2026-07-21): these 3 files originally shipped as separate `.gltf`+`.bin`+20 shared `T_*.png` texture files (~50MB total). Repacked via `gltfpack` to `50MB -> 14MB` single self-contained `.glb`s.
+- Building/Draco/LOD pipeline pass (2026-07-22): the 3 repacked `.glb` files were the last remaining raw building scans still loaded directly by `life-sim.js` at a single fixed detail level regardless of distance. Ran each through `tools/lifeverse_optimize_objaverse.py`'s pipeline (`gltf-transform simplify` for decimation - Blender itself isn't installed in this environment, so this is the documented Blender-equivalent substitute - + texture resize + Draco compression) to produce 3 real LODs per file: full detail (close range), 50% simplified (mid range), 20% simplified (far range), switched automatically by distance via `loadOptimizedObjaverseBuildingSwaps()`. `14MB -> ~3.7MB` combined LOD storage, with only one LOD ever rendered per building instance at a time. The original repacked `.glb` files (superseded, no longer referenced anywhere) were deleted; only the LOD outputs under `assets/environment/objaverse-optimized/` remain. Registered under 11 separate manifest entries (`objaverseBuildingAssets`) since the same 3 source files are reused across many different building groups/positions on the map - only the geometry needed processing once per file, not once per placement.
 
 License: CC0 1.0 Universal (public domain). Free for personal, educational, and commercial use. Attribution to Quaternius (quaternius.com) is appreciated but not required.

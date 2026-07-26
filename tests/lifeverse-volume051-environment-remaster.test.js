@@ -92,7 +92,16 @@ assert.ok(sim.locations.length >= requiredLocations.length, "Life Sim exposes al
   "University Lecture Seats",
   "Flower Bed Soil",
   "Street Trash Bin",
-  "Road Center Line"
+  "Road Center Line",
+  "Integrated MRT Bus Interchange Deck",
+  "Neighbourhood Centre Shops",
+  "Main Street Mixed-Use Block",
+  "Park Connector Cycling Path",
+  "CBD Infill Tower",
+  "Singapore Street Corner Pocket",
+  "addSingaporeObjaverseReplacementProps",
+  "Objaverse Singapore Replacement",
+  "lifeVerseObjaverseReplacement"
 ].forEach((marker) => {
   assert.ok(simSource.includes(marker), `renderer includes recognizable prop: ${marker}`);
 });

@@ -37,7 +37,15 @@
   }
 
   // Simple overlap score between two tag lists, used to rank suggested
-  // squads and accountability partners. Higher is more similar.
+  // squads and accountability partners. Higher is more similar. Note this
+  // is already symmetric (scoreTagOverlap(A,B) === scoreTagOverlap(B,A))
+  // since extractTags() dedupes each list first, so it's really |A intersect
+  // B| either way round - the one-sidedness of accountability-partner
+  // suggestions isn't in this score, it's in ranking purely by MY score
+  // against candidates without checking whether I'd also make THEIR list.
+  // See suggestedAccountabilityPartners() in community.js for the
+  // reciprocity check that fixes that (and why real Gale-Shapley stable
+  // matching doesn't cleanly apply to this particular pool).
   function scoreTagOverlap(tagsA, tagsB) {
     const listA = Array.isArray(tagsA) ? tagsA : [];
     const listB = Array.isArray(tagsB) ? tagsB : [];

@@ -3433,6 +3433,29 @@ body.life-sim-active .sos-fab {
   color: var(--color-ink);
 }
 
+.paycheck-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-faint);
+  font-size: 13px;
+}
+
+.paycheck-result-row:last-child {
+  border-bottom: none;
+}
+
+.paycheck-result-final {
+  padding-top: 10px;
+  font-size: 15px;
+}
+
+.paycheck-result-final strong {
+  color: var(--color-calm-ink, var(--color-ink));
+}
+
 .empty-state-card {
   padding: 14px;
   border-radius: var(--radius-md);
@@ -3566,6 +3589,161 @@ textarea {
 
 .mood-choice.is-selected img {
   filter: invert(1);
+}
+
+.streak-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.streak-chip.is-active {
+  background: #fdecc8;
+  color: #7a4b00;
+}
+
+.streak-chip.is-at-risk {
+  background: #fde3df;
+  color: #92352a;
+}
+
+.streak-chip.is-fresh {
+  background: var(--color-surface-soft);
+  color: var(--color-muted);
+}
+
+.mood-emoji-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.mood-choice.mood-emoji-grid-item,
+.mood-emoji-grid .mood-choice {
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 84px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mood-emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.mood-emoji-grid .mood-tone-calm.is-selected { background: #2f6f5e; border-color: #2f6f5e; }
+.mood-emoji-grid .mood-tone-okay.is-selected { background: #a1791f; border-color: #a1791f; }
+.mood-emoji-grid .mood-tone-tired.is-selected { background: #3d4a7a; border-color: #3d4a7a; }
+.mood-emoji-grid .mood-tone-stressed.is-selected { background: #93392f; border-color: #93392f; }
+
+.mood-emoji-grid .mood-choice.is-selected {
+  transform: scale(1.04);
+  box-shadow: 0 8px 18px rgba(13, 13, 13, 0.18);
+  animation: moodTilePop 0.22s ease;
+}
+
+@keyframes moodTilePop {
+  0% { transform: scale(0.92); }
+  60% { transform: scale(1.07); }
+  100% { transform: scale(1.04); }
+}
+
+.mood-energy-card {
+  margin: 6px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-faint);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-soft);
+}
+
+.mood-energy-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 850;
+  color: var(--color-muted);
+}
+
+.mood-energy-head strong {
+  font-size: 20px;
+}
+
+.mood-energy-card input[type="range"] {
+  width: 100%;
+  margin: 8px 0 4px;
+}
+
+.mood-energy-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.reflection-stuck-label {
+  margin: 4px 0 8px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.reflection-starter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.reflection-starter-chip {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.reflection-starter-chip:active {
+  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.checkin-celebrate-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 110px;
+  z-index: 60;
+  transform: translate(-50%, 0);
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: var(--color-ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 12px 30px rgba(13, 13, 13, 0.28);
+  animation: checkInToastIn 0.28s ease;
+}
+
+.checkin-celebrate-toast.is-leaving {
+  opacity: 0;
+  transform: translate(-50%, 10px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+@keyframes checkInToastIn {
+  0% { opacity: 0; transform: translate(-50%, 16px) scale(0.94); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 
 .upload-box {
@@ -5539,6 +5717,30 @@ body {
   font-weight: 700;
 }
 
+.difficulty-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--color-warm);
+  color: var(--color-ink);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.mutual-pick-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--color-mint-soft);
+  color: var(--color-ink);
+  font-size: 10px;
+  font-weight: 850;
+}
+
 @media (max-width: 420px) {
   .growth-stat-grid,
   .growth-chip-grid,
@@ -5825,9 +6027,37 @@ body.life-sim-active .phone-shell::before {
 }
 
 .life-sim-game::before {
+  /* Vignette only (unchanged blend mode from before - just nudged the
+     opacity up slightly). The color-grade tint lives in a separate real
+     element (.life-sim-color-grade) below since it needs a different
+     mix-blend-mode (soft-light) than this vignette's normal darkening -
+     one pseudo-element can't cleanly carry two different blend modes. */
   background:
-    linear-gradient(180deg, rgba(5, 6, 7, 0.24), transparent 22%, transparent 72%, rgba(5, 6, 7, 0.38)),
-    radial-gradient(circle at 50% 50%, transparent 52%, rgba(2, 3, 5, 0.38));
+    linear-gradient(180deg, rgba(5, 6, 7, 0.28), transparent 22%, transparent 72%, rgba(5, 6, 7, 0.42)),
+    radial-gradient(circle at 50% 50%, transparent 48%, rgba(2, 3, 5, 0.42));
+}
+
+.life-sim-color-grade {
+  /* Cheap "post-processing" (2026-07-22): a real EffectComposer pass (SSAO/
+     bloom) would cost a second render per frame - measured shadows alone
+     costing 30-55% of frame rate on this same performance budget, so a
+     multi-pass composer isn't worth the risk. This is a static, GPU-
+     composited CSS layer instead (near-zero per-frame cost, no extra WebGL
+     render passes): a warm-to-cool grade (golden tropical highlight top-
+     left, cooler shadow bottom-right) mimicking real late-afternoon
+     Singapore light, instead of the flat, neutral default lighting a bare
+     renderer produces. soft-light keeps it a tint, not a wash.
+     Positioned above the vignette but below the topbar/HUD/controls (see
+     the z-index order among .life-sim-game's absolutely-positioned
+     children). */
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  background:
+    radial-gradient(circle at 22% 15%, rgba(255, 196, 120, 0.5), transparent 45%),
+    linear-gradient(135deg, rgba(255, 179, 102, 0.24), transparent 40%, transparent 60%, rgba(20, 40, 60, 0.4));
 }
 
 .life-sim-game::after {
@@ -5849,7 +6079,10 @@ body.life-sim-active .life-sim-root canvas {
   width: 100% !important;
   height: 100% !important;
   display: block;
-  filter: saturate(1.08) contrast(1.02);
+  /* Nudged up slightly (2026-07-22, part of the cheap-post-processing pass)
+     - a GPU-compositor filter, not a render pass, so this costs nothing
+     like a real render-to-texture post-process would. */
+  filter: saturate(1.15) contrast(1.06) brightness(1.02);
 }
 
 .life-sim-game-topbar {
@@ -6627,6 +6860,51 @@ body.life-sim-active .sim-activity-button span {
   backdrop-filter: blur(12px);
 }
 
+.asset-credits-tag {
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(150px, calc(env(safe-area-inset-bottom) + 150px));
+  z-index: 7;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(9, 10, 12, 0.4);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(10px);
+}
+
+.asset-credits-modal .asset-credits-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.asset-credits-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-faint);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.asset-credits-row strong {
+  display: block;
+  font-size: 13px;
+}
+
+.asset-credits-row span {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
 body.life-sim-active .life-sim-result-card {
   position: absolute;
   top: max(132px, calc(env(safe-area-inset-top) + 126px));
@@ -7123,6 +7401,27 @@ body.life-sim-active .lifeverse-overlay-panel::-webkit-scrollbar {
   border-color: rgba(255, 120, 120, 0.36);
   background: rgba(67, 18, 20, 0.68);
   color: #ffd2d2;
+}
+
+.life-sim-district-loading {
+  position: absolute;
+  left: 50%;
+  top: max(178px, calc(env(safe-area-inset-top) + 170px));
+  z-index: 10;
+  max-width: min(520px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(7, 8, 10, 0.62);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.3;
+  text-align: center;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+  pointer-events: none;
 }
 
 .life-sim-rotate {
@@ -7680,7 +7979,8 @@ body.life-sim-active .life-sim-root canvas {
   filter: saturate(1.08) contrast(1.03);
 }
 
-body.life-sim-active .life-sim-asset-status {
+body.life-sim-active .life-sim-asset-status,
+body.life-sim-active .life-sim-district-loading {
   animation: lifeverseSoftNoticeIn 420ms ease both;
 }
 
@@ -8305,6 +8605,26 @@ body.life-sim-active .lifeverse-consequence-toast {
 
 .build-coach-prompt-row button:disabled {
   opacity: 0.55;
+}
+
+.build-training-input-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.build-training-input-row .voice-button {
+  flex: 0 0 auto;
+}
+
+.build-training-input-row textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.build-voice-status {
+  min-height: 14px;
+  color: var(--color-ink-soft, #6b6558);
 }
 
 @media (min-width: 480px) {

@@ -4,6 +4,7 @@ const path = require("path");
 const vm = require("vm");
 
 const root = path.join(__dirname, "..");
+const realManifest = JSON.parse(fs.readFileSync(path.join(root, "assets", "life-sim", "asset-manifest.json"), "utf8"));
 
 function makeFakeThree() {
   class Color {
@@ -137,6 +138,25 @@ requiredFolders.forEach((folder) => {
   assert.ok(fs.existsSync(path.join(root, folder)), `${folder} exists`);
 });
 
+assert.strictEqual(realManifest.enabled, true, "real Life Sim asset manifest is enabled");
+const realReplacementPass = (realManifest.objaverseReplacementPasses || []).find((pass) => pass.id === "singapore-urban-props-v1");
+assert.ok(realReplacementPass, "real manifest includes singapore-urban-props-v1");
+assert.ok(realReplacementPass.categories.includes("lamppost"), "real replacement pass includes lampposts");
+assert.ok(realReplacementPass.categories.includes("bench"), "real replacement pass includes benches");
+assert.ok(realReplacementPass.categories.includes("trash_can"), "real replacement pass includes trash cans");
+assert.ok(realManifest.objaverseAssets.some((entry) => entry.url.includes("assets/props/objaverse/") && entry.category === "lamppost"), "real manifest has local Objaverse lamppost GLB");
+assert.ok(realManifest.objaverseAssets.some((entry) => entry.url.includes("assets/props/objaverse/") && entry.category === "bench"), "real manifest has local Objaverse bench GLB");
+// Character reverted to null (2026-07-22): CesiumMan validated that the
+// real-character pipeline loads/animates a textured humanoid GLB correctly,
+// but it's a glTF conformance/test asset with a deliberately stylized blue-
+// green swirl texture over the whole body, not a real-person appearance -
+// confirmed via production screenshots to look like a broken sci-fi
+// mannequin rather than a placeholder person, actively working against the
+// realistic-Singapore feel. Falls back to the primitive capsule/sphere rig
+// (same documented no-crash behavior) until a real, properly licensed
+// character GLB is sourced.
+assert.strictEqual(realManifest.character, null, "real manifest has no character asset until a real, properly licensed one is sourced");
+
 const THREE = makeFakeThree();
 const materials = sandbox.window.LifeVerseAssets.createMaterialLibrary(THREE, { pipeline: "pbr" });
 const road = materials.get("road");
@@ -145,6 +165,8 @@ assert.ok(materials.snapshot().definitions.includes("glass"), "material library 
 
 const manager = sandbox.window.LifeVerseAssets.createAssetManager({ THREE, materialLibrary: materials, logger: { warn() {} } });
 assert.ok(manager.registerPrefab("prop:test", { url: "assets/props/test.glb" }), "prefab registration works");
+assert.strictEqual(typeof manager.normalizeToHeight, "function", "asset manager exposes real-world height normalization");
+assert.strictEqual(typeof manager.alignBottomToGround, "function", "asset manager exposes model ground alignment");
 
 (async () => {
   const manifest = await manager.loadManifest("assets/life-sim/asset-manifest.json");
@@ -179,7 +201,13 @@ assert.ok(manager.registerPrefab("prop:test", { url: "assets/props/test.glb" }),
   assert.ok(appSource.includes("lifeverse-asset-manager.js"), "asset manager is loaded before Life Sim");
   assert.ok(appSource.includes("lifeverse-render-pipeline.js"), "render pipeline is loaded before Life Sim");
   assert.ok(simSource.includes("createAssetManager"), "Life Sim creates a centralized asset manager");
-  assert.ok(simSource.includes("assetManager.instantiatePrefab"), "Life Sim production prefabs load through Asset Manager");
+  // Realistic-style pivot: the old environment/locationModels manifest fields
+  // (and the instantiatePrefab() call sites that read them) were dropped -
+  // they pointed at files that never existed and weren't the live asset-swap
+  // mechanism anyway. assetManager.loadModel() is what actually loads real
+  // GLBs today, for both the character (loadCharacterAsset()) and district
+  // prop/building swaps (loadDistrictAssetSamples()).
+  assert.ok(simSource.includes("assetManager.loadModel"), "Life Sim loads real GLB assets through the centralized Asset Manager");
   assert.ok(!simSource.includes("new THREE.GLTFLoader"), "Life Sim no longer creates GLTF loaders directly");
 
   console.log("LifeVerse Volume 5.0 asset pipeline tests passed.");
