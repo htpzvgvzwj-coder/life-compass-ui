@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Shared Life Roadmap - Compass</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { margin: 0; padding: 24px 16px 60px; font-family: var(--font-sans); color: var(--color-ink); }
+  .guardian-wrap { max-width: 520px; margin: 0 auto; }
+  .guardian-header { margin-bottom: 20px; }
+  .guardian-header .eyebrow { color: var(--color-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 6px; }
+  .guardian-header h1 { font-size: 22px; margin: 0 0 8px; }
+  .guardian-header p { color: var(--color-muted); font-size: 13px; line-height: 1.5; margin: 0; }
+  .guardian-card { background: var(--color-surface); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-tight); }
+  .guardian-card h2 { font-size: 16px; margin: 0 0 4px; }
+  .guardian-card .updated { color: var(--color-muted); font-size: 11px; margin-bottom: 10px; }
+  .guardian-milestone { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-top: 1px solid var(--color-faint); font-size: 13px; }
+  .guardian-milestone:first-of-type { border-top: none; }
+  .guardian-milestone .dot { flex: none; width: 16px; height: 16px; border-radius: 50%; margin-top: 2px; border: 1px solid var(--color-faint); }
+  .guardian-milestone.is-done .dot { background: var(--color-mint); border-color: var(--color-mint); }
+  .guardian-milestone.is-done span { color: var(--color-muted); text-decoration: line-through; }
+  .guardian-milestone.is-in-progress .dot { background: var(--color-warning); border-color: var(--color-warning); }
+  .guardian-empty, .guardian-loading, .guardian-error { text-align: center; color: var(--color-muted); font-size: 13px; padding: 40px 16px; }
+  .guardian-blueprint p, .guardian-chat p { font-size: 13px; color: var(--color-muted); margin: 4px 0; }
+  .guardian-chat-msg { font-size: 13px; margin: 6px 0; }
+  .guardian-chat-msg strong { display: block; font-size: 11px; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .guardian-cost-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+</style>
+</head>
+<body>
+  <div class="guardian-wrap">
+    <header class="guardian-header">
+      <p class="eyebrow">Compass - Life Roadmap</p>
+      <h1>Shared with you</h1>
+      <p>This is a read-only view someone chose to share with you. It only shows what they explicitly selected, and they can revoke this link at any time.</p>
+    </header>
+    <div id="guardian-content">
+      <div class="guardian-loading">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    const COMMUNITY_API_BASE = window.location.protocol === "file:" ? "http://localhost:5179" : "";
+
+    function escapeHTML(value) {
+      return String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+
+    function renderGoals(goals) {
+      if (!goals || !goals.length) return "";
+      return goals.map((goal) => `
+        <section class="guardian-card">
+          <h2>${escapeHTML(goal.title)}</h2>
+          ${(goal.milestones || []).map((milestone) => `
+            <div class="guardian-milestone ${milestone.status === "done" ? "is-done" : milestone.status === "in-progress" ? "is-in-progress" : ""}">
+              <span class="dot"></span>
+              <span>${escapeHTML(milestone.title)}${milestone.status === "in-progress" ? " (in progress)" : ""}</span>
+            </div>
+          `).join("") || `<p class="guardian-empty" style="padding:8px 0;">No milestones yet.</p>`}
+        </section>
+      `).join("");
+    }
+
+    function renderBlueprint(blueprint) {
+      if (!blueprint) return "";
+      const rows = [
+        ["Values", (blueprint.values || []).join(", ")],
+        ["Strengths", (blueprint.strengths || []).join(", ")],
+        ["Motivation style", blueprint.motivationStyle || blueprint.motivationChoice || ""],
+        ["Work style", blueprint.workStyle || blueprint.workChoice || ""],
+        ["Decision style", blueprint.decisionStyle || blueprint.decisionChoice || ""]
+      ].filter((row) => row[1]);
+      if (!rows.length) return "";
+      return `
+        <section class="guardian-card guardian-blueprint">
+          <h2>Personal Blueprint</h2>
+          ${rows.map((row) => `<p><strong>${escapeHTML(row[0])}:</strong> ${escapeHTML(row[1])}</p>`).join("")}
+        </section>
+      `;
+    }
+
+    function renderChat(messages) {
+      if (!messages || !messages.length) return "";
+      return `
+        <section class="guardian-card guardian-chat">
+          <h2>Recent chat history</h2>
+          ${messages.slice(-20).map((message) => `
+            <div class="guardian-chat-msg">
+              <strong>${message.from === "assistant" ? "Compass AI" : "Them"}</strong>
+              ${escapeHTML(message.text)}
+            </div>
+          `).join("")}
+        </section>
+      `;
+    }
+
+    function renderCostOfLiving(cost) {
+      if (!cost || !Array.isArray(cost.rows)) return "";
+      return `
+        <section class="guardian-card">
+          <h2>Real Cost of Living estimate</h2>
+          ${cost.rows.map((row) => `<div class="guardian-cost-row"><span>${escapeHTML(row.label)}</span><span>$${row.range[0]}-${row.range[1]}/mo</span></div>`).join("")}
+          <div class="guardian-cost-row" style="font-weight:600;border-top:1px solid var(--color-faint);margin-top:6px;padding-top:8px;">
+            <span>Estimated total</span><span>$${cost.total[0]}-${cost.total[1]}/mo</span>
+          </div>
+        </section>
+      `;
+    }
+
+    async function loadShare() {
+      const params = new URLSearchParams(window.location.search);
+      const token = (params.get("token") || "").trim();
+      const content = document.getElementById("guardian-content");
+      if (!token) {
+        content.innerHTML = `<div class="guardian-error">This link is missing its share code.</div>`;
+        return;
+      }
+      try {
+        const response = await fetch(`${COMMUNITY_API_BASE}/api/guardian-share?token=${encodeURIComponent(token)}`);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          content.innerHTML = `<div class="guardian-error">${escapeHTML(data.error || "This share link is no longer active.")}</div>`;
+          return;
+        }
+        const goalsHtml = renderGoals(data.goals);
+        const html = [
+          goalsHtml || `<div class="guardian-empty">No goals were included in this share.</div>`,
+          renderBlueprint(data.personalBlueprint),
+          renderChat(data.chatHistory),
+          renderCostOfLiving(data.costOfLiving)
+        ].join("");
+        content.innerHTML = html;
+      } catch (error) {
+        console.error("[GuardianShare] load failed", error);
+        content.innerHTML = `<div class="guardian-error">Couldn't load this share right now. Try again shortly.</div>`;
+      }
+    }
+
+    loadShare();
+  </script>
+</body>
+</html>

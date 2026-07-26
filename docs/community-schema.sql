@@ -1,8 +1,12 @@
 -- Community tab schema for Compass - Future Mirror.
 -- Run this once in the Supabase SQL editor for a fresh project.
 -- Everything here is additive: it does not touch any table Supabase creates
--- for you (auth.users etc). Community is the only part of the app that uses
--- this database; every other tab keeps its existing local-only storage.
+-- for you (auth.users etc). Community used to be the only part of the app
+-- using this database; the Guardian Sharing feature (see guardian_shares
+-- below) is a deliberate, confirmed exception to that - Life Roadmap has no
+-- Community/Supabase Auth requirement, so it needed its own unauthenticated,
+-- token-gated table instead of reusing auth.uid()-scoped RLS. Every other
+-- tab still keeps its existing local-only storage.
 
 -- ---------------------------------------------------------------------------
 -- profiles
@@ -263,6 +267,71 @@ create policy "mentor_applications_select_own" on mentor_applications
 
 create policy "mentor_applications_delete_own_pending" on mentor_applications
   for delete to authenticated using (user_id = auth.uid() and status = 'pending');
+
+-- ---------------------------------------------------------------------------
+-- skill_tags
+-- Backs the Skill Exchange feature: each row is one "I can offer X" or
+-- "I need X" listing, tagged with one of the 6 BUILD_LIFE_MOMENT_CATEGORIES
+-- (app.js) and a one-line note. Same non-bypassable moderation shape as
+-- posts/opportunities_shared -- no client-reachable INSERT policy, so the
+-- only way a row lands here is api/community-skill-tag.js (verify session ->
+-- AI safety check on the note -> service-role insert). No payments/points;
+-- connecting reuses accountability_connections as-is.
+-- ---------------------------------------------------------------------------
+create table if not exists skill_tags (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  type text not null check (type in ('offered', 'needed')),
+  category text not null check (category in ('independence', 'money', 'communication', 'career', 'wellness', 'relationships')),
+  note text not null check (char_length(note) between 4 and 140),
+  status text not null default 'pending' check (status in ('pending', 'published', 'blocked')),
+  moderation_reason text,
+  created_at timestamptz not null default now()
+);
+
+alter table skill_tags enable row level security;
+
+create policy "skill_tags_select_published_or_own" on skill_tags
+  for select to authenticated using (status = 'published' or user_id = auth.uid());
+
+create policy "skill_tags_delete_own" on skill_tags
+  for delete to authenticated using (user_id = auth.uid());
+
+create index if not exists skill_tags_category_type_idx on skill_tags (category, type);
+create index if not exists skill_tags_user_id_idx on skill_tags (user_id);
+
+-- ---------------------------------------------------------------------------
+-- guardian_shares
+-- Backs the Guardian read-only share feature on Life Roadmap. Life Roadmap
+-- goals/milestones live only in the browser's localStorage, and using them
+-- doesn't require a Community account - so there is no auth.uid() to scope
+-- RLS against here, unlike every other table in this file. RLS is enabled
+-- with NO policies at all, meaning anon/authenticated get zero direct
+-- access; every read and write goes through api/guardian-share.js using the
+-- service-role key. The token (a long random unguessable string) is the
+-- "view" credential a guardian needs to open their link; manage_secret
+-- (known only to the sharing user's own browser, never returned by a public
+-- read) is the separate "revoke/update" credential. Regenerating a link
+-- deletes the old row and creates a new token+manage_secret pair - there is
+-- no user identity to reset a forgotten manage_secret against, by design.
+-- ---------------------------------------------------------------------------
+create table if not exists guardian_shares (
+  token text primary key,
+  manage_secret text not null,
+  local_user_id text not null,
+  goals jsonb not null default '[]'::jsonb,
+  include_personal_blueprint boolean not null default false,
+  include_chat_history boolean not null default false,
+  include_cost_of_living boolean not null default false,
+  personal_blueprint jsonb,
+  chat_history jsonb,
+  cost_of_living jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table guardian_shares enable row level security;
+-- Intentionally no policies here - see comment above.
 
 -- ---------------------------------------------------------------------------
 -- Seed data: migrate the 6 static communityGroups from app.js (lines ~322-365)

@@ -24,7 +24,10 @@
   let communityAccountabilityConnectionsCache = [];
   let communityMentorProfilesCache = [];
   let communityMyMentorApplicationsCache = [];
+  let communitySkillTagsCache = [];
   let communityMyProfile = null;
+  let skillExchangeBrowseType = "offered";
+  let skillExchangeFilterCategory = "";
   let communityDataLoading = false;
   let communityDataLoaded = false;
   let communityDataError = "";
@@ -83,7 +86,7 @@
     if (!hasCommunitySession() || communityDataLoading) return;
     communityDataLoading = true;
     try {
-      const [squads, squadMembers, posts, opportunities, profiles, optIns, connections, mentorProfiles, mentorApplications] = await Promise.all([
+      const [squads, squadMembers, posts, opportunities, profiles, optIns, connections, mentorProfiles, mentorApplications, skillTags] = await Promise.all([
         fetchCommunityTable("squads", (q) => q.order("is_seeded", { ascending: false }).order("created_at", { ascending: true })),
         fetchCommunityTable("squad_members"),
         fetchCommunityTable("posts", (q) => q.order("created_at", { ascending: false }).limit(60)),
@@ -92,7 +95,8 @@
         fetchCommunityTable("accountability_optins"),
         fetchCommunityTable("accountability_connections"),
         fetchCommunityTable("mentor_profiles"),
-        fetchCommunityTable("mentor_applications")
+        fetchCommunityTable("mentor_applications"),
+        fetchCommunityTable("skill_tags", (q) => q.order("created_at", { ascending: false }).limit(120))
       ]);
       communitySquadsCache = squads;
       communitySquadMembersCache = squadMembers;
@@ -103,6 +107,7 @@
       communityAccountabilityConnectionsCache = connections;
       communityMentorProfilesCache = mentorProfiles;
       communityMyMentorApplicationsCache = mentorApplications;
+      communitySkillTagsCache = skillTags;
       communityMyProfile = profiles.find((profile) => profile.id === communityUserId()) || null;
       communityDataLoaded = true;
       communityDataError = "";
@@ -587,6 +592,148 @@
   }
 
   // ---------------------------------------------------------------------
+  // Skill Exchange - "I can offer X" / "I need X" listings tagged with one
+  // of the 6 BUILD_LIFE_MOMENT_CATEGORIES (app.js). Connecting reuses
+  // accountability_connections as-is, same as Community Mentors below - a
+  // connection request doesn't care whether the recipient is a peer, a
+  // mentor, or a skill-exchange match. No payments/points.
+  // ---------------------------------------------------------------------
+
+  function mySkillTags() {
+    const myId = communityUserId();
+    return communitySkillTagsCache.filter((tag) => tag.user_id === myId && tag.status !== "blocked");
+  }
+
+  function browsableSkillTags() {
+    const myId = communityUserId();
+    return communitySkillTagsCache
+      .filter((tag) => tag.status === "published" && tag.user_id !== myId && tag.type === skillExchangeBrowseType)
+      .filter((tag) => !skillExchangeFilterCategory || tag.category === skillExchangeFilterCategory);
+  }
+
+  function skillCategoryLabel(categoryId) {
+    const category = (typeof BUILD_LIFE_MOMENT_CATEGORIES !== "undefined" ? BUILD_LIFE_MOMENT_CATEGORIES : []).find((entry) => entry.id === categoryId);
+    return category ? category.label : categoryId;
+  }
+
+  function skillTagChip(tag) {
+    return `
+      <span class="badge-chip">
+        ${escapeHTML(skillCategoryLabel(tag.category))} - ${escapeHTML(tag.note)}
+        ${tag.status === "pending" ? `<em> (checking...)</em>` : ""}
+        <button type="button" class="ghost-circle" data-delete-skill-tag="${escapeHTML(tag.id)}" aria-label="Remove">x</button>
+      </span>
+    `;
+  }
+
+  function skillTagCard(tag) {
+    const profile = communityProfileFor(tag.user_id);
+    const badgeCount = (profile && Array.isArray(profile.badges)) ? profile.badges.length : 0;
+    return `
+      <article class="community-card">
+        <div class="community-card-top">
+          <span class="category-badge">${escapeHTML(skillCategoryLabel(tag.category))}</span>
+          <img src="assets/icon-support.png" alt="">
+        </div>
+        <h3>${escapeHTML(profile ? profile.username : "Member")}</h3>
+        <p>${escapeHTML(tag.note)}</p>
+        <small>trust ${Math.round((profile && profile.community_trust_snapshot) || 0)}${badgeCount ? ` - ${badgeCount} badge${badgeCount === 1 ? "" : "s"}` : ""}</small>
+        <div class="community-actions">
+          <button class="primary-action compact-action" type="button" data-open="communityAccountabilityRequest" data-open-payload="${escapeHTML(tag.user_id)}">Request connection</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function communitySkillExchangeSection() {
+    const myOffered = mySkillTags().filter((tag) => tag.type === "offered");
+    const myNeeded = mySkillTags().filter((tag) => tag.type === "needed");
+    const browsed = browsableSkillTags();
+    const categories = typeof BUILD_LIFE_MOMENT_CATEGORIES !== "undefined" ? BUILD_LIFE_MOMENT_CATEGORIES : [];
+    return `
+      <section class="accountability-match-card">
+        <p class="eyebrow">Skill Exchange</p>
+        <h3>Trade what you know for what you need.</h3>
+        <p class="muted">Offer something you're good at, or ask for help with something you're not. No payments or points - just people helping people. Notes are checked before they're visible to others.</p>
+
+        <div class="content-rail-title"><strong>What I can offer</strong><span>${myOffered.length}</span></div>
+        <div class="community-member-list">${myOffered.length ? myOffered.map(skillTagChip).join("") : `<p class="muted">Nothing offered yet.</p>`}</div>
+        <button class="secondary-action compact-action" type="button" data-open="communityAddSkillTag" data-open-payload="offered">Offer a skill</button>
+
+        <div class="content-rail-title"><strong>What I need</strong><span>${myNeeded.length}</span></div>
+        <div class="community-member-list">${myNeeded.length ? myNeeded.map(skillTagChip).join("") : `<p class="muted">Nothing added yet.</p>`}</div>
+        <button class="secondary-action compact-action" type="button" data-open="communityAddSkillTag" data-open-payload="needed">Ask for help</button>
+
+        <div class="content-rail-title"><strong>Browse the exchange</strong><span>${browsed.length}</span></div>
+        <div class="mirror-example-row mode-toggle-row">
+          <button type="button" class="${skillExchangeBrowseType === "offered" ? "is-selected" : ""}" data-skill-browse-type="offered">People offering help</button>
+          <button type="button" class="${skillExchangeBrowseType === "needed" ? "is-selected" : ""}" data-skill-browse-type="needed">People who need help</button>
+        </div>
+        <div class="mirror-example-row mode-toggle-row">
+          <button type="button" class="${skillExchangeFilterCategory === "" ? "is-selected" : ""}" data-skill-browse-category="">All</button>
+          ${categories.map((category) => `<button type="button" class="${skillExchangeFilterCategory === category.id ? "is-selected" : ""}" data-skill-browse-category="${escapeHTML(category.id)}">${escapeHTML(category.label)}</button>`).join("")}
+        </div>
+        <div class="community-grid">
+          ${browsed.length ? browsed.map(skillTagCard).join("") : `
+            <section class="empty-feature">
+              <img src="assets/icon-support.png" alt="">
+              <div><strong>No matches yet</strong><p>Check back soon, or try a different filter.</p></div>
+            </section>
+          `}
+        </div>
+      </section>
+    `;
+  }
+
+  function communityAddSkillTagModal(type) {
+    const skillType = type === "needed" ? "needed" : "offered";
+    const categories = typeof BUILD_LIFE_MOMENT_CATEGORIES !== "undefined" ? BUILD_LIFE_MOMENT_CATEGORIES : [];
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-skill-tag-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Skill Exchange</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="community-skill-tag-title">${skillType === "offered" ? "Offer a skill" : "Ask for help"}</h3>
+        <p class="muted">Keep it short and specific. Do not include private personal details - notes are checked before they're visible to others.</p>
+        <input type="hidden" id="community-skill-tag-type" value="${skillType}">
+        <div class="admin-form">
+          <label>Category
+            <select id="community-skill-tag-category">
+              ${categories.map((category) => `<option value="${escapeHTML(category.id)}">${escapeHTML(category.label)}</option>`).join("")}
+            </select>
+          </label>
+          <label>One-line note<input id="community-skill-tag-note" type="text" maxlength="140" placeholder="${skillType === "offered" ? "Example: I just finished filing my taxes, can walk you through the IRAS site" : "Example: Could use help practicing interview answers"}"></label>
+          <p class="form-error" id="community-skill-tag-error" aria-live="polite"></p>
+        </div>
+        <button class="primary-action" type="button" data-save-skill-tag>${skillType === "offered" ? "Offer" : "Ask"}</button>
+      </div>
+    `;
+  }
+
+  async function submitSkillTag({ type, category, note }) {
+    const response = await fetch(`${COMMUNITY_API_BASE}/api/community-skill-tag`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${communityAccessToken()}` },
+      body: JSON.stringify({ type, category, note })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Could not save that right now.");
+    return data;
+  }
+
+  async function deleteSkillTag(tagId) {
+    const client = getCommunitySupabaseClient();
+    if (!client) return false;
+    const { error } = await client.from("skill_tags").delete().eq("id", tagId).eq("user_id", communityUserId());
+    if (error) {
+      console.error("[Community] deleteSkillTag failed", error);
+      return false;
+    }
+    return true;
+  }
+
+  // ---------------------------------------------------------------------
   // Community mentors (roadmap item 4: extend accountability matching to
   // vetted adult mentors, not just peers). "Vetted" here means owner-curated:
   // mentor_profiles has no client-reachable insert/update - the only way a
@@ -801,6 +948,8 @@
 
       ${accountabilityMatchCard()}
 
+      ${communitySkillExchangeSection()}
+
       ${communityMentorSection()}
 
       ${communityWall()}
@@ -832,6 +981,14 @@
   window.communityMentorSection = communityMentorSection;
   window.communityMentorApplyModal = communityMentorApplyModal;
   window.submitMentorApplication = submitMentorApplication;
+  window.communitySkillExchangeSection = communitySkillExchangeSection;
+  window.communityAddSkillTagModal = communityAddSkillTagModal;
+  window.submitSkillTag = submitSkillTag;
+  window.deleteSkillTag = deleteSkillTag;
+  window.getSkillExchangeBrowseType = () => skillExchangeBrowseType;
+  window.setSkillExchangeBrowseType = (type) => { skillExchangeBrowseType = type === "needed" ? "needed" : "offered"; };
+  window.getSkillExchangeFilterCategory = () => skillExchangeFilterCategory;
+  window.setSkillExchangeFilterCategory = (category) => { skillExchangeFilterCategory = category || ""; };
   window.communityMyProfileSnapshot = () => communityMyProfile;
   window.communityPostsCacheSnapshot = () => communityPostsCache;
   window.communitySquadMembersCacheSnapshot = () => communitySquadMembersCache;

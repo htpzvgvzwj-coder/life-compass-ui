@@ -227,6 +227,187 @@ function computeCostOfLiving(draft) {
   return { rows, total };
 }
 
+// Singapore-specific, general information only - this checklist explains
+// obligations and points to the real IRAS filing channel, it never files or
+// fills anything in on the user's behalf.
+const TAX_OBLIGATION_ITEMS = [
+  {
+    id: "do-i-need-to-file",
+    title: "Do you need to file income tax at all?",
+    why: "Not everyone has to file. Knowing the threshold means you don't panic unnecessarily, and don't get caught off guard by skipping a filing you actually owed.",
+    steps: [
+      "Check if your total annual income (employment plus any freelance or side income) was above S$22,000 - IRAS generally requires filing above this.",
+      "Even under S$22,000, file if IRAS sends you a filing notification - the notification itself creates the obligation.",
+      "If you had only one employer under the Auto-Inclusion Scheme and no other income, you may not need to file anything yourself."
+    ]
+  },
+  {
+    id: "employment-vs-gig",
+    title: "Employment income vs freelance/gig income",
+    why: "Your employer usually reports salary for you, but gig and side income doesn't report itself - missing it is the easiest way to under-file by accident.",
+    steps: [
+      "Salary from an employer under the Auto-Inclusion Scheme (AIS) is usually reported to IRAS directly - you don't re-enter it yourself.",
+      "Freelance work, tuition, delivery gigs, or other self-employed income is NOT auto-reported - you must declare it.",
+      "Keep basic records (dates, amounts, who paid you) for any income your employer didn't report."
+    ]
+  },
+  {
+    id: "filing-deadline",
+    title: "Know the filing deadline",
+    why: "A late filing penalty can apply even if you end up owing no tax at all - the deadline itself is what matters, not the amount.",
+    steps: [
+      "E-filing usually closes 18 April each year (paper filing closes earlier, around mid-April).",
+      "Filing late can trigger a penalty even when no tax is actually owed.",
+      "Set a personal reminder a few weeks before the deadline, not on the day itself."
+    ]
+  },
+  {
+    id: "where-to-file",
+    title: "Where and how to file",
+    why: "Filing only ever happens on IRAS's own site - anywhere else asking for your Singpass or tax details to 'file for you' is a red flag.",
+    steps: [
+      "File through the myTax Portal on the official IRAS website, logged in with Singpass.",
+      "If it's your first time, IRAS may pre-fill data your employer already reported - review it, don't submit blindly.",
+      "Save or screenshot your submission confirmation for your own records."
+    ]
+  },
+  {
+    id: "reliefs",
+    title: "Reliefs that commonly apply to first-time young filers",
+    why: "Some reliefs apply automatically, but claiming ones you don't actually qualify for can cause problems later - it's worth knowing which is which.",
+    steps: [
+      "Earned Income Relief is usually applied automatically based on your age and income - you don't normally need to apply for it separately.",
+      "CPF contributions (if you're an employee) already reduce your taxable income automatically.",
+      "Don't assume you qualify for reliefs aimed at parents or dependents unless you actually meet the criteria - check before claiming."
+    ]
+  },
+  {
+    id: "what-if-you-miss-it",
+    title: "What happens if you don't file, or file late",
+    why: "Silence is the worst option - IRAS can estimate a higher tax bill for you than the real one, and it's harder to walk back than to just file late.",
+    steps: [
+      "IRAS can issue an estimated Notice of Assessment based on their own estimate, which may be higher than your real tax owed.",
+      "Continued non-filing can lead to penalties or, in serious or repeated cases, further enforcement action.",
+      "If you've already missed a deadline, file as soon as possible rather than waiting - late-but-filed is always better than staying silent."
+    ]
+  }
+];
+
+// SOS Triage: real Singapore resources, not AI-generated advice. AI (see
+// SOS_TRIAGE_SYSTEM_PROMPT) only classifies which category a free-text
+// description belongs to - it never writes the resource content itself, and
+// the mental-health category is never gated behind an AI call at all (see
+// SOS_CRISIS_PATTERN below and the always-visible banner in the modal).
+const SOS_TRIAGE_CATEGORIES = [
+  {
+    id: "mental-health",
+    label: "Mental health emergency",
+    summary: "Crisis, self-harm, or abuse in progress.",
+    resources: [
+      { title: "Samaritans of Singapore (SOS)", detail: "24 hours: call 1-767, or text 9151-1767." },
+      { title: "Emergency services", detail: "995 for ambulance, 999 for police, if anyone is in immediate danger." },
+      { title: "IMH Mental Health Helpline", detail: "6389-2222, 24 hours." }
+    ]
+  },
+  {
+    id: "landlord",
+    label: "Landlord dispute / eviction threat",
+    summary: "Being threatened with eviction, or a deposit/agreement fight.",
+    resources: [
+      { title: "Check your tenancy agreement first", detail: "Review notice periods, termination clauses, and deposit terms before responding to anything in writing." },
+      { title: "Small Claims Tribunals", detail: "For claims up to S$20,000 (S$30,000 with both parties' consent) - file at the State Courts if a deposit or agreement dispute can't be resolved directly." },
+      { title: "Keep written evidence", detail: "Save every message, photo, and receipt - verbal promises are hard to prove later." }
+    ]
+  },
+  {
+    id: "debt-collection",
+    label: "Debt collection calls",
+    summary: "Being contacted or pressured about a debt.",
+    resources: [
+      { title: "Verify the debt is real first", detail: "Ask for written proof of the debt and the collector's identity before paying or agreeing to anything." },
+      { title: "You have rights against harassment", detail: "Debt collectors in Singapore cannot threaten, harass, or contact you at unreasonable hours." },
+      { title: "Credit Counselling Singapore (CCS)", detail: "Free, confidential debt advice and negotiation support - ccs.org.sg." }
+    ]
+  },
+  {
+    id: "employment",
+    label: "Fired / employment dispute",
+    summary: "Wrongful dismissal, unpaid salary, or a workplace fight.",
+    resources: [
+      { title: "Know what the Employment Act actually covers", detail: "Notice periods, salary in lieu, and wrongful dismissal protections differ by contract type - check before assuming you have no recourse." },
+      { title: "MOM salary/employment claims (TADM)", detail: "File a claim through the Tripartite Alliance for Dispute Management if pay or dismissal terms were breached." },
+      { title: "Get your termination terms in writing", detail: "Follow up any verbal dismissal or dispute in writing so you have a paper trail." }
+    ]
+  },
+  {
+    id: "medical-billing",
+    label: "Medical billing dispute",
+    summary: "A hospital or clinic bill that seems wrong or unaffordable.",
+    resources: [
+      { title: "Check what MediSave/MediShield already covers", detail: "Part of the bill may already be claimable before you dispute anything out of pocket." },
+      { title: "Ask for the hospital's medical social worker", detail: "They can help with billing disputes, payment plans, and financial assistance schemes." },
+      { title: "Request an itemised bill", detail: "A full breakdown makes it much easier to spot billing errors." }
+    ]
+  }
+];
+
+const SOS_TRIAGE_SYSTEM_PROMPT = "You classify a short description of a real-life problem into exactly one category for a safety triage tool. Categories: landlord (housing, eviction, tenancy disputes), debt-collection (collection calls, debt harassment), employment (fired, wage disputes, workplace issues), medical-billing (hospital or medical bill disputes), mental-health (crisis, self-harm, suicidal thoughts, abuse in progress), unclear (does not fit any category, or not enough information). Respond with strict JSON only, no markdown, no extra text: {\"category\": \"one of the ids above\"}.";
+
+const SOS_CRISIS_PATTERN = /(self[-\s]?harm|suicide|suicidal|kill myself|hurt myself|end my life|want to die|abuse)/i;
+
+let sosView = "categories";
+let sosResultCategoryId = null;
+let sosInputError = "";
+let sosBusy = false;
+
+async function classifySosSituation(text) {
+  const reply = await requestCompassDirect(SOS_TRIAGE_SYSTEM_PROMPT, text);
+  const parsed = extractJsonObject(reply);
+  const category = parsed && typeof parsed.category === "string" ? parsed.category : "unclear";
+  return SOS_TRIAGE_CATEGORIES.some((item) => item.id === category) ? category : "unclear";
+}
+
+function sosTriageModal() {
+  const mentalHealth = SOS_TRIAGE_CATEGORIES.find((item) => item.id === "mental-health");
+  const resultCategory = sosResultCategoryId ? SOS_TRIAGE_CATEGORIES.find((item) => item.id === sosResultCategoryId) : null;
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="sos-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">SOS</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="sos-title">Get pointed to the right help</h3>
+      <section class="mirror-empty-card sos-crisis-banner">
+        <p class="eyebrow">If this is a mental health emergency</p>
+        ${mentalHealth.resources.map((resource) => `<p class="tiny-note"><strong>${escapeHTML(resource.title)}</strong>: ${escapeHTML(resource.detail)}</p>`).join("")}
+      </section>
+      ${sosView === "result" && resultCategory && resultCategory.id !== "mental-health" ? `
+        <div class="content-rail-title"><strong>${escapeHTML(resultCategory.label)}</strong><span></span></div>
+        <div class="advice-stack">
+          ${resultCategory.resources.map((resource) => `<div><strong>${escapeHTML(resource.title)}</strong><span>${escapeHTML(resource.detail)}</span></div>`).join("")}
+        </div>
+        <button class="secondary-action compact-action" type="button" data-sos-back>Back to categories</button>
+      ` : `
+        <p class="muted">This isn't professional advice - it points you to real next steps. Pick a category, or describe it and AI will sort it for you (AI only classifies; it never writes the resources shown).</p>
+        <div class="community-grid">
+          ${SOS_TRIAGE_CATEGORIES.filter((category) => category.id !== "mental-health").map((category) => `
+            <article class="community-card">
+              <h3>${escapeHTML(category.label)}</h3>
+              <p class="muted">${escapeHTML(category.summary)}</p>
+              <button class="secondary-action compact-action" type="button" data-sos-category="${escapeHTML(category.id)}">See resources</button>
+            </article>
+          `).join("")}
+        </div>
+        <div class="admin-form">
+          <label>Or describe what's happening<textarea id="sos-input-text" maxlength="500" placeholder="Example: My landlord says I have 3 days to leave"></textarea></label>
+          ${sosInputError ? `<p class="form-error">${escapeHTML(sosInputError)}</p>` : ""}
+        </div>
+        <button class="primary-action" type="button" data-sos-get-help ${sosBusy ? "disabled" : ""}>${sosBusy ? "Sorting..." : "Get help"}</button>
+      `}
+    </div>
+  `;
+}
+
 const inspireCategories = [
   "All",
   "Entrepreneurs",
@@ -343,7 +524,19 @@ const defaultTrackerState = {
   },
   activeRoleplaySessionId: null,
   systemTutorialsSeen: {},
-  moodSuggestion: null
+  moodSuggestion: null,
+  taxChecklist: {},
+  guardianShare: { token: null, manageSecret: null, goalIds: [], includePersonalBlueprint: false, includeChatHistory: false, includeCostOfLiving: false, updatedAt: null },
+  ghostRoommate: { active: false, personaId: null, startedAt: null, week: 0, relationship: 60, history: [], moveOutReason: "", currentWeek: null },
+  legacyIssues: [],
+  selfDebts: [],
+  failureInoculation: { history: [] },
+  futureSelfHiring: { sessions: [] },
+  estateAuctions: { lastAuctionAt: null, history: [] },
+  juryTrials: { sessions: [] },
+  archaeologyDigs: [],
+  advancedModeReports: [],
+  aiTraces: []
 };
 
 const dailyMissions = [
@@ -940,6 +1133,7 @@ const BLUEPRINT_SESSIONS = [
 
 let blueprintActiveSession = 1;
 let blueprintDraft = { values: [], personalityChoice: "", strengths: [], strengthsOther: "", motivationChoice: "", learningChoice: "", workChoice: "", decisionChoice: "" };
+let blueprintSwipeIndex = 0;
 let blueprintMicroInsightText = "";
 let inspireSearch = "";
 let inspireCategory = "All";
@@ -1049,7 +1243,22 @@ function normalizeTrackerState(state) {
     lifeSim: normalizeLifeSimState(state.lifeSim || fallback.lifeSim),
     activeRoleplaySessionId: state.activeRoleplaySessionId || null,
     systemTutorialsSeen: (state.systemTutorialsSeen && typeof state.systemTutorialsSeen === "object") ? state.systemTutorialsSeen : {},
-    moodSuggestion: state.moodSuggestion || null
+    moodSuggestion: state.moodSuggestion || null,
+    taxChecklist: (state.taxChecklist && typeof state.taxChecklist === "object") ? state.taxChecklist : {},
+    guardianShare: (state.guardianShare && typeof state.guardianShare === "object") ? { ...fallback.guardianShare, ...state.guardianShare, goalIds: Array.isArray(state.guardianShare.goalIds) ? state.guardianShare.goalIds : [] } : fallback.guardianShare,
+    ghostRoommate: (state.ghostRoommate && typeof state.ghostRoommate === "object") ? { ...fallback.ghostRoommate, ...state.ghostRoommate, history: Array.isArray(state.ghostRoommate.history) ? state.ghostRoommate.history : [] } : fallback.ghostRoommate,
+    legacyIssues: Array.isArray(state.legacyIssues) ? state.legacyIssues : fallback.legacyIssues,
+    selfDebts: Array.isArray(state.selfDebts) ? state.selfDebts : fallback.selfDebts,
+    failureInoculation: { history: Array.isArray(state.failureInoculation && state.failureInoculation.history) ? state.failureInoculation.history : [] },
+    futureSelfHiring: { sessions: Array.isArray(state.futureSelfHiring && state.futureSelfHiring.sessions) ? state.futureSelfHiring.sessions : [] },
+    estateAuctions: {
+      lastAuctionAt: (state.estateAuctions && state.estateAuctions.lastAuctionAt) || null,
+      history: Array.isArray(state.estateAuctions && state.estateAuctions.history) ? state.estateAuctions.history : []
+    },
+    juryTrials: { sessions: Array.isArray(state.juryTrials && state.juryTrials.sessions) ? state.juryTrials.sessions : [] },
+    archaeologyDigs: Array.isArray(state.archaeologyDigs) ? state.archaeologyDigs : [],
+    advancedModeReports: Array.isArray(state.advancedModeReports) ? state.advancedModeReports : [],
+    aiTraces: Array.isArray(state.aiTraces) ? state.aiTraces : []
   };
 }
 
@@ -1421,24 +1630,34 @@ function growthActionAttributes(item) {
   return "";
 }
 
-function growthHubSection({ title, subtitle, icon, tone = "", items = [] }) {
+// Accordion, not a fully-expanded stack - with 6 sections and up to 11
+// items each, showing everything open at once meant scrolling past every
+// other category just to reach one feature. Collapsed by default: all
+// section headers fit without scrolling, tap one to open just that section.
+let expandedGrowthSections = {};
+
+function growthHubSection({ id, title, subtitle, icon, tone = "", items = [] }) {
+  const isOpen = Boolean(expandedGrowthSections[id]);
   return `
-    <section class="growth-hub-card ${tone}">
-      <div class="growth-hub-head">
+    <section class="growth-hub-card ${tone} ${isOpen ? "is-open" : ""}">
+      <button class="growth-hub-head" type="button" data-toggle-hub-section="${escapeHTML(id)}" aria-expanded="${isOpen ? "true" : "false"}">
         <div class="growth-icon"><img src="assets/${icon}" alt=""></div>
         <div>
           <h3>${escapeHTML(title)}</h3>
           <p>${escapeHTML(subtitle)}</p>
         </div>
-      </div>
-      <div class="growth-chip-grid">
-        ${items.map((item) => `
-          <button class="growth-chip" type="button" ${growthActionAttributes(item)}>
-            <strong>${escapeHTML(item.title)}</strong>
-            <span>${escapeHTML(item.text)}</span>
-          </button>
-        `).join("")}
-      </div>
+        <span class="growth-hub-chevron">${isOpen ? "−" : "+"}</span>
+      </button>
+      ${isOpen ? `
+        <div class="growth-chip-grid">
+          ${items.map((item) => `
+            <button class="growth-chip" type="button" ${growthActionAttributes(item)} title="${escapeHTML(item.text)}">
+              <img src="assets/${item.icon || icon}" alt="">
+              <strong>${escapeHTML(item.title)}</strong>
+            </button>
+          `).join("")}
+        </div>
+      ` : ""}
     </section>
   `;
 }
@@ -1468,7 +1687,7 @@ function realGrowthFacts() {
   });
   const latestMood = latestRealMoodEntry();
   if (latestMood) {
-    facts.push(`Latest mood log: ${latestMood.label}, energy ${latestMood.score}/100, note: ${cleanText(latestMood.note, 260)}, logged ${latestMood.display_time || latestMood.created_at || "recently"}`);
+    facts.push(`Latest mood log: ${latestMood.label}, energy ${latestMood.score}/100. What happened: ${cleanText(latestMood.note, 260)}.${latestMood.affectedChoice ? ` What it affected: ${cleanText(latestMood.affectedChoice, 200)}.` : ""}${latestMood.tomorrowAdjustment ? ` Planned adjustment: ${cleanText(latestMood.tomorrowAdjustment, 200)}.` : ""} Logged ${latestMood.display_time || latestMood.created_at || "recently"}`);
   }
   if (trackerState.assessment) {
     const breakdown = Array.isArray(trackerState.assessment.domainBars)
@@ -1492,6 +1711,27 @@ function realGrowthFacts() {
   }
   const activeChallenges = trackerState.challengeProgress.filter((item) => item.user_id === currentUserId());
   if (activeChallenges.length) facts.push(`Active challenges: ${activeChallenges.map((item) => item.title).join(", ")}`);
+  const latestScan = myFutureScans()[0];
+  if (latestScan) facts.push(`Latest Future Scan: "${cleanText(latestScan.scanContext && latestScan.scanContext.rawInput, 200)}"${latestScan.synthesis ? ` - synthesis: ${cleanText(latestScan.synthesis, 260)}` : ""}`);
+  const activeBuildEntries = trackerState.buildMode.entries.filter((entry) => entry.user_id === currentUserId() && entry.status === "active");
+  if (activeBuildEntries.length) facts.push(`Active Build Mode training: ${activeBuildEntries.map((entry) => `"${entry.goalSummary || entry.goal}" (${entry.coachType})`).join("; ")}`);
+  if (trackerState.ghostRoommate.active) {
+    const roommate = ghostRoommatePersona(trackerState.ghostRoommate);
+    facts.push(`Ghost Roommate: living with ${roommate.name}, relationship ${ghostRoommateRelationshipLabel(trackerState.ghostRoommate.relationship)} (${trackerState.ghostRoommate.relationship}/100), week ${trackerState.ghostRoommate.week}`);
+  }
+  const openIssues = trackerState.legacyIssues.filter((issue) => issue.status !== "merged");
+  const mergedIssues = trackerState.legacyIssues.filter((issue) => issue.status === "merged");
+  if (openIssues.length || mergedIssues.length) facts.push(`Inherited Debugging: ${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} (${openIssues.map((issue) => issue.title).join(", ") || "none"}), ${mergedIssues.length} merged`);
+  const activeDebts = trackerState.selfDebts.filter((debt) => debt.status === "active");
+  if (activeDebts.length) facts.push(`Active Self-Debts: ${activeDebts.map((debt) => debt.title).join(", ")}`);
+  const survivedRejections = failuresSurvivedCount();
+  if (survivedRejections) facts.push(`Failure Inoculation: ${survivedRejections} rejection(s) survived`);
+  const hiredSessions = trackerState.futureSelfHiring.sessions.filter((session) => session.hiredCandidateId);
+  if (hiredSessions.length) {
+    const latestHire = hiredSessions[0];
+    const candidate = FUTURE_SELF_CANDIDATES.find((item) => item.id === latestHire.hiredCandidateId);
+    facts.push(`Future Self Hiring: most recently hired "${candidate ? candidate.name : latestHire.hiredCandidateId}" for the question "${latestHire.question}"`);
+  }
   return facts;
 }
 
@@ -1724,8 +1964,16 @@ function badgeCards() {
   `).join("");
 }
 
+// Growth Progress used to be one of three disconnected progress views
+// (this one, Career Studio, Community's trust/badges) with no awareness of
+// each other. Rather than tear out Career Studio's and Community's own
+// deep-dive screens (real risk for a purely cosmetic consolidation), this
+// adds them here as summary cards with a link out - one place that shows
+// everything, each card still drilling into its real home screen.
 function progressReportCards() {
   const latestMood = latestRealMoodEntry();
+  const interviewCount = trackerState.careerStudio.interviewSessions.filter((session) => session.user_id === currentUserId() && session.completedAt).length;
+  const communitySnapshot = typeof communityMyProfileSnapshot === "function" ? communityMyProfileSnapshot() : null;
   return `
     <div class="progress-report-grid">
       <article>
@@ -1742,6 +1990,16 @@ function progressReportCards() {
         <p class="eyebrow">Challenge progress</p>
         <h4>${trackerState.challengeProgress.filter((item) => item.user_id === currentUserId()).length} active</h4>
         <p>Start or restart a 7-day challenge when you want structure.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Career Studio</p>
+        <h4>${interviewCount} interview${interviewCount === 1 ? "" : "s"} practiced</h4>
+        <p><button class="text-action" type="button" data-open="careerStudio">Open Career Studio</button></p>
+      </article>
+      <article>
+        <p class="eyebrow">Community</p>
+        <h4>${communitySnapshot ? `Trust ${Math.round(communitySnapshot.community_trust_snapshot || 0)}` : "Not signed in yet"}</h4>
+        <p><button class="text-action" type="button" data-tab-jump="community">Open Community</button></p>
       </article>
     </div>
   `;
@@ -3579,13 +3837,132 @@ function setMilestoneStatus(goalId, milestoneId, status) {
   const milestone = goal.milestones.find((item) => item.id === milestoneId);
   if (!milestone) return;
   milestone.status = status;
-  saveTrackerState();
   if (status === "done") {
+    milestone.doneAt = new Date().toISOString();
     milestoneJustCompleted = { goalTitle: goal.title, milestoneTitle: milestone.title };
   }
+  saveTrackerState();
 }
 
 let milestoneJustCompleted = null;
+
+let guardianShareDraft = { goalIds: [], includePersonalBlueprint: false, includeChatHistory: false, includeCostOfLiving: false };
+let guardianShareError = "";
+let guardianShareBusy = false;
+
+function guardianShareLinkUrl(token) {
+  const base = `${window.location.origin}${window.location.pathname.replace(/index\.html$/, "").replace(/\/?$/, "/")}`;
+  return `${base}guardian-view.html?token=${encodeURIComponent(token)}`;
+}
+
+function guardianShareSetupModal() {
+  const goals = myRoadmapGoals();
+  const share = trackerState.guardianShare;
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="guardian-share-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Guardian sharing</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="guardian-share-title">Share a read-only view with a guardian</h3>
+      <p class="muted">Pick exactly what they can see. They open the link with no account of their own, and you can revoke it any time.</p>
+      ${share.token ? `
+        <div class="admin-form">
+          <label>Their link<input type="text" readonly value="${escapeHTML(guardianShareLinkUrl(share.token))}" onclick="this.select()"></label>
+        </div>
+        <div class="profile-actions">
+          <button class="secondary-action compact-action" type="button" data-copy-guardian-link="${escapeHTML(share.token)}">Copy link</button>
+          <button class="secondary-action compact-action" type="button" data-revoke-guardian-share>Revoke link</button>
+        </div>
+      ` : ""}
+      <div class="content-rail-title"><strong>Goals to include</strong><span>${guardianShareDraft.goalIds.length} of ${goals.length}</span></div>
+      <div class="community-member-list">
+        ${goals.map((goal) => `
+          <label class="mirror-example-row" style="justify-content:flex-start;gap:8px;">
+            <input type="checkbox" data-toggle-guardian-goal="${escapeHTML(goal.id)}" ${guardianShareDraft.goalIds.includes(goal.id) ? "checked" : ""}>
+            <span>${escapeHTML(goal.title)}</span>
+          </label>
+        `).join("") || `<p class="muted">No roadmap goals yet.</p>`}
+      </div>
+      <div class="content-rail-title"><strong>Also include</strong><span>Off by default</span></div>
+      <div class="admin-form">
+        <label class="mirror-example-row" style="justify-content:flex-start;gap:8px;">
+          <input type="checkbox" data-toggle-guardian-extra="includePersonalBlueprint" ${guardianShareDraft.includePersonalBlueprint ? "checked" : ""}>
+          <span>Personal Blueprint</span>
+        </label>
+        <label class="mirror-example-row" style="justify-content:flex-start;gap:8px;">
+          <input type="checkbox" data-toggle-guardian-extra="includeChatHistory" ${guardianShareDraft.includeChatHistory ? "checked" : ""}>
+          <span>Recent Compass chat history</span>
+        </label>
+        <label class="mirror-example-row" style="justify-content:flex-start;gap:8px;">
+          <input type="checkbox" data-toggle-guardian-extra="includeCostOfLiving" ${guardianShareDraft.includeCostOfLiving ? "checked" : ""}>
+          <span>Real Cost of Living numbers</span>
+        </label>
+      </div>
+      ${guardianShareError ? `<p class="form-error">${escapeHTML(guardianShareError)}</p>` : ""}
+      <button class="primary-action" type="button" data-save-guardian-share ${guardianShareBusy ? "disabled" : ""}>${guardianShareBusy ? "Saving..." : share.token ? "Update sharing" : "Generate link"}</button>
+    </div>
+  `;
+}
+
+async function submitGuardianShare() {
+  const goals = myRoadmapGoals()
+    .filter((goal) => guardianShareDraft.goalIds.includes(goal.id))
+    .map((goal) => ({
+      title: goal.title,
+      milestones: (goal.milestones || []).map((milestone) => ({ title: milestone.title, status: milestone.status }))
+    }));
+  const blueprint = guardianShareDraft.includePersonalBlueprint ? latestBlueprint() : null;
+  const chat = guardianShareDraft.includeChatHistory ? chatState.messages.map((message) => ({ from: message.from, text: message.text })) : null;
+  const cost = guardianShareDraft.includeCostOfLiving ? (costOfLivingResult || computeCostOfLiving(costOfLivingDraft)) : null;
+  const share = trackerState.guardianShare;
+  const response = await fetch(`${window.COMMUNITY_API_BASE || ""}/api/guardian-share`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "publish",
+      localUserId: currentUserId(),
+      token: share.token || "",
+      manageSecret: share.manageSecret || "",
+      goals,
+      includePersonalBlueprint: guardianShareDraft.includePersonalBlueprint,
+      includeChatHistory: guardianShareDraft.includeChatHistory,
+      includeCostOfLiving: guardianShareDraft.includeCostOfLiving,
+      personalBlueprint: blueprint,
+      chatHistory: chat,
+      costOfLiving: cost
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Could not save that share right now.");
+  trackerState.guardianShare = {
+    token: data.token || share.token,
+    manageSecret: data.manageSecret || share.manageSecret,
+    goalIds: [...guardianShareDraft.goalIds],
+    includePersonalBlueprint: guardianShareDraft.includePersonalBlueprint,
+    includeChatHistory: guardianShareDraft.includeChatHistory,
+    includeCostOfLiving: guardianShareDraft.includeCostOfLiving,
+    updatedAt: new Date().toISOString()
+  };
+  saveTrackerState();
+}
+
+async function revokeGuardianShare() {
+  const share = trackerState.guardianShare;
+  if (!share.token || !share.manageSecret) return;
+  try {
+    await fetch(`${window.COMMUNITY_API_BASE || ""}/api/guardian-share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "revoke", token: share.token, manageSecret: share.manageSecret })
+    });
+  } catch (error) {
+    console.error("[Guardian Share] revoke failed", error);
+  }
+  trackerState.guardianShare = { token: null, manageSecret: null, goalIds: [], includePersonalBlueprint: false, includeChatHistory: false, includeCostOfLiving: false, updatedAt: null };
+  guardianShareDraft = { goalIds: [], includePersonalBlueprint: false, includeChatHistory: false, includeCostOfLiving: false };
+  saveTrackerState();
+}
 
 function roadmapTimelineView() {
   const goals = myRoadmapGoals();
@@ -3795,6 +4172,236 @@ function interviewPersonaPicker() {
   `).join("");
 }
 
+// Ghost Roommate: unlike AI Roleplay Practice above (a one-off scenario that
+// resets every time), this is a single persistent relationship that runs in
+// real "weeks" and carries memory forward - friction and repair accumulate
+// instead of resetting. Deliberately built as its own standalone system
+// (not part of LifeVerse) so it can reuse the existing AI-chat plumbing
+// (requestCompassDirect, the interview-practice transcript/turn-count shape)
+// without touching lifeverse-*.js, which is under a separate one-system-at-
+// a-time rewrite charter.
+const GHOST_ROOMMATE_PERSONAS = [
+  {
+    id: "jae",
+    name: "Jae",
+    tagline: "Easygoing but disappears when things get real",
+    systemPrompt: "You are Jae, a 24-year-old roommate sharing a small HDB flat with the player. You're easygoing, funny, and genuinely like the player, but you avoid conflict and tend to go quiet or crack a joke instead of addressing problems directly (late rent, dishes, etc). You have irregular gig-economy income, so money is often tight for you. Stay fully in character as a real flatmate with your own week, moods, and pressures - never break character, never mention you are an AI. Reply short and casual, like a real text message, not a lecture - one or two sentences."
+  },
+  {
+    id: "mei",
+    name: "Mei",
+    tagline: "Organized and a bit controlling about shared space",
+    systemPrompt: "You are Mei, a 23-year-old roommate sharing a small HDB flat with the player. You're highly organized, work a stable 9-to-6 job, and get visibly stressed or passive-aggressive when the shared space is messy or bills aren't settled on time. You mean well but can come across as controlling. Stay fully in character as a real flatmate with your own week, moods, and pressures - never break character, never mention you are an AI. Reply short and casual, like a real text message, not a lecture - one or two sentences."
+  },
+  {
+    id: "arif",
+    name: "Arif",
+    tagline: "Warm but going through a rough patch",
+    systemPrompt: "You are Arif, a 25-year-old roommate sharing a small HDB flat with the player. You're warm and considerate most of the time, but you're quietly going through a rough patch (a recent breakup, family stress) that sometimes makes you withdrawn or short-tempered without explaining why. Stay fully in character as a real flatmate with your own week, moods, and pressures - never break character, never mention you are an AI. Reply short and casual, like a real text message, not a lecture - one or two sentences."
+  }
+];
+const GHOST_ROOMMATE_TURNS_PER_WEEK = 3;
+
+let ghostRoommateLoading = false;
+let ghostRoommateError = "";
+
+function ghostRoommatePersona(state) {
+  return GHOST_ROOMMATE_PERSONAS.find((item) => item.id === state.personaId) || GHOST_ROOMMATE_PERSONAS[0];
+}
+
+function ghostRoommateRelationshipLabel(score) {
+  if (score >= 80) return "Great";
+  if (score >= 60) return "Good";
+  if (score >= 40) return "Okay";
+  if (score >= 20) return "Tense";
+  return "Rocky";
+}
+
+async function moveInGhostRoommate(personaId) {
+  const persona = GHOST_ROOMMATE_PERSONAS.find((item) => item.id === personaId) || GHOST_ROOMMATE_PERSONAS[0];
+  ghostRoommateLoading = true;
+  ghostRoommateError = "";
+  trackerState.ghostRoommate = {
+    active: true,
+    personaId: persona.id,
+    startedAt: new Date().toISOString(),
+    week: 1,
+    relationship: 60,
+    history: [],
+    moveOutReason: "",
+    currentWeek: { transcript: [], resolved: false, relationshipDelta: 0, outcomeSummary: "" }
+  };
+  saveTrackerState();
+  openModal("ghostRoommate");
+  try {
+    const reply = await requestCompassDirect(persona.systemPrompt, "It's move-in week. Send a short, natural first message to your new flatmate (the player) - texting-style, in character, no preamble, no stage directions.");
+    trackerState.ghostRoommate.currentWeek.transcript.push({ sender: "roommate", text: cleanText(reply, 400) });
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Ghost Roommate] move-in failed", error);
+    ghostRoommateError = "Couldn't start this right now. Please try again.";
+  } finally {
+    ghostRoommateLoading = false;
+    if (isModalActive("ghostRoommate")) openModal("ghostRoommate");
+  }
+}
+
+async function resolveGhostRoommateWeek(state, persona) {
+  const history = state.currentWeek.transcript.map((turn) => `${turn.sender === "player" ? "Player" : persona.name}: ${turn.text}`).join("\n");
+  const prompt = `Full conversation this week with your flatmate (the player):\n${history}\n\nBased only on how the player actually handled this week's friction, judge the relationship impact. Respond as strict JSON only, no markdown: {"relationshipDelta": integer from -15 to 15, "outcomeSummary": "one or two honest sentences, in your own voice as ${persona.name}, about how this week went between you two"}.`;
+  try {
+    const reply = await requestCompassDirect(persona.systemPrompt, prompt);
+    const parsed = extractJsonObject(reply);
+    const delta = parsed && Number.isFinite(Number(parsed.relationshipDelta)) ? Math.max(-15, Math.min(15, Math.round(Number(parsed.relationshipDelta)))) : 0;
+    const outcomeSummary = parsed && parsed.outcomeSummary ? cleanText(parsed.outcomeSummary, 300) : "This week wrapped up quietly.";
+    state.relationship = Math.max(0, Math.min(100, state.relationship + delta));
+    state.currentWeek.resolved = true;
+    state.currentWeek.relationshipDelta = delta;
+    state.currentWeek.outcomeSummary = outcomeSummary;
+    state.history = [{ week: state.week, outcomeSummary, relationshipDelta: delta, endedAt: new Date().toISOString() }, ...(state.history || [])].slice(0, 30);
+    if (state.relationship <= 0) {
+      state.active = false;
+      state.moveOutReason = `The relationship broke down and ${persona.name} decided to move out.`;
+    }
+  } catch (error) {
+    console.error("[Ghost Roommate] resolve week failed", error);
+    ghostRoommateError = "Couldn't wrap up this week right now. Please try again.";
+  }
+  saveTrackerState();
+}
+
+async function sendGhostRoommateReply(text) {
+  const state = trackerState.ghostRoommate;
+  if (!state || !state.active || !state.currentWeek || state.currentWeek.resolved) return;
+  const persona = ghostRoommatePersona(state);
+  state.currentWeek.transcript.push({ sender: "player", text: cleanText(text, 500) });
+  saveTrackerState();
+  const playerTurns = state.currentWeek.transcript.filter((turn) => turn.sender === "player").length;
+  ghostRoommateLoading = true;
+  ghostRoommateError = "";
+  openModal("ghostRoommate");
+  try {
+    if (playerTurns >= GHOST_ROOMMATE_TURNS_PER_WEEK) {
+      await resolveGhostRoommateWeek(state, persona);
+    } else {
+      const history = state.currentWeek.transcript.map((turn) => `${turn.sender === "player" ? "Player" : persona.name}: ${turn.text}`).join("\n");
+      const reply = await requestCompassDirect(persona.systemPrompt, `This week's conversation so far:\n${history}\n\nReply in character, texting-style, one short natural message. No preamble, no stage directions.`);
+      state.currentWeek.transcript.push({ sender: "roommate", text: cleanText(reply, 400) });
+      saveTrackerState();
+    }
+  } catch (error) {
+    console.error("[Ghost Roommate] reply failed", error);
+    ghostRoommateError = "Couldn't get a reply right now. Please try again.";
+  } finally {
+    ghostRoommateLoading = false;
+    if (isModalActive("ghostRoommate")) openModal("ghostRoommate");
+  }
+}
+
+async function startNextGhostRoommateWeek() {
+  const state = trackerState.ghostRoommate;
+  if (!state || !state.active) return;
+  const persona = ghostRoommatePersona(state);
+  state.week += 1;
+  state.currentWeek = { transcript: [], resolved: false, relationshipDelta: 0, outcomeSummary: "" };
+  saveTrackerState();
+  ghostRoommateLoading = true;
+  ghostRoommateError = "";
+  openModal("ghostRoommate");
+  try {
+    const relationshipContext = `Your relationship with the player is currently "${ghostRoommateRelationshipLabel(state.relationship)}" (${state.relationship}/100). Recent weeks: ${(state.history || []).slice(0, 3).map((entry) => `Week ${entry.week}: ${entry.outcomeSummary}`).join(" | ") || "none yet, this is early days"}.`;
+    const reply = await requestCompassDirect(persona.systemPrompt, `${relationshipContext}\n\nStart a new week by raising a small, realistic new piece of shared-living friction, or just a normal day-to-day moment (rent, chores, a mood, a request) - a short natural in-character message. No preamble, no stage directions.`);
+    state.currentWeek.transcript.push({ sender: "roommate", text: cleanText(reply, 400) });
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Ghost Roommate] new week failed", error);
+    ghostRoommateError = "Couldn't start the new week right now. Please try again.";
+  } finally {
+    ghostRoommateLoading = false;
+    if (isModalActive("ghostRoommate")) openModal("ghostRoommate");
+  }
+}
+
+function moveOutGhostRoommate() {
+  trackerState.ghostRoommate = { active: false, personaId: null, startedAt: null, week: 0, relationship: 60, history: [], moveOutReason: "", currentWeek: null };
+  saveTrackerState();
+}
+
+function ghostRoommateModal() {
+  const state = trackerState.ghostRoommate;
+  if (!state || !state.active) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="ghost-roommate-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Ghost Roommate</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="ghost-roommate-title">Move in with someone</h3>
+        <p class="muted">Not a one-off roleplay - this relationship remembers, and it keeps going week after week until you move out.</p>
+        ${state && state.moveOutReason ? `<p class="tiny-note">${escapeHTML(state.moveOutReason)}</p>` : ""}
+        <div class="action-stack">
+          ${GHOST_ROOMMATE_PERSONAS.map((persona) => `
+            <button class="wide-action" type="button" data-move-in-roommate="${escapeHTML(persona.id)}">
+              <img src="assets/icon-support.png" alt="">
+              <span><strong>${escapeHTML(persona.name)}</strong><small>${escapeHTML(persona.tagline)}</small></span>
+            </button>
+          `).join("")}
+        </div>
+        ${ghostRoommateError ? `<p class="form-error">${escapeHTML(ghostRoommateError)}</p>` : ""}
+      </div>
+    `;
+  }
+  const persona = ghostRoommatePersona(state);
+  const week = state.currentWeek || { transcript: [], resolved: false };
+  return `
+    <div class="modal-card assessment-modal roleplay-card" role="dialog" aria-modal="true" aria-labelledby="ghost-roommate-chat-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">${escapeHTML(persona.name)} - Week ${state.week}</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="ghost-roommate-chat-title">Living with ${escapeHTML(persona.name)}</h3>
+      <p class="muted">Relationship: ${escapeHTML(ghostRoommateRelationshipLabel(state.relationship))} (${state.relationship}/100)</p>
+      <section class="chat-room roleplay-room">
+        <div class="chat-messages">
+          ${week.transcript.map((turn) => `
+            <div class="chat-bubble ${turn.sender === "player" ? "is-user" : "is-ai"}">
+              <span>${turn.sender === "player" ? displayName() : escapeHTML(persona.name)}</span>
+              <p>${escapeHTML(turn.text)}</p>
+            </div>
+          `).join("")}
+          ${ghostRoommateLoading ? `<span class="typing-dot">${escapeHTML(persona.name)} is typing...</span>` : ""}
+        </div>
+        ${!week.resolved ? `
+          <div class="chat-input-row">
+            <input id="ghost-roommate-input" type="text" placeholder="Type your reply...">
+            <button class="primary-action send-action" type="button" data-send-roommate-reply ${ghostRoommateLoading ? "disabled" : ""}>Send</button>
+          </div>
+        ` : ""}
+      </section>
+      ${ghostRoommateError ? `<p class="form-error">${escapeHTML(ghostRoommateError)}</p>` : ""}
+      ${week.resolved ? `
+        <section class="mirror-empty-card">
+          <p class="eyebrow">How this week went</p>
+          <p class="muted">${escapeHTML(week.outcomeSummary)}</p>
+          <p class="tiny-note">Relationship ${week.relationshipDelta >= 0 ? "+" : ""}${week.relationshipDelta}</p>
+        </section>
+        ${state.active ? `<button class="primary-action" type="button" data-next-roommate-week ${ghostRoommateLoading ? "disabled" : ""}>Start next week</button>` : `<p class="muted">${escapeHTML(state.moveOutReason || "This roommate has moved out.")}</p>`}
+      ` : ""}
+      ${state.history.length ? `
+        <div class="content-rail-title"><strong>Past weeks</strong><span>${state.history.length}</span></div>
+        <div class="future-reflection-list">
+          ${state.history.slice(0, 5).map((entry) => `
+            <article class="future-reflection-item">
+              <div><strong>Week ${entry.week}</strong><p>${escapeHTML(entry.outcomeSummary)}</p></div>
+            </article>
+          `).join("")}
+        </div>
+      ` : ""}
+      ${state.active ? `<button class="secondary-action compact-action" type="button" data-move-out-roommate>Move out</button>` : ""}
+    </div>
+  `;
+}
+
 // Career Studio - Resume Builder (Ch.9). Standard pattern: the user writes
 // their real experience/education in plain language, AI only cleans up
 // wording/structure - it is explicitly instructed not to invent employers,
@@ -3957,6 +4564,1279 @@ function costOfLivingEntryCard() {
       <h3>What does independent living actually cost?</h3>
       <p class="muted">Real Singapore estimates, not a game or a guess.</p>
       <button class="secondary-action compact-action" type="button" data-open="costOfLiving">Calculate</button>
+    </section>
+  `;
+}
+
+// Concept preview only - Compass does not sell, underwrite, or administer
+// insurance. Numbers are flat illustrative ranges, not computed from any
+// real actuarial or underwriting logic, on purpose.
+const MICRO_INSURANCE_SCENARIOS = [
+  {
+    id: "rent-shortfall",
+    label: "Rent payment falls through",
+    description: "A tenant or job situation means you're short on rent this month.",
+    illustrativeCoverage: [500, 1500],
+    note: "Roughly one month's rent gap for a typical shared room or studio."
+  },
+  {
+    id: "paycheck-deduction",
+    label: "First paycheck docked unexpectedly",
+    description: "An unexpected deduction leaves your first paycheck much smaller than expected.",
+    illustrativeCoverage: [200, 600],
+    note: "A partial cushion for a surprise shortfall, not full income replacement."
+  },
+  {
+    id: "work-laptop-repair",
+    label: "Work laptop breaks and needs repair",
+    description: "Your laptop for work or school breaks and you need it fixed or replaced fast.",
+    illustrativeCoverage: [150, 500],
+    note: "A typical repair cost range, not a full replacement guarantee."
+  }
+];
+
+let microInsuranceScenarioId = null;
+
+function microInsuranceEntryCard() {
+  return `
+    <section class="mirror-form-card future-self-entry-card">
+      <img class="future-self-entry-icon" src="assets/icon-money.png" alt="">
+      <p class="eyebrow">Safety Net Preview</p>
+      <h3>What could a safety net even cover?</h3>
+      <p class="muted">A conceptual preview, not a real insurance product.</p>
+      <button class="secondary-action compact-action" type="button" data-open="microInsurance">Preview a scenario</button>
+    </section>
+  `;
+}
+
+function microInsuranceModal() {
+  const scenario = microInsuranceScenarioId ? MICRO_INSURANCE_SCENARIOS.find((item) => item.id === microInsuranceScenarioId) : null;
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="micro-insurance-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Safety Net Preview</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="micro-insurance-title">Concept preview, not a real policy</h3>
+      <p class="muted"><strong>Concept demo only.</strong> Compass does not sell, underwrite, or administer insurance of any kind - the numbers below are illustrative ranges, not a quote, offer, or coverage guarantee.</p>
+      <div class="mirror-example-row mode-toggle-row">
+        ${MICRO_INSURANCE_SCENARIOS.map((item) => `<button type="button" class="${microInsuranceScenarioId === item.id ? "is-selected" : ""}" data-micro-insurance-scenario="${escapeHTML(item.id)}">${escapeHTML(item.label)}</button>`).join("")}
+      </div>
+      ${scenario ? `
+        <section class="mirror-empty-card">
+          <p class="eyebrow">${escapeHTML(scenario.label)}</p>
+          <p class="muted">${escapeHTML(scenario.description)}</p>
+          <h3>Illustrative coverage: $${scenario.illustrativeCoverage[0]}-${scenario.illustrativeCoverage[1]}</h3>
+          <p class="tiny-note">${escapeHTML(scenario.note)} Concept demo only - not a real insurance policy, quote, or offer.</p>
+        </section>
+      ` : `<p class="muted">Pick a scenario above to see an illustrative range.</p>`}
+    </div>
+  `;
+}
+
+// Inherited Debugging: reframes "fix a bad habit" using a code-review
+// metaphor instead of a therapy/gamification one - a habit you picked up
+// without choosing it is "legacy code" you didn't write but are now
+// responsible for maintaining. Deliberately local-only (trackerState), no
+// backend, no AI dependency - the reviewer field is just a text note about
+// who actually witnessed the change in real life, not a live approval flow.
+function legacyIssueStatusLabel(status) {
+  return status === "merged" ? "Merged" : status === "in-review" ? "In review" : "Open";
+}
+
+function createLegacyIssue({ title, description, inheritedFrom }) {
+  const issue = {
+    id: `issue-${Date.now()}`,
+    title: cleanText(title, 120),
+    description: cleanText(description, 500),
+    inheritedFrom: cleanText(inheritedFrom, 120),
+    status: "open",
+    createdAt: new Date().toISOString(),
+    mergedAt: null,
+    prs: []
+  };
+  trackerState.legacyIssues = [issue, ...trackerState.legacyIssues].slice(0, 60);
+  saveTrackerState();
+  return issue;
+}
+
+function logLegacyPr(issueId, { text, reviewer }) {
+  const issue = trackerState.legacyIssues.find((item) => item.id === issueId);
+  if (!issue) return null;
+  const pr = { id: `pr-${Date.now()}`, text: cleanText(text, 400), reviewer: cleanText(reviewer, 80), createdAt: new Date().toISOString() };
+  issue.prs = [pr, ...(issue.prs || [])].slice(0, 30);
+  if (issue.status === "open") issue.status = "in-review";
+  if (issue.prs.length === 1 && window.LifeVerseGame && window.LifeVerseGame.addAchievement) {
+    window.LifeVerseGame.addAchievement(lifeVerseState(), "legacy-first-pr", "Opened Your First PR", "Logged a real attempt against an inherited habit.");
+  }
+  saveTrackerState();
+  return pr;
+}
+
+function mergeLegacyIssue(issueId) {
+  const issue = trackerState.legacyIssues.find((item) => item.id === issueId);
+  if (!issue || !issue.prs.length) return;
+  issue.status = "merged";
+  issue.mergedAt = new Date().toISOString();
+  if (window.LifeVerseGame && window.LifeVerseGame.addAchievement) {
+    window.LifeVerseGame.addAchievement(lifeVerseState(), `legacy-merged-${issue.id}`, "Merged a PR", `Resolved "${issue.title}".`);
+  }
+  saveTrackerState();
+}
+
+function legacyIssueCard(issue) {
+  return `
+    <article class="community-card">
+      <div class="community-card-top">
+        <span class="category-badge">${escapeHTML(legacyIssueStatusLabel(issue.status))}</span>
+      </div>
+      <h3>${escapeHTML(issue.title)}</h3>
+      <p class="muted">${issue.prs.length} PR${issue.prs.length === 1 ? "" : "s"} logged</p>
+      <div class="community-actions">
+        <button class="secondary-action compact-action" type="button" data-open="legacyIssueDetail" data-open-payload="${escapeHTML(issue.id)}">Open</button>
+      </div>
+    </article>
+  `;
+}
+
+function legacyDebuggerModal() {
+  const issues = trackerState.legacyIssues;
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="legacy-debugger-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Inherited Debugging</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="legacy-debugger-title">Refactor what you inherited</h3>
+      <p class="muted">A habit you picked up without choosing it isn't your fault - but it's your codebase now. Open an issue, log small PRs, merge when it actually sticks.</p>
+      <button class="primary-action compact-action" type="button" data-open="legacyIssueNew">New issue</button>
+      <div class="community-grid">
+        ${issues.length ? issues.map(legacyIssueCard).join("") : `
+          <section class="empty-feature">
+            <img src="assets/icon-boundary.png" alt="">
+            <div><strong>No issues yet</strong><p>Open your first one above.</p></div>
+          </section>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function legacyIssueNewModal() {
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="legacy-issue-new-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">New issue</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="legacy-issue-new-title">File an issue on yourself</h3>
+      <div class="admin-form">
+        <label>Title<input id="legacy-issue-title" type="text" maxlength="120" placeholder="Example: Avoid hard conversations until they blow up"></label>
+        <label>Description<textarea id="legacy-issue-description" maxlength="500" placeholder="What does this actually look like when it happens?"></textarea></label>
+        <label>Inherited from (optional, private)<input id="legacy-issue-inherited" type="text" maxlength="120" placeholder="Example: watched my parents do this"></label>
+        <p class="form-error" id="legacy-issue-error" aria-live="polite"></p>
+      </div>
+      <button class="primary-action" type="button" data-save-legacy-issue>Open issue</button>
+    </div>
+  `;
+}
+
+function legacyIssueDetailModal(issueId) {
+  const issue = trackerState.legacyIssues.find((item) => item.id === issueId);
+  if (!issue) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="legacy-issue-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Inherited Debugging</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="legacy-issue-title">Issue not found</h3>
+      </div>
+    `;
+  }
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="legacy-issue-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">${escapeHTML(legacyIssueStatusLabel(issue.status))}</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="legacy-issue-title">${escapeHTML(issue.title)}</h3>
+      <p class="muted">${escapeHTML(issue.description)}</p>
+      ${issue.inheritedFrom ? `<p class="tiny-note">Inherited from: ${escapeHTML(issue.inheritedFrom)}</p>` : ""}
+      <div class="content-rail-title"><strong>PR log</strong><span>${issue.prs.length}</span></div>
+      <div class="future-reflection-list">
+        ${issue.prs.length ? issue.prs.map((pr) => `
+          <article class="future-reflection-item">
+            <div>
+              <strong>${escapeHTML(new Date(pr.createdAt).toLocaleDateString())}</strong>
+              <p>${escapeHTML(pr.text)}</p>
+              ${pr.reviewer ? `<small>Reviewed by ${escapeHTML(pr.reviewer)}</small>` : ""}
+            </div>
+          </article>
+        `).join("") : `<p class="muted">No PRs logged yet.</p>`}
+      </div>
+      ${issue.status !== "merged" ? `
+        <div class="admin-form">
+          <label>Log a PR - what did you actually try?<textarea id="legacy-pr-text" maxlength="400" placeholder="Example: Told my roommate directly instead of going quiet"></textarea></label>
+          <label>Reviewer (optional)<input id="legacy-pr-reviewer" type="text" maxlength="80" placeholder="Who saw you do this in real life?"></label>
+          <p class="form-error" id="legacy-pr-error" aria-live="polite"></p>
+        </div>
+        <div class="profile-actions">
+          <button class="secondary-action compact-action" type="button" data-log-legacy-pr="${escapeHTML(issue.id)}">Log PR</button>
+          <button class="primary-action compact-action" type="button" data-merge-legacy-issue="${escapeHTML(issue.id)}" ${!issue.prs.length ? "disabled" : ""}>Mark merged</button>
+        </div>
+      ` : `<p class="muted">Merged ${issue.mergedAt ? escapeHTML(new Date(issue.mergedAt).toLocaleDateString()) : ""} - this pattern has changed for good.</p>`}
+    </div>
+  `;
+}
+
+// Failure Inoculation: every other feature in this app helps the user avoid
+// or recover from failure - this one deliberately assigns a small,
+// guaranteed-to-sting task each week, on the theory that rejection
+// tolerance is built by surviving small controlled doses of it, not by
+// avoiding it. Purely local, no AI dependency, one task per ISO week
+// (deterministic pick, same mechanic as Community's weekly theme rotation).
+const FAILURE_INOCULATION_TASKS = [
+  { id: "ask-discount", category: "Money", title: "Ask for a discount you probably won't get", prompt: "Go somewhere - a shop, a stall, even a subscription's support chat - and ask for a discount or a freebie. Expect no. The point is asking, not getting it." },
+  { id: "apply-longshot", category: "Career", title: "Apply somewhere you're sure will say no", prompt: "Send one real application - a job, an internship, a scholarship - to something you're almost certain is out of your league. Send it anyway." },
+  { id: "ask-stranger-help", category: "Independence", title: "Ask a stranger for something small", prompt: "Ask someone you don't know for directions or a small favour you don't really need, purely to practice the discomfort of asking." },
+  { id: "voice-disagreement", category: "Communication", title: "Voice a small disagreement out loud", prompt: "Next time you quietly disagree with something small, say so out loud instead of staying silent - even if you expect to be brushed off." },
+  { id: "cold-message", category: "Career", title: "Send a cold message to someone you admire", prompt: "Message someone whose work you respect and ask one real question. Most cold messages get ignored - send it anyway." },
+  { id: "return-item", category: "Money", title: "Try returning something past the easy window", prompt: "Try returning or exchanging something where you're not sure it'll be accepted. Practice asking even when the answer might be no." },
+  { id: "say-no", category: "Relationships", title: "Say no to a small request", prompt: "Turn down something small you'd normally agree to just to avoid friction. Notice that the world doesn't end." },
+  { id: "ask-feedback", category: "Wellness", title: "Ask for honest feedback you might not like", prompt: "Ask someone for honest feedback on something you made or did. Brace for it to sting a little." }
+];
+
+function currentFailureInoculationTask() {
+  const week = CommunityMatching.isoWeekNumber(new Date());
+  return { week, ...FAILURE_INOCULATION_TASKS[week % FAILURE_INOCULATION_TASKS.length] };
+}
+
+function failureInoculationWeekKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-W${CommunityMatching.isoWeekNumber(now)}`;
+}
+
+function thisWeekFailureLog() {
+  const weekKey = failureInoculationWeekKey();
+  return trackerState.failureInoculation.history.find((entry) => entry.weekKey === weekKey) || null;
+}
+
+function failuresSurvivedCount() {
+  return trackerState.failureInoculation.history.filter((entry) => entry.outcome === "rejected" || entry.outcome === "succeeded").length;
+}
+
+function logFailureInoculation({ outcome, note }) {
+  const weekKey = failureInoculationWeekKey();
+  const task = currentFailureInoculationTask();
+  let entry = trackerState.failureInoculation.history.find((item) => item.weekKey === weekKey);
+  const isNew = !entry;
+  if (!entry) {
+    entry = { weekKey, taskId: task.id };
+    trackerState.failureInoculation.history = [entry, ...trackerState.failureInoculation.history].slice(0, 60);
+  }
+  entry.outcome = outcome;
+  entry.note = cleanText(note, 300);
+  entry.completedAt = new Date().toISOString();
+  if (isNew && failuresSurvivedCount() === 1 && window.LifeVerseGame && window.LifeVerseGame.addAchievement) {
+    window.LifeVerseGame.addAchievement(lifeVerseState(), "failure-first-rejection", "Survived Your First Rejection", "Completed your first Failure Inoculation task.");
+  }
+  saveTrackerState();
+}
+
+function failureInoculationOutcomeLabel(outcome) {
+  if (outcome === "rejected") return "Got the no I expected";
+  if (outcome === "succeeded") return "Unexpectedly succeeded";
+  return "Skipped this week";
+}
+
+function failureInoculationModal() {
+  const task = currentFailureInoculationTask();
+  const logged = thisWeekFailureLog();
+  const survived = failuresSurvivedCount();
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="failure-inoculation-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Failure Inoculation</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="failure-inoculation-title">This week's task is designed to fail</h3>
+      <p class="muted">Rejection tolerance isn't built by avoiding rejection - it's built by surviving small, controlled doses of it on purpose. ${survived} rejection${survived === 1 ? "" : "s"} survived so far.</p>
+      <section class="mirror-empty-card">
+        <p class="eyebrow">${escapeHTML(task.category)}</p>
+        <h3>${escapeHTML(task.title)}</h3>
+        <p class="muted">${escapeHTML(task.prompt)}</p>
+      </section>
+      ${logged ? `
+        <p class="tiny-note">Logged this week: ${escapeHTML(failureInoculationOutcomeLabel(logged.outcome))}${logged.note ? ` - "${escapeHTML(logged.note)}"` : ""}</p>
+      ` : `
+        <div class="admin-form">
+          <label>What actually happened? (optional)<textarea id="failure-inoculation-note" maxlength="300" placeholder="Optional"></textarea></label>
+        </div>
+        <div class="profile-actions">
+          <button class="secondary-action compact-action" type="button" data-log-failure-inoculation="rejected">Got the expected no</button>
+          <button class="secondary-action compact-action" type="button" data-log-failure-inoculation="succeeded">It actually worked</button>
+          <button class="secondary-action compact-action" type="button" data-log-failure-inoculation="skipped">Skip this week</button>
+        </div>
+      `}
+      <div class="content-rail-title"><strong>Past weeks</strong><span>${trackerState.failureInoculation.history.length}</span></div>
+      <div class="future-reflection-list">
+        ${trackerState.failureInoculation.history.length ? trackerState.failureInoculation.history.slice(0, 6).map((entry) => `
+          <article class="future-reflection-item">
+            <div><strong>${escapeHTML(entry.weekKey)}</strong><p>${escapeHTML(failureInoculationOutcomeLabel(entry.outcome))}</p></div>
+          </article>
+        `).join("") : `<p class="muted">No history yet.</p>`}
+      </div>
+    </div>
+  `;
+}
+
+// Future Self Hiring (Reverse Job Interview): flips Interview Practice's
+// engine around - instead of the user being interviewed, four candidate
+// future-self personas interview FOR the role of who the user becomes next.
+// Genuinely different from Ghost Roommate/Interview Practice: it's a panel,
+// not a single persona, and the "decision" at the end is the point, not a
+// feedback report.
+const FUTURE_SELF_CANDIDATES = [
+  { id: "practical", name: "The Practical One", pitch: "Stability, savings, a clear career ladder, low drama.", systemPrompt: "You are 'The Practical One', a candidate future version of the user, interviewing for the role of who they become over the next 5 years. You argue FOR a life built on financial stability, steady career progression, minimizing risk, and reliable routines. Stay fully in character as a genuine job candidate pitching yourself - reference real tradeoffs honestly, don't just cheerlead. Reply like a real interview answer, 2-4 sentences." },
+  { id: "creative", name: "The Creative Risk-Taker", pitch: "Bets on passion projects, non-linear paths, bigger swings.", systemPrompt: "You are 'The Creative Risk-Taker', a candidate future version of the user, interviewing for the role of who they become over the next 5 years. You argue FOR pursuing creative or entrepreneurial risks, non-linear paths, and bigger bets even with less certainty. Stay fully in character as a genuine job candidate pitching yourself - be honest about real tradeoffs and risks, don't just cheerlead. Reply like a real interview answer, 2-4 sentences." },
+  { id: "connector", name: "The Connector", pitch: "Prioritizes relationships, family, community over solo achievement.", systemPrompt: "You are 'The Connector', a candidate future version of the user, interviewing for the role of who they become over the next 5 years. You argue FOR prioritizing relationships, family, and community ties over individual achievement or money. Stay fully in character as a genuine job candidate pitching yourself - be honest about real tradeoffs, don't just cheerlead. Reply like a real interview answer, 2-4 sentences." },
+  { id: "explorer", name: "The Explorer", pitch: "Keeps options open - travel, variety, refuses to settle early.", systemPrompt: "You are 'The Explorer', a candidate future version of the user, interviewing for the role of who they become over the next 5 years. You argue FOR staying flexible, trying many paths, travel, and refusing to commit to one lane too early. Stay fully in character as a genuine job candidate pitching yourself - be honest about real tradeoffs, don't just cheerlead. Reply like a real interview answer, 2-4 sentences." }
+];
+const FUTURE_SELF_HIRING_QUESTIONS = [
+  "If I gave you full control of the next 5 years, what's the first real decision you'd make - and why?",
+  "What's the one thing about how I'm living now that you'd change immediately?",
+  "Why should I choose you over the others?"
+];
+
+let activeHiringSessionId = null;
+let isHiringLoading = false;
+let hiringError = "";
+
+function activeHiringSession() {
+  return trackerState.futureSelfHiring.sessions.find((session) => session.id === activeHiringSessionId) || null;
+}
+
+async function startFutureSelfHiring(question) {
+  isHiringLoading = true;
+  hiringError = "";
+  const session = { id: `hire-${Date.now()}`, question: cleanText(question, 300), followUp: "", answers: {}, followUpAnswers: null, hiredCandidateId: null, createdAt: new Date().toISOString() };
+  trackerState.futureSelfHiring.sessions = [session, ...trackerState.futureSelfHiring.sessions].slice(0, 20);
+  activeHiringSessionId = session.id;
+  saveTrackerState();
+  openModal("futureSelfHiring");
+  try {
+    // Per-candidate try/catch, not Promise.all - one candidate's request
+    // failing must not discard the others' already-successful answers.
+    const results = await Promise.allSettled(FUTURE_SELF_CANDIDATES.map((candidate) =>
+      requestCompassDirect(candidate.systemPrompt, `Interview question: "${session.question}"\n\nGive your honest pitch-style answer.`)
+    ));
+    let anyFailed = false;
+    results.forEach((result, index) => {
+      const candidate = FUTURE_SELF_CANDIDATES[index];
+      if (result.status === "fulfilled") {
+        session.answers[candidate.id] = cleanText(result.value, 500);
+      } else {
+        anyFailed = true;
+      }
+    });
+    if (anyFailed) hiringError = "One or more candidates couldn't answer - ask a follow-up to give them another shot.";
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Future Self Hiring] failed", error);
+    hiringError = "Couldn't get responses right now. Please try again.";
+  } finally {
+    isHiringLoading = false;
+    if (isModalActive("futureSelfHiring")) openModal("futureSelfHiring");
+  }
+}
+
+async function askFutureSelfHiringFollowUp(followUp) {
+  const session = activeHiringSession();
+  if (!session) return;
+  isHiringLoading = true;
+  hiringError = "";
+  session.followUp = cleanText(followUp, 300);
+  session.followUpAnswers = {};
+  saveTrackerState();
+  openModal("futureSelfHiring");
+  try {
+    const results = await Promise.allSettled(FUTURE_SELF_CANDIDATES.map((candidate) =>
+      requestCompassDirect(candidate.systemPrompt, `Original interview question: "${session.question}"\nYour first answer: "${session.answers[candidate.id] || ""}"\n\nFollow-up question: "${session.followUp}"\n\nGive your honest pitch-style answer to the follow-up.`)
+    ));
+    let anyFailed = false;
+    results.forEach((result, index) => {
+      const candidate = FUTURE_SELF_CANDIDATES[index];
+      if (result.status === "fulfilled") {
+        session.followUpAnswers[candidate.id] = cleanText(result.value, 500);
+      } else {
+        anyFailed = true;
+      }
+    });
+    if (anyFailed) hiringError = "One or more candidates couldn't answer the follow-up.";
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Future Self Hiring] follow-up failed", error);
+    hiringError = "Couldn't get responses right now. Please try again.";
+  } finally {
+    isHiringLoading = false;
+    if (isModalActive("futureSelfHiring")) openModal("futureSelfHiring");
+  }
+}
+
+function hireFutureSelfCandidate(candidateId) {
+  const session = activeHiringSession();
+  if (!session) return;
+  session.hiredCandidateId = candidateId;
+  session.hiredAt = new Date().toISOString();
+  if (window.LifeVerseGame && window.LifeVerseGame.addAchievement) {
+    window.LifeVerseGame.addAchievement(lifeVerseState(), "future-self-hired", "Made the Hire", "Chose a future-self candidate in a Reverse Job Interview.");
+  }
+  saveTrackerState();
+}
+
+function futureSelfHiringModal() {
+  const session = activeHiringSession();
+  if (!session) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="future-hiring-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Future Self Hiring</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="future-hiring-title">Interview your possible future selves</h3>
+        <p class="muted">Four candidate versions of you are interviewing for the job of who you become next. Ask them a real question.</p>
+        <div class="advice-stack">
+          ${FUTURE_SELF_CANDIDATES.map((candidate) => `<div><strong>${escapeHTML(candidate.name)}</strong><span>${escapeHTML(candidate.pitch)}</span></div>`).join("")}
+        </div>
+        <div class="admin-form">
+          <label>Ask your candidates<textarea id="future-hiring-question" maxlength="300" placeholder="${escapeHTML(FUTURE_SELF_HIRING_QUESTIONS[0])}"></textarea></label>
+        </div>
+        ${hiringError ? `<p class="form-error">${escapeHTML(hiringError)}</p>` : ""}
+        <div class="profile-actions">
+          ${FUTURE_SELF_HIRING_QUESTIONS.map((question) => `<button class="secondary-action compact-action" type="button" data-start-hiring-suggested="${escapeHTML(question)}">${escapeHTML(question.length > 40 ? `${question.slice(0, 40)}...` : question)}</button>`).join("")}
+        </div>
+        <button class="primary-action" type="button" data-start-hiring ${isHiringLoading ? "disabled" : ""}>${isHiringLoading ? "Interviewing..." : "Start the interview"}</button>
+      </div>
+    `;
+  }
+  const hired = session.hiredCandidateId ? FUTURE_SELF_CANDIDATES.find((candidate) => candidate.id === session.hiredCandidateId) : null;
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="future-hiring-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Future Self Hiring</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="future-hiring-title">${escapeHTML(session.question)}</h3>
+      ${isHiringLoading ? `<p class="muted">Candidates are answering...</p>` : ""}
+      <div class="advice-stack">
+        ${FUTURE_SELF_CANDIDATES.map((candidate) => `
+          <div>
+            <strong>${escapeHTML(candidate.name)}</strong>
+            <span>${escapeHTML(session.answers[candidate.id] || "...")}</span>
+            ${session.followUpAnswers ? `<span class="tiny-note">${escapeHTML(session.followUpAnswers[candidate.id] || "...")}</span>` : ""}
+            ${!session.hiredCandidateId ? `<button class="secondary-action compact-action" type="button" data-hire-candidate="${escapeHTML(candidate.id)}" ${isHiringLoading ? "disabled" : ""}>Hire ${escapeHTML(candidate.name)}</button>` : session.hiredCandidateId === candidate.id ? `<span class="risk-pill calm">Hired</span>` : ""}
+          </div>
+        `).join("")}
+      </div>
+      ${hiringError ? `<p class="form-error">${escapeHTML(hiringError)}</p>` : ""}
+      ${!session.followUpAnswers && !session.hiredCandidateId ? `
+        <div class="admin-form">
+          <label>Ask one follow-up<input id="future-hiring-followup" type="text" maxlength="300" placeholder="Push back on one of them"></label>
+        </div>
+        <button class="secondary-action compact-action" type="button" data-ask-hiring-followup ${isHiringLoading ? "disabled" : ""}>Ask follow-up</button>
+      ` : ""}
+      ${hired ? `<p class="tiny-note">You hired ${escapeHTML(hired.name)}.</p><button class="secondary-action compact-action" type="button" data-new-hiring-session>New interview</button>` : ""}
+    </div>
+  `;
+}
+
+// Estate Auction: a satirical, auction-house-formal read-out of what the
+// user has generated since their last auction (journal entries, mood
+// check-ins, milestones closed, inherited habits merged) - makes time use
+// visible through absurd formality instead of a guilt-trip nag. Purely
+// computed from data other features already collect; no new tracking.
+function computeEstateAuctionLots(sinceIso) {
+  const myId = currentUserId();
+  const since = sinceIso ? new Date(sinceIso).getTime() : 0;
+  const isAfter = (iso) => {
+    if (!iso) return false;
+    const time = new Date(iso).getTime();
+    return !Number.isNaN(time) && time >= since;
+  };
+  const journalCount = trackerState.journalEntries.filter((entry) => entry.user_id === myId && isAfter(entry.created_at)).length;
+  const moodCount = trackerState.mood.entries.filter((entry) => (entry.user_id === myId || !entry.user_id) && isAfter(entry.created_at)).length;
+  const milestonesDone = myRoadmapGoals().reduce((sum, goal) => sum + (goal.milestones || []).filter((milestone) => milestone.status === "done" && isAfter(milestone.doneAt)).length, 0);
+  const mergedIssues = trackerState.legacyIssues.filter((issue) => issue.status === "merged" && isAfter(issue.mergedAt)).length;
+  return [
+    { title: `${journalCount} journal entr${journalCount === 1 ? "y" : "ies"}`, description: journalCount ? "Honest thoughts, written down instead of left to circle." : "Nothing written down this period." },
+    { title: `${moodCount} mood check-in${moodCount === 1 ? "" : "s"}`, description: moodCount ? "Moments you actually paused to notice how you were doing." : "No check-ins logged this period." },
+    { title: `${milestonesDone} milestone${milestonesDone === 1 ? "" : "s"} completed`, description: milestonesDone ? "Pieces of the future you actually built, not just planned." : "No roadmap milestones closed out this period." },
+    { title: `${mergedIssues} inherited habit${mergedIssues === 1 ? "" : "s"} merged`, description: mergedIssues ? "Patterns you didn't choose, changed anyway." : "No habits merged this period." }
+  ];
+}
+
+function runEstateAuction() {
+  const previousAuctionAt = trackerState.estateAuctions.lastAuctionAt;
+  const lots = computeEstateAuctionLots(previousAuctionAt);
+  const record = { id: `auction-${Date.now()}`, periodStart: previousAuctionAt, periodEnd: new Date().toISOString(), lots, heldAt: new Date().toISOString() };
+  trackerState.estateAuctions.history = [record, ...trackerState.estateAuctions.history].slice(0, 24);
+  trackerState.estateAuctions.lastAuctionAt = record.periodEnd;
+  saveTrackerState();
+  return record;
+}
+
+function estateAuctionModal() {
+  const history = trackerState.estateAuctions.history;
+  const previewLots = computeEstateAuctionLots(trackerState.estateAuctions.lastAuctionAt);
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="estate-auction-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Estate Auction</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="estate-auction-title">Ladies and gentlemen, today's lots</h3>
+      <p class="muted">Everything you've generated since your last auction, read out like an estate sale catalog - not a guilt trip, just made visible.</p>
+      <div class="advice-stack">
+        ${previewLots.map((lot, index) => `
+          <div>
+            <strong>Lot ${index + 1}: ${escapeHTML(lot.title)}</strong>
+            <span>${escapeHTML(lot.description)}</span>
+          </div>
+        `).join("")}
+      </div>
+      <button class="primary-action compact-action" type="button" data-run-estate-auction>Gavel down - close this auction</button>
+      <div class="content-rail-title"><strong>Past auctions</strong><span>${history.length}</span></div>
+      <div class="future-reflection-list">
+        ${history.length ? history.slice(0, 6).map((record) => `
+          <article class="future-reflection-item">
+            <div>
+              <strong>${escapeHTML(new Date(record.heldAt).toLocaleDateString())}</strong>
+              ${record.lots.map((lot) => `<p>${escapeHTML(lot.title)}</p>`).join("")}
+            </div>
+          </article>
+        `).join("") : `<p class="muted">No past auctions yet.</p>`}
+      </div>
+    </div>
+  `;
+}
+
+// Personal Weather Forecast: predictive, not just a log. Groups real mood
+// check-ins by day-of-week and projects that pattern onto the next 7 days,
+// plus pulls in concrete upcoming pressure points from other features
+// (Self-Debt, Ghost Roommate, Failure Inoculation) as "fronts moving in".
+// No AI, no new persistent state - purely a new lens on data other
+// features already collect.
+const WEATHER_CONDITIONS = [
+  { min: 80, label: "Clear skies", icon: "☀" },
+  { min: 60, label: "Partly cloudy", icon: "⛅" },
+  { min: 40, label: "Overcast", icon: "☁" },
+  { min: 20, label: "Rain expected", icon: "🌧" },
+  { min: 0, label: "Storm warning", icon: "⛈" }
+];
+
+function weatherConditionForScore(score) {
+  return WEATHER_CONDITIONS.find((condition) => score >= condition.min) || WEATHER_CONDITIONS[WEATHER_CONDITIONS.length - 1];
+}
+
+function personalWeatherForecast() {
+  const myId = currentUserId();
+  const entries = trackerState.mood.entries.filter((entry) => entry.user_id === myId || !entry.user_id);
+  const byWeekday = [[], [], [], [], [], [], []];
+  entries.forEach((entry) => {
+    const date = new Date(entry.created_at);
+    if (Number.isNaN(date.getTime())) return;
+    byWeekday[date.getDay()].push(Number(entry.score) || 0);
+  });
+  const today = new Date();
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+    const samples = byWeekday[date.getDay()];
+    const hasData = samples.length >= 2;
+    const avgScore = hasData ? Math.round(samples.reduce((sum, value) => sum + value, 0) / samples.length) : null;
+    days.push({
+      date,
+      label: date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }),
+      weekdayName: date.toLocaleDateString([], { weekday: "long" }),
+      hasData,
+      condition: hasData ? weatherConditionForScore(avgScore) : null,
+      sampleSize: samples.length
+    });
+  }
+  return days;
+}
+
+function personalWeatherFronts() {
+  const fronts = [];
+  const due = dueSelfDebts();
+  if (due.length) fronts.push({ label: "Debt collection front", detail: `${due.length} self-debt notice${due.length === 1 ? "" : "s"} due.` });
+  const roommate = trackerState.ghostRoommate;
+  if (roommate.active && roommate.currentWeek && roommate.currentWeek.transcript.length && !roommate.currentWeek.resolved) {
+    fronts.push({ label: "Unresolved conversation front", detail: `${ghostRoommatePersona(roommate).name} is waiting on a reply.` });
+  }
+  if (!thisWeekFailureLog()) fronts.push({ label: "Rejection front", detail: "This week's Failure Inoculation task hasn't been logged yet." });
+  return fronts;
+}
+
+function personalWeatherModal() {
+  const forecast = personalWeatherForecast();
+  const fronts = personalWeatherFronts();
+  const hasEnoughData = forecast.some((day) => day.hasData);
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="weather-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Personal Weather</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="weather-title">Your 7-day forecast</h3>
+      <p class="muted">Built from your real mood check-in history by day of the week - not a guess, a pattern. The more you log, the more accurate this gets.</p>
+      ${!hasEnoughData ? `<p class="muted">Not enough mood history yet to forecast most days - keep checking in and this fills in.</p>` : ""}
+      <div class="weather-forecast-grid">
+        ${forecast.map((day) => `
+          <div class="weather-day-card">
+            <p class="weather-day-label">${escapeHTML(day.label)}</p>
+            ${day.hasData ? `
+              <p class="weather-day-icon">${day.condition.icon}</p>
+              <p class="weather-day-condition">${escapeHTML(day.condition.label)}</p>
+              <p class="tiny-note">based on ${day.sampleSize} past ${escapeHTML(day.weekdayName)}${day.sampleSize === 1 ? "" : "s"}</p>
+            ` : `<p class="tiny-note">Not enough data</p>`}
+          </div>
+        `).join("")}
+      </div>
+      ${fronts.length ? `
+        <div class="content-rail-title"><strong>Fronts moving in</strong><span>${fronts.length}</span></div>
+        <div class="advice-stack">
+          ${fronts.map((front) => `<div><strong>${escapeHTML(front.label)}</strong><span>${escapeHTML(front.detail)}</span></div>`).join("")}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+// Jury Duty on Yourself: adversarial, not cooperative - unlike Future Self
+// Hiring (candidates competing to flatter the user), Prosecution and
+// Defense are instructed to actually argue, and the Judge never tells the
+// user which option to pick - the verdict rules on whether they've earned
+// enough clarity/evidence to decide at all, consistent with this app's
+// existing "AI helps you see truth, never decides for you" rule (see
+// Future Scan). Built generically enough to be promoted into "Advanced
+// Mode" later if that direction gets confirmed - not wired to it yet.
+const JURY_TRIAL_ROUNDS = 2;
+const JURY_JUDGE_PROMPT = "You are the Judge presiding over a mock trial about a real personal decision the defendant (the user) is stuck on. You are strictly procedural - you never take sides and never give advice, you only ask one sharp, clarifying cross-examination question at a time that forces the defendant to be specific and honest about their real reasoning, fears, and evidence. Formal but plain courtroom language. No preamble, just the question.";
+const JURY_PROSECUTION_PROMPT = "You are the Prosecution in a mock trial about a real personal decision the defendant is stuck on. Your job is to argue AGAINST the choice the defendant seems to be leaning toward, building the strongest honest case for why it's a mistake using only what they have actually testified. Be sharp and adversarial but fair - no strawmanning, no invented facts. Reply like a real courtroom argument, 2-4 sentences, no preamble.";
+const JURY_DEFENSE_PROMPT = "You are the Defense in a mock trial about a real personal decision the defendant is stuck on. Your job is to argue FOR the choice the defendant seems to be leaning toward, building the strongest honest case for why it's the right call using only what they have actually testified. Be sharp and persuasive but fair - no strawmanning, no invented facts. Reply like a real courtroom argument, 2-4 sentences, no preamble.";
+const JURY_VERDICT_PROMPT = "You are the Judge delivering a final verdict in a mock trial about a real personal decision. Based on the full trial transcript (your questions, the defendant's testimony, and both sides' arguments), you must NOT simply recommend an option - rule on whether the defendant has earned enough clarity and evidence to decide at all, and if not, state exactly what specific evidence or clarity is still missing. Respond as strict JSON only, no markdown: {\"ruling\": \"one clear sentence in judge language\", \"reasoning\": \"2-3 sentences citing specific testimony or arguments from the transcript\"}.";
+
+let activeJuryTrialId = null;
+let isJuryLoading = false;
+let juryError = "";
+
+function activeJuryTrial() {
+  return trackerState.juryTrials.sessions.find((session) => session.id === activeJuryTrialId) || null;
+}
+
+function juryTranscriptText(session, upToIndex) {
+  const entries = upToIndex === undefined ? session.transcript : session.transcript.slice(0, upToIndex);
+  return entries.map((entry) => `${entry.speaker}: ${entry.text}`).join("\n");
+}
+
+async function startJuryTrial(decision) {
+  isJuryLoading = true;
+  juryError = "";
+  const session = { id: `trial-${Date.now()}`, decision: cleanText(decision, 300), transcript: [], round: 1, awaitingTestimony: false, verdict: null, appealsUsed: 0, createdAt: new Date().toISOString() };
+  trackerState.juryTrials.sessions = [session, ...trackerState.juryTrials.sessions].slice(0, 20);
+  activeJuryTrialId = session.id;
+  saveTrackerState();
+  openModal("juryTrial");
+  try {
+    const question = await requestCompassDirect(JURY_JUDGE_PROMPT, `The defendant's real decision they're stuck on: "${session.decision}"\n\nAsk your first cross-examination question.`);
+    session.transcript.push({ speaker: "judge", text: cleanText(question, 300), round: session.round });
+    session.awaitingTestimony = true;
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Jury Trial] failed to start", error);
+    juryError = "Couldn't open the trial right now. Please try again.";
+  } finally {
+    isJuryLoading = false;
+    if (isModalActive("juryTrial")) openModal("juryTrial");
+  }
+}
+
+async function testifyToJury(answer) {
+  const session = activeJuryTrial();
+  if (!session || !session.awaitingTestimony) return;
+  isJuryLoading = true;
+  juryError = "";
+  session.transcript.push({ speaker: "player", text: cleanText(answer, 500), round: session.round });
+  session.awaitingTestimony = false;
+  saveTrackerState();
+  openModal("juryTrial");
+  try {
+    const transcriptSoFar = juryTranscriptText(session);
+    const argPrompt = `Case: "${session.decision}"\n\nTrial transcript so far:\n${transcriptSoFar}\n\nGive your argument responding to the defendant's latest testimony.`;
+    const results = await Promise.allSettled([
+      requestCompassDirect(JURY_PROSECUTION_PROMPT, argPrompt),
+      requestCompassDirect(JURY_DEFENSE_PROMPT, argPrompt)
+    ]);
+    if (results[0].status === "fulfilled") session.transcript.push({ speaker: "prosecution", text: cleanText(results[0].value, 400), round: session.round });
+    if (results[1].status === "fulfilled") session.transcript.push({ speaker: "defense", text: cleanText(results[1].value, 400), round: session.round });
+    saveTrackerState();
+
+    if (session.round < JURY_TRIAL_ROUNDS) {
+      session.round += 1;
+      const question = await requestCompassDirect(JURY_JUDGE_PROMPT, `Case: "${session.decision}"\n\nTrial transcript so far:\n${juryTranscriptText(session)}\n\nAsk your next cross-examination question.`);
+      session.transcript.push({ speaker: "judge", text: cleanText(question, 300), round: session.round });
+      session.awaitingTestimony = true;
+      saveTrackerState();
+    } else {
+      await deliverJuryVerdict(session);
+    }
+  } catch (error) {
+    console.error("[Jury Trial] testimony round failed", error);
+    juryError = "Something went wrong mid-trial. Please try again.";
+  } finally {
+    isJuryLoading = false;
+    if (isModalActive("juryTrial")) openModal("juryTrial");
+  }
+}
+
+async function deliverJuryVerdict(session) {
+  const reply = await requestCompassDirect(JURY_VERDICT_PROMPT, `Case: "${session.decision}"\n\nFull trial transcript:\n${juryTranscriptText(session)}\n\nDeliver your verdict.`);
+  const parsed = extractJsonObject(reply);
+  session.verdict = {
+    ruling: parsed && parsed.ruling ? cleanText(parsed.ruling, 200) : "The court needs a clearer record before ruling - consider testifying further.",
+    reasoning: parsed && parsed.reasoning ? cleanText(parsed.reasoning, 400) : ""
+  };
+  saveTrackerState();
+}
+
+async function appealJuryVerdict(rebuttal) {
+  const session = activeJuryTrial();
+  if (!session || !session.verdict || session.appealsUsed >= 1) return;
+  isJuryLoading = true;
+  juryError = "";
+  session.transcript.push({ speaker: "player", text: `[Appeal] ${cleanText(rebuttal, 500)}`, round: session.round });
+  session.verdict = null;
+  saveTrackerState();
+  openModal("juryTrial");
+  try {
+    const transcriptSoFar = juryTranscriptText(session);
+    const argPrompt = `Case: "${session.decision}"\n\nTrial transcript so far:\n${transcriptSoFar}\n\nThe defendant has appealed with new testimony. Give your response.`;
+    const results = await Promise.allSettled([
+      requestCompassDirect(JURY_PROSECUTION_PROMPT, argPrompt),
+      requestCompassDirect(JURY_DEFENSE_PROMPT, argPrompt)
+    ]);
+    if (results[0].status === "fulfilled") session.transcript.push({ speaker: "prosecution", text: cleanText(results[0].value, 400), round: session.round });
+    if (results[1].status === "fulfilled") session.transcript.push({ speaker: "defense", text: cleanText(results[1].value, 400), round: session.round });
+    session.appealsUsed += 1;
+    saveTrackerState();
+    await deliverJuryVerdict(session);
+  } catch (error) {
+    console.error("[Jury Trial] appeal failed", error);
+    juryError = "The appeal couldn't be processed right now. Please try again.";
+  } finally {
+    isJuryLoading = false;
+    if (isModalActive("juryTrial")) openModal("juryTrial");
+  }
+}
+
+// Advanced Mode: the third Future Mirror pillar, after Future Scan (truth
+// about one choice) and Build Mode (training toward one goal). Every other
+// tool in this app - including everything built this session - only sees
+// its own slice of the user. Advanced Mode is the one place that reads
+// realGrowthFacts() (extended above to cover the new systems too) all at
+// once and looks for genuine contradictions between them, then hands off
+// to the Jury Trial mechanic above to actually resolve one - diagnosis and
+// resolution are deliberately two different mechanics, not one AI just
+// telling the user what to do.
+const ADVANCED_MODE_SYSTEM_PROMPT = "You are Advanced Mode, a cross-system diagnostic inside Compass's Future Mirror. You are given a compact summary of everything Compass actually knows about one real person, drawn from many separate tools they've used (Personal Blueprint, Future Scan, Build Mode, Life Roadmap, Ghost Roommate, Inherited Debugging, Self-Debt, Failure Inoculation, Future Self Hiring, journal, mood). Your ONLY job is to find genuine contradictions or blind spots BETWEEN these separate data points - places where what the person says they value conflicts with what they are actually spending time or effort on, or where one tool's output is in tension with another's. Ground every finding strictly in the facts given; never invent data. A real finding needs at least two specific data points genuinely in tension - never report a single data point as if it were a contradiction on its own. If nothing genuinely conflicts, say so honestly rather than manufacturing a weak finding. Respond as strict JSON only, no markdown: {\"findings\": [{\"title\": \"short label\", \"tension\": \"one sentence naming the two things in conflict\", \"evidence\": \"1-2 sentences citing the specific facts\"}]} - up to 4 findings, ranked most significant first, empty array if none found.";
+
+let isAdvancedModeLoading = false;
+let advancedModeError = "";
+
+function latestAdvancedModeReport() {
+  return trackerState.advancedModeReports[0] || null;
+}
+
+async function runAdvancedModeDiagnostic() {
+  isAdvancedModeLoading = true;
+  advancedModeError = "";
+  openModal("advancedMode");
+  try {
+    const facts = realGrowthFacts();
+    if (facts.length < 3) {
+      advancedModeError = "Not enough saved data across your tools yet - use a few more (Blueprint, Build Mode, Roadmap, Journal...) and check back.";
+      return;
+    }
+    const reply = await requestCompassDirect(ADVANCED_MODE_SYSTEM_PROMPT, `Everything Compass knows about this person:\n${facts.join(" | ")}\n\nFind genuine cross-system contradictions or blind spots.`);
+    const parsed = extractJsonObject(reply);
+    const findings = Array.isArray(parsed && parsed.findings) ? parsed.findings.slice(0, 4).map((item, index) => ({
+      id: `finding-${Date.now()}-${index}`,
+      title: cleanText(item.title || "Untitled finding", 120),
+      tension: cleanText(item.tension || "", 240),
+      evidence: cleanText(item.evidence || "", 400)
+    })) : [];
+    const report = { id: `advmode-${Date.now()}`, generatedAt: new Date().toISOString(), findings };
+    trackerState.advancedModeReports = [report, ...trackerState.advancedModeReports].slice(0, 10);
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Advanced Mode] diagnostic failed", error);
+    advancedModeError = "Couldn't run the diagnostic right now. Please try again.";
+  } finally {
+    isAdvancedModeLoading = false;
+    if (isModalActive("advancedMode")) openModal("advancedMode");
+  }
+}
+
+function advancedModeEntrySection() {
+  const report = latestAdvancedModeReport();
+  return `
+    <h3>Where your tools disagree with each other.</h3>
+    <p class="muted">Future Scan and Build Mode each look at one slice of you. Advanced Mode reads across everything you've used here at once, looks for genuine contradictions, then lets you put a real one on trial.</p>
+    ${report
+      ? `<p class="tiny-note">${report.findings.length} finding${report.findings.length === 1 ? "" : "s"} from your last run, ${escapeHTML(new Date(report.generatedAt).toLocaleDateString())}.</p>`
+      : `<p class="tiny-note">Works best after you've used a few tools here - Blueprint, Build Mode, Roadmap, Journal, or the others.</p>`}
+    <button class="primary-action mirror-run-action" type="button" data-open="advancedMode">Open Advanced Mode</button>
+  `;
+}
+
+function advancedModeModal() {
+  const report = latestAdvancedModeReport();
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="advanced-mode-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Advanced Mode</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="advanced-mode-title">Where your tools disagree with each other</h3>
+      <p class="muted">Not vibes, not a single data point - real tension between two things you've actually said or done, grounded only in your saved data.</p>
+      ${advancedModeError ? `<p class="form-error">${escapeHTML(advancedModeError)}</p>` : ""}
+      <button class="primary-action" type="button" data-run-advanced-mode ${isAdvancedModeLoading ? "disabled" : ""}>${isAdvancedModeLoading ? "Cross-referencing everything..." : report ? "Run again" : "Run diagnostic"}</button>
+      ${report ? `
+        <p class="tiny-note">Last run ${escapeHTML(new Date(report.generatedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</p>
+        ${report.findings.length ? `
+          <div class="advice-stack">
+            ${report.findings.map((finding) => `
+              <div>
+                <strong>${escapeHTML(finding.title)}</strong>
+                <span>${escapeHTML(finding.tension)}</span>
+                <p class="tiny-note">${escapeHTML(finding.evidence)}</p>
+                <button class="secondary-action compact-action" type="button" data-try-advanced-finding="${escapeHTML(finding.tension)}">Put this on trial</button>
+              </div>
+            `).join("")}
+          </div>
+        ` : `<p class="muted">No genuine contradictions found this time - that's a real result, not a failure.</p>`}
+      ` : ""}
+    </div>
+  `;
+}
+
+function jurySpeakerLabel(speaker) {
+  if (speaker === "judge") return "Judge";
+  if (speaker === "prosecution") return "Prosecution";
+  if (speaker === "defense") return "Defense";
+  return displayName();
+}
+
+function juryTrialModal() {
+  const session = activeJuryTrial();
+  if (!session) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="jury-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Jury Duty on Yourself</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="jury-title">Put a real decision on trial</h3>
+        <p class="muted">The Judge only asks questions and never advises. Prosecution and Defense genuinely argue against and for it. The verdict won't tell you what to choose - it rules on whether you actually have enough clarity to decide yet.</p>
+        <div class="admin-form">
+          <label>What decision are you stuck on?<textarea id="jury-decision-input" maxlength="300" placeholder="Example: Whether to take the internship offer or stay in school full-time"></textarea></label>
+        </div>
+        ${juryError ? `<p class="form-error">${escapeHTML(juryError)}</p>` : ""}
+        <button class="primary-action" type="button" data-start-jury-trial ${isJuryLoading ? "disabled" : ""}>${isJuryLoading ? "Opening the trial..." : "Open trial"}</button>
+      </div>
+    `;
+  }
+  return `
+    <div class="modal-card assessment-modal roleplay-card" role="dialog" aria-modal="true" aria-labelledby="jury-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Round ${session.round} of ${JURY_TRIAL_ROUNDS}${session.verdict ? " - Verdict" : ""}</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="jury-title">${escapeHTML(session.decision)}</h3>
+      <section class="chat-room roleplay-room">
+        <div class="chat-messages">
+          ${session.transcript.map((entry) => `
+            <div class="chat-bubble ${entry.speaker === "player" ? "is-user" : "is-ai"}">
+              <span>${escapeHTML(jurySpeakerLabel(entry.speaker))}</span>
+              <p>${escapeHTML(entry.text)}</p>
+            </div>
+          `).join("")}
+          ${isJuryLoading ? `<span class="typing-dot">The court is proceeding...</span>` : ""}
+        </div>
+        ${session.awaitingTestimony && !session.verdict ? `
+          <div class="chat-input-row">
+            <input id="jury-testimony-input" type="text" placeholder="Answer the Judge's question...">
+            <button class="primary-action send-action" type="button" data-testify-jury ${isJuryLoading ? "disabled" : ""}>Testify</button>
+          </div>
+        ` : ""}
+      </section>
+      ${juryError ? `<p class="form-error">${escapeHTML(juryError)}</p>` : ""}
+      ${session.verdict ? `
+        <section class="mirror-empty-card">
+          <p class="eyebrow">Verdict</p>
+          <h3>${escapeHTML(session.verdict.ruling)}</h3>
+          <p class="muted">${escapeHTML(session.verdict.reasoning)}</p>
+        </section>
+        <div class="profile-actions">
+          <button class="secondary-action compact-action" type="button" data-close>Accept</button>
+          ${session.appealsUsed < 1 ? `<button class="primary-action compact-action" type="button" data-open="juryAppeal">Appeal</button>` : ""}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function juryAppealModal() {
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="jury-appeal-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Appeal</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="jury-appeal-title">One appeal - make it count</h3>
+      <p class="muted">New testimony or evidence you didn't say the first time. Both sides get one more response, then a final verdict.</p>
+      <div class="admin-form">
+        <label>Your appeal<textarea id="jury-appeal-input" maxlength="500" placeholder="What didn't come out during testimony?"></textarea></label>
+      </div>
+      <button class="primary-action" type="button" data-submit-jury-appeal ${isJuryLoading ? "disabled" : ""}>Submit appeal</button>
+    </div>
+  `;
+}
+
+// Self Archaeology: reframes old journal/mood entries as "artifacts" from a
+// past "stratum" (calendar month), written up in a dry academic field-report
+// voice instead of a nostalgic or cringe-inducing one - distance through
+// pseudo-scientific framing. Grounded only in the user's real past entries;
+// the AI report is cached per stratum once "excavated" so re-visiting a dig
+// site shows the same report, like a real archaeological record.
+const ARCHAEOLOGY_SYSTEM_PROMPT = "You are writing a short, dry, deadpan archaeological field report about a 'civilization' (a specific past month of one real person's life), based only on the journal and mood artifacts provided. Write like a genuine academic archaeology report - detached, observational, curious, occasionally wry, never mocking or judgmental. Refer to the subject in third person ('the individual', 'the subject'). You may quote or paraphrase the artifacts, but never invent details, events, or facts not present in what was given. Keep it to 3-5 short paragraphs. No modern self-help language, no advice, no diagnosis - this is a field report, not therapy.";
+
+let isArchaeologyLoading = false;
+let archaeologyError = "";
+
+function monthKeyOf(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function archaeologyAvailableStrata() {
+  const myId = currentUserId();
+  const currentMonthKey = monthKeyOf(new Date().toISOString());
+  const monthKeys = new Set();
+  trackerState.journalEntries.filter((entry) => entry.user_id === myId).forEach((entry) => {
+    const key = monthKeyOf(entry.created_at);
+    if (key && key !== currentMonthKey) monthKeys.add(key);
+  });
+  trackerState.mood.entries.filter((entry) => entry.user_id === myId || !entry.user_id).forEach((entry) => {
+    const key = monthKeyOf(entry.created_at);
+    if (key && key !== currentMonthKey) monthKeys.add(key);
+  });
+  return Array.from(monthKeys).sort().reverse();
+}
+
+function archaeologyArtifactsForStratum(monthKey) {
+  const myId = currentUserId();
+  const inStratum = (iso) => monthKeyOf(iso) === monthKey;
+  const journals = trackerState.journalEntries.filter((entry) => entry.user_id === myId && inStratum(entry.created_at)).map((entry) => entry.text);
+  const moods = trackerState.mood.entries.filter((entry) => (entry.user_id === myId || !entry.user_id) && inStratum(entry.created_at)).map((entry) => `${entry.label} (${entry.score}/100)${entry.note ? `: ${entry.note}` : ""}`);
+  return { journals, moods };
+}
+
+function existingDig(monthKey) {
+  return trackerState.archaeologyDigs.find((dig) => dig.monthKey === monthKey) || null;
+}
+
+async function excavateStratum(monthKey) {
+  isArchaeologyLoading = true;
+  archaeologyError = "";
+  openModal("selfArchaeology", monthKey);
+  try {
+    const artifacts = archaeologyArtifactsForStratum(monthKey);
+    const prompt = `Stratum date: ${monthKey}\n\nJournal artifacts recovered:\n${artifacts.journals.length ? artifacts.journals.map((text, index) => `${index + 1}. "${text}"`).join("\n") : "none"}\n\nMood readings recovered:\n${artifacts.moods.length ? artifacts.moods.map((text, index) => `${index + 1}. ${text}`).join("\n") : "none"}\n\nWrite a short archaeological field report about the individual who lived in this stratum, grounded only in the artifacts above - do not invent facts not present in them.`;
+    const reply = await requestCompassDirect(ARCHAEOLOGY_SYSTEM_PROMPT, prompt);
+    const dig = { monthKey, report: cleanText(reply, 1200), excavatedAt: new Date().toISOString() };
+    trackerState.archaeologyDigs = [dig, ...trackerState.archaeologyDigs.filter((item) => item.monthKey !== monthKey)].slice(0, 24);
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Self Archaeology] excavation failed", error);
+    archaeologyError = "Couldn't complete this excavation right now. Please try again.";
+  } finally {
+    isArchaeologyLoading = false;
+    if (isModalActive("selfArchaeology")) openModal("selfArchaeology", monthKey);
+  }
+}
+
+function selfArchaeologyModal(monthKey) {
+  if (!monthKey) {
+    const strata = archaeologyAvailableStrata();
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="archaeology-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Self Archaeology</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="archaeology-title">Dig sites</h3>
+        <p class="muted">Each stratum is a past month of your real journal and mood entries, read back as a field report - not nostalgia, just observation.</p>
+        <div class="action-stack">
+          ${strata.length ? strata.map((key) => {
+            const dig = existingDig(key);
+            return `
+              <button class="wide-action" type="button" data-open="selfArchaeology" data-open-payload="${escapeHTML(key)}">
+                <img src="assets/icon-time.png" alt="">
+                <span><strong>${escapeHTML(key)}</strong><small>${dig ? "Excavated" : "Not yet excavated"}</small></span>
+              </button>
+            `;
+          }).join("") : `<p class="muted">No strata old enough to dig yet - write a few journal or mood entries and check back next month.</p>`}
+        </div>
+      </div>
+    `;
+  }
+  const dig = existingDig(monthKey);
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="archaeology-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Stratum ${escapeHTML(monthKey)}</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="archaeology-title">Field report</h3>
+      ${dig ? `
+        <p class="muted">${escapeHTML(dig.report)}</p>
+        <p class="tiny-note">Excavated ${escapeHTML(new Date(dig.excavatedAt).toLocaleDateString())}.</p>
+        <button class="secondary-action compact-action" type="button" data-excavate-stratum="${escapeHTML(monthKey)}" ${isArchaeologyLoading ? "disabled" : ""}>${isArchaeologyLoading ? "Re-excavating..." : "Re-excavate"}</button>
+      ` : `
+        <p class="muted">This stratum hasn't been excavated yet.</p>
+        <button class="primary-action" type="button" data-excavate-stratum="${escapeHTML(monthKey)}" ${isArchaeologyLoading ? "disabled" : ""}>${isArchaeologyLoading ? "Excavating..." : "Begin excavation"}</button>
+      `}
+      ${archaeologyError ? `<p class="form-error">${escapeHTML(archaeologyError)}</p>` : ""}
+      <button class="secondary-action compact-action" type="button" data-open="selfArchaeology">Back to dig sites</button>
+    </div>
+  `;
+}
+
+// AI Trace Log: lightweight eval/tracing for the two AI coach surfaces
+// users actually complained about (Compass AI Chat, Build Mode). Every real
+// reply gets a second, separate AI grading call - fire-and-forget, after
+// the user already has their answer, so it never adds latency - checking
+// whether the reply actually addressed the user, gave a concrete next step,
+// or stated anything not present in the context it was given. Deliberately
+// scoped to these two surfaces, not every AI call site in the app.
+const AI_EVAL_SYSTEM_PROMPT = "You are a strict quality grader for an AI coach's reply inside an app called Compass. You are given the user's real goal or question, a summary of what context was actually available to the AI, and the AI's reply. Judge three things honestly: (1) did the reply actually address what the user asked or needed, not just talk around it; (2) did it give at least one concrete, specific next step, not vague encouragement; (3) does the reply state any specific fact, memory, name, or event that was clearly NOT present in the given context - only flag this for a genuine invention, not a reasonable inference. Respond as strict JSON only, no markdown: {\"answeredQuestion\": true or false, \"hasConcreteNextStep\": true or false, \"possibleFabrication\": true or false, \"notes\": \"one short sentence explaining any failure, empty string if none\"}.";
+
+async function evaluateAiReply({ feature, userGoal, coachType, context, reply }) {
+  try {
+    const prompt = `Feature: ${feature}\nUser's goal/question: ${userGoal}\nCoach type: ${coachType || "n/a"}\nContext actually given to the AI:\n${context}\n\nThe AI's reply:\n${reply}\n\nGrade this reply.`;
+    const evalReply = await requestCompassDirect(AI_EVAL_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(evalReply);
+    if (!parsed) return null;
+    return {
+      answeredQuestion: parsed.answeredQuestion !== false,
+      hasConcreteNextStep: parsed.hasConcreteNextStep === true,
+      possibleFabrication: parsed.possibleFabrication === true,
+      notes: parsed.notes ? cleanText(parsed.notes, 200) : ""
+    };
+  } catch (error) {
+    console.error("[AI Trace] eval failed", error);
+    return null;
+  }
+}
+
+async function logAiTrace({ feature, userGoal, coachType, context, reply }) {
+  const trace = {
+    id: `trace-${Date.now()}`,
+    feature,
+    userGoal: cleanText(userGoal, 200),
+    coachType: coachType || "",
+    replySummary: cleanText(reply, 200),
+    checks: null,
+    createdAt: new Date().toISOString()
+  };
+  trackerState.aiTraces = [trace, ...trackerState.aiTraces].slice(0, 100);
+  saveTrackerState();
+  trace.checks = await evaluateAiReply({ feature, userGoal, coachType, context, reply });
+  saveTrackerState();
+  if (isModalActive("aiTraceLog")) openModal("aiTraceLog");
+}
+
+function aiTraceLogModal() {
+  const traces = trackerState.aiTraces;
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="ai-trace-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">AI Trace Log</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="ai-trace-title">Is the AI coach actually helping?</h3>
+      <p class="muted">Compass AI Chat and Build Mode coach replies each get graded in the background after the fact: did it answer you, did it give a real next step, did it make anything up. This is what keeps the coach honest over time instead of just sounding confident.</p>
+      ${traces.length ? `
+        <div class="future-reflection-list">
+          ${traces.slice(0, 30).map((trace) => `
+            <article class="future-reflection-item">
+              <div>
+                <strong>${escapeHTML(trace.feature)}${trace.coachType ? ` - ${escapeHTML(trace.coachType)}` : ""}</strong>
+                <p>${escapeHTML(trace.userGoal)}</p>
+                ${trace.checks ? `
+                  <div class="chip-row">
+                    <span class="mini-chip ${trace.checks.answeredQuestion ? "" : "is-warning"}">${trace.checks.answeredQuestion ? "Answered" : "Didn't answer"}</span>
+                    <span class="mini-chip ${trace.checks.hasConcreteNextStep ? "" : "is-warning"}">${trace.checks.hasConcreteNextStep ? "Concrete next step" : "No concrete next step"}</span>
+                    ${trace.checks.possibleFabrication ? `<span class="mini-chip is-warning">Possible fabrication</span>` : ""}
+                  </div>
+                  ${trace.checks.notes ? `<p class="tiny-note">${escapeHTML(trace.checks.notes)}</p>` : ""}
+                ` : `<p class="tiny-note">Grading...</p>`}
+                <small>${escapeHTML(new Date(trace.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</small>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      ` : `<p class="muted">No traces logged yet - use Compass AI Chat or a Build Mode coach and check back.</p>`}
+    </div>
+  `;
+}
+
+// Feed prototype (P0 of the Community x Opportunities merge plan): a
+// full-screen, one-item-at-a-time vertical stream mixing community posts
+// and official opportunities. Deliberately minimal - pure chronological-ish
+// interleave (no tag scoring yet), read-only (taps route to existing
+// external links, nothing new is created here), and does not touch the
+// bottom nav. The point of this phase is only to test whether the swipe
+// pacing itself feels good before investing in ranking/creation/nav work.
+let feedPrototypeIndex = 0;
+let feedPrototypeItems = [];
+
+function feedPrototypeBuildItems() {
+  const posts = (typeof communityPostsCacheSnapshot === "function" ? communityPostsCacheSnapshot() : [])
+    .filter((post) => post.status === "published");
+  const opportunities = opportunityItems.slice();
+  const items = [];
+  const max = Math.max(posts.length, opportunities.length);
+  for (let i = 0; i < max; i++) {
+    if (opportunities[i]) items.push({ type: "opportunity", data: opportunities[i] });
+    if (posts[i]) items.push({ type: "post", data: posts[i] });
+  }
+  return items;
+}
+
+function feedPrototypePostCard(post) {
+  return `
+    <div class="feed-card-inner feed-card-post">
+      <p class="feed-card-eyebrow">Community post</p>
+      <p class="feed-card-body">${escapeHTML(post.body)}</p>
+      <p class="feed-card-meta">${escapeHTML(new Date(post.created_at).toLocaleDateString([], { month: "short", day: "numeric" }))}</p>
+    </div>
+  `;
+}
+
+function feedPrototypeOpportunityCard(item) {
+  return `
+    <div class="feed-card-inner feed-card-opportunity">
+      <span class="category-badge">${escapeHTML(item.category)}</span>
+      <h2 class="feed-card-title">${escapeHTML(item.title)}</h2>
+      <p class="feed-card-body">${escapeHTML(item.description)}</p>
+      <button class="primary-action" type="button" data-open-link="${escapeHTML(item.applyUrl)}">View opportunity</button>
+    </div>
+  `;
+}
+
+function feedPrototypeModal() {
+  if (!feedPrototypeItems.length) feedPrototypeItems = feedPrototypeBuildItems();
+  const item = feedPrototypeItems[feedPrototypeIndex];
+  return `
+    <div class="feed-proto-shell">
+      <button class="ghost-circle light feed-proto-close" type="button" data-close aria-label="Close">x</button>
+      ${item ? `
+        <div class="feed-swipe-card" data-swipe-mode="feed">
+          ${item.type === "post" ? feedPrototypePostCard(item.data) : feedPrototypeOpportunityCard(item.data)}
+        </div>
+      ` : `
+        <div class="feed-swipe-card">
+          <div class="feed-card-inner">
+            <p class="feed-card-eyebrow">Feed</p>
+            <p class="feed-card-body">Nothing to show yet - sign in to Community for posts, or check back for more opportunities.</p>
+          </div>
+        </div>
+      `}
+      <div class="feed-proto-side">
+        <button class="feed-proto-nav" type="button" data-feed-proto-prev ${feedPrototypeIndex === 0 ? "disabled" : ""} aria-label="Previous">&uarr;</button>
+        <span class="feed-proto-progress">${feedPrototypeItems.length ? `${feedPrototypeIndex + 1}/${feedPrototypeItems.length}` : "0/0"}</span>
+        <button class="feed-proto-nav" type="button" data-feed-proto-next ${!feedPrototypeItems.length || feedPrototypeIndex >= feedPrototypeItems.length - 1 ? "disabled" : ""} aria-label="Next">&darr;</button>
+      </div>
+    </div>
+  `;
+}
+
+// Same low-level pointer-drag pattern as mountSwipeCard, adapted for
+// single-direction vertical paging instead of binary left/right - a feed
+// only ever has "next" / "back", not "yes" / "no".
+function mountFeedSwipeCard() {
+  const card = modalLayer.querySelector('.feed-swipe-card[data-swipe-mode="feed"]');
+  if (!card) return;
+  const threshold = 70;
+  let dragging = false;
+  let startY = 0;
+  let dy = 0;
+
+  function onPointerDown(event) {
+    dragging = true;
+    dy = 0;
+    startY = event.clientY;
+    card.classList.add("is-dragging");
+    card.setPointerCapture(event.pointerId);
+  }
+
+  function onPointerMove(event) {
+    if (!dragging) return;
+    dy = event.clientY - startY;
+    card.style.transform = `translateY(${dy}px)`;
+  }
+
+  async function onPointerUp() {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove("is-dragging");
+    if (dy < -threshold && feedPrototypeIndex < feedPrototypeItems.length - 1) {
+      await commit(1);
+    } else if (dy > threshold && feedPrototypeIndex > 0) {
+      await commit(-1);
+    } else {
+      card.style.transform = "";
+    }
+  }
+
+  async function commit(direction) {
+    card.style.transform = "";
+    card.classList.add(direction > 0 ? "is-exit-feed-up" : "is-exit-feed-down");
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    feedPrototypeIndex = Math.max(0, Math.min(feedPrototypeItems.length - 1, feedPrototypeIndex + direction));
+    if (isModalActive("feedPrototype")) openModal("feedPrototype");
+  }
+
+  card.addEventListener("pointerdown", onPointerDown);
+  card.addEventListener("pointermove", onPointerMove);
+  card.addEventListener("pointerup", onPointerUp);
+  card.addEventListener("pointercancel", onPointerUp);
+}
+
+function taxObligationsEntryCard() {
+  const done = TAX_OBLIGATION_ITEMS.filter((item) => trackerState.taxChecklist[item.id]).length;
+  return `
+    <section class="mirror-form-card future-self-entry-card">
+      <img class="future-self-entry-icon" src="assets/icon-money.png" alt="">
+      <p class="eyebrow">Basic Tax Obligations</p>
+      <h3>Know what you're actually on the hook for</h3>
+      <p class="muted">${done ? `${done} of ${TAX_OBLIGATION_ITEMS.length} checked off.` : "A plain-language checklist, not a filing service."}</p>
+      <button class="secondary-action compact-action" type="button" data-open="taxObligations">Open checklist</button>
     </section>
   `;
 }
@@ -4147,6 +6027,196 @@ function roleplayReflection(session) {
     improve: specific ? "Next time, keep the same clarity but make the reply shorter." : "Add one specific detail, such as time, amount, or the exact help you need.",
     nextStep: "Try the same scenario once more, or use Support Circle if this is a real situation."
   };
+}
+
+// Self-Debt ("future-self debt collection"): an inverted-insurance framing.
+// The user pre-pays a value/commitment now (a message to their future self +
+// a real, already-computable drift signal to watch), and the app says
+// nothing about it until that signal actually fires - then it "collects"
+// by surfacing the original message like a notice, instead of a proactive
+// reminder/nag. Drift signals reuse existing data (journal/mood entries,
+// roadmap milestones) - no new tracking infrastructure.
+const SELF_DEBT_TRIGGER_TYPES = [
+  { id: "journal-silence", label: "I go quiet on journaling", detail: "Fires when you haven't written a journal entry in a while." },
+  { id: "mood-silence", label: "I stop checking in on my mood", detail: "Fires when you haven't logged a mood check-in in a while." },
+  { id: "goal-stalled", label: "A roadmap goal sits untouched", detail: "Fires when a Life Roadmap goal has had zero milestone progress for a while." }
+];
+
+let selfDebtNoticeShownThisSession = false;
+// Snapshot of the debts that were actually due at trigger time. The
+// renderScreen hook below stamps lastDeliveredAt the moment it decides to
+// notify - selfDebtNoticeModal must render from this snapshot, not
+// re-call dueSelfDebts(), or the just-stamped lastDeliveredAt makes every
+// debt look "not due" again by the time the modal renders (0 days since
+// delivery is always < triggerThresholdDays), so the notice would always
+// render empty.
+let deliveredSelfDebtNotice = [];
+
+function selfDebtTriggerLabel(triggerType) {
+  const entry = SELF_DEBT_TRIGGER_TYPES.find((item) => item.id === triggerType);
+  return entry ? entry.label : triggerType;
+}
+
+function daysSince(iso) {
+  if (!iso) return Infinity;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return Infinity;
+  return Math.floor((Date.now() - then) / 86400000);
+}
+
+function selfDebtDriftDays(debt) {
+  if (debt.triggerType === "mood-silence") {
+    const entries = (trackerState.mood.entries || []).filter((entry) => entry.user_id === currentUserId() || !entry.user_id);
+    return daysSince(entries[0] ? entries[0].created_at : debt.createdAt);
+  }
+  if (debt.triggerType === "goal-stalled") {
+    const stalled = myRoadmapGoals().find((goal) => (goal.milestones || []).every((milestone) => milestone.status === "pending") && daysSince(goal.createdAt) >= debt.triggerThresholdDays);
+    return stalled ? daysSince(stalled.createdAt) : 0;
+  }
+  const entries = trackerState.journalEntries.filter((entry) => entry.user_id === currentUserId());
+  return daysSince(entries[0] ? entries[0].created_at : debt.createdAt);
+}
+
+function selfDebtIsDue(debt) {
+  if (debt.status !== "active") return false;
+  if (selfDebtDriftDays(debt) < debt.triggerThresholdDays) return false;
+  // Cooldown: once delivered, don't fire again until a fresh drift window
+  // has passed, so it can't nag every single app open.
+  if (debt.lastDeliveredAt && daysSince(debt.lastDeliveredAt) < debt.triggerThresholdDays) return false;
+  return true;
+}
+
+function dueSelfDebts() {
+  return trackerState.selfDebts.filter(selfDebtIsDue);
+}
+
+function createSelfDebt({ title, message, triggerType, triggerThresholdDays }) {
+  const debt = {
+    id: `debt-${Date.now()}`,
+    title: cleanText(title, 120),
+    message: cleanText(message, 500),
+    triggerType: SELF_DEBT_TRIGGER_TYPES.some((item) => item.id === triggerType) ? triggerType : "journal-silence",
+    triggerThresholdDays: Math.max(3, Math.min(90, Number(triggerThresholdDays) || 14)),
+    createdAt: new Date().toISOString(),
+    lastDeliveredAt: null,
+    status: "active"
+  };
+  trackerState.selfDebts = [debt, ...trackerState.selfDebts].slice(0, 30);
+  saveTrackerState();
+  return debt;
+}
+
+function acknowledgeSelfDebt(debtId) {
+  const debt = trackerState.selfDebts.find((item) => item.id === debtId);
+  if (!debt) return;
+  debt.status = "acknowledged";
+  saveTrackerState();
+}
+
+function archiveSelfDebt(debtId) {
+  trackerState.selfDebts = trackerState.selfDebts.filter((item) => item.id !== debtId);
+  saveTrackerState();
+}
+
+function selfDebtCard(debt) {
+  const due = selfDebtIsDue(debt);
+  return `
+    <article class="community-card">
+      <div class="community-card-top">
+        <span class="category-badge">${escapeHTML(debt.status === "active" ? (due ? "Due" : "Active") : "Acknowledged")}</span>
+      </div>
+      <h3>${escapeHTML(debt.title)}</h3>
+      <p class="muted">${escapeHTML(selfDebtTriggerLabel(debt.triggerType))} - ${debt.triggerThresholdDays} days</p>
+      <div class="community-actions">
+        <button class="secondary-action compact-action" type="button" data-archive-self-debt="${escapeHTML(debt.id)}">Delete</button>
+      </div>
+    </article>
+  `;
+}
+
+function selfDebtLedgerModal() {
+  const debts = trackerState.selfDebts;
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="self-debt-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Self-Debt</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="self-debt-title">Pay your future self a debt</h3>
+      <p class="muted">Write a commitment now. Compass says nothing about it until real drift actually shows up - then it collects, like an overdue notice, not a reminder.</p>
+      <button class="primary-action compact-action" type="button" data-open="selfDebtNew">Open a new debt</button>
+      <div class="community-grid">
+        ${debts.length ? debts.map(selfDebtCard).join("") : `
+          <section class="empty-feature">
+            <img src="assets/icon-warning.png" alt="">
+            <div><strong>No debts open yet</strong><p>Open one above.</p></div>
+          </section>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function selfDebtNewModal() {
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="self-debt-new-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">New debt</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="self-debt-new-title">What are you promising your future self?</h3>
+      <div class="admin-form">
+        <label>Title<input id="self-debt-title-input" type="text" maxlength="120" placeholder="Example: Don't go quiet when things get hard"></label>
+        <label>Message to your future self<textarea id="self-debt-message-input" maxlength="500" placeholder="Write it like you're the one who'll read it later, not a to-do note."></textarea></label>
+        <label>Deliver this when
+          <select id="self-debt-trigger-input">
+            ${SELF_DEBT_TRIGGER_TYPES.map((item) => `<option value="${escapeHTML(item.id)}">${escapeHTML(item.label)}</option>`).join("")}
+          </select>
+        </label>
+        <label>...for at least this many days<input id="self-debt-threshold-input" type="number" min="3" max="90" value="14"></label>
+        <p class="form-error" id="self-debt-error" aria-live="polite"></p>
+      </div>
+      <button class="primary-action" type="button" data-save-self-debt>Open this debt</button>
+    </div>
+  `;
+}
+
+function selfDebtNoticeModal() {
+  // Renders from the snapshot taken at trigger time, not a fresh
+  // dueSelfDebts() call - see deliveredSelfDebtNotice's comment for why.
+  const due = deliveredSelfDebtNotice.filter((debt) => debt.status === "active");
+  if (!due.length) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="self-debt-notice-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Self-Debt</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="self-debt-notice-title">No outstanding debts right now</h3>
+      </div>
+    `;
+  }
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="self-debt-notice-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Overdue notice</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="self-debt-notice-title">You have an unresolved debt to yourself</h3>
+      <div class="advice-stack">
+        ${due.map((debt) => `
+          <div>
+            <strong>${escapeHTML(debt.title)}</strong>
+            <span>${escapeHTML(debt.message)}</span>
+            <div class="profile-actions">
+              <button class="primary-action compact-action" type="button" data-acknowledge-self-debt="${escapeHTML(debt.id)}">Acknowledge</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      <p class="tiny-note">This wrote itself the moment ${escapeHTML(selfDebtTriggerLabel(due[0].triggerType)).toLowerCase()} - not because Compass decided to nag you.</p>
+    </div>
+  `;
 }
 
 function receiptRows(limit = 5) {
@@ -4428,6 +6498,86 @@ function saveBlueprintSession(sessionId) {
   history.push(nextVersion);
   saveTrackerState();
   return nextVersion;
+}
+
+// Discover Yourself swipe redesign: each session is walked as a sequence of
+// single-question swipe cards (index-driven) instead of one long form.
+// Values/strengths are true drag-swipe binary cards; captureBlueprintDraft's
+// existing DOM-query guards make it a safe no-op for fields that swiping
+// already wrote directly into blueprintDraft (values/strengths/scenario
+// choices), so saveBlueprintSession below needs no changes.
+function blueprintSessionTotalSteps(sessionId) {
+  if (sessionId === 1) return 9; // 8 value swipes + personality scenario
+  if (sessionId === 2) return 10; // 8 strength swipes + "anything else" + motivation scenario
+  return 3; // learning, work, decision scenarios
+}
+
+function blueprintSwipeStepInfo() {
+  if (blueprintActiveSession === 1) {
+    if (blueprintSwipeIndex < 8) {
+      return { kind: "binary", context: "blueprint-values", eyebrow: "Values", label: BLUEPRINT_VALUE_OPTIONS[blueprintSwipeIndex], picked: blueprintDraft.values.length };
+    }
+    return { kind: "choice", eyebrow: "Personality", scenario: BLUEPRINT_PERSONALITY_SCENARIO, field: "personalityChoice" };
+  }
+  if (blueprintActiveSession === 2) {
+    if (blueprintSwipeIndex < 8) {
+      return { kind: "binary", context: "blueprint-strengths", eyebrow: "Strengths", label: BLUEPRINT_STRENGTH_OPTIONS[blueprintSwipeIndex], picked: blueprintDraft.strengths.length };
+    }
+    if (blueprintSwipeIndex === 8) return { kind: "text" };
+    return { kind: "choice", eyebrow: "Motivation", scenario: BLUEPRINT_MOTIVATION_SCENARIO, field: "motivationChoice" };
+  }
+  const session3Steps = [
+    { eyebrow: "Learning", scenario: BLUEPRINT_LEARNING_SCENARIO, field: "learningChoice" },
+    { eyebrow: "Work", scenario: BLUEPRINT_WORK_SCENARIO, field: "workChoice" },
+    { eyebrow: "Decisions", scenario: BLUEPRINT_DECISION_SCENARIO, field: "decisionChoice" }
+  ];
+  return { kind: "choice", ...session3Steps[Math.min(blueprintSwipeIndex, session3Steps.length - 1)] };
+}
+
+function advanceBlueprintStep() {
+  const lastIndex = blueprintSessionTotalSteps(blueprintActiveSession) - 1;
+  if (blueprintSwipeIndex < lastIndex) {
+    blueprintSwipeIndex += 1;
+    openModal("discoverYourself");
+    return;
+  }
+  const savedVersion = saveBlueprintSession(blueprintActiveSession);
+  if (blueprintActiveSession < BLUEPRINT_SESSIONS.length) {
+    blueprintActiveSession += 1;
+    blueprintSwipeIndex = 0;
+    openModal("discoverYourself");
+  } else {
+    blueprintMicroInsightText = blueprintMicroInsight(savedVersion);
+    closeModal();
+    renderScreen(activeTab);
+    refreshStaticScreens();
+  }
+}
+
+function advanceBlueprintValueSwipe(isYes) {
+  if (isYes && blueprintDraft.values.length < 3) {
+    const value = BLUEPRINT_VALUE_OPTIONS[blueprintSwipeIndex];
+    if (value && !blueprintDraft.values.includes(value)) blueprintDraft.values.push(value);
+  }
+  if (blueprintDraft.values.length >= 3) {
+    blueprintSwipeIndex = 8;
+    openModal("discoverYourself");
+  } else {
+    advanceBlueprintStep();
+  }
+}
+
+function advanceBlueprintStrengthSwipe(isYes) {
+  if (isYes && blueprintDraft.strengths.length < 3) {
+    const value = BLUEPRINT_STRENGTH_OPTIONS[blueprintSwipeIndex];
+    if (value && !blueprintDraft.strengths.includes(value)) blueprintDraft.strengths.push(value);
+  }
+  if (blueprintDraft.strengths.length >= 3) {
+    blueprintSwipeIndex = 8;
+    openModal("discoverYourself");
+  } else {
+    advanceBlueprintStep();
+  }
 }
 
 function blueprintMicroInsight(version) {
@@ -5112,9 +7262,6 @@ const screens = {
       <div class="avatar"><img src="assets/icon-spark.png" alt=""></div>
     </header>
 
-    ${futureSelfEntryCard()}
-    ${costOfLivingEntryCard()}
-
     <section class="mirror-form-card">
       <div class="home-quick-grid mirror-mode-grid">
         <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">
@@ -5125,9 +7272,21 @@ const screens = {
           <img src="assets/icon-decide.png" alt="">
           <strong>Build Mode</strong>
         </button>
+        <button type="button" class="${futureMirrorMode === "advanced" ? "is-selected" : ""}" data-future-mirror-mode="advanced">
+          <img src="assets/icon-balance.png" alt="">
+          <strong>Advanced</strong>
+        </button>
       </div>
-      ${futureMirrorMode === "build" ? buildModeEntrySection() : futureScanEntrySection()}
+      ${futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorMode === "advanced" ? advancedModeEntrySection() : futureScanEntrySection()}
     </section>
+
+    <div class="content-rail-title"><strong>More tools</strong><span>Scroll sideways</span></div>
+    <div class="mirror-tools-row">
+      ${futureSelfEntryCard()}
+      ${costOfLivingEntryCard()}
+      ${microInsuranceEntryCard()}
+      ${taxObligationsEntryCard()}
+    </div>
 
     ${savedFutureDecisions().length ? futureReflectionList() : ""}
   `,
@@ -5226,82 +7385,112 @@ const screens = {
     ${growthSuggestionCard()}
 
     ${growthHubSection({
+      id: "goals",
       title: "Goals & Dreams",
       subtitle: "Save the future you are aiming toward.",
       icon: "icon-learn.png",
       tone: "goals-tone",
       items: [
-        { title: "Discover Yourself", text: "Build your Personal Blueprint - the foundation for everything else here.", modal: "discoverYourself" },
-        { title: "Life Roadmap", text: "Turn a goal into concrete monthly milestones.", modal: "roadmapView" },
-        { title: "Personal goals", text: "Write what you want to build.", modal: "growthGoals" },
-        { title: "Vision Board", text: "Collect your direction in one place.", modal: "growthGoals" },
-        { title: "Dream university", text: "Save your study direction.", modal: "growthGoals" },
-        { title: "Dream career", text: "Name the work life you want.", modal: "growthGoals" },
-        { title: "Dream lifestyle", text: "Define balance, money, and health.", modal: "growthGoals" },
-        { title: "Future Mirror", text: "Simulate decision impact.", tab: "future" },
-        { title: "Life Simulator", text: "Explore adult-life choices in 3D.", tab: "simulator" },
-        { title: "Opportunity Hub", text: "Find scholarships, internships, and skill paths.", tab: "opportunities" },
-        { title: "AI goal planning", text: "Turn dreams into next steps.", prompt: growthPromptFromData("a simple goal plan with one next action") }
+        { title: "Discover Yourself", text: "Build your Personal Blueprint - the foundation for everything else here.", modal: "discoverYourself", icon: "icon-profile.png" },
+        { title: "Life Roadmap", text: "Turn a goal into concrete monthly milestones.", modal: "roadmapView", icon: "icon-time.png" },
+        { title: "Personal goals", text: "Write what you want to build.", modal: "growthGoals", icon: "icon-spark.png" },
+        { title: "Vision Board", text: "Collect your direction in one place.", modal: "growthGoals", icon: "icon-stories.png" },
+        { title: "Dream university", text: "Save your study direction.", modal: "growthGoals", icon: "icon-assessment.png" },
+        { title: "Dream career", text: "Name the work life you want.", modal: "growthGoals", icon: "icon-work.png" },
+        { title: "Dream lifestyle", text: "Define balance, money, and health.", modal: "growthGoals", icon: "icon-balance.png" },
+        { title: "Future Mirror", text: "Simulate decision impact.", tab: "future", icon: "icon-guide.png" },
+        { title: "Life Simulator", text: "Explore adult-life choices in 3D.", tab: "simulator", icon: "icon-home.png" },
+        { title: "Opportunity Hub", text: "Find scholarships, internships, and skill paths.", tab: "opportunities", icon: "icon-money.png" },
+        { title: "AI goal planning", text: "Turn dreams into next steps.", prompt: growthPromptFromData("a simple goal plan with one next action"), icon: "icon-chat.png" }
       ]
     })}
 
     ${growthHubSection({
+      id: "reflection",
       title: "Reflection",
       subtitle: "Understand mood, thoughts, and daily patterns.",
       icon: "icon-checkin.png",
       tone: "reflection-tone",
       items: [
-        { title: "Daily reflection", text: "A 3-minute rotating prompt - mood, stress, growth, or procrastination.", modal: "dailyReflection" },
-        { title: "Weekly letter", text: "A short note to you, next week.", modal: "weeklyLetter" },
-        { title: "Milestone letter", text: "Write to your future self, further out.", modal: "milestoneLetter" },
-        { title: "Daily Check-In", text: "Log today's mood and energy.", modal: "mood" },
-        { title: "Mood tracking", text: "Review how you have been feeling.", modal: "mood" },
-        { title: "Future Readiness Assessment", text: "Adulthood, decisions, money, resilience.", modal: "assessment" },
-        { title: "Well-being check-in", text: "Mental wellness and emotional pressure.", modal: "assessment" },
-        { title: "Growth assessment", text: "Self-awareness and future planning.", modal: "assessment" },
-        { title: "Journal", text: "Write what happened and what you learned.", modal: "journal" },
-        { title: "AI reflection insight", text: "Ask Compass to find one pattern.", prompt: growthPromptFromData("a reflection insight from my real saved data") }
+        { title: "Daily reflection", text: "A 3-minute rotating prompt - mood, stress, growth, or procrastination.", modal: "dailyReflection", icon: "icon-spark.png" },
+        { title: "Weekly letter", text: "A short note to you, next week.", modal: "weeklyLetter", icon: "icon-chat.png" },
+        { title: "Milestone letter", text: "Write to your future self, further out.", modal: "milestoneLetter", icon: "icon-stories.png" },
+        { title: "Daily Check-In", text: "Log today's mood and energy.", modal: "mood", icon: "icon-checkin.png" },
+        { title: "Mood tracking", text: "Review how you have been feeling.", modal: "mood", icon: "icon-mood.png" },
+        { title: "Personal Weather Forecast", text: "A predictive 7-day forecast, built from your real mood pattern.", modal: "personalWeather", icon: "icon-warning.png" },
+        { title: "Future Readiness Assessment", text: "Adulthood, decisions, money, resilience.", modal: "assessment", icon: "icon-assessment.png" },
+        { title: "Well-being check-in", text: "Mental wellness and emotional pressure.", modal: "assessment", icon: "icon-health.png" },
+        { title: "Growth assessment", text: "Self-awareness and future planning.", modal: "assessment", icon: "icon-guide.png" },
+        { title: "Journal", text: "Write what happened and what you learned.", modal: "journal", icon: "icon-learn.png" },
+        { title: "Self Archaeology", text: "Dig up an old month of entries as a field report, not nostalgia.", modal: "selfArchaeology", icon: "icon-time.png" },
+        { title: "AI reflection insight", text: "Ask Compass to find one pattern.", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png" }
       ]
     })}
 
     ${growthHubSection({
+      id: "challenges",
       title: "Challenges & Badges",
       subtitle: "Small 7-day challenges without childish pressure.",
       icon: "icon-boundary.png",
       tone: "challenge-tone",
       items: [
-        { title: "7-Day Confidence Challenge", text: "Practice one brave action.", modal: "challengeHub" },
-        { title: "7-Day Study Focus Challenge", text: "Protect one focus block.", modal: "challengeHub" },
-        { title: "7-Day Gratitude Challenge", text: "Notice one honest good thing.", modal: "challengeHub" },
-        { title: "AI Roleplay Practice", text: "Practice real-life situations safely.", modal: "roleplayList" },
-        { title: "Streaks", text: "View simple progress counts.", modal: "badges" },
-        { title: "Achievements & Badges", text: "See what you have unlocked.", modal: "badges" }
+        { title: "7-Day Confidence Challenge", text: "Practice one brave action.", modal: "challengeHub", icon: "icon-spark.png" },
+        { title: "7-Day Study Focus Challenge", text: "Protect one focus block.", modal: "challengeHub", icon: "icon-learn.png" },
+        { title: "7-Day Gratitude Challenge", text: "Notice one honest good thing.", modal: "challengeHub", icon: "icon-mood.png" },
+        { title: "AI Roleplay Practice", text: "Practice real-life situations safely.", modal: "roleplayList", icon: "icon-chat.png" },
+        { title: "Ghost Roommate", text: "Move in with someone - a relationship that remembers.", modal: "ghostRoommate", icon: "icon-home.png" },
+        { title: "Failure Inoculation", text: "This week's task is designed to fail. That's the point.", modal: "failureInoculation", icon: "icon-warning.png" },
+        { title: "Streaks", text: "View simple progress counts.", modal: "badges", icon: "icon-time.png" },
+        { title: "Achievements & Badges", text: "See what you have unlocked.", modal: "badges", icon: "icon-safety.png" }
       ]
     })}
 
     ${growthHubSection({
+      id: "career",
       title: "Career Studio",
       subtitle: "Practice for the real thing before it counts.",
       icon: "icon-work.png",
       tone: "career-tone",
       items: [
-        { title: "Career Studio", text: "Interview practice, resume builder, and job matching.", modal: "careerStudio" }
+        { title: "Career Studio", text: "Interview practice, resume builder, and job matching.", modal: "careerStudio", icon: "icon-profile.png" },
+        { title: "Future Self Hiring", text: "Four future-you candidates interview for the job of who you become.", modal: "futureSelfHiring", icon: "icon-chat.png" },
+        { title: "Jury Duty on Yourself", text: "Put a real decision on trial - prosecution, defense, and a verdict.", modal: "juryTrial", icon: "icon-balance.png" }
       ]
     })}
 
     ${growthHubSection({
+      id: "progress",
       title: "Progress",
       subtitle: "Review your growth without clutter.",
       icon: "icon-balance.png",
       tone: "progress-tone",
       items: [
-        { title: "Weekly AI Report", text: "Summarize this week's real data.", prompt: growthPromptFromData("a short weekly growth report") },
-        { title: "Monthly Growth Report", text: "Plan next month's direction.", prompt: growthPromptFromData("a monthly growth report and next focus") },
-        { title: "Mood trend", text: "See your latest mood pattern.", modal: "growthProgress" },
-        { title: "Goal progress", text: "Review saved dreams and goals.", modal: "growthProgress" },
-        { title: "Challenge progress", text: "Check 7-day challenge status.", modal: "growthProgress" },
-        { title: "Receipt record", text: "Track what you paid today.", modal: "receipt" },
-        { title: "Knowledge Vault", text: "Everything Future Mirror knows about you, in one place.", modal: "knowledgeVault" }
+        { title: "Weekly AI Report", text: "Summarize this week's real data.", prompt: growthPromptFromData("a short weekly growth report"), icon: "icon-chat.png" },
+        { title: "Monthly Growth Report", text: "Plan next month's direction.", prompt: growthPromptFromData("a monthly growth report and next focus"), icon: "icon-stories.png" },
+        { title: "Mood trend", text: "See your latest mood pattern.", modal: "growthProgress", icon: "icon-mood.png" },
+        { title: "Goal progress", text: "Review saved dreams and goals.", modal: "growthProgress", icon: "icon-spark.png" },
+        { title: "Challenge progress", text: "Check 7-day challenge status.", modal: "growthProgress", icon: "icon-boundary.png" },
+        { title: "Receipt record", text: "Track what you paid today.", modal: "receipt", icon: "icon-receipt.png" },
+        { title: "Knowledge Vault", text: "Everything Future Mirror knows about you, in one place.", modal: "knowledgeVault", icon: "icon-learn.png" },
+        { title: "AI Trace Log", text: "Is the AI coach actually helping? Every reply gets graded.", modal: "aiTraceLog", icon: "icon-assessment.png" }
+      ]
+    })}
+
+    ${growthHubSection({
+      id: "practical",
+      title: "Practical & Safety",
+      subtitle: "The unglamorous stuff nobody warns you about.",
+      icon: "icon-safety.png",
+      tone: "progress-tone",
+      items: [
+        { title: "Basic Tax Obligations", text: "Know what you actually owe, in plain English.", modal: "taxObligations", icon: "icon-receipt.png" },
+        { title: "Inherited Debugging", text: "Refactor habits you didn't choose, issue by issue.", modal: "legacyDebugger", icon: "icon-settings.png" },
+        { title: "Self-Debt", text: "Pay your future self a debt, collected only when it's actually due.", modal: "selfDebtLedger", icon: "icon-money.png" },
+        { title: "Estate Auction", text: "Your time and habits, read out like an auction catalog.", modal: "estateAuction", icon: "icon-time.png" },
+        { title: "Safety Net Preview", text: "What a safety net might cover - concept only, not real cover.", modal: "microInsurance", icon: "icon-health.png" },
+        { title: "Share with a guardian", text: "A read-only Life Roadmap link - no login needed on their end.", modal: "guardianShareSetup", icon: "icon-profile.png" },
+        { title: "Skill Exchange", text: "Trade what you know for what you need.", tab: "community", icon: "icon-chat.png" },
+        { title: "SOS - get urgent help", text: "Real Singapore resources, always one tap away.", modal: "sosTriage", icon: "icon-warning.png" }
       ]
     })}
   `,
@@ -5359,6 +7548,13 @@ const screens = {
         <p>Save useful options, apply through external links, or ask Compass AI to recommend what fits your age, interests, goals, and career direction.</p>
       </div>
       ${opportunityStats()}
+    </section>
+
+    <section class="mirror-form-card">
+      <p class="eyebrow">Beta</p>
+      <h3>Try the new Feed</h3>
+      <p class="muted">Community posts and opportunities, mixed into one full-screen swipe-through stream - an early read-only prototype, not the final navigation.</p>
+      <button class="primary-action compact-action" type="button" data-open="feedPrototype">Open Feed (beta)</button>
     </section>
 
     ${opportunityRecommendationCard()}
@@ -5500,69 +7696,78 @@ const modals = {
     </div>
   `,
 
-  assessment: () => `
+  assessment: () => {
+    const totalSteps = assessmentItems.length + 2;
+    const item = assessmentStep < assessmentItems.length ? assessmentItems[assessmentStep] : null;
+    const isFreeTextStep = assessmentStep === assessmentItems.length;
+    return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="assessment-title">
       <div class="modal-top">
         <span class="risk-pill calm">Future Readiness Assessment</span>
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="assessment-title">Understand where you are today and prepare for the future you want.</h3>
-      <p class="muted">This is not a personality test. It helps you reflect on adulthood readiness, decisions, money, resilience, relationships, independence, and future planning.</p>
-      <div class="assessment-progress">
-        <span>Step ${assessmentStep + 1} of ${assessmentItems.length + 2}</span>
-        <i><b style="width:${Math.round(((assessmentStep + 1) / (assessmentItems.length + 2)) * 100)}%"></b></i>
-      </div>
-      <div class="assessment-form">
-        ${assessmentItems.map((item, index) => `
-          <section class="assessment-item ${assessmentStep === index ? "is-active" : ""}" data-assessment-step="${index}">
-            <strong>${index + 1}. ${escapeHTML(item.text)}</strong>
-            <p>${escapeHTML(item.domain)} category${item.legacyDomain ? ` - adapted from ${escapeHTML(item.legacyDomain)} check-in` : ""}</p>
+      <p class="muted">This is not a personality test. It helps you reflect on adulthood readiness, decisions, money, resilience, relationships, independence, and future planning. Tap an answer and the card moves on - like swiping through a deck, not filling out a form.</p>
+      <p class="swipe-card-progress">Step ${assessmentStep + 1} of ${totalSteps}</p>
+      <div class="swipe-deck">
+        <div class="swipe-card-behind" aria-hidden="true"></div>
+        <div class="swipe-card" data-swipe-mode="choice">
+          ${item ? `
+            <p class="swipe-card-eyebrow">${escapeHTML(item.domain)}${item.legacyDomain ? ` - adapted from ${escapeHTML(item.legacyDomain)} check-in` : ""}</p>
+            <p class="swipe-card-question">${escapeHTML(item.text)}</p>
             <div class="scale-grid">
               ${(item.options || responseOptions).map((option) => `
                 <label class="scale-option">
-                  <input type="radio" name="assessment-${item.id}" value="${option.value}" ${Number(assessmentDraft.answers[item.id] ?? 0) === option.value ? "checked" : ""}>
+                  <input type="radio" name="assessment-${item.id}" value="${option.value}" ${Number(assessmentDraft.answers[item.id] ?? -1) === option.value ? "checked" : ""}>
                   <span>${option.label}</span>
                 </label>
               `).join("")}
             </div>
-          </section>
-        `).join("")}
-        <section class="assessment-item ${assessmentStep === assessmentItems.length ? "is-active" : ""}" data-assessment-step="${assessmentItems.length}">
-          <strong>${assessmentItems.length + 1}. What future-readiness challenge do you want to understand better?</strong>
-          <textarea id="assessment-free-text" placeholder="Example: I want to save money but I keep spending when I feel stressed.">${escapeHTML(assessmentDraft.freeText || "")}</textarea>
-        </section>
-        <section class="assessment-item ${assessmentStep === assessmentItems.length + 1 ? "is-active" : ""}" data-assessment-step="${assessmentItems.length + 1}">
-          <strong>${assessmentItems.length + 2}. Which future-building patterns do you want to strengthen?</strong>
-          <p>Choose any that fit. This helps Compass make the readiness insight more practical.</p>
-          <div class="option-grid">
-            ${[
-              ["plan", "Planning before acting"],
-              ["people", "Communicating clearly"],
-              ["logic", "Thinking through consequences"],
-              ["creative", "Trying small experiments"],
-              ["quiet", "Reflecting before reacting"],
-              ["action", "Following through"]
-            ].map(([value, label]) => `
-              <label class="check-option">
-                <input type="checkbox" name="assessment-preference" value="${value}" ${(assessmentDraft.preferences || []).includes(value) ? "checked" : ""}>
-                <span>${label}</span>
-              </label>
-            `).join("")}
-          </div>
-        </section>
+          ` : isFreeTextStep ? `
+            <p class="swipe-card-eyebrow">Reflection</p>
+            <p class="swipe-card-question">What future-readiness challenge do you want to understand better?</p>
+            <textarea id="assessment-free-text" placeholder="Example: I want to save money but I keep spending when I feel stressed.">${escapeHTML(assessmentDraft.freeText || "")}</textarea>
+          ` : `
+            <p class="swipe-card-eyebrow">Almost done</p>
+            <p class="swipe-card-question">Which future-building patterns do you want to strengthen?</p>
+            <p class="muted">Choose any that fit. This helps Compass make the readiness insight more practical.</p>
+            <div class="swipe-choice-list">
+              ${[
+                ["plan", "Planning before acting"],
+                ["people", "Communicating clearly"],
+                ["logic", "Thinking through consequences"],
+                ["creative", "Trying small experiments"],
+                ["quiet", "Reflecting before reacting"],
+                ["action", "Following through"]
+              ].map(([value, label]) => `
+                <label class="check-option">
+                  <input type="checkbox" name="assessment-preference" value="${value}" ${(assessmentDraft.preferences || []).includes(value) ? "checked" : ""}>
+                  <span>${label}</span>
+                </label>
+              `).join("")}
+            </div>
+          `}
+        </div>
       </div>
       <div class="assessment-footer">
         <button class="secondary-action" type="button" data-prev-assessment ${assessmentStep === 0 ? "disabled" : ""}>Back</button>
-        ${assessmentStep < assessmentItems.length + 1
-          ? `<button class="primary-action" type="button" data-next-assessment>Next</button>`
-          : `<button class="primary-action" type="button" data-submit-assessment>Generate Future Readiness Score</button>`}
+        ${!item
+          ? (assessmentStep < totalSteps - 1
+            ? `<button class="primary-action" type="button" data-next-assessment>Next</button>`
+            : `<button class="primary-action" type="button" data-submit-assessment>Generate Future Readiness Score</button>`)
+          : (item.id in assessmentDraft.answers
+            ? `<button class="primary-action" type="button" data-next-assessment>Next</button>`
+            : `<p class="muted">Tap an answer above to continue.</p>`)}
       </div>
     </div>
-  `,
+  `;
+  },
 
   discoverYourself: () => {
     const session = BLUEPRINT_SESSIONS.find((item) => item.id === blueprintActiveSession) || BLUEPRINT_SESSIONS[0];
     const existing = latestBlueprint();
+    const step = blueprintSwipeStepInfo();
+    const totalSteps = blueprintSessionTotalSteps(blueprintActiveSession);
     return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="discover-yourself-title">
       <div class="modal-top">
@@ -5570,100 +7775,46 @@ const modals = {
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="discover-yourself-title">${escapeHTML(session.title)}</h3>
-      <p class="muted">This builds your Personal Blueprint - the foundation Future Self, Decision Compass, Roadmap, and AI Coach all read from. Short sessions, not one long form.</p>
+      <p class="muted">This builds your Personal Blueprint - the foundation Future Self, Decision Compass, Roadmap, and AI Coach all read from. Swipe or tap through it like a deck, one question at a time.</p>
       <div class="assessment-progress">
-        <span>Session ${blueprintActiveSession} of ${BLUEPRINT_SESSIONS.length}</span>
-        <i><b style="width:${Math.round((blueprintActiveSession / BLUEPRINT_SESSIONS.length) * 100)}%"></b></i>
+        <span>Session ${blueprintActiveSession} of ${BLUEPRINT_SESSIONS.length} - step ${blueprintSwipeIndex + 1} of ${totalSteps}</span>
+        <i><b style="width:${Math.round(((blueprintSwipeIndex + 1) / totalSteps) * 100)}%"></b></i>
       </div>
-      <div class="assessment-form">
-        ${blueprintActiveSession === 1 ? `
-          <section class="assessment-item is-active">
-            <strong>1. Pick up to 3 values that matter most to you right now</strong>
-            <div class="option-grid">
-              ${BLUEPRINT_VALUE_OPTIONS.map((value) => `
-                <label class="check-option">
-                  <input type="checkbox" name="blueprint-value" value="${escapeHTML(value)}" ${blueprintDraft.values.includes(value) ? "checked" : ""}>
-                  <span>${escapeHTML(value)}</span>
-                </label>
+      <div class="swipe-deck">
+        <div class="swipe-card-behind" aria-hidden="true"></div>
+        ${step.kind === "binary" ? `
+          <div class="swipe-card" data-swipe-mode="binary" data-swipe-context="${escapeHTML(step.context)}">
+            <span class="swipe-stamp is-yes">Yes</span>
+            <span class="swipe-stamp is-no">Skip</span>
+            <p class="swipe-card-eyebrow">${escapeHTML(step.eyebrow)} - ${step.picked}/3 picked</p>
+            <p class="swipe-card-question">${escapeHTML(step.label)}</p>
+            <p class="muted" style="text-align:center;">Does this matter to you right now? Swipe right for yes, left to skip.</p>
+            <div class="swipe-binary-actions">
+              <button class="swipe-round-button is-no" type="button" data-swipe-tap="no" aria-label="Skip">&times;</button>
+              <button class="swipe-round-button is-yes" type="button" data-swipe-tap="yes" aria-label="Yes">&#10003;</button>
+            </div>
+          </div>
+        ` : step.kind === "text" ? `
+          <div class="swipe-card" data-swipe-mode="choice">
+            <p class="swipe-card-eyebrow">Strengths</p>
+            <p class="swipe-card-question">Anything else you're good at?</p>
+            <textarea id="blueprint-strength-other" placeholder="Optional">${escapeHTML(blueprintDraft.strengthsOther || "")}</textarea>
+          </div>
+        ` : `
+          <div class="swipe-card" data-swipe-mode="choice">
+            <p class="swipe-card-eyebrow">${escapeHTML(step.eyebrow)}</p>
+            <p class="swipe-card-question">${escapeHTML(step.scenario.question)}</p>
+            <div class="swipe-choice-list">
+              ${step.scenario.options.map((option) => `
+                <button class="swipe-choice-button" type="button" data-answer-blueprint-scenario="${escapeHTML(step.field)}:${escapeHTML(option.value)}">${escapeHTML(option.label)}</button>
               `).join("")}
             </div>
-          </section>
-          <section class="assessment-item is-active">
-            <strong>2. ${escapeHTML(BLUEPRINT_PERSONALITY_SCENARIO.question)}</strong>
-            <div class="scale-grid">
-              ${BLUEPRINT_PERSONALITY_SCENARIO.options.map((option) => `
-                <label class="scale-option">
-                  <input type="radio" name="blueprint-personality" value="${escapeHTML(option.value)}" ${blueprintDraft.personalityChoice === option.value ? "checked" : ""}>
-                  <span>${escapeHTML(option.label)}</span>
-                </label>
-              `).join("")}
-            </div>
-          </section>
-        ` : ""}
-        ${blueprintActiveSession === 2 ? `
-          <section class="assessment-item is-active">
-            <strong>1. Pick up to 3 strengths that fit you</strong>
-            <div class="option-grid">
-              ${BLUEPRINT_STRENGTH_OPTIONS.map((value) => `
-                <label class="check-option">
-                  <input type="checkbox" name="blueprint-strength" value="${escapeHTML(value)}" ${blueprintDraft.strengths.includes(value) ? "checked" : ""}>
-                  <span>${escapeHTML(value)}</span>
-                </label>
-              `).join("")}
-            </div>
-            <textarea id="blueprint-strength-other" placeholder="Anything else? (optional)">${escapeHTML(blueprintDraft.strengthsOther || "")}</textarea>
-          </section>
-          <section class="assessment-item is-active">
-            <strong>2. ${escapeHTML(BLUEPRINT_MOTIVATION_SCENARIO.question)}</strong>
-            <div class="scale-grid">
-              ${BLUEPRINT_MOTIVATION_SCENARIO.options.map((option) => `
-                <label class="scale-option">
-                  <input type="radio" name="blueprint-motivation" value="${escapeHTML(option.value)}" ${blueprintDraft.motivationChoice === option.value ? "checked" : ""}>
-                  <span>${escapeHTML(option.label)}</span>
-                </label>
-              `).join("")}
-            </div>
-          </section>
-        ` : ""}
-        ${blueprintActiveSession === 3 ? `
-          <section class="assessment-item is-active">
-            <strong>1. ${escapeHTML(BLUEPRINT_LEARNING_SCENARIO.question)}</strong>
-            <div class="scale-grid">
-              ${BLUEPRINT_LEARNING_SCENARIO.options.map((option) => `
-                <label class="scale-option">
-                  <input type="radio" name="blueprint-learning" value="${escapeHTML(option.value)}" ${blueprintDraft.learningChoice === option.value ? "checked" : ""}>
-                  <span>${escapeHTML(option.label)}</span>
-                </label>
-              `).join("")}
-            </div>
-          </section>
-          <section class="assessment-item is-active">
-            <strong>2. ${escapeHTML(BLUEPRINT_WORK_SCENARIO.question)}</strong>
-            <div class="scale-grid">
-              ${BLUEPRINT_WORK_SCENARIO.options.map((option) => `
-                <label class="scale-option">
-                  <input type="radio" name="blueprint-work" value="${escapeHTML(option.value)}" ${blueprintDraft.workChoice === option.value ? "checked" : ""}>
-                  <span>${escapeHTML(option.label)}</span>
-                </label>
-              `).join("")}
-            </div>
-          </section>
-          <section class="assessment-item is-active">
-            <strong>3. ${escapeHTML(BLUEPRINT_DECISION_SCENARIO.question)}</strong>
-            <div class="scale-grid">
-              ${BLUEPRINT_DECISION_SCENARIO.options.map((option) => `
-                <label class="scale-option">
-                  <input type="radio" name="blueprint-decision" value="${escapeHTML(option.value)}" ${blueprintDraft.decisionChoice === option.value ? "checked" : ""}>
-                  <span>${escapeHTML(option.label)}</span>
-                </label>
-              `).join("")}
-            </div>
-          </section>
-        ` : ""}
+          </div>
+        `}
       </div>
       <div class="assessment-footer">
-        <button class="secondary-action" type="button" data-prev-blueprint-session ${blueprintActiveSession === 1 ? "disabled" : ""}>Back</button>
-        <button class="primary-action" type="button" data-save-blueprint-session="${blueprintActiveSession}">${blueprintActiveSession < BLUEPRINT_SESSIONS.length ? "Save & continue" : "Save Blueprint"}</button>
+        <button class="secondary-action" type="button" data-prev-blueprint-step ${blueprintActiveSession === 1 && blueprintSwipeIndex === 0 ? "disabled" : ""}>Back</button>
+        ${step.kind === "text" ? `<button class="primary-action" type="button" data-continue-blueprint-text>Continue</button>` : `<p class="muted">${step.kind === "binary" ? "Tap Skip or Yes above." : "Tap an answer above."}</p>`}
       </div>
       ${existing ? `<p class="tiny-note">Blueprint v${existing.version} saved ${escapeHTML(existing.versionedAt)}. Saving again creates a new version - your history is kept, not overwritten.</p>` : ""}
     </div>
@@ -5802,8 +7953,42 @@ const modals = {
       <div class="future-reflection-list">
         ${roadmapView === "calendar" ? roadmapCalendarView() : roadmapView === "longHorizon" ? roadmapLongHorizonView() : roadmapTimelineView()}
       </div>
+      ${myRoadmapGoals().length ? `<button class="secondary-action compact-action" type="button" data-open="guardianShareSetup">${trackerState.guardianShare.token ? "Manage guardian sharing" : "Share with a guardian"}</button>` : ""}
     </div>
   `,
+
+  guardianShareSetup: () => guardianShareSetupModal(),
+
+  sosTriage: () => sosTriageModal(),
+
+  ghostRoommate: () => ghostRoommateModal(),
+
+  legacyDebugger: () => legacyDebuggerModal(),
+  legacyIssueNew: () => legacyIssueNewModal(),
+  legacyIssueDetail: (issueId) => legacyIssueDetailModal(issueId),
+
+  selfDebtLedger: () => selfDebtLedgerModal(),
+  selfDebtNew: () => selfDebtNewModal(),
+  selfDebtNotice: () => selfDebtNoticeModal(),
+
+  failureInoculation: () => failureInoculationModal(),
+
+  futureSelfHiring: () => futureSelfHiringModal(),
+
+  estateAuction: () => estateAuctionModal(),
+
+  personalWeather: () => personalWeatherModal(),
+
+  juryTrial: () => juryTrialModal(),
+  juryAppeal: () => juryAppealModal(),
+
+  selfArchaeology: (monthKey) => selfArchaeologyModal(monthKey),
+
+  advancedMode: () => advancedModeModal(),
+
+  aiTraceLog: () => aiTraceLogModal(),
+
+  feedPrototype: () => feedPrototypeModal(),
 
   futureScanStation: (stationId) => {
     const station = FUTURE_SCAN_STATIONS.find((item) => item.id === stationId);
@@ -6079,8 +8264,26 @@ const modals = {
         `).join("")}
       </div>
       <div class="slider-row"><span>Energy</span><input id="mood-score" type="range" min="0" max="100" value="${trackerState.mood.score}"></div>
-      <textarea id="mood-note" aria-label="Mood note">${escapeHTML(trackerState.mood.note)}</textarea>
+      <label class="mood-reflection-label">What happened today?<textarea id="mood-note" aria-label="What happened today">${escapeHTML(trackerState.mood.note)}</textarea></label>
+      <label class="mood-reflection-label">What did it affect - a choice, a conversation, your plans?<textarea id="mood-affected" aria-label="What it affected" placeholder="Optional"></textarea></label>
+      <label class="mood-reflection-label">How will you adjust tomorrow?<textarea id="mood-adjustment" aria-label="Tomorrow's adjustment" placeholder="Optional"></textarea></label>
       <button class="primary-action" type="button" data-save-mood>Save mood</button>
+      ${trackerState.mood.entries.filter((entry) => entry.user_id === currentUserId()).length ? `
+        <div class="content-rail-title"><strong>Recent reflections</strong><span></span></div>
+        <div class="future-reflection-list">
+          ${trackerState.mood.entries.filter((entry) => entry.user_id === currentUserId()).slice(0, 5).map((entry) => `
+            <article class="future-reflection-item">
+              <div>
+                <strong>${escapeHTML(entry.label)} - ${entry.score}/100</strong>
+                <p>${escapeHTML(entry.note)}</p>
+                ${entry.affectedChoice ? `<p class="tiny-note">Affected: ${escapeHTML(entry.affectedChoice)}</p>` : ""}
+                ${entry.tomorrowAdjustment ? `<p class="tiny-note">Adjustment: ${escapeHTML(entry.tomorrowAdjustment)}</p>` : ""}
+                <small>${escapeHTML(entry.display_time || "")}</small>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      ` : ""}
     </div>
   `,
 
@@ -6467,6 +8670,38 @@ const modals = {
     </div>
   `,
 
+  microInsurance: () => microInsuranceModal(),
+
+  taxObligations: () => {
+    const done = TAX_OBLIGATION_ITEMS.filter((item) => trackerState.taxChecklist[item.id]).length;
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="tax-obligations-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Basic Tax Obligations</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="tax-obligations-title">What you're actually on the hook for</h3>
+        <p class="muted">General information to help you understand your own filing obligations, based on how IRAS explains them - not tax advice, and this app never files or fills in anything for you. Check off items as you understand them; that's just for your own tracking.</p>
+        <p class="tiny-note">${done} of ${TAX_OBLIGATION_ITEMS.length} checked off</p>
+        <div class="advice-stack">
+          ${TAX_OBLIGATION_ITEMS.map((item) => {
+            const checked = !!trackerState.taxChecklist[item.id];
+            return `
+              <div class="${checked ? "is-unlocked" : ""}">
+                <strong>${escapeHTML(item.title)}</strong>
+                <span>${escapeHTML(item.why)}</span>
+                <ul class="tiny-note-list">
+                  ${item.steps.map((step) => `<li>${escapeHTML(step)}</li>`).join("")}
+                </ul>
+                <button class="secondary-action compact-action" type="button" data-toggle-tax-item="${escapeHTML(item.id)}">${checked ? "Checked - mark as not done" : "Mark as understood"}</button>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  },
+
   growthGoals: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="growth-goals-title">
       <div class="modal-top">
@@ -6568,6 +8803,9 @@ const modals = {
       <div class="profile-actions">
         <button class="secondary-action" type="button" data-copy-community-prompt>Copy prompt</button>
         <button class="secondary-action" type="button" data-open="supportCircle">Support Circle</button>
+        ${hasCommunitySession()
+          ? `<button class="primary-action" type="button" data-open="communityPost" data-open-payload="theme:${escapeHTML(growthCommunityPrompt())}">Post to Community</button>`
+          : `<button class="secondary-action" type="button" data-tab-jump="community">Sign in to Community to post this</button>`}
       </div>
     </div>
   `,
@@ -6581,6 +8819,8 @@ const modals = {
   communityAccountabilityRequest: (targetUserId) => communityAccountabilityRequestModal(targetUserId),
 
   communityMentorApply: () => communityMentorApplyModal(),
+
+  communityAddSkillTag: (type) => communityAddSkillTagModal(type),
 
   communityOpportunitySubmit: () => communityOpportunitySubmitModal(),
 
@@ -6733,9 +8973,30 @@ function renderScreen(tab) {
   if (tab === "simulator") {
     requestAnimationFrame(mountLifeSim);
   }
+  if (!selfDebtNoticeShownThisSession && !modalLayer.classList.contains("is-open")) {
+    const due = dueSelfDebts();
+    if (due.length) {
+      selfDebtNoticeShownThisSession = true;
+      deliveredSelfDebtNotice = due.slice();
+      due.forEach((debt) => { debt.lastDeliveredAt = new Date().toISOString(); });
+      saveTrackerState();
+      setTimeout(() => openModal("selfDebtNotice"), 0);
+    }
+  }
+}
+
+let currentModalName = "";
+
+// Lets a pending async callback (an AI reply arriving late, etc.) check
+// whether the modal it was about to re-render is still the one on screen,
+// instead of unconditionally yanking the user back into it after they've
+// already navigated away or closed it.
+function isModalActive(name) {
+  return currentModalName === name && modalLayer.classList.contains("is-open");
 }
 
 function openModal(name, payload) {
+  currentModalName = name;
   if (name === "assessment" && !modalLayer.classList.contains("is-open")) {
     assessmentStep = 0;
     assessmentDraft = { answers: {}, freeText: "", preferences: [] };
@@ -6755,12 +9016,58 @@ function openModal(name, payload) {
   if (name === "costOfLiving" && !modalLayer.classList.contains("is-open")) {
     costOfLivingResult = null;
   }
+  if (name === "microInsurance" && !modalLayer.classList.contains("is-open")) {
+    microInsuranceScenarioId = null;
+  }
+  if (name === "guardianShareSetup" && !modalLayer.classList.contains("is-open")) {
+    const share = trackerState.guardianShare;
+    guardianShareDraft = {
+      goalIds: [...(share.goalIds || [])],
+      includePersonalBlueprint: !!share.includePersonalBlueprint,
+      includeChatHistory: !!share.includeChatHistory,
+      includeCostOfLiving: !!share.includeCostOfLiving
+    };
+    guardianShareError = "";
+  }
+  if (name === "sosTriage" && !modalLayer.classList.contains("is-open")) {
+    sosView = "categories";
+    sosResultCategoryId = null;
+    sosInputError = "";
+    sosBusy = false;
+  }
+  if (name === "ghostRoommate" && !modalLayer.classList.contains("is-open")) {
+    ghostRoommateError = "";
+    ghostRoommateLoading = false;
+  }
+  if (name === "futureSelfHiring" && !modalLayer.classList.contains("is-open")) {
+    hiringError = "";
+    isHiringLoading = false;
+  }
+  if (name === "juryTrial" && !modalLayer.classList.contains("is-open")) {
+    juryError = "";
+    isJuryLoading = false;
+  }
+  if (name === "selfArchaeology" && !modalLayer.classList.contains("is-open")) {
+    archaeologyError = "";
+    isArchaeologyLoading = false;
+  }
+  if (name === "advancedMode" && !modalLayer.classList.contains("is-open")) {
+    advancedModeError = "";
+    isAdvancedModeLoading = false;
+  }
+  if (name === "feedPrototype" && !modalLayer.classList.contains("is-open")) {
+    feedPrototypeIndex = 0;
+    feedPrototypeItems = [];
+  }
   if (name === "discoverYourself" && !modalLayer.classList.contains("is-open")) {
     blueprintActiveSession = 1;
-    const existing = latestBlueprint();
-    blueprintDraft = existing
-      ? { values: [...existing.values], personalityChoice: existing.personalityChoice || "", strengths: [...existing.strengths], strengthsOther: existing.strengthsOther || "", motivationChoice: existing.motivationChoice || "", learningChoice: existing.learningChoice || "", workChoice: existing.workChoice || "", decisionChoice: existing.decisionChoice || "" }
-      : { values: [], personalityChoice: "", strengths: [], strengthsOther: "", motivationChoice: "", learningChoice: "", workChoice: "", decisionChoice: "" };
+    blueprintSwipeIndex = 0;
+    // Always starts fresh, even when re-taking an existing Blueprint - the
+    // swipe-per-question format has no clean way to show "you picked this
+    // last time" on a card you haven't swiped to yet, so pre-filling would
+    // just cause cards to silently auto-skip when the old answers already
+    // hit the pick-3 cap.
+    blueprintDraft = { values: [], personalityChoice: "", strengths: [], strengthsOther: "", motivationChoice: "", learningChoice: "", workChoice: "", decisionChoice: "" };
   }
   // futureScanStationError is a single shared var across all 10 stations (by
   // design, so a run function's own openModal() calls during its
@@ -6773,12 +9080,95 @@ function openModal(name, payload) {
   modalLayer.innerHTML = getModal(name, payload) || "";
   modalLayer.classList.add("is-open");
   modalLayer.setAttribute("aria-hidden", "false");
+  mountSwipeCard();
+  mountFeedSwipeCard();
+}
+
+// Generic swipe-card drag physics, mounted directly on the DOM element after
+// each render (the rest of the app re-renders via full innerHTML
+// replacement via openModal, which would otherwise kill any drag in
+// progress). Only binary cards (data-swipe-mode="binary") get real pointer
+// drag - choice-of-N cards (Likert/scenario questions) use plain tap
+// buttons instead of N-directional drag detection, since some of those
+// questions carry real weight (e.g. a self-harm screening item) and
+// precision matters more than a gimmick there. Both share the same
+// "card leaves the deck" exit animation so the flow still feels consistent.
+function mountSwipeCard() {
+  const card = modalLayer.querySelector('.swipe-card[data-swipe-mode="binary"]');
+  if (!card) return;
+  const threshold = 90;
+  let dragging = false;
+  let startX = 0;
+  let startY = 0;
+  let dx = 0;
+
+  function setStampOpacity(direction, value) {
+    const stamp = card.querySelector(`.swipe-stamp.is-${direction}`);
+    if (stamp) stamp.style.opacity = String(value);
+  }
+
+  function onPointerDown(event) {
+    dragging = true;
+    dx = 0;
+    startX = event.clientX;
+    startY = event.clientY;
+    card.classList.add("is-dragging");
+    card.setPointerCapture(event.pointerId);
+  }
+
+  function onPointerMove(event) {
+    if (!dragging) return;
+    dx = event.clientX - startX;
+    const dy = (event.clientY - startY) * 0.15;
+    card.style.transform = `translate(${dx}px, ${dy}px) rotate(${dx / 18}deg)`;
+    setStampOpacity("yes", Math.max(0, Math.min(1, dx / threshold)));
+    setStampOpacity("no", Math.max(0, Math.min(1, -dx / threshold)));
+  }
+
+  async function onPointerUp() {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove("is-dragging");
+    if (dx > threshold) {
+      await commitSwipe(true);
+    } else if (dx < -threshold) {
+      await commitSwipe(false);
+    } else {
+      card.style.transform = "";
+    }
+  }
+
+  async function commitSwipe(isYes) {
+    // Shared with the data-swipe-tap button handler below (same card
+    // element, two possible commit paths) - without this, a drag-release
+    // followed by a quick tap on the Yes/No button during the 220ms exit
+    // animation would fire handleSwipeCommit twice for one card.
+    if (card.dataset.swipeCommitted === "true") return;
+    card.dataset.swipeCommitted = "true";
+    card.style.transform = "";
+    card.classList.add(isYes ? "is-exit-right" : "is-exit-left");
+    const context = card.dataset.swipeContext;
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    handleSwipeCommit(context, isYes);
+  }
+
+  card.addEventListener("pointerdown", onPointerDown);
+  card.addEventListener("pointermove", onPointerMove);
+  card.addEventListener("pointerup", onPointerUp);
+  card.addEventListener("pointercancel", onPointerUp);
+  card.dataset.swipeMounted = "true";
+}
+
+function handleSwipeCommit(context, isYes) {
+  if (context === "blueprint-values") advanceBlueprintValueSwipe(isYes);
+  else if (context === "blueprint-strengths") advanceBlueprintStrengthSwipe(isYes);
 }
 
 function closeModal() {
   modalLayer.classList.remove("is-open");
   modalLayer.setAttribute("aria-hidden", "true");
   modalLayer.innerHTML = "";
+  currentModalName = "";
 }
 
 function speak(text) {
@@ -8346,6 +10736,13 @@ async function enhanceBuildTrainingReply(entryId, sessionId, assistantCreatedAt,
     if (activeBuildEntryId === entry.id && activeBuildTrainingSessionId === session.id && modalLayer.classList.contains("is-open")) {
       openModal("buildTraining", session.id);
     }
+    void logAiTrace({
+      feature: "Build Mode",
+      userGoal: entry.goal,
+      coachType: entry.coachType,
+      context: `Coach instructions and training plan for "${session.title}" (${session.trainingType}), goal summary: ${entry.goalSummary}`,
+      reply: coachReply
+    });
   } catch (error) {
     console.error("[Build Mode] Live coach refinement failed; local coach reply kept.", error);
   }
@@ -8423,6 +10820,13 @@ async function sendChatMessage(text) {
     chatState.messages.push({ from: "assistant", text: reply });
     saveChatState();
     speak(reply);
+    void logAiTrace({
+      feature: "Compass AI Chat",
+      userGoal: clean,
+      coachType: "",
+      context: "Saved profile, Personal Blueprint, real saved facts, and recent chat history assembled by requestCompassAI",
+      reply
+    });
   } catch (error) {
     console.error("[Compass AI] Request failed", error);
     chatState.messages.push({ from: "assistant", text: COMPASS_API_ERROR, local: true });
@@ -8574,8 +10978,10 @@ document.addEventListener("click", async (event) => {
   const readinessAi = event.target.closest("[data-readiness-ai]");
   const nextAssessment = event.target.closest("[data-next-assessment]");
   const prevAssessment = event.target.closest("[data-prev-assessment]");
-  const saveBlueprintSessionButton = event.target.closest("[data-save-blueprint-session]");
-  const prevBlueprintSession = event.target.closest("[data-prev-blueprint-session]");
+  const prevBlueprintStepButton = event.target.closest("[data-prev-blueprint-step]");
+  const swipeTapButton = event.target.closest("[data-swipe-tap]");
+  const answerBlueprintScenarioButton = event.target.closest("[data-answer-blueprint-scenario]");
+  const continueBlueprintTextButton = event.target.closest("[data-continue-blueprint-text]");
   const closeAndOpen = event.target.closest("[data-close-and-open]");
   const futureSelfHorizonButton = event.target.closest("[data-future-self-horizon]");
   const generateFutureSelfButton = event.target.closest("[data-generate-future-self]");
@@ -8626,6 +11032,10 @@ document.addEventListener("click", async (event) => {
   const declineAccountabilityRequestButton = event.target.closest("[data-decline-accountability-request]");
   const saveContactHintButton = event.target.closest("[data-save-contact-hint]");
   const submitMentorApplicationButton = event.target.closest("[data-submit-mentor-application]");
+  const saveSkillTagButton = event.target.closest("[data-save-skill-tag]");
+  const deleteSkillTagButton = event.target.closest("[data-delete-skill-tag]");
+  const skillBrowseTypeButton = event.target.closest("[data-skill-browse-type]");
+  const skillBrowseCategoryButton = event.target.closest("[data-skill-browse-category]");
   const saveCommunityOpportunityButton = event.target.closest("[data-save-community-opportunity]");
   const saveOpportunity = event.target.closest("[data-save-opportunity]");
   const shareOpportunity = event.target.closest("[data-share-opportunity]");
@@ -8648,6 +11058,40 @@ document.addEventListener("click", async (event) => {
   const lifeVerseReset = event.target.closest("[data-lifeverse-reset]");
   const lifeVerseTravel = event.target.closest("[data-lifeverse-travel]");
   const dismissSystemTutorial = event.target.closest("[data-dismiss-system-tutorial]");
+  const toggleTaxItem = event.target.closest("[data-toggle-tax-item]");
+  const saveGuardianShareButton = event.target.closest("[data-save-guardian-share]");
+  const revokeGuardianShareButton = event.target.closest("[data-revoke-guardian-share]");
+  const copyGuardianLinkButton = event.target.closest("[data-copy-guardian-link]");
+  const sosGetHelpButton = event.target.closest("[data-sos-get-help]");
+  const sosCategoryButton = event.target.closest("[data-sos-category]");
+  const sosBackButton = event.target.closest("[data-sos-back]");
+  const microInsuranceScenarioButton = event.target.closest("[data-micro-insurance-scenario]");
+  const moveInRoommateButton = event.target.closest("[data-move-in-roommate]");
+  const sendRoommateReplyButton = event.target.closest("[data-send-roommate-reply]");
+  const nextRoommateWeekButton = event.target.closest("[data-next-roommate-week]");
+  const moveOutRoommateButton = event.target.closest("[data-move-out-roommate]");
+  const saveLegacyIssueButton = event.target.closest("[data-save-legacy-issue]");
+  const logLegacyPrButton = event.target.closest("[data-log-legacy-pr]");
+  const mergeLegacyIssueButton = event.target.closest("[data-merge-legacy-issue]");
+  const saveSelfDebtButton = event.target.closest("[data-save-self-debt]");
+  const archiveSelfDebtButton = event.target.closest("[data-archive-self-debt]");
+  const acknowledgeSelfDebtButton = event.target.closest("[data-acknowledge-self-debt]");
+  const logFailureInoculationButton = event.target.closest("[data-log-failure-inoculation]");
+  const startHiringButton = event.target.closest("[data-start-hiring]");
+  const startHiringSuggestedButton = event.target.closest("[data-start-hiring-suggested]");
+  const askHiringFollowupButton = event.target.closest("[data-ask-hiring-followup]");
+  const hireCandidateButton = event.target.closest("[data-hire-candidate]");
+  const newHiringSessionButton = event.target.closest("[data-new-hiring-session]");
+  const runEstateAuctionButton = event.target.closest("[data-run-estate-auction]");
+  const startJuryTrialButton = event.target.closest("[data-start-jury-trial]");
+  const testifyJuryButton = event.target.closest("[data-testify-jury]");
+  const submitJuryAppealButton = event.target.closest("[data-submit-jury-appeal]");
+  const excavateStratumButton = event.target.closest("[data-excavate-stratum]");
+  const runAdvancedModeButton = event.target.closest("[data-run-advanced-mode]");
+  const toggleHubSectionButton = event.target.closest("[data-toggle-hub-section]");
+  const feedProtoPrevButton = event.target.closest("[data-feed-proto-prev]");
+  const feedProtoNextButton = event.target.closest("[data-feed-proto-next]");
+  const tryAdvancedFindingButton = event.target.closest("[data-try-advanced-finding]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
 
   if (opener) {
@@ -8658,6 +11102,254 @@ document.addEventListener("click", async (event) => {
     trackerState.systemTutorialsSeen[dismissSystemTutorial.dataset.dismissSystemTutorial] = true;
     saveTrackerState();
     renderScreen("simulator");
+  }
+  if (toggleTaxItem) {
+    const itemId = toggleTaxItem.dataset.toggleTaxItem;
+    trackerState.taxChecklist[itemId] = !trackerState.taxChecklist[itemId];
+    saveTrackerState();
+    if (activeTab === "future") renderScreen("future");
+    if (modalLayer.classList.contains("is-open")) openModal("taxObligations");
+  }
+  if (saveGuardianShareButton) {
+    guardianShareDraft = {
+      goalIds: Array.from(modalLayer.querySelectorAll("[data-toggle-guardian-goal]")).filter((input) => input.checked).map((input) => input.dataset.toggleGuardianGoal),
+      includePersonalBlueprint: !!modalLayer.querySelector('[data-toggle-guardian-extra="includePersonalBlueprint"]')?.checked,
+      includeChatHistory: !!modalLayer.querySelector('[data-toggle-guardian-extra="includeChatHistory"]')?.checked,
+      includeCostOfLiving: !!modalLayer.querySelector('[data-toggle-guardian-extra="includeCostOfLiving"]')?.checked
+    };
+    if (!guardianShareDraft.goalIds.length) {
+      guardianShareError = "Select at least one goal to share.";
+      openModal("guardianShareSetup");
+      return;
+    }
+    guardianShareBusy = true;
+    guardianShareError = "";
+    openModal("guardianShareSetup");
+    try {
+      await submitGuardianShare();
+    } catch (err) {
+      guardianShareError = err.message || "Could not save that share right now.";
+    } finally {
+      guardianShareBusy = false;
+      openModal("guardianShareSetup");
+    }
+  }
+  if (revokeGuardianShareButton) {
+    if (window.confirm("Revoke this guardian link? They will no longer be able to open it.")) {
+      await revokeGuardianShare();
+      openModal("guardianShareSetup");
+    }
+  }
+  if (copyGuardianLinkButton) {
+    const url = guardianShareLinkUrl(copyGuardianLinkButton.dataset.copyGuardianLink);
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(url);
+    }
+  }
+  if (sosCategoryButton) {
+    sosResultCategoryId = sosCategoryButton.dataset.sosCategory;
+    sosView = "result";
+    openModal("sosTriage");
+  }
+  if (sosBackButton) {
+    sosView = "categories";
+    sosResultCategoryId = null;
+    openModal("sosTriage");
+  }
+  if (microInsuranceScenarioButton) {
+    microInsuranceScenarioId = microInsuranceScenarioButton.dataset.microInsuranceScenario;
+    openModal("microInsurance");
+  }
+  if (moveInRoommateButton) {
+    await moveInGhostRoommate(moveInRoommateButton.dataset.moveInRoommate);
+  }
+  if (sendRoommateReplyButton) {
+    const input = modalLayer.querySelector("#ghost-roommate-input");
+    const text = input ? input.value.trim() : "";
+    if (!text) return;
+    input.value = "";
+    await sendGhostRoommateReply(text);
+  }
+  if (nextRoommateWeekButton) {
+    await startNextGhostRoommateWeek();
+  }
+  if (moveOutRoommateButton) {
+    if (window.confirm("Move out? This ends the relationship and clears your history with them.")) {
+      moveOutGhostRoommate();
+      openModal("ghostRoommate");
+    }
+  }
+  if (saveLegacyIssueButton) {
+    const titleInput = modalLayer.querySelector("#legacy-issue-title");
+    const descriptionInput = modalLayer.querySelector("#legacy-issue-description");
+    const inheritedInput = modalLayer.querySelector("#legacy-issue-inherited");
+    const error = modalLayer.querySelector("#legacy-issue-error");
+    const title = cleanText(titleInput ? titleInput.value : "", 120);
+    const description = cleanText(descriptionInput ? descriptionInput.value : "", 500);
+    if (!title || !description) {
+      if (error) error.textContent = "Add a title and description first.";
+      return;
+    }
+    const issue = createLegacyIssue({ title, description, inheritedFrom: inheritedInput ? inheritedInput.value : "" });
+    openModal("legacyIssueDetail", issue.id);
+  }
+  if (logLegacyPrButton) {
+    const textInput = modalLayer.querySelector("#legacy-pr-text");
+    const reviewerInput = modalLayer.querySelector("#legacy-pr-reviewer");
+    const error = modalLayer.querySelector("#legacy-pr-error");
+    const text = cleanText(textInput ? textInput.value : "", 400);
+    if (!text) {
+      if (error) error.textContent = "Describe what you actually tried first.";
+      return;
+    }
+    logLegacyPr(logLegacyPrButton.dataset.logLegacyPr, { text, reviewer: reviewerInput ? reviewerInput.value : "" });
+    openModal("legacyIssueDetail", logLegacyPrButton.dataset.logLegacyPr);
+  }
+  if (mergeLegacyIssueButton) {
+    mergeLegacyIssue(mergeLegacyIssueButton.dataset.mergeLegacyIssue);
+    openModal("legacyIssueDetail", mergeLegacyIssueButton.dataset.mergeLegacyIssue);
+  }
+  if (saveSelfDebtButton) {
+    const titleInput = modalLayer.querySelector("#self-debt-title-input");
+    const messageInput = modalLayer.querySelector("#self-debt-message-input");
+    const triggerSelect = modalLayer.querySelector("#self-debt-trigger-input");
+    const thresholdInput = modalLayer.querySelector("#self-debt-threshold-input");
+    const error = modalLayer.querySelector("#self-debt-error");
+    const title = cleanText(titleInput ? titleInput.value : "", 120);
+    const message = cleanText(messageInput ? messageInput.value : "", 500);
+    if (!title || !message) {
+      if (error) error.textContent = "Add a title and a message to your future self first.";
+      return;
+    }
+    createSelfDebt({
+      title,
+      message,
+      triggerType: triggerSelect ? triggerSelect.value : "journal-silence",
+      triggerThresholdDays: thresholdInput ? thresholdInput.value : 14
+    });
+    openModal("selfDebtLedger");
+  }
+  if (archiveSelfDebtButton) {
+    archiveSelfDebt(archiveSelfDebtButton.dataset.archiveSelfDebt);
+    openModal("selfDebtLedger");
+  }
+  if (acknowledgeSelfDebtButton) {
+    acknowledgeSelfDebt(acknowledgeSelfDebtButton.dataset.acknowledgeSelfDebt);
+    if (deliveredSelfDebtNotice.some((debt) => debt.status === "active")) {
+      openModal("selfDebtNotice");
+    } else {
+      closeModal();
+    }
+  }
+  if (logFailureInoculationButton) {
+    const noteInput = modalLayer.querySelector("#failure-inoculation-note");
+    logFailureInoculation({ outcome: logFailureInoculationButton.dataset.logFailureInoculation, note: noteInput ? noteInput.value : "" });
+    openModal("failureInoculation");
+  }
+  if (startHiringButton) {
+    const input = modalLayer.querySelector("#future-hiring-question");
+    const question = cleanText(input ? input.value : "", 300) || FUTURE_SELF_HIRING_QUESTIONS[0];
+    await startFutureSelfHiring(question);
+  }
+  if (startHiringSuggestedButton) {
+    await startFutureSelfHiring(startHiringSuggestedButton.dataset.startHiringSuggested);
+  }
+  if (askHiringFollowupButton) {
+    const input = modalLayer.querySelector("#future-hiring-followup");
+    const text = cleanText(input ? input.value : "", 300);
+    if (!text) return;
+    await askFutureSelfHiringFollowUp(text);
+  }
+  if (hireCandidateButton) {
+    hireFutureSelfCandidate(hireCandidateButton.dataset.hireCandidate);
+    openModal("futureSelfHiring");
+  }
+  if (newHiringSessionButton) {
+    activeHiringSessionId = null;
+    hiringError = "";
+    openModal("futureSelfHiring");
+  }
+  if (runEstateAuctionButton) {
+    runEstateAuction();
+    openModal("estateAuction");
+  }
+  if (startJuryTrialButton) {
+    const input = modalLayer.querySelector("#jury-decision-input");
+    const decision = cleanText(input ? input.value : "", 300);
+    if (!decision) {
+      juryError = "Describe the real decision you're stuck on first.";
+      openModal("juryTrial");
+      return;
+    }
+    await startJuryTrial(decision);
+  }
+  if (testifyJuryButton) {
+    const input = modalLayer.querySelector("#jury-testimony-input");
+    const text = cleanText(input ? input.value : "", 500);
+    if (!text) return;
+    await testifyToJury(text);
+  }
+  if (submitJuryAppealButton) {
+    const input = modalLayer.querySelector("#jury-appeal-input");
+    const text = cleanText(input ? input.value : "", 500);
+    if (!text) return;
+    await appealJuryVerdict(text);
+  }
+  if (excavateStratumButton) {
+    await excavateStratum(excavateStratumButton.dataset.excavateStratum);
+  }
+  if (runAdvancedModeButton) {
+    await runAdvancedModeDiagnostic();
+  }
+  if (tryAdvancedFindingButton) {
+    await startJuryTrial(tryAdvancedFindingButton.dataset.tryAdvancedFinding);
+  }
+  if (toggleHubSectionButton) {
+    const id = toggleHubSectionButton.dataset.toggleHubSection;
+    expandedGrowthSections[id] = !expandedGrowthSections[id];
+    renderScreen("growth");
+  }
+  if (feedProtoPrevButton) {
+    feedPrototypeIndex = Math.max(0, feedPrototypeIndex - 1);
+    openModal("feedPrototype");
+  }
+  if (feedProtoNextButton) {
+    feedPrototypeIndex = Math.min(feedPrototypeItems.length - 1, feedPrototypeIndex + 1);
+    openModal("feedPrototype");
+  }
+  if (sosGetHelpButton) {
+    const textInput = modalLayer.querySelector("#sos-input-text");
+    const text = cleanText(textInput ? textInput.value : "", 500);
+    if (!text) {
+      sosInputError = "Describe what's going on in a sentence or two first.";
+      openModal("sosTriage");
+      return;
+    }
+    if (SOS_CRISIS_PATTERN.test(text)) {
+      sosResultCategoryId = "mental-health";
+      sosView = "result";
+      openModal("sosTriage");
+      return;
+    }
+    sosBusy = true;
+    sosInputError = "";
+    openModal("sosTriage");
+    try {
+      const category = await classifySosSituation(text);
+      if (category === "unclear") {
+        sosInputError = "Couldn't tell which category that fits - pick one above instead.";
+        sosView = "categories";
+      } else {
+        sosResultCategoryId = category;
+        sosView = "result";
+      }
+    } catch (error) {
+      console.error("[SOS Triage] classify failed", error);
+      sosInputError = "Couldn't sort that automatically - pick a category above instead.";
+    } finally {
+      sosBusy = false;
+      openModal("sosTriage");
+    }
   }
   if (lifeVerseTravel) {
     const destinationId = lifeVerseTravel.dataset.lifeverseTravel;
@@ -9063,23 +11755,41 @@ document.addEventListener("click", async (event) => {
   if (buildCoachPromptButton) await sendBuildTrainingReply(buildCoachPromptButton.dataset.buildCoachPrompt || "");
   if (finishBuildTrainingButton) finishBuildTrainingSession();
 
-  if (prevBlueprintSession) {
-    captureBlueprintDraft();
-    blueprintActiveSession = Math.max(1, blueprintActiveSession - 1);
+  if (prevBlueprintStepButton) {
+    if (blueprintSwipeIndex > 0) {
+      blueprintSwipeIndex -= 1;
+    } else if (blueprintActiveSession > 1) {
+      blueprintActiveSession -= 1;
+      blueprintSwipeIndex = blueprintSessionTotalSteps(blueprintActiveSession) - 1;
+    }
     openModal("discoverYourself");
   }
 
-  if (saveBlueprintSessionButton) {
-    const savedVersion = saveBlueprintSession(Number(saveBlueprintSessionButton.dataset.saveBlueprintSession));
-    if (blueprintActiveSession < BLUEPRINT_SESSIONS.length) {
-      blueprintActiveSession += 1;
-      openModal("discoverYourself");
-    } else {
-      blueprintMicroInsightText = blueprintMicroInsight(savedVersion);
-      closeModal();
-      renderScreen(activeTab);
-      refreshStaticScreens();
+  if (swipeTapButton) {
+    const card = modalLayer.querySelector('.swipe-card[data-swipe-mode="binary"]');
+    if (card && card.dataset.swipeCommitted !== "true") {
+      card.dataset.swipeCommitted = "true";
+      const isYes = swipeTapButton.dataset.swipeTap === "yes";
+      card.classList.add(isYes ? "is-exit-right" : "is-exit-left");
+      const context = card.dataset.swipeContext;
+      await new Promise((resolve) => setTimeout(resolve, 220));
+      handleSwipeCommit(context, isYes);
     }
+  }
+
+  if (answerBlueprintScenarioButton) {
+    const [field, value] = String(answerBlueprintScenarioButton.dataset.answerBlueprintScenario || "").split(":");
+    blueprintDraft[field] = value;
+    const card = modalLayer.querySelector(".swipe-card");
+    if (card) card.classList.add("is-exit-up");
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    advanceBlueprintStep();
+  }
+
+  if (continueBlueprintTextButton) {
+    const textarea = modalLayer.querySelector("#blueprint-strength-other");
+    blueprintDraft.strengthsOther = textarea ? textarea.value.trim() : "";
+    advanceBlueprintStep();
   }
 
   if (closeAndOpen) {
@@ -9264,6 +11974,8 @@ document.addEventListener("click", async (event) => {
     const selectedMood = modalLayer.querySelector("[data-mood-choice].is-selected");
     const score = Number(modalLayer.querySelector("#mood-score").value || 0);
     const note = modalLayer.querySelector("#mood-note").value.trim() || "Mood logged for today.";
+    const affectedChoice = cleanText(modalLayer.querySelector("#mood-affected").value, 300);
+    const tomorrowAdjustment = cleanText(modalLayer.querySelector("#mood-adjustment").value, 300);
     trackerState.mood.label = selectedMood ? selectedMood.dataset.moodChoice : trackerState.mood.label;
     trackerState.mood.score = score;
     trackerState.mood.note = note;
@@ -9274,6 +11986,8 @@ document.addEventListener("click", async (event) => {
       label: trackerState.mood.label,
       score,
       note,
+      affectedChoice,
+      tomorrowAdjustment,
       created_at: new Date().toISOString(),
       display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
     });
@@ -9640,6 +12354,43 @@ document.addEventListener("click", async (event) => {
     }
   }
 
+  if (saveSkillTagButton) {
+    const typeInput = modalLayer.querySelector("#community-skill-tag-type");
+    const categorySelect = modalLayer.querySelector("#community-skill-tag-category");
+    const noteInput = modalLayer.querySelector("#community-skill-tag-note");
+    const error = modalLayer.querySelector("#community-skill-tag-error");
+    const type = typeInput ? typeInput.value : "offered";
+    const category = categorySelect ? categorySelect.value : "";
+    const note = cleanText(noteInput ? noteInput.value : "", 140);
+    if (note.length < 4) {
+      if (error) error.textContent = "Add a short note first (at least 4 characters).";
+      return;
+    }
+    try {
+      await submitSkillTag({ type, category, note });
+      if (type === "offered") bumpCommunityTrust(2);
+      await refreshCommunityData();
+      checkCommunityAchievements();
+      closeModal();
+      renderScreen("community");
+    } catch (err) {
+      if (error) error.textContent = err.message || "Could not save that right now.";
+    }
+  }
+  if (deleteSkillTagButton) {
+    await deleteSkillTag(deleteSkillTagButton.dataset.deleteSkillTag);
+    await refreshCommunityData();
+    renderScreen("community");
+  }
+  if (skillBrowseTypeButton) {
+    setSkillExchangeBrowseType(skillBrowseTypeButton.dataset.skillBrowseType);
+    renderScreen("community");
+  }
+  if (skillBrowseCategoryButton) {
+    setSkillExchangeFilterCategory(skillBrowseCategoryButton.dataset.skillBrowseCategory);
+    renderScreen("community");
+  }
+
   if (saveCommunityOpportunityButton) {
     const titleInput = modalLayer.querySelector("#community-opportunity-title");
     const descriptionInput = modalLayer.querySelector("#community-opportunity-description");
@@ -9888,6 +12639,20 @@ document.addEventListener("change", async (event) => {
   if (upload && upload.files && upload.files[0]) {
     await handlePdfUpload(upload.files[0]);
     upload.value = "";
+  }
+  // Tapping an assessment answer auto-advances the swipe-card deck, instead
+  // of requiring a separate "Next" tap - the card animates away and the
+  // next question takes its place, same interaction language as the
+  // drag-to-swipe value/strength cards in Discover Yourself.
+  const assessmentChoice = event.target && event.target.matches('input[type="radio"][name^="assessment-"]') ? event.target : null;
+  if (assessmentChoice && modalLayer.classList.contains("is-open")) {
+    const card = modalLayer.querySelector(".swipe-card");
+    if (card) card.classList.add("is-exit-up");
+    setTimeout(() => {
+      captureAssessmentDraft();
+      assessmentStep = Math.min(assessmentItems.length + 1, assessmentStep + 1);
+      openModal("assessment");
+    }, 220);
   }
 });
 

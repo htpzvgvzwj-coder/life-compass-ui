@@ -330,6 +330,10 @@ const COMMUNITY_OPPORTUNITY_MODERATION_PROMPT = "You are a safety classifier for
 
 const COMMUNITY_MENTOR_MODERATION_PROMPT = "You are a safety classifier for mentor applications on a youth self-growth app called Compass. Given a single applicant bio, decide if it is safe to queue for human review. Block bios that: describe active self-harm, suicidal intent, or in-progress abuse; contain hate speech, harassment, or sexual content involving minors; share identifying details like a full name plus address, a school name plus schedule, a phone number, or passwords; contain scam links, spam, or solicitation for money/payment; make explicit claims to be a licensed professional (doctor, therapist, lawyer) that cannot be verified here. Do NOT block bios that simply describe someone's own past struggles or experience they want to mentor others through - that is the point of this feature. Respond with strict JSON only, no markdown, no extra text: {\"safe\": true or false, \"reason\": \"short user-facing reason, empty string if safe\"}.";
 
+const COMMUNITY_SKILL_TAG_MODERATION_PROMPT = "You are a safety classifier for a youth self-growth app's Skill Exchange board, where members offer or ask for help in one of six categories (Independence, Money, Communication, Career, Wellness, Relationships). Given a single one-line note describing what someone can offer or needs help with, decide if it is safe to publish. Block notes that: are scams, ask for money/fees/payment, advertise unrelated products or services, contain hate speech or sexual content, or share personal identifying details like a home address, phone number, or full school schedule that don't belong on a public listing. Do NOT block ordinary legitimate offers or requests, even informal ones (e.g. \"I can help with budgeting\", \"I need someone to practice interview answers with me\"). Respond with strict JSON only, no markdown, no extra text: {\"safe\": true or false, \"reason\": \"short user-facing reason, empty string if safe\"}.";
+
+const SKILL_TAG_CATEGORIES = ["independence", "money", "communication", "career", "wellness", "relationships"];
+
 function parseModerationReply(text) {
   const match = String(text || '').match(/\{[\s\S]*\}/);
   if (!match) return null;
@@ -579,7 +583,207 @@ async function handleCommunityMentorApply(req, res) {
   }
 }
 
-const COMMUNITY_ROUTES = new Set(['/api/community-config', '/api/community-post', '/api/community-opportunity', '/api/community-mentor-apply']);
+async function handleCommunitySkillTag(req, res) {
+  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+    sendJson(res, 503, { error: 'Community is not configured yet.' });
+    return;
+  }
+  const accessToken = bearerTokenFrom(req);
+  if (!accessToken) {
+    sendJson(res, 401, { error: 'Sign in to Community to use Skill Exchange.' });
+    return;
+  }
+  try {
+    const user = await verifySupabaseUser(accessToken);
+    if (!user) {
+      sendJson(res, 401, { error: 'Your Community session has expired. Please sign in again.' });
+      return;
+    }
+    const body = await readJsonBody(req);
+    const type = body.type === 'needed' ? 'needed' : body.type === 'offered' ? 'offered' : '';
+    const category = SKILL_TAG_CATEGORIES.includes(String(body.category || '')) ? String(body.category) : '';
+    const note = String(body.note || '').trim();
+    if (!type) {
+      sendJson(res, 400, { error: "Type must be 'offered' or 'needed'." });
+      return;
+    }
+    if (!category) {
+      sendJson(res, 400, { error: 'Pick a valid category.' });
+      return;
+    }
+    if (note.length < 4 || note.length > 140) {
+      sendJson(res, 400, { error: 'Note must be between 4 and 140 characters.' });
+      return;
+    }
+    const moderation = await moderateText(COMMUNITY_SKILL_TAG_MODERATION_PROMPT, note);
+    const status = moderation.safe ? 'published' : 'blocked';
+    const row = await insertSupabaseRow('skill_tags', {
+      user_id: user.id,
+      type,
+      category,
+      note,
+      status,
+      moderation_reason: moderation.safe ? null : (moderation.reason || 'This note needs a safer rewording before it can be shared.'),
+    });
+    sendJson(res, 200, { skillTag: row, status, reason: moderation.safe ? '' : row.moderation_reason });
+  } catch (error) {
+    console.error('[Community] community-skill-tag failed', error);
+    sendJson(res, 500, { error: 'Could not save that right now.' });
+  }
+}
+
+// --- Guardian share (Supabase, service-role only, no RLS policies) --------
+// Local mirror of api/guardian-share.js - see that file's header comment for
+// why this table has no anon/authenticated RLS access at all.
+
+function randomToken(bytes) {
+  return require('crypto').randomBytes(bytes).toString('base64url');
+}
+
+async function supabaseRestRequest(path, options = {}) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: supabaseServiceRoleKey,
+      Authorization: `Bearer ${supabaseServiceRoleKey}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Supabase request to ${path} failed (${response.status}): ${text.slice(0, 500)}`);
+  }
+  if (response.status === 204) return null;
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+function sanitizeGuardianGoals(goals) {
+  if (!Array.isArray(goals)) return [];
+  return goals.slice(0, 30).map((goal) => ({
+    title: String(goal.title || '').slice(0, 160),
+    milestones: Array.isArray(goal.milestones) ? goal.milestones.slice(0, 24).map((milestone) => ({
+      title: String(milestone.title || '').slice(0, 200),
+      status: ['done', 'in-progress'].includes(milestone.status) ? milestone.status : 'pending',
+    })) : [],
+  }));
+}
+
+async function handleGuardianShareGet(req, res) {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    sendJson(res, 503, { error: 'Guardian sharing is not configured yet.' });
+    return;
+  }
+  const requestUrl = new URL(req.url, 'http://localhost');
+  const token = String(requestUrl.searchParams.get('token') || '').trim();
+  if (!token) {
+    sendJson(res, 400, { error: 'Missing token.' });
+    return;
+  }
+  try {
+    const rows = await supabaseRestRequest(`guardian_shares?token=eq.${encodeURIComponent(token)}&select=goals,include_personal_blueprint,include_chat_history,include_cost_of_living,personal_blueprint,chat_history,cost_of_living,updated_at`);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) {
+      sendJson(res, 404, { error: 'This share link is no longer active.' });
+      return;
+    }
+    sendJson(res, 200, {
+      goals: row.goals || [],
+      personalBlueprint: row.include_personal_blueprint ? row.personal_blueprint : null,
+      chatHistory: row.include_chat_history ? row.chat_history : null,
+      costOfLiving: row.include_cost_of_living ? row.cost_of_living : null,
+      updatedAt: row.updated_at,
+    });
+  } catch (error) {
+    console.error('[GuardianShare] read failed', error);
+    sendJson(res, 500, { error: 'Could not load this share right now.' });
+  }
+}
+
+async function handleGuardianSharePost(req, res) {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    sendJson(res, 503, { error: 'Guardian sharing is not configured yet.' });
+    return;
+  }
+  try {
+    const body = await readJsonBody(req);
+    const action = body.action === 'revoke' ? 'revoke' : 'publish';
+
+    if (action === 'revoke') {
+      const token = String(body.token || '').trim();
+      const manageSecret = String(body.manageSecret || '').trim();
+      if (!token || !manageSecret) {
+        sendJson(res, 400, { error: 'Missing token or manage secret.' });
+        return;
+      }
+      const rows = await supabaseRestRequest(`guardian_shares?token=eq.${encodeURIComponent(token)}&select=manage_secret`);
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (!row || row.manage_secret !== manageSecret) {
+        sendJson(res, 403, { error: "That link can't be managed from here." });
+        return;
+      }
+      await supabaseRestRequest(`guardian_shares?token=eq.${encodeURIComponent(token)}`, { method: 'DELETE' });
+      sendJson(res, 200, { revoked: true });
+      return;
+    }
+
+    const localUserId = String(body.localUserId || '').trim().slice(0, 200);
+    if (!localUserId) {
+      sendJson(res, 400, { error: 'Missing local user id.' });
+      return;
+    }
+    const goals = sanitizeGuardianGoals(body.goals);
+    const includePersonalBlueprint = body.includePersonalBlueprint === true;
+    const includeChatHistory = body.includeChatHistory === true;
+    const includeCostOfLiving = body.includeCostOfLiving === true;
+
+    const row = {
+      local_user_id: localUserId,
+      goals,
+      include_personal_blueprint: includePersonalBlueprint,
+      include_chat_history: includeChatHistory,
+      include_cost_of_living: includeCostOfLiving,
+      personal_blueprint: includePersonalBlueprint ? (body.personalBlueprint || null) : null,
+      chat_history: includeChatHistory ? (Array.isArray(body.chatHistory) ? body.chatHistory.slice(-40) : null) : null,
+      cost_of_living: includeCostOfLiving ? (body.costOfLiving || null) : null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const existingToken = String(body.token || '').trim();
+    const existingManageSecret = String(body.manageSecret || '').trim();
+
+    if (existingToken && existingManageSecret) {
+      const rows = await supabaseRestRequest(`guardian_shares?token=eq.${encodeURIComponent(existingToken)}&select=manage_secret`);
+      const existing = Array.isArray(rows) ? rows[0] : null;
+      if (!existing || existing.manage_secret !== existingManageSecret) {
+        sendJson(res, 403, { error: "That link can't be managed from here." });
+        return;
+      }
+      await supabaseRestRequest(`guardian_shares?token=eq.${encodeURIComponent(existingToken)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify(row),
+      });
+      sendJson(res, 200, { token: existingToken });
+      return;
+    }
+
+    const token = randomToken(24);
+    const manageSecret = randomToken(24);
+    await supabaseRestRequest('guardian_shares', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ ...row, token, manage_secret: manageSecret, created_at: new Date().toISOString() }),
+    });
+    sendJson(res, 200, { token, manageSecret });
+  } catch (error) {
+    console.error('[GuardianShare] publish/revoke failed', error);
+    sendJson(res, 500, { error: 'Could not save that share right now.' });
+  }
+}
+
+const COMMUNITY_ROUTES = new Set(['/api/community-config', '/api/community-post', '/api/community-opportunity', '/api/community-mentor-apply', '/api/community-skill-tag']);
 
 http
   .createServer(async (req, res) => {
@@ -610,6 +814,22 @@ http
     }
     if (url.pathname === '/api/community-mentor-apply' && req.method === 'POST') {
       await handleCommunityMentorApply(req, res);
+      return;
+    }
+    if (url.pathname === '/api/community-skill-tag' && req.method === 'POST') {
+      await handleCommunitySkillTag(req, res);
+      return;
+    }
+    if (url.pathname === '/api/guardian-share' && req.method === 'OPTIONS') {
+      sendCorsPreflight(res);
+      return;
+    }
+    if (url.pathname === '/api/guardian-share' && req.method === 'GET') {
+      await handleGuardianShareGet(req, res);
+      return;
+    }
+    if (url.pathname === '/api/guardian-share' && req.method === 'POST') {
+      await handleGuardianSharePost(req, res);
       return;
     }
 
