@@ -1763,6 +1763,11 @@ function realGrowthFacts() {
   }
   const chainStats = habitChainStats(habitChainDays(84));
   if (chainStats.current > 0 || chainStats.longest > 0) facts.push(`Don't Break the Chain: ${chainStats.current}-day current streak of mood check-ins or journal entries, ${chainStats.longest}-day longest so far`);
+  const actionChallenges = trackerState.reflectionEntries.filter((entry) => entry.user_id === currentUserId() && entry.mode === "storyActionChallenge");
+  if (actionChallenges.length) {
+    const resolved = actionChallenges.filter((entry) => entry.lastRating === "resolved").length;
+    facts.push(`Inspire Hub action challenges taken on: ${actionChallenges.length}, ${resolved} marked resolved on follow-up`);
+  }
   const journalCount = trackerState.journalEntries.filter((entry) => entry.user_id === currentUserId()).length;
   if (journalCount) facts.push(`Journal entries written: ${journalCount}`);
   const nativeReflections = trackerState.reflectionEntries.filter((entry) => entry.user_id === currentUserId());
@@ -3764,7 +3769,7 @@ async function generateFutureSelfSnapshot(horizon) {
 // engine" acceptance criteria, without a risky rewrite of working code. This
 // is a deliberate deviation from a literal single-array schema - reported
 // here rather than done silently.
-const REFLECTION_RESURFACE_DAYS = { daily: 30, weeklyLetter: 14, decisionJournal: 90, milestoneLetter: 90 };
+const REFLECTION_RESURFACE_DAYS = { daily: 30, weeklyLetter: 14, decisionJournal: 90, milestoneLetter: 90, storyActionChallenge: 4 };
 const DAILY_REFLECTION_PROMPTS = [
   { id: "mood", label: "How would you describe your mood today, and why?", emoji: "🎭", starters: ["Honestly, today felt...", "My mood shifted when...", "I'm feeling this way because..."] },
   { id: "stress", label: "What's taking up the most mental space right now?", emoji: "🧠", starters: ["The thing I can't stop thinking about is...", "I keep worrying that...", "It would help if..."] },
@@ -3977,7 +3982,7 @@ function resurfacingCard() {
       ${due.map((entry) => `
         <article class="future-reflection-item">
           <div>
-            <strong>${escapeHTML(entry.mode === "decisionJournal" ? "A decision you journaled" : entry.mode === "weeklyLetter" ? "A letter to your past self" : entry.mode === "milestoneLetter" ? "A milestone letter" : entry.mode === "futureScanCheckBack" ? "A Future Scan check-back" : "A daily reflection")}</strong>
+            <strong>${escapeHTML(entry.mode === "decisionJournal" ? "A decision you journaled" : entry.mode === "weeklyLetter" ? "A letter to your past self" : entry.mode === "milestoneLetter" ? "A milestone letter" : entry.mode === "futureScanCheckBack" ? "A Future Scan check-back" : entry.mode === "storyActionChallenge" ? "An Inspire action challenge" : "A daily reflection")}</strong>
             <p>${escapeHTML(entry.content)}</p>
             <small>${escapeHTML(entry.displayTime || "")} - how does it look now?</small>
           </div>
@@ -7612,6 +7617,62 @@ function filteredStories() {
   });
 }
 
+// Real personalized ranking (reuses the exact CommunityMatching.
+// scoreTagOverlap technique the Feed already uses) - "Story of the Day"
+// used to be a pure date-seeded rotation and "Recommended stories" was
+// just the filtered list, neither backed by anything real. Stories have
+// no stored tags, so they're derived once per render from their own real
+// text (title/preview/focus/lessons/category), the same way Feed derives
+// tags from opportunity descriptions.
+function storyTags(story) {
+  const text = [story.category, story.title, story.preview, story.focus, (story.keyLessons || []).join(" ")].join(" ");
+  return typeof CommunityMatching !== "undefined" ? CommunityMatching.extractTags(text, 15) : [];
+}
+
+// Situational matching (bibliotherapy-inspired research idea): surfaces a
+// story tied to what's actually happening right now - a low mood entry,
+// an open Future Scan, or a stalled Key Result - instead of only static
+// interest tags, so the reason can be stated honestly ("because you're
+// dealing with X"), not a generic "you might like this".
+function storySituationalMatch() {
+  const latestMood = latestRealMoodEntry();
+  if (latestMood && Number(latestMood.score) < 45) {
+    return { text: `Because your last mood check-in was ${latestMood.label.toLowerCase()}`, tags: CommunityMatching.extractTags(`${latestMood.label} ${latestMood.note || ""}`, 10) };
+  }
+  const latestScan = myFutureScans()[0];
+  if (latestScan && latestScan.scanContext && latestScan.scanContext.rawInput) {
+    return { text: `Because of what you're working through: "${cleanText(latestScan.scanContext.rawInput, 60)}"`, tags: CommunityMatching.extractTags(latestScan.scanContext.rawInput, 10) };
+  }
+  const stalledKr = myRoadmapGoals()
+    .flatMap((goal) => (goal.keyResults || []).map((kr) => ({ ...kr, goalTitle: goal.title })))
+    .find((kr) => keyResultPercent(kr) < 30 && daysSince(kr.createdAt) >= 7);
+  if (stalledKr) {
+    return { text: `Because "${stalledKr.label}" for "${stalledKr.goalTitle}" has been stuck`, tags: CommunityMatching.extractTags(`${stalledKr.label} ${stalledKr.goalTitle}`, 10) };
+  }
+  return null;
+}
+
+function rankedStories(stories) {
+  if (typeof CommunityMatching === "undefined") return stories.map((story) => ({ story, score: 0, reason: null }));
+  const myTags = feedUserTags();
+  const situational = storySituationalMatch();
+  return stories
+    .map((story) => {
+      const tags = storyTags(story);
+      let score = CommunityMatching.scoreTagOverlap(myTags, tags);
+      let reason = null;
+      if (situational) {
+        const situScore = CommunityMatching.scoreTagOverlap(situational.tags, tags);
+        if (situScore > 0) {
+          score += situScore * 1.5;
+          reason = situational.text;
+        }
+      }
+      return { story, score, reason };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
 function storyCards(stories = filteredStories()) {
   if (!stories.length) {
     return `
@@ -7678,16 +7739,23 @@ function featuredStoryCard(useFallback = true) {
   `;
 }
 
+// Falls back to the original date-seeded rotation only when there's
+// genuinely no signal to rank on (cold start, or every story scores 0) -
+// otherwise a real top match would just repeat every day, which is
+// exactly the staleness a fixed rotation already had.
 function storyOfTheDay() {
   const stories = visibleStories().filter((story) => story.published !== false);
   if (!stories.length) return null;
+  const ranked = rankedStories(stories);
+  if (ranked[0] && ranked[0].score > 0) return ranked[0];
   const seed = Number(dateKey().replace(/\D/g, "")) || 0;
-  return stories[seed % stories.length];
+  return { story: stories[seed % stories.length], score: 0, reason: null };
 }
 
 function storyOfTheDayCard() {
-  const story = storyOfTheDay();
-  if (!story) return "";
+  const picked = storyOfTheDay();
+  if (!picked) return "";
+  const { story, reason } = picked;
   const lesson = (story.keyLessons && story.keyLessons[0]) || story.preview;
   return `
     <section class="story-day-card" style="background-image:url('${escapeHTML(story.coverImage)}')">
@@ -7696,6 +7764,7 @@ function storyOfTheDayCard() {
         <span class="category-badge">${escapeHTML(story.category)}</span>
         <h3>${escapeHTML(story.person)}</h3>
         <p>${escapeHTML(lesson)}</p>
+        ${reason ? `<p class="tiny-note">${escapeHTML(reason)}</p>` : ""}
         <button class="primary-action compact-action" type="button" data-story-ai-action="discuss" data-story-ai-id="${escapeHTML(story.id)}">What can I learn from this?</button>
       </div>
     </section>
@@ -8551,7 +8620,7 @@ const screens = {
     </div>
     ${featuredStoryCard(false)}
     <div class="content-rail-title"><strong>Recommended stories</strong><span>${filteredStories().length} items</span></div>
-    <div class="inspire-feed">${storyCards()}</div>
+    <div class="inspire-feed">${storyCards(inspireCategory === "All" && !inspireSearch.trim() ? rankedStories(filteredStories()).map((item) => item.story) : filteredStories())}</div>
   `,
 
   settings: () => `
@@ -9587,7 +9656,10 @@ const modals = {
         </div>
         <div class="advice-stack">
           <div><strong>Reflection question</strong><span>${escapeHTML(story.reflectionQuestion)}</span></div>
-          <div><strong>Action challenge</strong><span>${escapeHTML(story.actionChallenge)}</span></div>
+          <div>
+            <strong>Action challenge</strong><span>${escapeHTML(story.actionChallenge)}</span>
+            <button class="secondary-action compact-action" type="button" data-try-action-challenge="${escapeHTML(story.id)}">I'll try this</button>
+          </div>
         </div>
         <div class="related-block">
           <strong>Related videos and articles</strong>
@@ -12488,6 +12560,7 @@ document.addEventListener("click", async (event) => {
   const storyReader = event.target.closest("[data-story-id]");
   const discussStory = event.target.closest("[data-discuss-story]");
   const storyAiAction = event.target.closest("[data-story-ai-action]");
+  const tryActionChallengeButton = event.target.closest("[data-try-action-challenge]");
   const editStory = event.target.closest("[data-edit-story]");
   const deleteStory = event.target.closest("[data-delete-story]");
   const saveStory = event.target.closest("[data-save-story]");
@@ -13005,6 +13078,13 @@ document.addEventListener("click", async (event) => {
     closeModal();
     renderScreen("compass");
     await sendChatMessage(storyReflectionPrompt(story, storyAiAction.dataset.storyAiAction));
+  }
+  if (tryActionChallengeButton) {
+    const story = contentState.stories.find((item) => item.id === tryActionChallengeButton.dataset.tryActionChallenge);
+    if (story) {
+      createReflectionEntry("storyActionChallenge", `Action challenge from "${story.person}" (${story.title}): ${story.actionChallenge}`, { tags: ["actionChallenge", story.category] });
+      triggerCheckInCelebration("Compass will check back in a few days.");
+    }
   }
   if (storyReader) openModal("storyReader", storyReader.dataset.storyId);
   if (editStory) openModal("storyEditor", editStory.dataset.editStory);
