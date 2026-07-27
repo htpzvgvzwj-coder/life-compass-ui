@@ -9493,6 +9493,26 @@ body {
   margin-bottom: 14px;
 }
 
+.desk-hero-connection {
+  border-left: 2px solid var(--color-teal);
+  padding-left: 8px;
+  margin-top: -8px;
+  color: var(--color-teal-strong) !important;
+}
+
+/* Jury Duty verdict: same "case closed" stamp language as Future Scan's
+   synthesis card, instead of a plain prose block. */
+.jury-verdict-card {
+  border: 1px solid var(--color-teal);
+  background: var(--color-mint-soft);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.jury-verdict-card h3 {
+  margin: 2px 0 6px;
+}
+
 .desk-hero-cta {
   display: inline-block;
   background: var(--color-teal-strong);

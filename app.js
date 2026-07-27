@@ -1795,12 +1795,8 @@ function realGrowthFacts() {
   const topJobMatch = (jobMatchResults() || [])[0];
   if (topJobMatch) facts.push(`Top Job Matching fit: ${topJobMatch.role.title} (${topJobMatch.percent}%)${topJobMatch.missingTraits.length ? `, skill gap: ${topJobMatch.missingTraits.join(", ")}` : ""}`);
   if (resumeAtsResult) facts.push(`Latest ATS resume check this session: ${resumeAtsResult.percent}% keyword match against a pasted job posting${resumeAtsResult.missing.length ? `, missing: ${resumeAtsResult.missing.slice(0, 8).join(", ")}` : ""}`);
-  const starGapCounts = {};
-  trackerState.careerStudio.interviewSessions.filter((session) => session.user_id === currentUserId() && session.completedAt).forEach((session) => {
-    (session.feedback || []).forEach((item) => (item.starGaps || []).forEach((gap) => { starGapCounts[gap] = (starGapCounts[gap] || 0) + 1; }));
-  });
-  const recurringStarGap = Object.entries(starGapCounts).sort((a, b) => b[1] - a[1])[0];
-  if (recurringStarGap && recurringStarGap[1] >= 2) facts.push(`Interview Practice pattern: "${STAR_COMPONENT_LABEL[recurringStarGap[0]] || recurringStarGap[0]}" is the most recurring STAR gap across completed interview sessions (${recurringStarGap[1]} times)`);
+  const starGap = recurringStarGap();
+  if (starGap) facts.push(`Interview Practice pattern: "${starGap.label}" is the most recurring STAR gap across completed interview sessions (${starGap.count} times)`);
   const survivedRejections = failuresSurvivedCount();
   if (survivedRejections) facts.push(`Failure Inoculation: ${survivedRejections} rejection(s) survived`);
   const hiredSessions = trackerState.futureSelfHiring.sessions.filter((session) => session.hiredCandidateId);
@@ -2199,15 +2195,37 @@ function shareOpportunityText(item) {
 // mission > the nearest open Life Roadmap goal > a generic prompt into
 // Future Mirror if none of the above have real data yet.
 function todaysDeskFocus() {
+  // Highest priority: something genuinely waiting for a response, now
+  // that nothing pops up on its own to force the issue.
+  const debts = dueSelfDebts();
+  if (debts.length) {
+    return {
+      kind: "selfDebt",
+      eyebrow: "An unresolved debt to yourself",
+      title: cleanText(debts[0].title, 100),
+      text: cleanText(debts[0].message, 160),
+      ctaLabel: "Open Inbox",
+      ctaAttr: `data-open="inbox"`
+    };
+  }
   const activeBuild = trackerState.buildMode.entries
     .filter((entry) => entry.user_id === currentUserId() && entry.status === "active")
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))[0];
   if (activeBuild) {
+    // Connection hint: if this training happens to close a real skill gap
+    // Job Matching already found, say so - real cross-reference, not a
+    // fabricated link, since it only fires on an actual text match.
+    const topMatch = (jobMatchResults() || [])[0];
+    const matchedGap = topMatch && topMatch.missingTraits.find((trait) => {
+      const needle = trait.toLowerCase();
+      return (activeBuild.goal || "").toLowerCase().includes(needle) || (activeBuild.coachType || "").toLowerCase().includes(needle);
+    });
     return {
       kind: "build",
       eyebrow: `Continuing - ${cleanText(activeBuild.coachType || "Custom Growth Coach", 40)}`,
       title: cleanText(activeBuild.nextStep || activeBuild.goalSummary || activeBuild.goal, 100),
       text: cleanText(activeBuild.goalSummary || activeBuild.goal, 160),
+      connection: matchedGap ? `This also closes the "${matchedGap}" gap Job Matching found for ${topMatch.role.title}.` : null,
       ctaLabel: "Continue training",
       ctaAttr: `data-open="buildEntry" data-open-payload="${escapeHTML(activeBuild.id)}"`
     };
@@ -2252,6 +2270,7 @@ function todaysDeskHero() {
       <p class="desk-hero-eyebrow">${escapeHTML(focus.eyebrow)}</p>
       <h2>${escapeHTML(focus.title)}</h2>
       <p>${escapeHTML(focus.text)}</p>
+      ${focus.connection ? `<p class="tiny-note desk-hero-connection">${escapeHTML(focus.connection)}</p>` : ""}
       <button class="desk-hero-cta" type="button" ${focus.ctaAttr}>${escapeHTML(focus.ctaLabel)}</button>
       ${focus.kind === "build" ? `<span class="desk-hero-stamp">In progress</span>` : ""}
     </section>
@@ -2263,6 +2282,12 @@ function todaysDeskHero() {
 // data, no repeated card chrome.
 function homeLedgerRows(skipKind) {
   const rows = [];
+  const inboxCount = pendingInboxItems().length;
+  rows.push({
+    label: "Inbox",
+    value: inboxCount ? `${inboxCount} waiting` : "all caught up",
+    attr: `data-open="inbox"`
+  });
   const latestMood = latestRealMoodEntry();
   rows.push({
     label: "Mood check-in",
@@ -3998,6 +4023,81 @@ function resurfacingCard() {
   `;
 }
 
+// Unified Inbox: every "waiting for a response" mechanism used to fire
+// on its own - Self-Debt force-popped a modal, Ghost Roommate just sat
+// there, resurfacing had its own card - so there was no single place to
+// see everything actually asking for attention at once. This aggregates
+// the three real sources without inventing a new one.
+function pendingInboxItems() {
+  const items = [];
+  dueSelfDebts().forEach((debt) => {
+    items.push({ kind: "selfDebt", label: debt.title, detail: "Self-Debt notice" });
+  });
+  const roommate = trackerState.ghostRoommate;
+  if (roommate.active && roommate.currentWeek && roommate.currentWeek.transcript.length && !roommate.currentWeek.resolved) {
+    const lastTurn = roommate.currentWeek.transcript[roommate.currentWeek.transcript.length - 1];
+    if (lastTurn && lastTurn.sender === "roommate") {
+      items.push({ kind: "roommate", label: `${ghostRoommatePersona(roommate).name} is waiting on a reply`, detail: "Ghost Roommate" });
+    }
+  }
+  dueForResurfacing().forEach((entry) => {
+    items.push({ kind: "resurface", label: cleanText(entry.content, 100), detail: "Worth another look", entry });
+  });
+  return items;
+}
+
+function inboxModal() {
+  const items = pendingInboxItems();
+  const selfDebtItems = items.filter((item) => item.kind === "selfDebt");
+  const roommateItems = items.filter((item) => item.kind === "roommate");
+  const resurfaceItems = items.filter((item) => item.kind === "resurface").slice(0, 8);
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="inbox-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Inbox</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="inbox-title">${items.length ? `${items.length} thing${items.length === 1 ? "" : "s"} waiting` : "Nothing waiting"}</h3>
+      <p class="muted">Everything actually asking for a response, in one place - nothing here interrupts you on its own anymore.</p>
+      ${!items.length ? `
+        <section class="empty-feature">
+          <img src="assets/icon-checkin.png" alt="">
+          <div><strong>All caught up</strong><p>Check back later.</p></div>
+        </section>
+      ` : `
+        <div class="ledger-sheet">
+          ${selfDebtItems.map((item) => `
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
+              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
+              <button class="secondary-action compact-action" type="button" data-view-self-debt-notice>View</button>
+            </article>
+          `).join("")}
+          ${roommateItems.map((item) => `
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
+              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
+              <button class="secondary-action compact-action" type="button" data-open="ghostRoommate">Open</button>
+            </article>
+          `).join("")}
+          ${resurfaceItems.map((item) => `
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
+              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
+              <div class="profile-actions">
+                <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:relevant">Still relevant</button>
+                <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:somewhat">Somewhat</button>
+                <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:resolved">Resolved</button>
+                <button class="text-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:snooze">Not now</button>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      `}
+    </div>
+  `;
+}
+
 let dailyReflectionPromptIndex = 0;
 let dailyReflectionDraft = "";
 
@@ -4499,6 +4599,23 @@ async function sendInterviewAnswer(text) {
 }
 
 const STAR_COMPONENT_LABEL = { situation: "Situation", task: "Task", action: "Action", result: "Result" };
+
+// Shared by realGrowthFacts() and Job Matching's connection hint - one
+// computation, two surfaces, so they can never quietly disagree.
+function recurringStarGap() {
+  const counts = {};
+  trackerState.careerStudio.interviewSessions.filter((session) => session.user_id === currentUserId() && session.completedAt).forEach((session) => {
+    (session.feedback || []).forEach((item) => (item.starGaps || []).forEach((gap) => { counts[gap] = (counts[gap] || 0) + 1; }));
+  });
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  return top && top[1] >= 2 ? { gap: top[0], label: STAR_COMPONENT_LABEL[top[0]] || top[0], count: top[1] } : null;
+}
+
+function jobMatchingStarGapHint() {
+  const recurring = recurringStarGap();
+  if (!recurring) return "";
+  return `<p class="tiny-note desk-hero-connection">Interview Practice shows "${escapeHTML(recurring.label)}" as your most recurring STAR gap (${recurring.count} times) - whichever role you pursue, that's worth practicing before the real interview.</p>`;
+}
 
 async function finishInterviewSession(session, persona) {
   const history = session.transcript.map((t) => `Turn ${t.turn} (${t.sender}): ${t.text}${t.sender === "candidate" ? ` [responded after ${t.respondedAfterMs ? Math.round(t.respondedAfterMs / 1000) + "s" : "unknown"}, ${t.fillerWordCount || 0} filler words]` : ""}`).join("\n");
@@ -5132,6 +5249,7 @@ function jobMatchingView() {
   }
   return `
     <p class="muted">Based on your saved Personal Blueprint - a starting point for exploration, not a verdict on what you should do.</p>
+    ${jobMatchingStarGapHint()}
     <div class="action-stack">
       ${results.map((result) => `
         <div class="job-match-card">
@@ -6159,8 +6277,8 @@ function juryTrialModal() {
       </section>
       ${juryError ? `<p class="form-error">${escapeHTML(juryError)}</p>` : ""}
       ${session.verdict ? `
-        <section class="mirror-empty-card">
-          <p class="eyebrow">Verdict</p>
+        <section class="mirror-empty-card jury-verdict-card">
+          <p class="verdict-stamp">Verdict delivered</p>
           <h3>${escapeHTML(session.verdict.ruling)}</h3>
           <p class="muted">${escapeHTML(session.verdict.reasoning)}</p>
         </section>
@@ -6991,14 +7109,12 @@ const SELF_DEBT_TRIGGER_TYPES = [
   { id: "goal-stalled", label: "A roadmap goal sits untouched", detail: "Fires when a Life Roadmap goal has had zero milestone progress for a while." }
 ];
 
-let selfDebtNoticeShownThisSession = false;
-// Snapshot of the debts that were actually due at trigger time. The
-// renderScreen hook below stamps lastDeliveredAt the moment it decides to
-// notify - selfDebtNoticeModal must render from this snapshot, not
-// re-call dueSelfDebts(), or the just-stamped lastDeliveredAt makes every
-// debt look "not due" again by the time the modal renders (0 days since
-// delivery is always < triggerThresholdDays), so the notice would always
-// render empty.
+// Snapshot of the debts that were actually due when openSelfDebtNotice()
+// stamped lastDeliveredAt - selfDebtNoticeModal must render from this
+// snapshot, not re-call dueSelfDebts(), or the just-stamped
+// lastDeliveredAt makes every debt look "not due" again by the time the
+// modal renders (0 days since delivery is always < triggerThresholdDays),
+// so the notice would always render empty.
 let deliveredSelfDebtNotice = [];
 
 function selfDebtTriggerLabel(triggerType) {
@@ -9042,6 +9158,8 @@ const modals = {
 
   calibration: () => calibrationModal(),
 
+  inbox: () => inboxModal(),
+
   addKeyResult: (goalId) => addKeyResultModal(goalId),
   updateKeyResult: (payload) => updateKeyResultModal(payload),
 
@@ -10128,16 +10246,19 @@ function renderScreen(tab) {
   if (tab === "simulator") {
     requestAnimationFrame(mountLifeSim);
   }
-  if (!selfDebtNoticeShownThisSession && !modalLayer.classList.contains("is-open")) {
-    const due = dueSelfDebts();
-    if (due.length) {
-      selfDebtNoticeShownThisSession = true;
-      deliveredSelfDebtNotice = due.slice();
-      due.forEach((debt) => { debt.lastDeliveredAt = new Date().toISOString(); });
-      saveTrackerState();
-      setTimeout(() => openModal("selfDebtNotice"), 0);
-    }
-  }
+}
+
+// Self-Debt notices used to force-open on every navigation the moment
+// they were due - one more thing interrupting the user on its own, on
+// top of Ghost Roommate/resurfacing/etc. Now it's purely on-demand from
+// the Inbox: nothing pops up uninvited, everything genuinely waiting for
+// a response lives in one place the user opens when they choose to.
+function openSelfDebtNotice() {
+  const due = dueSelfDebts();
+  deliveredSelfDebtNotice = due.slice();
+  due.forEach((debt) => { debt.lastDeliveredAt = new Date().toISOString(); });
+  saveTrackerState();
+  openModal("selfDebtNotice");
 }
 
 let currentModalName = "";
@@ -11773,12 +11894,23 @@ function openBuildEntry(entryId) {
   openModal("buildEntry", entryId);
 }
 
+// Connection hint: reads the same calibration track record Judgment
+// Calibration already computes, surfaced here (not just in Advanced
+// Mode) since starting new training is exactly the moment an
+// overconfidence pattern is actually useful to know about.
+function buildModeCalibrationHint() {
+  const stats = calibrationStats();
+  if (!stats || stats.read !== "overconfident") return "";
+  return `<p class="tiny-note desk-hero-connection">Your Judgment Calibration track record shows you tend to run about ${stats.gap} points more confident than outcomes support - worth building extra room into whatever you plan here.</p>`;
+}
+
 function buildModeEntrySection() {
   const entries = myBuildEntries();
   return `
     <label>What are you trying to build?
       <textarea id="build-goal-input" placeholder="Example: prepare for an interview, talk to my parents, save money.">${escapeHTML(buildModeGoalInput)}</textarea>
     </label>
+    ${buildModeCalibrationHint()}
     ${buildLifeMomentsSection()}
     ${buildModeError ? `<p class="form-error">${escapeHTML(buildModeError)}</p>` : ""}
     <button class="primary-action mirror-run-action" type="button" data-start-build-entry ${isBuildModeLoading ? "disabled" : ""}>${isBuildModeLoading ? "Matching your coach..." : "Match My Coach"}</button>
@@ -12561,6 +12693,7 @@ document.addEventListener("click", async (event) => {
   const discussStory = event.target.closest("[data-discuss-story]");
   const storyAiAction = event.target.closest("[data-story-ai-action]");
   const tryActionChallengeButton = event.target.closest("[data-try-action-challenge]");
+  const viewSelfDebtNoticeButton = event.target.closest("[data-view-self-debt-notice]");
   const editStory = event.target.closest("[data-edit-story]");
   const deleteStory = event.target.closest("[data-delete-story]");
   const saveStory = event.target.closest("[data-save-story]");
@@ -13086,6 +13219,9 @@ document.addEventListener("click", async (event) => {
       triggerCheckInCelebration("Compass will check back in a few days.");
     }
   }
+  if (viewSelfDebtNoticeButton) {
+    openSelfDebtNotice();
+  }
   if (storyReader) openModal("storyReader", storyReader.dataset.storyId);
   if (editStory) openModal("storyEditor", editStory.dataset.editStory);
   if (editContact) openModal("supportEditor", editContact.dataset.editContact);
@@ -13436,6 +13572,8 @@ document.addEventListener("click", async (event) => {
       // it read, so the user can actually report what happened.
       openPastFutureScan(resurfacedEntry._scanId);
       openModal("futureScanStation", "checkBack");
+    } else if (currentModalName === "inbox") {
+      openModal("inbox");
     } else {
       renderScreen(activeTab);
       refreshStaticScreens();
