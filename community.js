@@ -858,11 +858,14 @@
         <div class="opportunity-card-top">
           <span class="category-badge">${escapeHTML(item.category)}</span>
           <span class="opportunity-type">Community-submitted</span>
+          ${item.difficulty ? `<span class="difficulty-pill difficulty-${escapeHTML(item.difficulty.toLowerCase())}">${escapeHTML(item.difficulty)}</span>` : ""}
         </div>
         <h3>${escapeHTML(item.title)}</h3>
         <p>${escapeHTML(item.description)}</p>
+        ${item.prep_needed ? `<p class="tiny-note feed-prep-note">Prep needed: ${escapeHTML(item.prep_needed)}</p>` : ""}
         <div class="profile-actions">
           <button class="primary-action compact-action" type="button" data-open-link="${escapeHTML(item.link)}">View</button>
+          <button class="secondary-action compact-action" type="button" data-prepare-opportunity="${escapeHTML(item.title)}" data-prepare-opportunity-category="${escapeHTML(item.category)}">Prepare with Compass</button>
         </div>
       </article>
     `;
@@ -915,6 +918,15 @@
             </select>
           </label>
           <label>Tags (comma separated)<input id="community-opportunity-tags" type="text" placeholder="internship, remote"></label>
+          <label>Difficulty
+            <select id="community-opportunity-difficulty">
+              <option value="">Not specified</option>
+              <option value="Beginner">Beginner</option>
+              <option value="Medium">Medium</option>
+              <option value="Advanced">Advanced</option>
+            </select>
+          </label>
+          <label>Prep needed (optional)<textarea id="community-opportunity-prep" maxlength="300" placeholder="Example: a short portfolio and one writing sample"></textarea></label>
           <p class="form-error" id="community-opportunity-error" aria-live="polite"></p>
         </div>
         <button class="primary-action" type="button" data-save-community-opportunity>Share</button>
@@ -922,11 +934,11 @@
     `;
   }
 
-  async function submitCommunityOpportunity({ title, description, link, category, tags }) {
+  async function submitCommunityOpportunity({ title, description, link, category, tags, difficulty, prepNeeded }) {
     const response = await fetch(`${COMMUNITY_API_BASE}/api/community-opportunity`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${communityAccessToken()}` },
-      body: JSON.stringify({ title, description, link, category, tags })
+      body: JSON.stringify({ title, description, link, category, tags, difficulty, prepNeeded })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "Could not share this opportunity right now.");

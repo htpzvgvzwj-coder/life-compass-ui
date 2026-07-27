@@ -522,7 +522,10 @@ async function handleCommunityOpportunity(req, res) {
       sendJson(res, 400, { error: 'Category is required.' });
       return;
     }
-    const moderation = await moderateText(COMMUNITY_OPPORTUNITY_MODERATION_PROMPT, `${title}\n\n${description}\n\n${link}`);
+    const difficultyRaw = String(body.difficulty || '').trim();
+    const difficulty = ['Beginner', 'Medium', 'Advanced'].includes(difficultyRaw) ? difficultyRaw : null;
+    const prepNeeded = String(body.prepNeeded || '').trim().slice(0, 300) || null;
+    const moderation = await moderateText(COMMUNITY_OPPORTUNITY_MODERATION_PROMPT, `${title}\n\n${description}\n\n${link}${prepNeeded ? `\n\nPrep needed: ${prepNeeded}` : ''}`);
     const status = moderation.safe ? 'published' : 'blocked';
     const tags = Array.isArray(body.tags) ? body.tags.map((tag) => String(tag).slice(0, 30)).slice(0, 8) : [];
     const row = await insertSupabaseRow('opportunities_shared', {
@@ -532,6 +535,8 @@ async function handleCommunityOpportunity(req, res) {
       link,
       tags,
       category,
+      difficulty,
+      prep_needed: prepNeeded,
       status,
       moderation_reason: moderation.safe ? null : (moderation.reason || 'This submission needs a safer rewording before it can be shared.'),
     });

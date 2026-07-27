@@ -627,32 +627,32 @@ const opportunityCategories = [
 // isn't well-established just to avoid using search. See opportunityCards()
 // for the matching "Search"/"Start learning" button-label honesty fix.
 const opportunityItems = [
-  { id: "part-time-jobs", category: "Jobs", type: "Part-time jobs", title: "Part-time job starter list", description: "Cafe, retail, event crew, tutoring, and campus helper roles that fit around study time.", tags: ["income", "student", "flexible"], applyUrl: "https://www.indeed.com/jobs?q=part-time&explvl=entry_level" },
-  { id: "student-jobs", category: "Jobs", type: "Student jobs", title: "Student-friendly work options", description: "Roles that build confidence, communication, and basic money habits without overloading school.", tags: ["student", "confidence", "money"], applyUrl: "https://www.indeed.com/jobs?q=student" },
-  { id: "remote-jobs", category: "Jobs", type: "Remote jobs", title: "Remote beginner work", description: "Search for virtual assistant, transcription, social media, tutoring, and data entry roles carefully.", tags: ["remote", "skills", "income"], applyUrl: "https://www.indeed.com/jobs?q=remote&explvl=entry_level" },
-  { id: "entry-level-jobs", category: "Jobs", type: "Entry-level jobs", title: "Entry-level career path", description: "Find roles that train beginners and help build a resume after school, college, or university.", tags: ["career", "entry-level", "resume"], applyUrl: "https://www.indeed.com/jobs?q=entry+level&explvl=entry_level" },
-  { id: "business-internship", category: "Internships", type: "Business", title: "Business internship search", description: "Explore operations, admin, project coordination, and startup assistant internships.", tags: ["business", "career", "internship"], applyUrl: "https://www.indeed.com/jobs?q=business+internship" },
-  { id: "marketing-internship", category: "Internships", type: "Marketing", title: "Marketing internship search", description: "Practice content calendars, campaigns, copywriting, analytics, and brand communication.", tags: ["marketing", "content", "communication"], applyUrl: "https://www.indeed.com/jobs?q=marketing+internship" },
-  { id: "technology-internship", category: "Internships", type: "Technology", title: "Technology internship search", description: "Look for web, app, QA, IT support, data, and product internships with beginner-friendly teams.", tags: ["technology", "coding", "product"], applyUrl: "https://www.indeed.com/jobs?q=technology+internship" },
-  { id: "design-internship", category: "Internships", type: "Design", title: "Design internship search", description: "Build portfolio evidence through UI, graphic design, brand, product, or social content work.", tags: ["design", "portfolio", "creative"], applyUrl: "https://www.indeed.com/jobs?q=design+internship" },
-  { id: "social-impact-internship", category: "Internships", type: "Social Impact", title: "Social impact internship", description: "Explore NGOs, youth programs, education, environment, and community development placements.", tags: ["impact", "community", "leadership"], applyUrl: "https://www.indeed.com/jobs?q=nonprofit+internship" },
-  { id: "local-scholarships", category: "Scholarships", type: "Local scholarships", title: "Local scholarship search", description: "Search local foundations, companies, universities, and community scholarship programs.", tags: ["scholarship", "local", "education"], applyUrl: "https://www.fastweb.com/college-scholarships" },
-  { id: "international-scholarships", category: "Scholarships", type: "International scholarships", title: "International scholarship search", description: "Find overseas scholarships and prepare requirements early: grades, essays, activities, and references.", tags: ["international", "education", "future"], applyUrl: "https://www.google.com/search?q=international+scholarships+for+students" },
-  { id: "university-scholarships", category: "Scholarships", type: "University scholarships", title: "University financial aid", description: "Check each university's scholarship page, deadlines, required documents, and interview needs.", tags: ["university", "study", "financial aid"], applyUrl: "https://www.google.com/search?q=university+scholarships+financial+aid" },
-  { id: "government-scholarships", category: "Scholarships", type: "Government scholarships", title: "Government scholarship prep", description: "Track eligibility, documents, leadership evidence, essays, and application deadlines.", tags: ["government", "education", "leadership"], applyUrl: "https://www.google.com/search?q=government+scholarships+for+students" },
-  { id: "innovation-challenges", category: "Competitions", type: "Innovation challenges", title: "Innovation challenge search", description: "Pitch solutions for real problems and build proof for your portfolio or scholarship profile.", tags: ["innovation", "portfolio", "problem-solving"], applyUrl: "https://devpost.com/hackathons" },
-  { id: "business-competitions", category: "Competitions", type: "Business competitions", title: "Business competition search", description: "Practice pitching, market research, financial thinking, and team communication.", tags: ["business", "entrepreneurship", "pitching"], applyUrl: "https://www.google.com/search?q=student+business+competition" },
-  { id: "hackathons", category: "Competitions", type: "Hackathons", title: "Hackathon search", description: "Join beginner-friendly tech challenges to practice coding, design, product, and teamwork.", tags: ["hackathon", "coding", "teamwork"], applyUrl: "https://devpost.com/hackathons" },
-  { id: "leadership-programs", category: "Competitions", type: "Leadership programs", title: "Leadership program search", description: "Find youth councils, student leadership camps, fellowships, and public speaking programs.", tags: ["leadership", "confidence", "network"], applyUrl: "https://www.google.com/search?q=youth+leadership+programs" },
-  { id: "ngo-volunteer", category: "Volunteer Opportunities", type: "NGOs", title: "NGO volunteer roles", description: "Support education, food aid, mental health, disability, animal welfare, or community projects.", tags: ["volunteer", "ngo", "community"], applyUrl: "https://www.volunteermatch.org/search/" },
-  { id: "community-service", category: "Volunteer Opportunities", type: "Community service", title: "Community service projects", description: "Help with tutoring, clean-ups, events, elderly support, food drives, or local campaigns.", tags: ["service", "community", "leadership"], applyUrl: "https://www.volunteermatch.org/search/" },
-  { id: "environmental-projects", category: "Volunteer Opportunities", type: "Environmental projects", title: "Environmental action projects", description: "Explore recycling, beach clean-ups, tree planting, climate education, and local green teams.", tags: ["environment", "impact", "teamwork"], applyUrl: "https://www.volunteermatch.org/search/?k=environment" },
-  { id: "youth-organizations", category: "Volunteer Opportunities", type: "Youth organizations", title: "Youth organization directory", description: "Join groups that build leadership, communication, teamwork, and social impact experience.", tags: ["youth", "leadership", "network"], applyUrl: "https://www.google.com/search?q=youth+organizations+near+me" },
-  { id: "canva-skills", category: "Learn & Earn", type: "Canva skills", title: "Canva design micro-skill", description: "Learn poster, social media, presentation, and resume design for small freelance tasks.", tags: ["canva", "design", "income"], applyUrl: "https://www.canva.com/designschool/" },
-  { id: "video-editing", category: "Learn & Earn", type: "Video editing", title: "Video editing starter path", description: "Learn short-form editing, captions, pacing, thumbnails, and portfolio clips for creators.", tags: ["video", "content", "creative"], applyUrl: "https://creatoracademy.youtube.com/" },
-  { id: "coding-skills", category: "Learn & Earn", type: "Coding", title: "Coding beginner path", description: "Start with websites, small apps, automation, or school project tools that become portfolio work.", tags: ["coding", "technology", "portfolio"], applyUrl: "https://www.freecodecamp.org/" },
-  { id: "content-creation", category: "Learn & Earn", type: "Content creation", title: "Content creation portfolio", description: "Build writing, filming, editing, and publishing skills around a topic you care about.", tags: ["content", "marketing", "creative"], applyUrl: "https://www.google.com/search?q=content+creation+skills+for+beginners" },
-  { id: "entrepreneurship", category: "Learn & Earn", type: "Entrepreneurship", title: "Mini entrepreneurship project", description: "Test a small service, product, or community idea with low risk and honest feedback.", tags: ["entrepreneurship", "business", "income"], applyUrl: "https://www.google.com/search?q=student+entrepreneurship+ideas" }
+  { id: "part-time-jobs", category: "Jobs", type: "Part-time jobs", title: "Part-time job starter list", description: "Cafe, retail, event crew, tutoring, and campus helper roles that fit around study time.", tags: ["income", "student", "flexible"], difficulty: "Beginner", prepNeeded: "A simple resume and a short availability schedule.", applyUrl: "https://www.indeed.com/jobs?q=part-time&explvl=entry_level" },
+  { id: "student-jobs", category: "Jobs", type: "Student jobs", title: "Student-friendly work options", description: "Roles that build confidence, communication, and basic money habits without overloading school.", tags: ["student", "confidence", "money"], difficulty: "Beginner", prepNeeded: "A one-page resume highlighting school activities.", applyUrl: "https://www.indeed.com/jobs?q=student" },
+  { id: "remote-jobs", category: "Jobs", type: "Remote jobs", title: "Remote beginner work", description: "Search for virtual assistant, transcription, social media, tutoring, and data entry roles carefully.", tags: ["remote", "skills", "income"], difficulty: "Beginner", prepNeeded: "A laptop, stable internet, and a short skills summary.", applyUrl: "https://www.indeed.com/jobs?q=remote&explvl=entry_level" },
+  { id: "entry-level-jobs", category: "Jobs", type: "Entry-level jobs", title: "Entry-level career path", description: "Find roles that train beginners and help build a resume after school, college, or university.", tags: ["career", "entry-level", "resume"], difficulty: "Beginner", prepNeeded: "An updated resume and one practiced answer for \"why this role\".", applyUrl: "https://www.indeed.com/jobs?q=entry+level&explvl=entry_level" },
+  { id: "business-internship", category: "Internships", type: "Business", title: "Business internship search", description: "Explore operations, admin, project coordination, and startup assistant internships.", tags: ["business", "career", "internship"], difficulty: "Medium", prepNeeded: "A resume and one paragraph on why operations or business interests you.", applyUrl: "https://www.indeed.com/jobs?q=business+internship" },
+  { id: "marketing-internship", category: "Internships", type: "Marketing", title: "Marketing internship search", description: "Practice content calendars, campaigns, copywriting, analytics, and brand communication.", tags: ["marketing", "content", "communication"], difficulty: "Medium", prepNeeded: "A resume plus one or two content samples if you have them.", applyUrl: "https://www.indeed.com/jobs?q=marketing+internship" },
+  { id: "technology-internship", category: "Internships", type: "Technology", title: "Technology internship search", description: "Look for web, app, QA, IT support, data, and product internships with beginner-friendly teams.", tags: ["technology", "coding", "product"], difficulty: "Medium", prepNeeded: "A resume, a GitHub or project link if you have one, and basic coding fundamentals.", applyUrl: "https://www.indeed.com/jobs?q=technology+internship" },
+  { id: "design-internship", category: "Internships", type: "Design", title: "Design internship search", description: "Build portfolio evidence through UI, graphic design, brand, product, or social content work.", tags: ["design", "portfolio", "creative"], difficulty: "Medium", prepNeeded: "A small portfolio - even 2-3 sample pieces count.", applyUrl: "https://www.indeed.com/jobs?q=design+internship" },
+  { id: "social-impact-internship", category: "Internships", type: "Social Impact", title: "Social impact internship", description: "Explore NGOs, youth programs, education, environment, and community development placements.", tags: ["impact", "community", "leadership"], difficulty: "Beginner", prepNeeded: "A resume and a short note on why the cause matters to you.", applyUrl: "https://www.indeed.com/jobs?q=nonprofit+internship" },
+  { id: "local-scholarships", category: "Scholarships", type: "Local scholarships", title: "Local scholarship search", description: "Search local foundations, companies, universities, and community scholarship programs.", tags: ["scholarship", "local", "education"], difficulty: "Medium", prepNeeded: "Transcript, a short personal statement, and one reference.", applyUrl: "https://www.fastweb.com/college-scholarships" },
+  { id: "international-scholarships", category: "Scholarships", type: "International scholarships", title: "International scholarship search", description: "Find overseas scholarships and prepare requirements early: grades, essays, activities, and references.", tags: ["international", "education", "future"], difficulty: "Advanced", prepNeeded: "Transcript, essays, references, and proof of English proficiency where required.", applyUrl: "https://www.google.com/search?q=international+scholarships+for+students" },
+  { id: "university-scholarships", category: "Scholarships", type: "University scholarships", title: "University financial aid", description: "Check each university's scholarship page, deadlines, required documents, and interview needs.", tags: ["university", "study", "financial aid"], difficulty: "Medium", prepNeeded: "Transcript and each university's specific application form.", applyUrl: "https://www.google.com/search?q=university+scholarships+financial+aid" },
+  { id: "government-scholarships", category: "Scholarships", type: "Government scholarships", title: "Government scholarship prep", description: "Track eligibility, documents, leadership evidence, essays, and application deadlines.", tags: ["government", "education", "leadership"], difficulty: "Advanced", prepNeeded: "Transcript, leadership evidence, essays, and often an interview.", applyUrl: "https://www.google.com/search?q=government+scholarships+for+students" },
+  { id: "innovation-challenges", category: "Competitions", type: "Innovation challenges", title: "Innovation challenge search", description: "Pitch solutions for real problems and build proof for your portfolio or scholarship profile.", tags: ["innovation", "portfolio", "problem-solving"], difficulty: "Advanced", prepNeeded: "A clear problem statement and a rough solution pitch.", applyUrl: "https://devpost.com/hackathons" },
+  { id: "business-competitions", category: "Competitions", type: "Business competitions", title: "Business competition search", description: "Practice pitching, market research, financial thinking, and team communication.", tags: ["business", "entrepreneurship", "pitching"], difficulty: "Advanced", prepNeeded: "A business idea, basic financial estimates, and a pitch deck.", applyUrl: "https://www.google.com/search?q=student+business+competition" },
+  { id: "hackathons", category: "Competitions", type: "Hackathons", title: "Hackathon search", description: "Join beginner-friendly tech challenges to practice coding, design, product, and teamwork.", tags: ["hackathon", "coding", "teamwork"], difficulty: "Medium", prepNeeded: "Basic coding or design skills and a teammate or two if required.", applyUrl: "https://devpost.com/hackathons" },
+  { id: "leadership-programs", category: "Competitions", type: "Leadership programs", title: "Leadership program search", description: "Find youth councils, student leadership camps, fellowships, and public speaking programs.", tags: ["leadership", "confidence", "network"], difficulty: "Medium", prepNeeded: "A short application essay and examples of past involvement.", applyUrl: "https://www.google.com/search?q=youth+leadership+programs" },
+  { id: "ngo-volunteer", category: "Volunteer Opportunities", type: "NGOs", title: "NGO volunteer roles", description: "Support education, food aid, mental health, disability, animal welfare, or community projects.", tags: ["volunteer", "ngo", "community"], difficulty: "Beginner", prepNeeded: "Just your availability and a short interest note.", applyUrl: "https://www.volunteermatch.org/search/" },
+  { id: "community-service", category: "Volunteer Opportunities", type: "Community service", title: "Community service projects", description: "Help with tutoring, clean-ups, events, elderly support, food drives, or local campaigns.", tags: ["service", "community", "leadership"], difficulty: "Beginner", prepNeeded: "Comfortable shoes and a few free hours.", applyUrl: "https://www.volunteermatch.org/search/" },
+  { id: "environmental-projects", category: "Volunteer Opportunities", type: "Environmental projects", title: "Environmental action projects", description: "Explore recycling, beach clean-ups, tree planting, climate education, and local green teams.", tags: ["environment", "impact", "teamwork"], difficulty: "Beginner", prepNeeded: "Just show up - most orientation happens on-site.", applyUrl: "https://www.volunteermatch.org/search/?k=environment" },
+  { id: "youth-organizations", category: "Volunteer Opportunities", type: "Youth organizations", title: "Youth organization directory", description: "Join groups that build leadership, communication, teamwork, and social impact experience.", tags: ["youth", "leadership", "network"], difficulty: "Beginner", prepNeeded: "A short interest form - no experience required.", applyUrl: "https://www.google.com/search?q=youth+organizations+near+me" },
+  { id: "canva-skills", category: "Learn & Earn", type: "Canva skills", title: "Canva design micro-skill", description: "Learn poster, social media, presentation, and resume design for small freelance tasks.", tags: ["canva", "design", "income"], difficulty: "Beginner", prepNeeded: "Just a free Canva account and 30 minutes.", applyUrl: "https://www.canva.com/designschool/" },
+  { id: "video-editing", category: "Learn & Earn", type: "Video editing", title: "Video editing starter path", description: "Learn short-form editing, captions, pacing, thumbnails, and portfolio clips for creators.", tags: ["video", "content", "creative"], difficulty: "Beginner", prepNeeded: "A phone or laptop and one short clip to practice on.", applyUrl: "https://creatoracademy.youtube.com/" },
+  { id: "coding-skills", category: "Learn & Earn", type: "Coding", title: "Coding beginner path", description: "Start with websites, small apps, automation, or school project tools that become portfolio work.", tags: ["coding", "technology", "portfolio"], difficulty: "Beginner", prepNeeded: "A laptop and about an hour to get through the first lesson.", applyUrl: "https://www.freecodecamp.org/" },
+  { id: "content-creation", category: "Learn & Earn", type: "Content creation", title: "Content creation portfolio", description: "Build writing, filming, editing, and publishing skills around a topic you care about.", tags: ["content", "marketing", "creative"], difficulty: "Beginner", prepNeeded: "One topic you actually care about and a place to publish.", applyUrl: "https://www.google.com/search?q=content+creation+skills+for+beginners" },
+  { id: "entrepreneurship", category: "Learn & Earn", type: "Entrepreneurship", title: "Mini entrepreneurship project", description: "Test a small service, product, or community idea with low risk and honest feedback.", tags: ["entrepreneurship", "business", "income"], difficulty: "Medium", prepNeeded: "One small idea and someone willing to give honest feedback.", applyUrl: "https://www.google.com/search?q=student+entrepreneurship+ideas" }
 ];
 
 const inspireCoverImages = {
@@ -2115,15 +2115,18 @@ function opportunityCards() {
         <div class="opportunity-card-top">
           <span class="category-badge">${escapeHTML(item.category)}</span>
           <span class="opportunity-type">${escapeHTML(item.type)}</span>
+          ${item.difficulty ? `<span class="difficulty-pill difficulty-${escapeHTML(item.difficulty.toLowerCase())}">${escapeHTML(item.difficulty)}</span>` : ""}
         </div>
         <h3>${escapeHTML(item.title)}</h3>
         <p>${escapeHTML(item.description)}</p>
+        ${item.prepNeeded ? `<p class="tiny-note feed-prep-note">Prep needed: ${escapeHTML(item.prepNeeded)}</p>` : ""}
         <div class="opportunity-tags">
           ${(item.tags || []).map((tag) => `<span>${escapeHTML(tag)}</span>`).join("")}
         </div>
         <div class="opportunity-actions">
           <button class="${saved ? "secondary-action" : "primary-action"} compact-action" type="button" data-save-opportunity="${escapeHTML(item.id)}">${saved ? "Saved" : "Save for later"}</button>
           <button class="secondary-action compact-action" type="button" data-open-link="${escapeHTML(item.applyUrl)}">${item.category === "Learn & Earn" ? "Start learning" : "Search"}</button>
+          <button class="secondary-action compact-action" type="button" data-prepare-opportunity="${escapeHTML(item.title)}" data-prepare-opportunity-category="${escapeHTML(item.category)}">Prepare with Compass</button>
           <button class="text-action" type="button" data-share-opportunity="${escapeHTML(item.id)}">Share</button>
         </div>
       </article>
@@ -6152,6 +6155,13 @@ function skillCategoryLabelForFeed(categoryId) {
   return category ? category.label : categoryId;
 }
 
+// The overlapping tags themselves (not just the score) so a card can say
+// what it actually matched on, not just that it ranked highly.
+function feedMatchedTags(myTags, itemTags) {
+  const mine = new Set((myTags || []).map((tag) => String(tag).toLowerCase()));
+  return (itemTags || []).filter((tag) => mine.has(String(tag).toLowerCase()));
+}
+
 function feedBuildItems() {
   const myTags = feedUserTags();
   const signedIn = typeof hasCommunitySession === "function" && hasCommunitySession();
@@ -6159,14 +6169,14 @@ function feedBuildItems() {
   const raw = [];
 
   opportunityItems.forEach((item) => {
-    raw.push({ type: "opportunity", id: item.id, data: item, score: CommunityMatching.scoreTagOverlap(myTags, item.tags || []) * 1.2 + 0.3 });
+    raw.push({ type: "opportunity", id: item.id, data: item, matchedTags: feedMatchedTags(myTags, item.tags), score: CommunityMatching.scoreTagOverlap(myTags, item.tags || []) * 1.2 + 0.3 });
   });
 
   if (signedIn) {
     (typeof communityOpportunitiesCacheSnapshot === "function" ? communityOpportunitiesCacheSnapshot() : [])
       .filter((item) => item.status === "published")
       .forEach((item) => {
-        raw.push({ type: "community-opportunity", id: item.id, data: item, score: CommunityMatching.scoreTagOverlap(myTags, item.tags || []) * 1.15 + feedFreshnessBoost(item.created_at) * 0.3 });
+        raw.push({ type: "community-opportunity", id: item.id, data: item, matchedTags: feedMatchedTags(myTags, item.tags), score: CommunityMatching.scoreTagOverlap(myTags, item.tags || []) * 1.15 + feedFreshnessBoost(item.created_at) * 0.3 });
       });
 
     (typeof communityPostsCacheSnapshot === "function" ? communityPostsCacheSnapshot() : [])
@@ -6224,22 +6234,39 @@ function feedCardShell({ eyebrow, bodyHtml, footerHtml, type, id }) {
   `;
 }
 
+// Shared by both opportunity types (the curated static list and community
+// submissions) - the two data shapes differ (applyUrl vs link, prepNeeded
+// vs prep_needed from Supabase's snake_case) but read the same on a card.
+function feedOpportunityCardHtml(data, link, matchedTags) {
+  const difficulty = data.difficulty;
+  const prepNeeded = data.prepNeeded || data.prep_needed;
+  return {
+    bodyHtml: `
+      <h2 class="feed-card-title">${escapeHTML(data.title)}</h2>
+      <p class="feed-card-body">${escapeHTML(data.description)}</p>
+      <div class="feed-opportunity-meta">
+        ${difficulty ? `<span class="difficulty-pill difficulty-${escapeHTML(String(difficulty).toLowerCase())}">${escapeHTML(difficulty)}</span>` : ""}
+        ${matchedTags && matchedTags.length ? `<span class="feed-match-chip">Matches: ${escapeHTML(matchedTags.slice(0, 2).join(", "))}</span>` : ""}
+      </div>
+      ${prepNeeded ? `<p class="tiny-note feed-prep-note">Prep needed: ${escapeHTML(prepNeeded)}</p>` : ""}
+    `,
+    footerHtml: `
+      <button class="secondary-action compact-action" type="button" data-open-link="${escapeHTML(link)}">View opportunity</button>
+      <button class="primary-action compact-action" type="button" data-prepare-opportunity="${escapeHTML(data.title)}" data-prepare-opportunity-category="${escapeHTML(data.category || "")}">Prepare with Compass</button>
+    `
+  };
+}
+
 function feedRenderCard(item) {
   if (item.type === "opportunity") {
     const data = item.data;
-    return feedCardShell({
-      type: item.type, id: item.id, eyebrow: data.category,
-      bodyHtml: `<h2 class="feed-card-title">${escapeHTML(data.title)}</h2><p class="feed-card-body">${escapeHTML(data.description)}</p>`,
-      footerHtml: `<button class="primary-action" type="button" data-open-link="${escapeHTML(data.applyUrl)}">View opportunity</button>`
-    });
+    const { bodyHtml, footerHtml } = feedOpportunityCardHtml(data, data.applyUrl, item.matchedTags);
+    return feedCardShell({ type: item.type, id: item.id, eyebrow: data.category, bodyHtml, footerHtml });
   }
   if (item.type === "community-opportunity") {
     const data = item.data;
-    return feedCardShell({
-      type: item.type, id: item.id, eyebrow: `${data.category} - Community-submitted`,
-      bodyHtml: `<h2 class="feed-card-title">${escapeHTML(data.title)}</h2><p class="feed-card-body">${escapeHTML(data.description)}</p>`,
-      footerHtml: `<button class="primary-action" type="button" data-open-link="${escapeHTML(data.link)}">View opportunity</button>`
-    });
+    const { bodyHtml, footerHtml } = feedOpportunityCardHtml(data, data.link, item.matchedTags);
+    return feedCardShell({ type: item.type, id: item.id, eyebrow: `${data.category} - Community-submitted`, bodyHtml, footerHtml });
   }
   if (item.type === "post") {
     const data = item.data;
@@ -11261,6 +11288,20 @@ function buildEntryModal(entryId) {
   `;
 }
 
+// Seeds Build Mode's goal input the same way data-build-goal-chip already
+// does (buildModeGoalInput + jump to the build tab) so a feed opportunity
+// card can hand off straight into the coach router without a new code path.
+// Reuses the "opportunity" coach's own catalog entry (scholarships,
+// competitions, application planning) already in BUILD_COACH_TYPES.
+function prepareOpportunityGoal(title, category) {
+  const label = cleanText(title, 120);
+  if (!label) return;
+  buildModeGoalInput = category ? `Prepare my application for: ${label} (${category})` : `Prepare my application for: ${label}`;
+  buildModeError = "";
+  futureMirrorMode = "build";
+  renderScreen("future");
+}
+
 async function startBuildEntry() {
   const inputEl = document.querySelector("#build-goal-input");
   const goal = cleanText(inputEl ? inputEl.value : buildModeGoalInput, 200);
@@ -11777,6 +11818,7 @@ document.addEventListener("click", async (event) => {
   const jumpFutureScanButton = event.target.closest("[data-jump-future-scan]");
   const jumpBuildModeButton = event.target.closest("[data-jump-build-mode]");
   const buildGoalChipButton = event.target.closest("[data-build-goal-chip]");
+  const prepareOpportunityButton = event.target.closest("[data-prepare-opportunity]");
   const buildMomentCategoryButton = event.target.closest("[data-build-moment-category]");
   const startBuildEntryButton = event.target.closest("[data-start-build-entry]");
   const openBuildEntryButton = event.target.closest("[data-open-build-entry]");
@@ -12609,6 +12651,9 @@ document.addEventListener("click", async (event) => {
     buildModeGoalInput = buildGoalChipButton.dataset.buildGoalChip || "";
     renderScreen("future");
   }
+  if (prepareOpportunityButton) {
+    prepareOpportunityGoal(prepareOpportunityButton.dataset.prepareOpportunity, prepareOpportunityButton.dataset.prepareOpportunityCategory);
+  }
   if (buildMomentCategoryButton) {
     buildMomentCategory = buildMomentCategoryButton.dataset.buildMomentCategory || "independence";
     renderScreen("future");
@@ -13298,12 +13343,16 @@ document.addEventListener("click", async (event) => {
     const linkInput = modalLayer.querySelector("#community-opportunity-link");
     const categorySelect = modalLayer.querySelector("#community-opportunity-category");
     const tagsInput = modalLayer.querySelector("#community-opportunity-tags");
+    const difficultySelect = modalLayer.querySelector("#community-opportunity-difficulty");
+    const prepInput = modalLayer.querySelector("#community-opportunity-prep");
     const error = modalLayer.querySelector("#community-opportunity-error");
     const title = cleanText(titleInput ? titleInput.value : "", 140);
     const description = cleanText(descriptionInput ? descriptionInput.value : "", 800);
     const link = (linkInput ? linkInput.value : "").trim();
     const category = categorySelect ? categorySelect.value : "";
     const tags = (tagsInput ? tagsInput.value : "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean).slice(0, 8);
+    const difficulty = difficultySelect ? difficultySelect.value : "";
+    const prepNeeded = cleanText(prepInput ? prepInput.value : "", 300);
     if (!title || !description || !/^https?:\/\//i.test(link)) {
       if (error) error.textContent = "Add a title, description, and a valid link (starting with http:// or https://).";
       return;
@@ -13311,7 +13360,7 @@ document.addEventListener("click", async (event) => {
     saveCommunityOpportunityButton.disabled = true;
     saveCommunityOpportunityButton.textContent = "Sharing...";
     try {
-      const result = await submitCommunityOpportunity({ title, description, link, category, tags });
+      const result = await submitCommunityOpportunity({ title, description, link, category, tags, difficulty, prepNeeded });
       await refreshCommunityData();
       closeModal();
       if (result.status === "blocked") {

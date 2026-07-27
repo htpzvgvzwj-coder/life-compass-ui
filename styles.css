@@ -3530,6 +3530,55 @@ body.life-sim-active .sos-fab {
   color: #55492f;
 }
 
+/* Opportunity cards (feed + Browse mode): difficulty/prep/match signal so
+   a card explains itself before you tap in, plus a footer that can hold
+   both "View" and "Prepare with Compass" without the buttons fighting. */
+.difficulty-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.difficulty-pill.difficulty-beginner { background: var(--color-mint-soft); }
+.difficulty-pill.difficulty-medium { background: #fff1ce; }
+.difficulty-pill.difficulty-advanced { background: #ffe1df; }
+
+.feed-opportunity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.feed-match-chip {
+  font-size: 11px;
+  color: var(--color-muted);
+  background: var(--color-faint);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.feed-prep-note {
+  margin: 0;
+}
+
+.feed-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.feed-card-footer .primary-action,
+.feed-card-footer .secondary-action {
+  flex: 1 1 auto;
+}
+
 .mood-reflection-label {
   display: block;
   margin: 12px 0 0;
@@ -5090,6 +5139,7 @@ textarea {
 
 .opportunity-card-top {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px;
   align-items: center;

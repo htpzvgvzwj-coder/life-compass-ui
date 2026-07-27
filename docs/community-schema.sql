@@ -199,10 +199,17 @@ create table if not exists opportunities_shared (
   link text not null,
   tags text[] not null default '{}',
   category text not null,
+  difficulty text check (difficulty in ('Beginner', 'Medium', 'Advanced')),
+  prep_needed text check (char_length(prep_needed) <= 300),
   status text not null default 'pending' check (status in ('pending', 'published', 'blocked')),
   moderation_reason text,
   created_at timestamptz not null default now()
 );
+
+-- Migration for projects that ran this script before difficulty/prep_needed
+-- existed - create table if not exists above only helps fresh projects.
+alter table opportunities_shared add column if not exists difficulty text check (difficulty in ('Beginner', 'Medium', 'Advanced'));
+alter table opportunities_shared add column if not exists prep_needed text check (char_length(prep_needed) <= 300);
 
 alter table opportunities_shared enable row level security;
 
