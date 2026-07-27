@@ -1572,47 +1572,6 @@ function weeklyMissionCount() {
   }).length;
 }
 
-function dailyMissionCard() {
-  const mission = todayMission();
-  if (!mission) {
-    return `
-      <section class="mission-card">
-        <p class="eyebrow">Daily Mission</p>
-        <h3>No mission today. Check back tomorrow.</h3>
-      </section>
-    `;
-  }
-  const completed = todayMissionProgress();
-  return `
-    <section class="mission-card ${completed ? "is-complete" : ""}">
-      <div>
-        <p class="eyebrow">Daily Mission</p>
-        <h3>${escapeHTML(mission.title)}</h3>
-        <p>${escapeHTML(completed ? "Nice. You completed today's mission." : mission.description)}</p>
-        <span>${weeklyMissionCount()} daily missions completed this week</span>
-      </div>
-      <button class="${completed ? "secondary-action" : "primary-action"} compact-action" type="button" data-complete-mission ${completed ? "disabled" : ""}>
-        ${completed ? "Done" : "Mark as Done"}
-      </button>
-    </section>
-  `;
-}
-
-function moodSuggestionSummary() {
-  const suggestion = trackerState.moodSuggestion;
-  if (!suggestion) return "";
-  return `
-    <section class="suggestion-card" data-open="moodGuidance">
-      <img src="assets/icon-spark.png" alt="">
-      <div>
-        <p class="eyebrow">Energy suggestion</p>
-        <h3>${escapeHTML(suggestion.title)}</h3>
-        <p>${escapeHTML(suggestion.summary)}</p>
-      </div>
-    </section>
-  `;
-}
-
 function showAuthIfNeeded() {
   if (!userProfile.email) {
     authLayer.classList.add("is-open");
@@ -2141,17 +2100,109 @@ function shareOpportunityText(item) {
   return `${item.title}\n${item.description}\nSearch: ${item.applyUrl}`;
 }
 
-function futureMirrorHomeHero() {
+// Home: "Today's Desk" - one computed focus block instead of a menu of
+// nine stacked cards. Priority order follows what's actually asking for
+// attention: an in-progress Build Mode session > today's unfinished daily
+// mission > the nearest open Life Roadmap goal > a generic prompt into
+// Future Mirror if none of the above have real data yet.
+function todaysDeskFocus() {
+  const activeBuild = trackerState.buildMode.entries
+    .filter((entry) => entry.user_id === currentUserId() && entry.status === "active")
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))[0];
+  if (activeBuild) {
+    return {
+      kind: "build",
+      eyebrow: `Continuing - ${cleanText(activeBuild.coachType || "Custom Growth Coach", 40)}`,
+      title: cleanText(activeBuild.nextStep || activeBuild.goalSummary || activeBuild.goal, 100),
+      text: cleanText(activeBuild.goalSummary || activeBuild.goal, 160),
+      ctaLabel: "Continue training",
+      ctaAttr: `data-open="buildEntry" data-open-payload="${escapeHTML(activeBuild.id)}"`
+    };
+  }
+  const mission = todayMission();
+  if (mission && !todayMissionProgress()) {
+    return {
+      kind: "mission",
+      eyebrow: "Today's mission",
+      title: mission.title,
+      text: mission.description,
+      ctaLabel: "Mark as done",
+      ctaAttr: `data-complete-mission`
+    };
+  }
+  const openGoal = myRoadmapGoals().find((goal) => (goal.milestones || []).some((milestone) => milestone.status !== "done"));
+  if (openGoal) {
+    const doneCount = openGoal.milestones.filter((milestone) => milestone.status === "done").length;
+    return {
+      kind: "goal",
+      eyebrow: "Push this goal forward",
+      title: cleanText(openGoal.title, 100),
+      text: `${doneCount} of ${openGoal.milestones.length} milestones done.`,
+      ctaLabel: "Open Life Roadmap",
+      ctaAttr: `data-open="roadmapView"`
+    };
+  }
+  return {
+    kind: "none",
+    eyebrow: "Start somewhere small",
+    title: "What's one real thing you want to move forward today?",
+    text: "Run it through Future Mirror, or tell Compass AI and get a training path back.",
+    ctaLabel: "Open Future Mirror",
+    ctaAttr: `data-tab-jump="future"`
+  };
+}
+
+function todaysDeskHero() {
+  const focus = todaysDeskFocus();
   return `
-    <header class="future-home-hero">
-      <div class="future-orb" aria-hidden="true"></div>
-      <div class="future-home-copy">
-        <p class="eyebrow">Future Mirror</p>
-        <h2>Your future is built by today's choices.</h2>
-        <p>Explore how your choices today may influence your future.</p>
-        <button class="primary-action mint-action" type="button" data-tab-jump="future">Try Future Mirror</button>
-      </div>
-    </header>
+    <section class="desk-hero">
+      <p class="desk-hero-eyebrow">${escapeHTML(focus.eyebrow)}</p>
+      <h2>${escapeHTML(focus.title)}</h2>
+      <p>${escapeHTML(focus.text)}</p>
+      <button class="desk-hero-cta" type="button" ${focus.ctaAttr}>${escapeHTML(focus.ctaLabel)}</button>
+      ${focus.kind === "build" ? `<span class="desk-hero-stamp">In progress</span>` : ""}
+    </section>
+  `;
+}
+
+// Everything else that used to be its own stacked card (mood, nearest goal,
+// Compass AI, today's Inspire pick) reads as a compact log instead - real
+// data, no repeated card chrome.
+function homeLedgerRows(skipKind) {
+  const rows = [];
+  const latestMood = latestRealMoodEntry();
+  rows.push({
+    label: "Mood check-in",
+    value: latestMood ? `${latestMood.label} today` : "not yet today",
+    attr: `data-open="mood"`
+  });
+  if (skipKind !== "goal") {
+    const openGoal = myRoadmapGoals().find((goal) => (goal.milestones || []).some((milestone) => milestone.status !== "done"));
+    if (openGoal) {
+      const doneCount = openGoal.milestones.filter((milestone) => milestone.status === "done").length;
+      rows.push({
+        label: cleanText(openGoal.title, 60),
+        value: `${doneCount} / ${openGoal.milestones.length} milestones`,
+        attr: `data-open="roadmapView"`
+      });
+    }
+  }
+  const latestMirror = trackerState.futureMirror && trackerState.futureMirror.latest;
+  rows.push({
+    label: latestMirror ? "Latest Future Mirror" : "Future Mirror",
+    value: latestMirror ? "ready to revisit" : "not started yet",
+    attr: `data-tab-jump="future"`
+  });
+  rows.push({ label: "Ask Compass", value: "one open question", attr: `data-tab-jump="compass"` });
+  return `
+    <div class="desk-ledger">
+      ${rows.map((row) => `
+        <button type="button" class="desk-ledger-row" ${row.attr}>
+          <span class="desk-ledger-label">${escapeHTML(row.label)}</span>
+          <span class="desk-ledger-value">${escapeHTML(row.value)}</span>
+        </button>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -2191,82 +2242,6 @@ function growthProgressHomeSummary() {
         </div>
       ` : ""}
       <button class="text-action" type="button" data-tab-jump="future">Open Future Mirror</button>
-    </section>
-  `;
-}
-
-function futureReflectionHomeSummary() {
-  const saved = savedFutureDecisions();
-  const reflected = saved.filter((item) => item.lesson || item.whatHappened).length;
-  return `
-    <section class="home-summary-card future-home-summary">
-      <p class="eyebrow">Future Reflection</p>
-      <div class="home-summary-grid">
-        <span><strong>${saved.length}</strong>Saved decisions</span>
-        <span><strong>${reflected}</strong>Reflected</span>
-        <span><strong>${trackerState.futureMirror.latest ? "Ready" : "New"}</strong>Mirror</span>
-      </div>
-      <p>${saved.length ? "Revisit decisions later and compare what you expected with what actually happened." : "Save a Future Mirror result, then return later to record what happened and what you learned."}</p>
-      <button class="text-action" type="button" data-tab-jump="future">Open Future Reflection</button>
-    </section>
-  `;
-}
-
-function compassQuickAccessCard() {
-  return `
-    <section class="compass-home-card">
-      <div>
-        <p class="eyebrow">Compass AI</p>
-        <h3>Talk through the next move.</h3>
-        <p>Use Compass AI to reflect on a Future Mirror result or turn an Inspire lesson into action.</p>
-      </div>
-      <button class="primary-action compact-action" type="button" data-tab-jump="compass">Open chat</button>
-    </section>
-  `;
-}
-
-function todayInsightCard() {
-  const latestMood = latestRealMoodEntry();
-  const latestMirror = trackerState.futureMirror && trackerState.futureMirror.latest;
-  let title = "Every choice writes your future.";
-  let text = "Choose one decision, one growth action, and one reflection today.";
-  if (latestMirror) {
-    title = "Your latest mirror is ready to use.";
-    text = "Connect that decision to your goals, journal, mood, or one small challenge before the day ends.";
-  } else if (latestMood) {
-    title = `${latestMood.label} energy can still guide a good choice.`;
-    text = Number(latestMood.score) < 50
-      ? "Keep today's action small and kind. A low-energy day still counts when you choose one steady step."
-      : "Use the energy you logged to protect one focused action that supports your future.";
-  }
-  return `
-    <section class="today-insight-card">
-      <p class="eyebrow">Today's Insight</p>
-      <h3>${escapeHTML(title)}</h3>
-      <p>${escapeHTML(text)}</p>
-      <div class="today-insight-actions">
-        <button class="secondary-action compact-action" type="button" data-open="mood">Check in</button>
-        <button class="secondary-action compact-action" type="button" data-open="journal">Reflect</button>
-      </div>
-    </section>
-  `;
-}
-
-function futureScoreHomeCard() {
-  const latest = trackerState.futureMirror && trackerState.futureMirror.latest;
-  const score = latest && latest.futureScore ? latest.futureScore : null;
-  const overall = score ? Number(score.overall || 0) : Math.round((Number(trackerState.mood.score || 0) + Math.min(100, weeklyMissionCount() * 20)) / 2);
-  return `
-    <section class="future-score-home-card">
-      <div class="future-score-ring small-ring" style="--score:${overall}">
-        <strong>${overall}</strong>
-      </div>
-      <div>
-        <p class="eyebrow">Future Score</p>
-        <h3>${score ? "Based on your latest Future Mirror" : "Start with one mirror to personalize this"}</h3>
-        <p>${escapeHTML(score ? score.explanation : "This score becomes more meaningful when Future Mirror connects to your goals, mood, journal, and challenges.")}</p>
-      </div>
-      <button class="text-action" type="button" data-tab-jump="future">${score ? "View score" : "Try Future Mirror"}</button>
     </section>
   `;
 }
@@ -7935,16 +7910,10 @@ function futureScanSignalBanner() {
 
 const screens = {
   home: () => `
-    ${futureMirrorHomeHero()}
+    ${todaysDeskHero()}
+    ${homeLedgerRows(todaysDeskFocus().kind)}
     ${lifeVerseHomeSpotlight()}
-    ${todayInsightCard()}
-    ${futureScoreHomeCard()}
     ${homeQuickAccessGrid()}
-    ${dailyMissionCard()}
-    ${moodSuggestionSummary()}
-    ${futureReflectionHomeSummary()}
-    ${storyOfTheDayCard()}
-    ${compassQuickAccessCard()}
   `,
 
   future: () => `

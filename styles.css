@@ -9021,3 +9021,214 @@ body.life-sim-active .lifeverse-consequence-toast {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ===========================================================================
+   Front Desk design system (redesign pitch approved 2026-07-27)
+   Replaces the warm-cream/gold "Refined Compass theme" above - every screen
+   used the same white rounded card + black pill + generic circle icon, which
+   read as a generic SaaS template rather than anything specific to Compass.
+   New concept: you're not opening an app, you're running your own front
+   desk - paper ground, one working accent (teal), one stamp accent (amber)
+   for completion/dates only. Layered as a final override block, following
+   this file's own existing convention (see "Modern mobile experience
+   refresh" and "Refined Compass theme" above) instead of rewriting every
+   earlier rule - lower risk, same mechanism this file already relies on.
+   Per-feature archetypes (ledger/dossier/form/noticeboard/etc.) land in
+   later passes; this pass is tokens + the shared primitives every screen
+   already inherits (buttons, cards, background, type).
+   =========================================================================== */
+:root {
+  --color-bg: #e8eae2;
+  --color-bg-deep: #14181a;
+  --color-surface: #f4f5ef;
+  --color-surface-soft: #dcdfd4;
+  --color-ink: #1c2321;
+  --color-ink-soft: #4b534e;
+  --color-ink-faint: #7c847c;
+  --color-muted: #5c6459;
+  --color-faint: #dde1d4;
+  --color-line: #b9bfae;
+  --color-primary: #0f6e5c;
+  --color-mint: #0f6e5c;
+  --color-mint-soft: #dfeae5;
+  --color-calm: #dfeae5;
+  --color-teal: #0f6e5c;
+  --color-teal-strong: #0b5646;
+  --color-teal-wash: #dfeae5;
+  --color-amber: #c67a0e;
+  --color-amber-wash: #f3e3c4;
+  --color-warning: #c67a0e;
+  --color-danger: #b5432e;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --shadow-soft: 0 10px 26px rgba(20, 24, 26, 0.1);
+  --shadow-tight: 0 4px 14px rgba(20, 24, 26, 0.08);
+  --font-sans: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", "Roboto Mono", Consolas, monospace;
+}
+
+body {
+  background: var(--color-bg);
+  background-image: repeating-linear-gradient(180deg, rgba(28, 35, 33, 0.03) 0px, rgba(28, 35, 33, 0.03) 1px, transparent 1px, transparent 34px);
+}
+
+.app-screen {
+  background: var(--color-bg);
+}
+
+.phone-shell {
+  box-shadow: 0 20px 60px rgba(20, 24, 26, 0.25);
+}
+
+.primary-action {
+  background: var(--color-teal-strong);
+  background-image: none;
+  color: #fdfdfa;
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.primary-action:hover:not(:disabled) {
+  background: var(--color-teal);
+  box-shadow: none;
+  transform: none;
+}
+
+.mint-action,
+.featured-story .primary-action,
+.center-nav.is-active {
+  background: var(--color-amber);
+  color: #1c2321;
+}
+
+.secondary-action {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background-image: none;
+}
+
+.text-action {
+  color: var(--color-teal-strong);
+}
+
+.modal-card {
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-soft);
+}
+
+.community-card,
+.community-wall-card,
+.growth-partner-card,
+.opportunity-card,
+.future-reflection-item {
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  box-shadow: none;
+}
+
+.future-letter-card {
+  background: var(--color-bg-deep);
+}
+
+.future-home-hero,
+.mirror-head,
+.compass-home-card,
+.compass-head {
+  background: linear-gradient(135deg, var(--color-bg-deep), #22201b);
+}
+
+/* Home: "Today's Desk" - one computed focus block instead of a menu of
+   nine stacked cards, plus a compact ledger for everything else. */
+.desk-hero {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  padding: 20px 20px 22px;
+  margin-top: 2px;
+}
+
+.desk-hero-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+.desk-hero h2 {
+  font-size: 19px;
+  line-height: 1.28;
+  margin: 8px 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.desk-hero p {
+  font-size: 13px;
+  color: var(--color-ink-soft);
+  margin-bottom: 14px;
+}
+
+.desk-hero-cta {
+  display: inline-block;
+  background: var(--color-teal-strong);
+  color: #fdfdfa;
+  padding: 11px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.desk-hero-stamp {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  border: 1.2px solid var(--color-amber);
+  color: var(--color-amber);
+  padding: 2px 8px;
+  border-radius: 2px;
+  transform: rotate(-3deg);
+}
+
+.desk-ledger {
+  display: grid;
+  gap: 1px;
+  background: var(--color-line);
+  border: 1px solid var(--color-line);
+  margin-top: 12px;
+}
+
+.desk-ledger-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-surface);
+  padding: 12px 14px;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+
+.desk-ledger-label {
+  font-size: 12.5px;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.desk-ledger-value {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
