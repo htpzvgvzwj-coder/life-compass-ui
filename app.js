@@ -1721,6 +1721,15 @@ function realGrowthFacts() {
   if (activeDebts.length) facts.push(`Active Self-Debts: ${activeDebts.map((debt) => debt.title).join(", ")}`);
   const calibration = calibrationStats();
   if (calibration && calibration.read !== "not-enough") facts.push(`Judgment Calibration: across ${calibration.count} resolved Future Scan Check-Backs, average stated confidence ${calibration.avgConfidence}% vs actual match rate ${calibration.avgAccuracy}% - reads as ${calibration.read}`);
+  const topJobMatch = (jobMatchResults() || [])[0];
+  if (topJobMatch) facts.push(`Top Job Matching fit: ${topJobMatch.role.title} (${topJobMatch.percent}%)${topJobMatch.missingTraits.length ? `, skill gap: ${topJobMatch.missingTraits.join(", ")}` : ""}`);
+  if (resumeAtsResult) facts.push(`Latest ATS resume check this session: ${resumeAtsResult.percent}% keyword match against a pasted job posting${resumeAtsResult.missing.length ? `, missing: ${resumeAtsResult.missing.slice(0, 8).join(", ")}` : ""}`);
+  const starGapCounts = {};
+  trackerState.careerStudio.interviewSessions.filter((session) => session.user_id === currentUserId() && session.completedAt).forEach((session) => {
+    (session.feedback || []).forEach((item) => (item.starGaps || []).forEach((gap) => { starGapCounts[gap] = (starGapCounts[gap] || 0) + 1; }));
+  });
+  const recurringStarGap = Object.entries(starGapCounts).sort((a, b) => b[1] - a[1])[0];
+  if (recurringStarGap && recurringStarGap[1] >= 2) facts.push(`Interview Practice pattern: "${STAR_COMPONENT_LABEL[recurringStarGap[0]] || recurringStarGap[0]}" is the most recurring STAR gap across completed interview sessions (${recurringStarGap[1]} times)`);
   const survivedRejections = failuresSurvivedCount();
   if (survivedRejections) facts.push(`Failure Inoculation: ${survivedRejections} rejection(s) survived`);
   const hiredSessions = trackerState.futureSelfHiring.sessions.filter((session) => session.hiredCandidateId);
@@ -4278,16 +4287,26 @@ async function sendInterviewAnswer(text) {
   }
 }
 
+const STAR_COMPONENT_LABEL = { situation: "Situation", task: "Task", action: "Action", result: "Result" };
+
 async function finishInterviewSession(session, persona) {
   const history = session.transcript.map((t) => `Turn ${t.turn} (${t.sender}): ${t.text}${t.sender === "candidate" ? ` [responded after ${t.respondedAfterMs ? Math.round(t.respondedAfterMs / 1000) + "s" : "unknown"}, ${t.fillerWordCount || 0} filler words]` : ""}`).join("\n");
-  const feedbackPrompt = `Full interview transcript with timing/filler-word signals:\n${history}\n\nGive feedback as strict JSON only: { "feedback": [ { "momentRef": "string quoting or referencing a specific turn", "observation": "string", "suggestion": "string" } ] }. Reference specific moments/turns, not just an aggregate score. Include the timing and filler-word signals where they're actually notable (e.g. a long pause or many filler words on a specific turn) - do not fabricate audio/tone detail beyond what the transcript, timing, and filler-word counts actually show.`;
+  // STAR scoring (GitHub research idea - structured behavioral interviews
+  // score ~3x higher on predictive validity than unstructured ones per
+  // Schmidt & Hunter's meta-analysis): only meaningful for story/behavioral
+  // answers ("tell me about a time..."), so the model is told to leave
+  // starGaps empty for turns where the STAR frame doesn't actually apply,
+  // rather than forcing a Situation/Task/Action/Result grade onto every
+  // answer regardless of question type.
+  const feedbackPrompt = `Full interview transcript with timing/filler-word signals:\n${history}\n\nGive feedback as strict JSON only: { "feedback": [ { "momentRef": "string quoting or referencing a specific turn", "observation": "string", "suggestion": "string", "starGaps": ["situation","task","action","result"] } ] }. Reference specific moments/turns, not just an aggregate score. For any candidate answer that was a behavioral/story-style response (e.g. "tell me about a time..."), set starGaps to the lowercase ids of whichever of Situation/Task/Action/Result that answer was missing or weak on - use an empty array if the story already covered all four, or if that turn wasn't a behavioral/story answer at all (don't force STAR onto question types where it doesn't apply, like technical or rapid-fire questions). Include the timing and filler-word signals where they're actually notable (e.g. a long pause or many filler words on a specific turn) - do not fabricate audio/tone detail beyond what the transcript, timing, and filler-word counts actually show.`;
   try {
     const reply = await requestCompassDirect(persona.systemPrompt, feedbackPrompt);
     const parsed = extractJsonObject(reply);
     session.feedback = Array.isArray(parsed && parsed.feedback) ? parsed.feedback.slice(0, 6).map((item) => ({
       momentRef: cleanText(item.momentRef || "", 160),
       observation: cleanText(item.observation || "", 260),
-      suggestion: cleanText(item.suggestion || "", 260)
+      suggestion: cleanText(item.suggestion || "", 260),
+      starGaps: Array.isArray(item.starGaps) ? item.starGaps.filter((gap) => Object.prototype.hasOwnProperty.call(STAR_COMPONENT_LABEL, gap)) : []
     })) : [];
   } catch (error) {
     console.error("[Interview Practice] Feedback generation failed", error);
@@ -4552,6 +4571,8 @@ function ghostRoommateModal() {
 // dates, or achievements, so the output stays trustworthy.
 let isResumeLoading = false;
 let resumeError = "";
+let resumeAtsJdDraft = "";
+let resumeAtsResult = null;
 
 function saveResumeDraft() {
   const existing = trackerState.careerStudio.resume || {};
@@ -4601,6 +4622,48 @@ async function polishResumeWithAI() {
   }
 }
 
+// ATS Resume Match Score (GitHub research idea, inspired by Resume-Matcher/
+// CV-Matcher/ATS-Screener): a deterministic keyword-overlap estimate
+// between the resume and a real pasted job posting, reusing
+// CommunityMatching.extractTags the same way Skill Exchange/Feed already
+// do for tag matching - not a real ATS parser, and the copy says so, so
+// this doesn't overclaim precision it doesn't have.
+function computeAtsMatch(resumeText, jdText) {
+  const jdTags = typeof CommunityMatching !== "undefined" ? CommunityMatching.extractTags(jdText, 40) : [];
+  if (!jdTags.length) return null;
+  const resumeTags = typeof CommunityMatching !== "undefined" ? CommunityMatching.extractTags(resumeText, 60) : [];
+  const resumeSet = new Set(resumeTags);
+  const matched = jdTags.filter((tag) => resumeSet.has(tag));
+  const missing = jdTags.filter((tag) => !resumeSet.has(tag));
+  return {
+    percent: Math.round((matched.length / jdTags.length) * 100),
+    matched,
+    missing,
+    jdTagCount: jdTags.length
+  };
+}
+
+function checkAtsMatch() {
+  const jdInput = modalLayer.querySelector("#resume-ats-jd");
+  const jdText = cleanText(jdInput ? jdInput.value : resumeAtsJdDraft, 4000);
+  resumeAtsJdDraft = jdText;
+  if (!jdText) {
+    resumeError = "Paste a real job description first.";
+    openModal("resumeBuilder");
+    return;
+  }
+  const resume = trackerState.careerStudio.resume || {};
+  const resumeText = [resume.polishedText, resume.rawSkills, resume.rawExperience, resume.rawEducation].filter(Boolean).join(" ");
+  if (!cleanText(resumeText, 1)) {
+    resumeError = "Add some resume content first - there's nothing to check yet.";
+    openModal("resumeBuilder");
+    return;
+  }
+  resumeAtsResult = computeAtsMatch(resumeText, jdText);
+  resumeError = "";
+  openModal("resumeBuilder");
+}
+
 function resumeBuilderView() {
   const resume = trackerState.careerStudio.resume || {};
   return `
@@ -4619,6 +4682,16 @@ function resumeBuilderView() {
         <div class="modal-action-row"><strong>Preview</strong><button class="secondary-action compact-action" type="button" data-copy-resume>Copy text</button></div>
         <pre class="resume-preview-text">${escapeHTML(resume.polishedText)}</pre>
       </div>
+    ` : ""}
+    <div class="content-rail-title"><strong>ATS Match Check</strong><span></span></div>
+    <p class="tiny-note">Paste a real job posting to see how your resume's keywords overlap with it - a rough keyword-overlap estimate, not a real ATS system.</p>
+    <label>Job description<textarea id="resume-ats-jd" rows="4" placeholder="Paste the job description here">${escapeHTML(resumeAtsJdDraft)}</textarea></label>
+    <button class="secondary-action compact-action" type="button" data-check-ats-match>Check ATS match</button>
+    ${resumeAtsResult ? `
+      <div class="paycheck-result-card resume-preview-card">
+        <div class="paycheck-result-row paycheck-result-final"><span>Keyword match</span><strong>${resumeAtsResult.percent}%</strong></div>
+      </div>
+      ${resumeAtsResult.missing.length ? `<p class="tiny-note">Missing from your resume: ${escapeHTML(resumeAtsResult.missing.slice(0, 12).join(", "))}</p>` : `<p class="tiny-note">Your resume covers every keyword this posting mentions.</p>`}
     ` : ""}
   `;
 }
@@ -4821,7 +4894,13 @@ function scoreCareerRole(role, blueprint) {
   const matchedTraits = [...matchedValues, ...matchedStrengths];
   if (workMatch) matchedTraits.push(WORK_STYLE_LABEL_BY_VALUE[blueprint.workStyle] || blueprint.workStyle);
   if (decisionMatch) matchedTraits.push(DECISION_STYLE_LABEL_BY_VALUE[blueprint.decisionStyle] || blueprint.decisionStyle);
-  return { role, percent, matchedTraits };
+  // Skill gap (GitHub research idea, inspired by open-source skill-gap
+  // analyzers): the same comparison scoreCareerRole already does, just
+  // keeping the values/strengths this role wants that the Blueprint
+  // doesn't have yet - each one becomes a real Build Mode training goal
+  // instead of a dead-end "you're not a fit" readout.
+  const missingTraits = [...role.values.filter((value) => !blueprint.values.includes(value)), ...role.strengths.filter((strength) => !blueprint.strengths.includes(strength))];
+  return { role, percent, matchedTraits, missingTraits };
 }
 
 function jobMatchResults() {
@@ -4848,6 +4927,10 @@ function jobMatchingView() {
           <div class="modal-action-row"><strong>${escapeHTML(result.role.title)}</strong><span class="risk-pill calm">${result.percent}% fit</span></div>
           <p class="muted">${escapeHTML(result.role.description)}</p>
           ${result.matchedTraits.length ? `<div class="chip-row">${result.matchedTraits.map((trait) => `<span class="mini-chip">${escapeHTML(trait)}</span>`).join("")}</div>` : ""}
+          ${result.missingTraits.length ? `
+            <p class="tiny-note">Skill gap for this role:</p>
+            <div class="chip-row">${result.missingTraits.map((trait) => `<button type="button" class="mini-chip gap-chip" data-train-skill-gap="${escapeHTML(trait)}" data-train-skill-gap-role="${escapeHTML(result.role.title)}">Train: ${escapeHTML(trait)}</button>`).join("")}</div>
+          ` : ""}
         </div>
       `).join("")}
     </div>
@@ -8907,7 +8990,11 @@ const modals = {
           <div class="advice-stack">
             <h3>Feedback on this interview</h3>
             ${session.feedback.length ? session.feedback.map((item) => `
-              <div><strong>${escapeHTML(item.momentRef)}</strong><span>${escapeHTML(item.observation)} ${escapeHTML(item.suggestion)}</span></div>
+              <div>
+                <strong>${escapeHTML(item.momentRef)}</strong>
+                <span>${escapeHTML(item.observation)} ${escapeHTML(item.suggestion)}</span>
+                ${item.starGaps && item.starGaps.length ? `<div class="chip-row">${item.starGaps.map((gap) => `<span class="mini-chip gap-chip">STAR gap: ${escapeHTML(STAR_COMPONENT_LABEL[gap] || gap)}</span>`).join("")}</div>` : ""}
+              </div>
             `).join("") : `<div><strong>Overall</strong><span>Feedback is being generated - if this stays empty, try finishing the interview again.</span></div>`}
           </div>
           <button class="secondary-action" type="button" data-close>Done</button>
@@ -9792,6 +9879,8 @@ function openModal(name, payload) {
   }
   if (name === "resumeBuilder" && !modalLayer.classList.contains("is-open")) {
     resumeError = "";
+    resumeAtsResult = null;
+    resumeAtsJdDraft = "";
   }
   if (name === "portfolioBuilder" && !modalLayer.classList.contains("is-open")) {
     portfolioError = "";
@@ -11549,6 +11638,19 @@ function buildEntryModal(entryId) {
 // card can hand off straight into the coach router without a new code path.
 // Reuses the "opportunity" coach's own catalog entry (scholarships,
 // competitions, application planning) already in BUILD_COACH_TYPES.
+// Same seed-into-Build-Mode pattern as prepareOpportunityGoal, but called
+// from inside a modal (Job Matching), so it closes the modal first -
+// otherwise it would sit on top of the Future Mirror screen underneath.
+function trainSkillGap(trait, roleTitle) {
+  const label = cleanText(trait, 60);
+  if (!label) return;
+  buildModeGoalInput = roleTitle ? `Build ${label} for a ${cleanText(roleTitle, 60)} path` : `Build ${label}`;
+  buildModeError = "";
+  futureMirrorMode = "build";
+  closeModal();
+  renderScreen("future");
+}
+
 function prepareOpportunityGoal(title, category) {
   const label = cleanText(title, 120);
   if (!label) return;
@@ -12078,6 +12180,7 @@ document.addEventListener("click", async (event) => {
   const jumpBuildModeButton = event.target.closest("[data-jump-build-mode]");
   const buildGoalChipButton = event.target.closest("[data-build-goal-chip]");
   const prepareOpportunityButton = event.target.closest("[data-prepare-opportunity]");
+  const trainSkillGapButton = event.target.closest("[data-train-skill-gap]");
   const buildMomentCategoryButton = event.target.closest("[data-build-moment-category]");
   const startBuildEntryButton = event.target.closest("[data-start-build-entry]");
   const openBuildEntryButton = event.target.closest("[data-open-build-entry]");
@@ -12117,6 +12220,7 @@ document.addEventListener("click", async (event) => {
   const sendInterviewAnswerButton = event.target.closest("[data-send-interview-answer]");
   const saveResumeDraftButton = event.target.closest("[data-save-resume-draft]");
   const polishResumeButton = event.target.closest("[data-polish-resume]");
+  const checkAtsMatchButton = event.target.closest("[data-check-ats-match]");
   const copyResumeButton = event.target.closest("[data-copy-resume]");
   const savePortfolioDraftButton = event.target.closest("[data-save-portfolio-draft]");
   const polishPortfolioButton = event.target.closest("[data-polish-portfolio]");
@@ -12919,6 +13023,9 @@ document.addEventListener("click", async (event) => {
   if (prepareOpportunityButton) {
     prepareOpportunityGoal(prepareOpportunityButton.dataset.prepareOpportunity, prepareOpportunityButton.dataset.prepareOpportunityCategory);
   }
+  if (trainSkillGapButton) {
+    trainSkillGap(trainSkillGapButton.dataset.trainSkillGap, trainSkillGapButton.dataset.trainSkillGapRole);
+  }
   if (buildMomentCategoryButton) {
     buildMomentCategory = buildMomentCategoryButton.dataset.buildMomentCategory || "independence";
     renderScreen("future");
@@ -13084,6 +13191,10 @@ document.addEventListener("click", async (event) => {
 
   if (polishResumeButton) {
     await polishResumeWithAI();
+  }
+
+  if (checkAtsMatchButton) {
+    checkAtsMatch();
   }
 
   if (copyResumeButton) {
@@ -13864,6 +13975,9 @@ document.addEventListener("input", (event) => {
   }
   if (event.target && event.target.id === "scan-checkback-report") {
     futureScanCheckBackReportText = event.target.value;
+  }
+  if (event.target && event.target.id === "resume-ats-jd") {
+    resumeAtsJdDraft = event.target.value;
   }
 });
 

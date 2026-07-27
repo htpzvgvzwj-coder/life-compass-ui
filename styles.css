@@ -3858,6 +3858,18 @@ body.life-sim-active .sos-fab {
   font-weight: 700;
 }
 
+/* Skill gap chips: a real button (train this), styled as a dashed-outline
+   "not yet" mark rather than a filled "matched" chip. */
+.mini-chip.gap-chip {
+  background: transparent;
+  border: 1px dashed var(--color-line);
+  color: var(--color-ink-soft);
+}
+
+.mini-chip.gap-chip:active {
+  transform: scale(0.96);
+}
+
 .mini-chip.is-warning {
   background: var(--color-danger);
   color: #fff;
