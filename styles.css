@@ -3345,6 +3345,63 @@ body.life-sim-active .sos-fab {
 .legacy-activity-cell[data-intensity="3"] { background: color-mix(in srgb, var(--color-mint) 80%, transparent); }
 .legacy-activity-cell[data-intensity="4"] { background: var(--color-mint); }
 
+/* Don't Break the Chain: same contribution-graph technique, boolean cells
+   in a 7-row grid (columns = weeks) instead of weekly intensity buckets. */
+.habit-chain-graph {
+  margin: 14px 0;
+}
+
+.habit-chain-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  grid-auto-flow: column;
+  gap: 3px;
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+.habit-chain-cell {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--color-faint);
+}
+
+.habit-chain-cell.is-active {
+  background: var(--color-teal);
+}
+
+/* OKR-style Key Results: reuses the Self-Debt pressure-bar primitive for
+   the fill, since both are "a real number progressing toward a target". */
+.key-results-block {
+  width: 100%;
+  margin: 10px 0 6px;
+  display: grid;
+  gap: 8px;
+}
+
+.key-result-row {
+  background: var(--color-surface-soft);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.key-result-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.key-result-row .profile-actions {
+  grid-template-columns: 1fr 1fr;
+  margin-top: 2px;
+}
+
 /* Self-Debt: a live pressure gauge instead of a static card list, reading
    off the same 0-4 weather scale Personal Weather uses (WEATHER_CONDITIONS)
    so the two features visibly share one signal. */

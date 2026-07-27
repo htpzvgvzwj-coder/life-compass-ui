@@ -1661,6 +1661,65 @@ function latestRealMoodEntry() {
   return (trackerState.mood.entries || []).find((entry) => entry.user_id === currentUserId() || !entry.user_id) || null;
 }
 
+// "Don't Break the Chain" (GitHub research idea, the Seinfeld method also
+// used by open-source habit trackers): a real day-by-day activity chain,
+// not just a streak number. Grounded only in genuinely dated per-day
+// activity (mood check-ins, journal entries) - challenge starts don't
+// have daily granularity in the data model, so they're deliberately left
+// out rather than faked into a false "daily" signal.
+function habitChainDays(days = 84) {
+  const myId = currentUserId();
+  const activeDates = new Set();
+  (trackerState.mood.entries || []).forEach((entry) => {
+    if (entry.user_id && entry.user_id !== myId) return;
+    const created = new Date(entry.created_at);
+    if (!Number.isNaN(created.getTime())) activeDates.add(dateKey(created));
+  });
+  trackerState.journalEntries.filter((entry) => entry.user_id === myId).forEach((entry) => {
+    const created = new Date(entry.created_at);
+    if (!Number.isNaN(created.getTime())) activeDates.add(dateKey(created));
+  });
+  const today = new Date();
+  const cells = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    const key = dateKey(day);
+    cells.push({ key, active: activeDates.has(key) });
+  }
+  return cells;
+}
+
+function habitChainStats(cells) {
+  let current = 0;
+  for (let i = cells.length - 1; i >= 0; i--) {
+    if (cells[i].active) current++;
+    else break;
+  }
+  let longest = 0;
+  let run = 0;
+  cells.forEach((cell) => {
+    if (cell.active) { run++; longest = Math.max(longest, run); } else run = 0;
+  });
+  return { current, longest };
+}
+
+function habitChainGraph() {
+  const cells = habitChainDays(84);
+  const stats = habitChainStats(cells);
+  return `
+    <div class="legacy-activity-graph habit-chain-graph">
+      <div class="modal-action-row">
+        <p class="eyebrow">Don't break the chain - last 12 weeks</p>
+        <span class="tiny-note desk-hero-eyebrow">${stats.current}-day current, ${stats.longest}-day longest</span>
+      </div>
+      <div class="habit-chain-grid">
+        ${cells.map((cell) => `<span class="habit-chain-cell ${cell.active ? "is-active" : ""}" title="${escapeHTML(cell.key)}${cell.active ? " - showed up" : ""}"></span>`).join("")}
+      </div>
+      <p class="tiny-note">Counts a day if you checked in on mood or wrote a journal entry - the two things here with a real daily timestamp.</p>
+    </div>
+  `;
+}
+
 function realGrowthFacts() {
   const facts = [];
   const blueprint = latestBlueprint();
@@ -1696,7 +1755,14 @@ function realGrowthFacts() {
   if (roadmapGoals.length) {
     const nextMilestone = roadmapGoals.flatMap((goal) => goal.milestones.filter((m) => m.status !== "done").map((m) => ({ ...m, goalTitle: goal.title }))).sort((a, b) => a.month - b.month)[0];
     facts.push(`Life Roadmap goals: ${roadmapGoals.map((g) => g.title).join(", ")}.${nextMilestone ? ` Next open milestone: "${nextMilestone.title}" (month ${nextMilestone.month} of "${nextMilestone.goalTitle}").` : ""}`);
+    const allKeyResults = roadmapGoals.flatMap((goal) => (goal.keyResults || []).map((kr) => ({ ...kr, goalTitle: goal.title, percent: keyResultPercent(kr) })));
+    if (allKeyResults.length) {
+      const behind = allKeyResults.filter((kr) => kr.percent < 30 && daysSince(kr.createdAt) >= 7).sort((a, b) => a.percent - b.percent)[0];
+      facts.push(`Key Results: ${allKeyResults.map((kr) => `"${kr.label}" ${kr.current}${kr.unit}/${kr.target}${kr.unit} (${kr.percent}%) for "${kr.goalTitle}"`).join("; ")}${behind ? `. Most behind: "${behind.label}" at ${behind.percent}%` : ""}`);
+    }
   }
+  const chainStats = habitChainStats(habitChainDays(84));
+  if (chainStats.current > 0 || chainStats.longest > 0) facts.push(`Don't Break the Chain: ${chainStats.current}-day current streak of mood check-ins or journal entries, ${chainStats.longest}-day longest so far`);
   const journalCount = trackerState.journalEntries.filter((entry) => entry.user_id === currentUserId()).length;
   if (journalCount) facts.push(`Journal entries written: ${journalCount}`);
   const nativeReflections = trackerState.reflectionEntries.filter((entry) => entry.user_id === currentUserId());
@@ -3842,50 +3908,60 @@ function dueForResurfacing() {
   return allReflectionLikeEntries().filter((entry) => !entry.dismissedAt && new Date(entry.resurfaceAt).getTime() <= now);
 }
 
+function resurfaceEntryOriginal(merged) {
+  if (merged._source === "reflection") return trackerState.reflectionEntries.find((entry) => entry.id === merged.id) || null;
+  if (merged._source === "futureMirror") return trackerState.futureMirror.saved.find((item) => item.id === merged.id) || null;
+  if (merged._source === "futureScan") {
+    const scan = trackerState.futureScans.find((item) => item.id === merged._scanId);
+    return scan && scan.stations ? scan.stations.checkBack || null : null;
+  }
+  return null;
+}
+
+function resurfaceBaseIntervalDays(mode) {
+  if (mode === "futureScanCheckBack") return 7;
+  return REFLECTION_RESURFACE_DAYS[mode] || REFLECTION_RESURFACE_DAYS.decisionJournal || 30;
+}
+
+// Adaptive resurfacing (GitHub research idea, inspired by the SM-2 spaced
+// repetition algorithm behind Anki): the interval now responds to how the
+// entry actually landed, instead of a fixed per-mode delay with only an
+// ignore-count penalty. The direction is intentionally the OPPOSITE of a
+// flashcard app - there, "remembered easily" means a longer gap; here,
+// "still relevant" means you probably want it back SOONER (it's still
+// live for you), and "resolved" means it can stretch way out or stop
+// resurfacing entirely, since the point is helping you process it, not
+// testing recall.
+function resurfaceRatingIntervalDays(baseDays, rating) {
+  if (rating === "resolved") return null;
+  if (rating === "relevant") return Math.max(2, Math.round(baseDays * 0.6));
+  return Math.round(baseDays * 1.6); // "somewhat" - partially settled, stretch out further
+}
+
 function resurfaceEntryAction(id, action) {
   const merged = allReflectionLikeEntries().find((entry) => entry.id === id);
   if (!merged) return;
-  if (merged._source === "reflection") {
-    const original = trackerState.reflectionEntries.find((entry) => entry.id === id);
-    if (!original) return;
-    if (action === "engage") {
-      original.resurfacedAt = new Date().toISOString();
+  const original = resurfaceEntryOriginal(merged);
+  if (!original) return;
+  if (action === "snooze") {
+    // A lighter option than rating it - "don't want to engage with this
+    // right now at all" - keeps the old escalating-delay behavior rather
+    // than forcing a rating out of someone who just wants it gone for now.
+    original.ignoredCount = (original.ignoredCount || 0) + 1;
+    if (original.ignoredCount >= 3) {
+      original.dismissedAt = new Date().toISOString();
     } else {
-      original.ignoredCount = (original.ignoredCount || 0) + 1;
-      if (original.ignoredCount >= 3) {
-        original.dismissedAt = new Date().toISOString();
-      } else {
-        original.resurfaceAt = new Date(Date.now() + (REFLECTION_RESURFACE_DAYS[original.mode] || 30) * 86400000 * (original.ignoredCount + 1)).toISOString();
-      }
+      original.resurfaceAt = new Date(Date.now() + resurfaceBaseIntervalDays(merged.mode) * 86400000 * (original.ignoredCount + 1)).toISOString();
     }
-  } else if (merged._source === "futureMirror") {
-    const original = trackerState.futureMirror.saved.find((item) => item.id === id);
-    if (!original) return;
-    if (action === "engage") {
-      original.resurfacedAt = new Date().toISOString();
-    } else {
-      original.ignoredCount = (original.ignoredCount || 0) + 1;
-      if (original.ignoredCount >= 3) {
-        original.dismissedAt = new Date().toISOString();
-      } else {
-        original.resurfaceAt = new Date(Date.now() + REFLECTION_RESURFACE_DAYS.decisionJournal * 86400000 * (original.ignoredCount + 1)).toISOString();
-      }
-    }
-  } else if (merged._source === "futureScan") {
-    const scan = trackerState.futureScans.find((item) => item.id === merged._scanId);
-    const checkBack = scan && scan.stations && scan.stations.checkBack;
-    if (!checkBack) return;
-    if (action === "engage") {
-      checkBack.resurfacedAt = new Date().toISOString();
-    } else {
-      checkBack.ignoredCount = (checkBack.ignoredCount || 0) + 1;
-      if (checkBack.ignoredCount >= 3) {
-        checkBack.dismissedAt = new Date().toISOString();
-      } else {
-        checkBack.resurfaceAt = new Date(Date.now() + 7 * 86400000 * (checkBack.ignoredCount + 1)).toISOString();
-      }
-    }
+    saveTrackerState();
+    return;
   }
+  const nextDays = resurfaceRatingIntervalDays(resurfaceBaseIntervalDays(merged.mode), action);
+  original.resurfacedAt = new Date().toISOString();
+  original.lastRating = action;
+  original.ignoredCount = 0;
+  if (nextDays === null) original.dismissedAt = new Date().toISOString();
+  else original.resurfaceAt = new Date(Date.now() + nextDays * 86400000).toISOString();
   saveTrackerState();
 }
 
@@ -3906,8 +3982,10 @@ function resurfacingCard() {
             <small>${escapeHTML(entry.displayTime || "")} - how does it look now?</small>
           </div>
           <div class="profile-actions">
-            <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(entry.id)}:engage">Reflect again</button>
-            <button class="text-action" type="button" data-resurface-action="${escapeHTML(entry.id)}:dismiss">Not now</button>
+            <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(entry.id)}:relevant">Still relevant</button>
+            <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(entry.id)}:somewhat">Somewhat</button>
+            <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(entry.id)}:resolved">Resolved</button>
+            <button class="text-action" type="button" data-resurface-action="${escapeHTML(entry.id)}:snooze">Not now</button>
           </div>
         </article>
       `).join("")}
@@ -3998,6 +4076,133 @@ function setMilestoneStatus(goalId, milestoneId, status) {
 }
 
 let milestoneJustCompleted = null;
+
+// Key Results (GitHub research idea, OKR-inspired): a milestone is
+// done/not-done; a Key Result is a real number the user tracks
+// themselves (savings, applications sent, pages read) so a goal's
+// progress can be a genuine percentage instead of only checkbox counts.
+// Deliberately not AI-generated like milestones are - the user defines
+// their own measure and target, since only they know what "done" means
+// numerically for their own goal.
+function addKeyResult(goalId, { label, unit, target }) {
+  const goal = trackerState.roadmapGoals.find((item) => item.id === goalId);
+  if (!goal) return null;
+  const kr = {
+    id: `kr-${Date.now()}`,
+    label: cleanText(label, 100),
+    unit: cleanText(unit, 12),
+    target: Math.max(0.01, Number(target) || 1),
+    current: 0,
+    createdAt: new Date().toISOString()
+  };
+  goal.keyResults = goal.keyResults || [];
+  goal.keyResults.push(kr);
+  saveTrackerState();
+  return kr;
+}
+
+function updateKeyResultProgress(goalId, krId, current) {
+  const goal = trackerState.roadmapGoals.find((item) => item.id === goalId);
+  const kr = goal && (goal.keyResults || []).find((item) => item.id === krId);
+  if (!kr) return;
+  kr.current = Math.max(0, Number(current) || 0);
+  kr.updatedAt = new Date().toISOString();
+  saveTrackerState();
+}
+
+function deleteKeyResult(goalId, krId) {
+  const goal = trackerState.roadmapGoals.find((item) => item.id === goalId);
+  if (!goal) return;
+  goal.keyResults = (goal.keyResults || []).filter((item) => item.id !== krId);
+  saveTrackerState();
+}
+
+function keyResultPercent(kr) {
+  return Math.max(0, Math.min(100, Math.round((kr.current / kr.target) * 100)));
+}
+
+function keyResultsSection(goal) {
+  const krs = goal.keyResults || [];
+  return `
+    <div class="key-results-block">
+      <p class="eyebrow">Key Results</p>
+      ${krs.length ? krs.map((kr) => {
+        const percent = keyResultPercent(kr);
+        const stalled = percent < 30 && daysSince(kr.createdAt) >= 7;
+        return `
+        <div class="key-result-row">
+          <div class="key-result-row-head">
+            <span>${escapeHTML(kr.label)}</span>
+            <span class="desk-ledger-value">${kr.current}${escapeHTML(kr.unit)} / ${kr.target}${escapeHTML(kr.unit)}</span>
+          </div>
+          <div class="debt-pressure-bar"><div class="debt-pressure-bar-fill" data-level="0" style="width:${percent}%"></div></div>
+          <div class="profile-actions">
+            <button class="text-action" type="button" data-open="updateKeyResult" data-open-payload="${escapeHTML(goal.id)}:${escapeHTML(kr.id)}">Update progress</button>
+            <button class="text-action" type="button" data-delete-key-result="${escapeHTML(goal.id)}:${escapeHTML(kr.id)}">Remove</button>
+          </div>
+          ${stalled ? `<button class="secondary-action compact-action" type="button" data-train-skill-gap="${escapeHTML(kr.label)}" data-train-skill-gap-role="${escapeHTML(goal.title)}">Train: make progress on ${escapeHTML(kr.label)}</button>` : ""}
+        </div>
+      `;
+      }).join("") : `<p class="tiny-note">No measurable key results yet - add one to track a real number, not just checkboxes.</p>`}
+      <button class="secondary-action compact-action" type="button" data-open="addKeyResult" data-open-payload="${escapeHTML(goal.id)}">Add key result</button>
+    </div>
+  `;
+}
+
+function addKeyResultModal(goalId) {
+  const goal = trackerState.roadmapGoals.find((item) => item.id === goalId);
+  if (!goal) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="add-kr-title">
+        <div class="modal-top"><span class="risk-pill calm">Key Result</span><button class="ghost-circle" type="button" data-close aria-label="Close">x</button></div>
+        <h3 id="add-kr-title">Goal not found</h3>
+      </div>
+    `;
+  }
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="add-kr-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Key Result</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="add-kr-title">Add a measurable result for "${escapeHTML(goal.title)}"</h3>
+      <p class="muted">A real number you can check in on, not another checkbox - e.g. "Savings", target 500, unit "$".</p>
+      <div class="admin-form">
+        <label>What are you measuring?<input id="kr-label-input" type="text" placeholder="e.g. Savings, Applications sent, Pages read"></label>
+        <label>Unit (optional)<input id="kr-unit-input" type="text" maxlength="12" placeholder="e.g. $, applications, pages"></label>
+        <label>Target<input id="kr-target-input" type="number" min="0.01" step="any" placeholder="e.g. 500"></label>
+      </div>
+      ${roadmapError ? `<p class="form-error">${escapeHTML(roadmapError)}</p>` : ""}
+      <button class="primary-action" type="button" data-save-key-result="${escapeHTML(goalId)}">Add key result</button>
+    </div>
+  `;
+}
+
+function updateKeyResultModal(payload) {
+  const [goalId, krId] = String(payload || "").split(":");
+  const goal = trackerState.roadmapGoals.find((item) => item.id === goalId);
+  const kr = goal && (goal.keyResults || []).find((item) => item.id === krId);
+  if (!kr) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="update-kr-title">
+        <div class="modal-top"><span class="risk-pill calm">Key Result</span><button class="ghost-circle" type="button" data-close aria-label="Close">x</button></div>
+        <h3 id="update-kr-title">Key result not found</h3>
+      </div>
+    `;
+  }
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="update-kr-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Key Result</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="update-kr-title">${escapeHTML(kr.label)}</h3>
+      <p class="muted">Target: ${kr.target}${escapeHTML(kr.unit)}</p>
+      <label>Current value<input id="kr-current-input" type="number" min="0" step="any" value="${kr.current}"></label>
+      <button class="primary-action" type="button" data-save-key-result-progress="${escapeHTML(goalId)}:${escapeHTML(krId)}">Save progress</button>
+    </div>
+  `;
+}
 
 let guardianShareDraft = { goalIds: [], includePersonalBlueprint: false, includeChatHistory: false, includeCostOfLiving: false };
 let guardianShareError = "";
@@ -4125,6 +4330,7 @@ function roadmapTimelineView() {
       <div style="width:100%">
         <strong>${escapeHTML(goal.title)}</strong>
         <small>${escapeHTML((ROADMAP_HORIZONS.find((item) => item.value === goal.horizon) || {}).label || goal.horizon)} horizon${goal.pacingProfile ? ` - paced for ${escapeHTML(goal.pacingProfile)} motivation` : ""}</small>
+        ${keyResultsSection(goal)}
         <div class="mirror-timeline">
           ${goal.milestones.sort((a, b) => a.month - b.month).map((milestone) => `
             <div class="timeline-step milestone-step is-${milestone.status}">
@@ -8212,6 +8418,8 @@ const screens = {
       ]
     })}
 
+    ${habitChainGraph()}
+
     ${growthHubSection({
       id: "challenges",
       title: "Challenges & Badges",
@@ -8764,6 +8972,9 @@ const modals = {
   aiTraceLog: () => aiTraceLogModal(),
 
   calibration: () => calibrationModal(),
+
+  addKeyResult: (goalId) => addKeyResultModal(goalId),
+  updateKeyResult: (payload) => updateKeyResultModal(payload),
 
 
   futureScanStation: (stationId) => {
@@ -9884,6 +10095,9 @@ function openModal(name, payload) {
   }
   if (name === "portfolioBuilder" && !modalLayer.classList.contains("is-open")) {
     portfolioError = "";
+  }
+  if (name === "addKeyResult" && !modalLayer.classList.contains("is-open")) {
+    roadmapError = "";
   }
   if (name === "roadmapView" && !modalLayer.classList.contains("is-open")) {
     roadmapView = "timeline";
@@ -12214,6 +12428,9 @@ document.addEventListener("click", async (event) => {
   const saveMilestoneLetterButton = event.target.closest("[data-save-milestone-letter]");
   const resurfaceActionButton = event.target.closest("[data-resurface-action]");
   const generateRoadmapButton = event.target.closest("[data-generate-roadmap]");
+  const saveKeyResultButton = event.target.closest("[data-save-key-result]");
+  const saveKeyResultProgressButton = event.target.closest("[data-save-key-result-progress]");
+  const deleteKeyResultButton = event.target.closest("[data-delete-key-result]");
   const roadmapViewButton = event.target.closest("[data-roadmap-view]");
   const setMilestoneStatusButton = event.target.closest("[data-set-milestone-status]");
   const startInterviewButton = event.target.closest("[data-start-interview]");
@@ -13133,7 +13350,7 @@ document.addEventListener("click", async (event) => {
     const [id, action] = resurfaceActionButton.dataset.resurfaceAction.split(":");
     const resurfacedEntry = allReflectionLikeEntries().find((item) => item.id === id);
     resurfaceEntryAction(id, action);
-    if (action === "engage" && resurfacedEntry && resurfacedEntry._source === "futureScan") {
+    if (action !== "snooze" && resurfacedEntry && resurfacedEntry._source === "futureScan") {
       // A resurfaced Check-Back is useless without a way back to it - jump
       // straight into that scan's Check-Back station instead of just marking
       // it read, so the user can actually report what happened.
@@ -13150,6 +13367,38 @@ document.addEventListener("click", async (event) => {
     const horizonInput = modalLayer.querySelector("#roadmap-goal-horizon");
     const title = cleanText(titleInput ? titleInput.value : "", 160);
     if (title) await generateRoadmapGoal(title, horizonInput ? horizonInput.value : "1-year");
+  }
+
+  if (saveKeyResultButton) {
+    const goalId = saveKeyResultButton.dataset.saveKeyResult;
+    const labelInput = modalLayer.querySelector("#kr-label-input");
+    const unitInput = modalLayer.querySelector("#kr-unit-input");
+    const targetInput = modalLayer.querySelector("#kr-target-input");
+    const label = cleanText(labelInput ? labelInput.value : "", 100);
+    const target = Number(targetInput ? targetInput.value : 0);
+    if (!label || !target || target <= 0) {
+      roadmapError = "Give this a name and a target number greater than 0.";
+      openModal("addKeyResult", goalId);
+    } else {
+      addKeyResult(goalId, { label, unit: unitInput ? unitInput.value : "", target });
+      roadmapError = "";
+      closeModal();
+      openModal("roadmapView");
+    }
+  }
+
+  if (saveKeyResultProgressButton) {
+    const [goalId, krId] = saveKeyResultProgressButton.dataset.saveKeyResultProgress.split(":");
+    const currentInput = modalLayer.querySelector("#kr-current-input");
+    updateKeyResultProgress(goalId, krId, currentInput ? currentInput.value : 0);
+    closeModal();
+    openModal("roadmapView");
+  }
+
+  if (deleteKeyResultButton) {
+    const [goalId, krId] = deleteKeyResultButton.dataset.deleteKeyResult.split(":");
+    deleteKeyResult(goalId, krId);
+    openModal("roadmapView");
   }
 
   if (roadmapViewButton) {
