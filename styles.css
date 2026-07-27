@@ -3481,13 +3481,32 @@ body.life-sim-active .sos-fab {
   color: var(--color-mint);
   font-weight: 800;
   letter-spacing: 2px;
-  transform: rotate(-6deg) scale(1.15);
-  animation: auctionStampIn 260ms ease;
+  --stamp-rotate: -6deg;
+  animation: stampIn 260ms ease forwards;
 }
 
-@keyframes auctionStampIn {
-  from { opacity: 0; transform: rotate(-6deg) scale(1.6); }
-  to { opacity: 1; transform: rotate(-6deg) scale(1.15); }
+/* Reused by every "this became true" moment (auction sold, exhibit filed,
+   tax item filed, case verdict) - one consistent stamp-hitting-paper
+   gesture instead of a different flourish per feature. Each element sets
+   its own --stamp-rotate resting angle; the animation owns the final
+   transform (forwards) so there's no static-vs-keyframe mismatch jump. */
+@keyframes stampIn {
+  from { opacity: 0; transform: rotate(var(--stamp-rotate, -4deg)) scale(1.7); }
+  to { opacity: 1; transform: rotate(var(--stamp-rotate, -4deg)) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auction-sold-stamp,
+  .exhibit-stamp,
+  .verdict-stamp,
+  .desk-hero-stamp,
+  .desk-hero,
+  .ledger-entry,
+  .tally-mark.is-filled,
+  .community-grid > .community-card {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 /* Self Archaeology: a real stratigraphic cross-section - oldest month at
@@ -4087,7 +4106,22 @@ textarea {
 
 .tally-mark.is-filled {
   background: var(--color-teal);
+  transform-origin: bottom;
+  animation: tallyFillIn 220ms ease both;
 }
+
+@keyframes tallyFillIn {
+  from { transform: scaleY(0.2); opacity: 0.4; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+
+.tally-mark:nth-child(1).is-filled { animation-delay: 0ms; }
+.tally-mark:nth-child(2).is-filled { animation-delay: 30ms; }
+.tally-mark:nth-child(3).is-filled { animation-delay: 60ms; }
+.tally-mark:nth-child(4).is-filled { animation-delay: 90ms; }
+.tally-mark:nth-child(5).is-filled { animation-delay: 120ms; }
+.tally-mark:nth-child(6).is-filled { animation-delay: 150ms; }
+.tally-mark:nth-child(7).is-filled { animation-delay: 180ms; }
 
 .tally-row.is-at-risk .tally-mark.is-filled {
   background: var(--color-amber);
@@ -4108,7 +4142,14 @@ textarea {
 .ledger-entry {
   padding: 12px 2px;
   border-bottom: 1px dashed var(--color-line);
+  animation: fadeRiseIn 220ms ease both;
 }
+
+.ledger-entry:nth-child(1) { animation-delay: 0ms; }
+.ledger-entry:nth-child(2) { animation-delay: 30ms; }
+.ledger-entry:nth-child(3) { animation-delay: 60ms; }
+.ledger-entry:nth-child(4) { animation-delay: 90ms; }
+.ledger-entry:nth-child(5) { animation-delay: 120ms; }
 
 .ledger-entry-stamp {
   margin: 0 0 4px;
@@ -5701,7 +5742,8 @@ textarea {
 .exhibit-stamp {
   border: 1.2px solid var(--color-teal);
   color: var(--color-teal-strong);
-  transform: rotate(-3deg);
+  --stamp-rotate: -3deg;
+  animation: stampIn 220ms ease forwards;
 }
 
 .exhibit-pending {
@@ -5719,6 +5761,14 @@ textarea {
   text-transform: uppercase;
   color: var(--color-teal-strong);
   margin: 0 0 2px;
+  animation: fadeRiseIn 260ms ease both;
+}
+
+/* Lighter entrance than stampIn - for text/rows settling into place rather
+   than a badge striking the page. */
+@keyframes fadeRiseIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .mirror-error-card {
@@ -9318,10 +9368,18 @@ body {
   box-shadow: 0 1px 2px rgba(20, 24, 26, 0.35);
 }
 
-.community-grid > .community-card:nth-child(4n+1) { transform: rotate(-0.6deg); }
-.community-grid > .community-card:nth-child(4n+2) { transform: rotate(0.5deg); }
-.community-grid > .community-card:nth-child(4n+3) { transform: rotate(-0.4deg); }
-.community-grid > .community-card:nth-child(4n+4) { transform: rotate(0.7deg); }
+.community-grid > .community-card:nth-child(4n+1) { transform: rotate(-0.6deg); animation-delay: 0ms; }
+.community-grid > .community-card:nth-child(4n+2) { transform: rotate(0.5deg); animation-delay: 40ms; }
+.community-grid > .community-card:nth-child(4n+3) { transform: rotate(-0.4deg); animation-delay: 80ms; }
+.community-grid > .community-card:nth-child(4n+4) { transform: rotate(0.7deg); animation-delay: 120ms; }
+
+.community-grid > .community-card {
+  animation: pinDropIn 260ms ease both;
+}
+
+@keyframes pinDropIn {
+  from { opacity: 0; transform: translateY(-6px) rotate(0deg) scale(0.97); }
+}
 
 .future-letter-card {
   background: var(--color-bg-deep);
@@ -9342,6 +9400,7 @@ body {
   border: 1px solid var(--color-line);
   padding: 20px 20px 22px;
   margin-top: 2px;
+  animation: modalCardIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .desk-hero-eyebrow {
@@ -9386,7 +9445,9 @@ body {
   color: var(--color-amber);
   padding: 2px 8px;
   border-radius: 2px;
-  transform: rotate(-3deg);
+  --stamp-rotate: -3deg;
+  animation: stampIn 300ms ease 200ms forwards;
+  opacity: 0;
 }
 
 .desk-ledger {
