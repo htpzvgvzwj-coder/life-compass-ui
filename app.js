@@ -503,6 +503,16 @@ const defaultTrackerState = {
   // this is what lets calibrationStats() aggregate across every decision
   // the user has ever checked back on, not just the current one.
   calibrationRecords: [],
+  // Real Life Events (self-audit finding): every existing "due" mechanism
+  // in Compass - Self-Debt, resurfacing, Check-Back - is an app-invented
+  // reminder about the user's own reflections, not a real external
+  // deadline. This is the one category with a genuine user-entered due
+  // date (rent, bills, renewals, appointments) - see pendingInboxItems().
+  realLifeEvents: [],
+  // Skill Guides progress (self-audit finding): every existing coaching
+  // surface is chat/roleplay-shaped, which can't actually teach a hands-on
+  // skill like laundry or cooking - see SKILL_GUIDES below.
+  skillGuideProgress: {},
   // Build Mode - a goal-based coach router and training path. Multiple
   // entries can be active at once because a user may want different coaches
   // for different goals.
@@ -1265,6 +1275,8 @@ function normalizeTrackerState(state) {
     futureSelfSnapshots: Array.isArray(state.futureSelfSnapshots) ? state.futureSelfSnapshots : fallback.futureSelfSnapshots,
     futureScans: Array.isArray(state.futureScans) ? state.futureScans : fallback.futureScans,
     calibrationRecords: Array.isArray(state.calibrationRecords) ? state.calibrationRecords : fallback.calibrationRecords,
+    realLifeEvents: Array.isArray(state.realLifeEvents) ? state.realLifeEvents : fallback.realLifeEvents,
+    skillGuideProgress: (state.skillGuideProgress && typeof state.skillGuideProgress === "object") ? state.skillGuideProgress : fallback.skillGuideProgress,
     buildMode: {
       entries: Array.isArray(state.buildMode && state.buildMode.entries) ? state.buildMode.entries : fallback.buildMode.entries
     },
@@ -1465,42 +1477,103 @@ function saveTrackerState() {
 // working safety net that ships with zero new infrastructure - phase 2
 // (cloud backup) is the actual fix, this is the "don't lose everything
 // today" stopgap.
+//
+// Self-audit finding: the first version of this exported journal/mood
+// content as plaintext JSON - anyone who got hold of the downloaded file
+// (or, for cloud backup, anyone with raw table access) could read it.
+// Everything below encrypts the payload client-side (PBKDF2 + AES-GCM,
+// Web Crypto - no library, no key ever leaves the browser or gets sent
+// anywhere). There is deliberately no password reset: Compass never
+// stores the passphrase, so a forgotten one makes that specific backup
+// permanently unreadable - that trade-off is the whole point, and the UI
+// says so before it's too late to matter.
 let backupImportError = "";
+let backupPassphraseMode = ""; // "export" | "import" | "cloudBackup" | "cloudRestore"
+let backupPassphraseInput = "";
+let backupPassphraseConfirm = "";
+let backupPassphraseBusy = false;
+let backupPassphraseError = "";
+let pendingImportPayload = null;
+let pendingCloudRestorePayload = null;
+let pendingCloudRestoreUpdatedAt = null;
 
-function exportTrackerData() {
-  const payload = {
-    app: "Compass",
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    email: userProfile.email,
-    trackerState
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `compass-backup-${dateKey()}.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+function backupBufToBase64(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }
 
-function importTrackerDataFromFile(file) {
+function backupBase64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function deriveBackupKey(passphrase, saltBytes) {
+  const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: saltBytes, iterations: 150000, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function encryptBackupPayload(obj, passphrase) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveBackupKey(passphrase, salt);
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify(obj)));
+  return { app: "Compass", encrypted: true, version: 1, salt: backupBufToBase64(salt), iv: backupBufToBase64(iv), ciphertext: backupBufToBase64(ciphertext) };
+}
+
+async function decryptBackupPayload(payload, passphrase) {
+  const salt = backupBase64ToBytes(payload.salt);
+  const iv = backupBase64ToBytes(payload.iv);
+  const key = await deriveBackupKey(passphrase, salt);
+  const plainBuf = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, backupBase64ToBytes(payload.ciphertext));
+  return JSON.parse(new TextDecoder().decode(plainBuf));
+}
+
+function openBackupPassphraseModal(mode) {
+  backupPassphraseMode = mode;
+  backupPassphraseInput = "";
+  backupPassphraseConfirm = "";
+  backupPassphraseError = "";
+  openModal("backupPassphrase");
+}
+
+function startExportBackup() {
+  openBackupPassphraseModal("export");
+}
+
+function applyImportedTrackerState(parsed) {
+  const incoming = parsed && typeof parsed === "object" && parsed.trackerState ? parsed.trackerState : parsed;
+  if (!incoming || typeof incoming !== "object") throw new Error("Not a Compass backup file.");
+  const normalized = normalizeTrackerState(incoming);
+  Object.keys(trackerState).forEach((key) => delete trackerState[key]);
+  Object.assign(trackerState, normalized);
+  saveTrackerState();
+  backupImportError = "";
+  closeModal();
+  renderScreen("settings");
+  triggerCheckInCelebration("Backup restored.");
+}
+
+function startImportBackup(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
     try {
       const parsed = JSON.parse(String(reader.result || ""));
-      const incoming = parsed && typeof parsed === "object" && parsed.trackerState ? parsed.trackerState : parsed;
-      if (!incoming || typeof incoming !== "object") throw new Error("Not a Compass backup file.");
-      const normalized = normalizeTrackerState(incoming);
-      Object.keys(trackerState).forEach((key) => delete trackerState[key]);
-      Object.assign(trackerState, normalized);
-      saveTrackerState();
-      backupImportError = "";
-      renderScreen("settings");
-      triggerCheckInCelebration("Backup restored.");
+      if (parsed && parsed.encrypted) {
+        pendingImportPayload = parsed;
+        openBackupPassphraseModal("import");
+      } else {
+        // A plaintext backup from before encryption existed - still
+        // honored so nobody's old backup silently stops working.
+        applyImportedTrackerState(parsed);
+      }
     } catch (error) {
       console.error("[Backup] Import failed", error);
       backupImportError = "That file doesn't look like a valid Compass backup.";
@@ -1562,6 +1635,13 @@ function growthTimelineEvents() {
   if (calRecords.length >= 3) {
     events.push({ at: calRecords[2].resolvedAt, label: "First real Judgment Calibration reading", detail: "3 resolved Check-Backs - enough to see a real pattern" });
   }
+  myRealLifeEvents().filter((event) => event.lastHandledAt).forEach((event) => {
+    events.push({ at: event.lastHandledAt, label: `Handled "${cleanText(event.title, 80)}"`, detail: "Real Due Date" });
+  });
+  SKILL_GUIDES.forEach((guide) => {
+    const progress = skillGuideProgress(guide.id);
+    if (progress.completedAt) events.push({ at: progress.completedAt, label: `Completed the "${guide.title}" guide`, detail: "Skill Guide" });
+  });
   return events.sort((a, b) => new Date(b.at) - new Date(a.at));
 }
 
@@ -1600,34 +1680,16 @@ function yourStoryCard() {
 let cloudBackupBusy = false;
 let cloudBackupStatus = "";
 
-async function backupTrackerDataToCloud() {
-  const client = typeof getCommunitySupabaseClient === "function" ? getCommunitySupabaseClient() : null;
-  if (!client || !hasCommunitySession()) {
+function startCloudBackup() {
+  if (!hasCommunitySession()) {
     cloudBackupStatus = "Sign in to Community first to back up to the cloud.";
     renderScreen("settings");
     return;
   }
-  cloudBackupBusy = true;
-  cloudBackupStatus = "";
-  renderScreen("settings");
-  try {
-    const { error } = await client.from("compass_backups").upsert({
-      user_id: communityUserId(),
-      data: trackerState,
-      updated_at: new Date().toISOString()
-    });
-    if (error) throw error;
-    cloudBackupStatus = `Backed up to the cloud ${new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
-  } catch (error) {
-    console.error("[Backup] Cloud backup failed", error);
-    cloudBackupStatus = "Couldn't back up to the cloud right now. Please try again.";
-  } finally {
-    cloudBackupBusy = false;
-    renderScreen("settings");
-  }
+  openBackupPassphraseModal("cloudBackup");
 }
 
-async function restoreTrackerDataFromCloud() {
+async function startCloudRestore() {
   const client = typeof getCommunitySupabaseClient === "function" ? getCommunitySupabaseClient() : null;
   if (!client || !hasCommunitySession()) {
     cloudBackupStatus = "Sign in to Community first to restore from the cloud.";
@@ -1644,18 +1706,100 @@ async function restoreTrackerDataFromCloud() {
       cloudBackupStatus = "No cloud backup found for this Community account yet.";
       return;
     }
-    const normalized = normalizeTrackerState(data.data);
-    Object.keys(trackerState).forEach((key) => delete trackerState[key]);
-    Object.assign(trackerState, normalized);
-    saveTrackerState();
-    cloudBackupStatus = `Restored from the cloud backup saved ${new Date(data.updated_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
-    triggerCheckInCelebration("Restored from cloud backup.");
+    pendingCloudRestorePayload = data.data;
+    pendingCloudRestoreUpdatedAt = data.updated_at;
+    openBackupPassphraseModal("cloudRestore");
   } catch (error) {
-    console.error("[Backup] Cloud restore failed", error);
-    cloudBackupStatus = "Couldn't restore from the cloud right now. Please try again.";
+    console.error("[Backup] Cloud restore fetch failed", error);
+    cloudBackupStatus = "Couldn't reach the cloud backup right now. Please try again.";
   } finally {
     cloudBackupBusy = false;
     renderScreen("settings");
+  }
+}
+
+const BACKUP_PASSPHRASE_COPY = {
+  export: { title: "Set a passphrase for this backup", note: "Compass never stores this passphrase anywhere - if you forget it, this backup file can't be recovered. Use one you'll actually remember.", confirm: true, submitLabel: "Encrypt & download" },
+  import: { title: "Enter this backup's passphrase", note: "The passphrase you set when this backup was created.", confirm: false, submitLabel: "Decrypt & restore" },
+  cloudBackup: { title: "Set a passphrase for this backup", note: "Compass never stores this passphrase anywhere - not even in the cloud. If you forget it, this backup can't be recovered.", confirm: true, submitLabel: "Encrypt & back up" },
+  cloudRestore: { title: "Enter this backup's passphrase", note: "The passphrase you set the last time you backed up to the cloud.", confirm: false, submitLabel: "Decrypt & restore" }
+};
+
+function backupPassphraseModal() {
+  const copy = BACKUP_PASSPHRASE_COPY[backupPassphraseMode] || BACKUP_PASSPHRASE_COPY.export;
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="backup-passphrase-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Encrypted backup</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="backup-passphrase-title">${escapeHTML(copy.title)}</h3>
+      <p class="muted">${escapeHTML(copy.note)}</p>
+      <div class="admin-form">
+        <label>Passphrase<input id="backup-passphrase-input" type="password" autocomplete="off" value="${escapeHTML(backupPassphraseInput)}"></label>
+        ${copy.confirm ? `<label>Confirm passphrase<input id="backup-passphrase-confirm" type="password" autocomplete="off" value="${escapeHTML(backupPassphraseConfirm)}"></label>` : ""}
+      </div>
+      ${backupPassphraseError ? `<p class="form-error">${escapeHTML(backupPassphraseError)}</p>` : ""}
+      <button class="primary-action" type="button" data-submit-backup-passphrase ${backupPassphraseBusy ? "disabled" : ""}>${backupPassphraseBusy ? "Working..." : escapeHTML(copy.submitLabel)}</button>
+    </div>
+  `;
+}
+
+async function submitBackupPassphrase() {
+  const mode = backupPassphraseMode;
+  const passphrase = backupPassphraseInput;
+  if (!passphrase || passphrase.length < 6) {
+    backupPassphraseError = "Use a passphrase of at least 6 characters.";
+    openModal("backupPassphrase");
+    return;
+  }
+  if ((mode === "export" || mode === "cloudBackup") && passphrase !== backupPassphraseConfirm) {
+    backupPassphraseError = "Passphrases don't match.";
+    openModal("backupPassphrase");
+    return;
+  }
+  backupPassphraseBusy = true;
+  backupPassphraseError = "";
+  openModal("backupPassphrase");
+  try {
+    if (mode === "export") {
+      const payload = await encryptBackupPayload({ app: "Compass", exportedAt: new Date().toISOString(), email: userProfile.email, trackerState }, passphrase);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `compass-backup-${dateKey()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      closeModal();
+      triggerCheckInCelebration("Encrypted backup downloaded.");
+    } else if (mode === "import") {
+      const decrypted = await decryptBackupPayload(pendingImportPayload, passphrase);
+      pendingImportPayload = null;
+      applyImportedTrackerState(decrypted);
+    } else if (mode === "cloudBackup") {
+      const client = getCommunitySupabaseClient();
+      const payload = await encryptBackupPayload({ app: "Compass", exportedAt: new Date().toISOString(), email: userProfile.email, trackerState }, passphrase);
+      const { error } = await client.from("compass_backups").upsert({ user_id: communityUserId(), data: payload, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      cloudBackupStatus = `Backed up to the cloud ${new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
+      closeModal();
+      renderScreen("settings");
+    } else if (mode === "cloudRestore") {
+      const decrypted = await decryptBackupPayload(pendingCloudRestorePayload, passphrase);
+      const restoredAt = pendingCloudRestoreUpdatedAt;
+      pendingCloudRestorePayload = null;
+      applyImportedTrackerState(decrypted);
+      cloudBackupStatus = `Restored from the cloud backup saved ${new Date(restoredAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
+    }
+  } catch (error) {
+    console.error("[Backup] Passphrase action failed", error);
+    backupPassphraseError = mode === "import" || mode === "cloudRestore" ? "Wrong passphrase, or this backup is corrupted." : "Something went wrong. Please try again.";
+  } finally {
+    backupPassphraseBusy = false;
+    if (backupPassphraseError) openModal("backupPassphrase");
   }
 }
 
@@ -1664,7 +1808,7 @@ function yourDataCard() {
   return `
     <section class="profile-card">
       <p class="eyebrow">Your Data</p>
-      <p class="muted">Everything here only lives in this browser. Clearing site data or switching devices loses it - back up regularly, especially before clearing your browser.</p>
+      <p class="muted">Everything here only lives in this browser. Clearing site data or switching devices loses it - back up regularly, especially before clearing your browser. Every backup is encrypted with a passphrase only you know - Compass never stores it, so a forgotten passphrase means that backup can't be recovered.</p>
       ${backupImportError ? `<p class="form-error">${escapeHTML(backupImportError)}</p>` : ""}
       <div class="profile-actions">
         <button class="secondary-action compact-action" type="button" data-export-tracker-data>Back up my data</button>
@@ -2034,6 +2178,10 @@ function realGrowthFacts() {
   if (resumeAtsResult) facts.push(`Latest ATS resume check this session: ${resumeAtsResult.percent}% keyword match against a pasted job posting${resumeAtsResult.missing.length ? `, missing: ${resumeAtsResult.missing.slice(0, 8).join(", ")}` : ""}`);
   const starGap = recurringStarGap();
   if (starGap) facts.push(`Interview Practice pattern: "${starGap.label}" is the most recurring STAR gap across completed interview sessions (${starGap.count} times)`);
+  const dueEvents = dueRealLifeEvents();
+  if (dueEvents.length) facts.push(`Real Due Dates overdue: ${dueEvents.map((event) => `"${event.title}" (due ${event.dueDate})`).join("; ")}`);
+  const completedGuides = SKILL_GUIDES.filter((guide) => skillGuideProgress(guide.id).completedAt).map((guide) => guide.title);
+  if (completedGuides.length) facts.push(`Skill Guides completed: ${completedGuides.join(", ")}`);
   const survivedRejections = failuresSurvivedCount();
   if (survivedRejections) facts.push(`Failure Inoculation: ${survivedRejections} rejection(s) survived`);
   const hiredSessions = trackerState.futureSelfHiring.sessions.filter((session) => session.hiredCandidateId);
@@ -4260,13 +4408,285 @@ function resurfacingCard() {
   `;
 }
 
+// Real Life Events (self-audit finding): the one category of "due" with
+// a genuine external deadline the user entered themselves, not something
+// Compass invented about their own reflections.
+let realLifeEventError = "";
+
+function myRealLifeEvents() {
+  return trackerState.realLifeEvents.filter((event) => event.user_id === currentUserId());
+}
+
+function dueRealLifeEvents() {
+  const now = Date.now();
+  return myRealLifeEvents().filter((event) => event.status !== "done" && new Date(event.dueDate).getTime() <= now);
+}
+
+function addRealLifeEvent({ title, dueDate, recurrence, note }) {
+  trackerState.realLifeEvents.push({
+    id: `rle-${Date.now()}`,
+    user_id: currentUserId(),
+    title: cleanText(title, 120),
+    dueDate,
+    recurrence: ["once", "monthly", "yearly"].includes(recurrence) ? recurrence : "once",
+    note: cleanText(note, 240),
+    status: "active",
+    createdAt: new Date().toISOString(),
+    lastHandledAt: null
+  });
+  saveTrackerState();
+}
+
+// Marking a one-off event handled closes it out; a recurring one rolls
+// its dueDate forward by one cycle instead, the way a real bill or
+// renewal actually works.
+function markRealLifeEventHandled(id) {
+  const event = trackerState.realLifeEvents.find((item) => item.id === id);
+  if (!event) return;
+  event.lastHandledAt = new Date().toISOString();
+  if (event.recurrence === "once") {
+    event.status = "done";
+  } else {
+    const next = new Date(`${event.dueDate}T00:00:00`);
+    if (event.recurrence === "monthly") next.setMonth(next.getMonth() + 1);
+    if (event.recurrence === "yearly") next.setFullYear(next.getFullYear() + 1);
+    event.dueDate = dateKey(next);
+  }
+  saveTrackerState();
+}
+
+function deleteRealLifeEvent(id) {
+  trackerState.realLifeEvents = trackerState.realLifeEvents.filter((item) => item.id !== id);
+  saveTrackerState();
+}
+
+function realLifeEventsModal() {
+  const events = myRealLifeEvents().filter((event) => event.status !== "done").sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+  const now = Date.now();
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="real-life-events-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Real Due Dates</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="real-life-events-title">Real things, real dates</h3>
+      <p class="muted">Rent, bills, renewals, appointments - things with an actual deadline outside this app, not a reminder Compass invented about your own reflections.</p>
+      <div class="admin-form">
+        <label>What is it?<input id="rle-title-input" type="text" maxlength="120" placeholder="e.g. Pay rent, Renew student pass, Dentist appointment"></label>
+        <label>Due date<input id="rle-date-input" type="date"></label>
+        <label>Repeats
+          <select id="rle-recurrence-input">
+            <option value="once">Just once</option>
+            <option value="monthly">Every month</option>
+            <option value="yearly">Every year</option>
+          </select>
+        </label>
+        <label>Note (optional)<input id="rle-note-input" type="text" maxlength="240" placeholder="Optional details"></label>
+      </div>
+      ${realLifeEventError ? `<p class="form-error">${escapeHTML(realLifeEventError)}</p>` : ""}
+      <button class="primary-action" type="button" data-save-real-life-event>Add</button>
+      <div class="content-rail-title"><strong>Tracking</strong><span>${events.length}</span></div>
+      <div class="ledger-sheet">
+        ${events.length ? events.map((event) => {
+          const due = new Date(event.dueDate).getTime() <= now;
+          return `
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(new Date(event.dueDate).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }))}${event.recurrence !== "once" ? ` - repeats ${event.recurrence}` : ""}${due ? " - due" : ""}</p>
+              <p class="ledger-entry-text">${escapeHTML(event.title)}</p>
+              ${event.note ? `<p class="ledger-entry-note">${escapeHTML(event.note)}</p>` : ""}
+              <div class="profile-actions">
+                <button class="secondary-action compact-action" type="button" data-handle-real-life-event="${escapeHTML(event.id)}">${event.recurrence === "once" ? "Mark done" : "Mark handled"}</button>
+                <button class="text-action" type="button" data-delete-real-life-event="${escapeHTML(event.id)}">Remove</button>
+              </div>
+            </article>
+          `;
+        }).join("") : `<p class="muted">Nothing tracked yet.</p>`}
+      </div>
+    </div>
+  `;
+}
+
+// Skill Guides (self-audit finding): every coaching surface in Compass is
+// chat or roleplay-shaped - useful for interpersonal/decision skills, but
+// it can't actually teach someone how to do laundry. These are literal,
+// hand-written step-by-step instructions - not AI-generated, on purpose,
+// for the same reliability reason Tax Obligations isn't AI-generated:
+// factual how-to content should be consistent and correct every time.
+const SKILL_GUIDES = [
+  {
+    id: "cook-simple-meal",
+    title: "Cook one simple, real meal",
+    category: "Home",
+    summary: "A meal you can actually make without a recipe app open the whole time.",
+    steps: [
+      "Pick one protein (egg, canned tuna, tofu, or chicken) and one carb (rice, noodles, or bread) you already have.",
+      "Wash your hands and any fresh ingredients before you start.",
+      "Heat oil in a pan on medium heat, not high - high heat burns the outside before the inside cooks.",
+      "Cook the protein first since it takes longest; season with just salt and pepper the first few times.",
+      "Cook or reheat the carb while the protein rests off the heat.",
+      "Taste before you serve, then adjust salt - not more of everything.",
+      "Turn off the stove and unplug or switch off any appliance before you sit down to eat."
+    ]
+  },
+  {
+    id: "do-laundry",
+    title: "Do laundry without ruining anything",
+    category: "Home",
+    summary: "Reading a care label takes 10 seconds and saves your clothes.",
+    steps: [
+      "Sort by color first - whites, darks, and brights - at minimum keep new dark items away from whites once.",
+      "Check care labels for max temperature and whether something is delicate or dry-clean only.",
+      "Turn anything printed or delicate inside out before washing.",
+      "Use about half the detergent the box suggests to start - most people overdose detergent and it doesn't rinse out cleanly.",
+      "Don't overload the machine - clothes need room to actually move through the water.",
+      "Hang or lay flat anything marked \"do not tumble dry\" - heat shrinks it permanently.",
+      "Fold or hang clothes within an hour of the cycle ending so they don't wrinkle-set."
+    ]
+  },
+  {
+    id: "before-renting-room",
+    title: "What to check before renting a room",
+    category: "Housing",
+    summary: "The questions that actually prevent a bad tenancy, not just \"is the room nice\".",
+    steps: [
+      "Ask for the total move-in cost in writing: deposit, first month, agent fee if any - not just the monthly rent number.",
+      "Ask exactly what the deposit covers and the conditions for getting it back in full.",
+      "Check what's actually included (wifi, utilities, aircon usage) and what has separate caps or charges.",
+      "Ask how much notice you need to give to move out, and what happens if you need to leave early.",
+      "Walk through with your phone and photograph any existing damage before you move anything in.",
+      "Get the agreement in writing, even for an informal room rental - a text message confirming terms beats nothing.",
+      "Know who to contact for repairs and how fast they're expected to respond."
+    ]
+  },
+  {
+    id: "read-payslip",
+    title: "Understand your own payslip",
+    category: "Money",
+    summary: "What each line actually means, so a wrong number doesn't slip past you.",
+    steps: [
+      "Find your gross pay - the full amount before any deductions.",
+      "Find your CPF contribution (if applicable) - this is your own retirement/housing money, not a fee.",
+      "Check every other deduction (tax, insurance, advances) and make sure you recognize each one.",
+      "Confirm your net/take-home pay matches what actually lands in your bank account.",
+      "Check the pay period and hours/days match what you actually worked, especially for part-time or hourly work.",
+      "Keep every payslip somewhere you can find it later - you'll need them for tax filing, loans, or disputes."
+    ]
+  },
+  {
+    id: "basic-first-aid",
+    title: "Basic first aid at home",
+    category: "Health",
+    summary: "The handful of things worth actually knowing before you need them.",
+    steps: [
+      "For a minor cut: apply pressure with a clean cloth until bleeding slows, then clean and cover it.",
+      "For a burn: cool it under running water for several minutes - don't apply ice, butter, or toothpaste.",
+      "For a mild fever: rest and fluids first, and know your own threshold for when to actually see a doctor.",
+      "Know where the nearest 24-hour clinic or A&E is before you need it, not while you're panicking.",
+      "Keep a basic kit at home: plasters, antiseptic, paracetamol, a thermometer.",
+      "Save one emergency contact and the SOS number somewhere reachable even at low battery."
+    ]
+  },
+  {
+    id: "choosing-sim-plan",
+    title: "Choosing a SIM or phone plan",
+    category: "Money",
+    summary: "What actually matters versus what's just marketing.",
+    steps: [
+      "Estimate your real monthly data/call usage before comparing plans - most people overestimate what they need.",
+      "Check the contract length - a cheaper plan with a 24-month lock-in can cost more than a flexible one if your needs change.",
+      "Compare the actual total monthly cost, not just the advertised first-month promo price.",
+      "Check roaming/overseas rates if you travel, even occasionally.",
+      "Know how to check your own usage so a surprise bill doesn't happen.",
+      "Know the cancellation process and any early-termination fee before you sign up."
+    ]
+  }
+];
+
+function skillGuideProgress(guideId) {
+  return trackerState.skillGuideProgress[guideId] || { checkedSteps: [], completedAt: null };
+}
+
+function toggleSkillGuideStep(guideId, stepIndex) {
+  const guide = SKILL_GUIDES.find((item) => item.id === guideId);
+  if (!guide) return;
+  const progress = trackerState.skillGuideProgress[guideId] || { checkedSteps: [], completedAt: null };
+  const index = progress.checkedSteps.indexOf(stepIndex);
+  if (index >= 0) progress.checkedSteps.splice(index, 1);
+  else progress.checkedSteps.push(stepIndex);
+  progress.completedAt = progress.checkedSteps.length >= guide.steps.length ? (progress.completedAt || new Date().toISOString()) : null;
+  trackerState.skillGuideProgress[guideId] = progress;
+  saveTrackerState();
+}
+
+function skillGuidesModal() {
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="skill-guides-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Skill Guides</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="skill-guides-title">Things nobody sits you down to teach</h3>
+      <p class="muted">Real step-by-step instructions, not a chat about it - hand-written, not AI-generated, so they stay reliable.</p>
+      <div class="action-stack">
+        ${SKILL_GUIDES.map((guide) => {
+          const progress = skillGuideProgress(guide.id);
+          const percent = Math.round((progress.checkedSteps.length / guide.steps.length) * 100);
+          return `
+            <button class="wide-action" type="button" data-open="skillGuideDetail" data-open-payload="${escapeHTML(guide.id)}">
+              <img src="assets/icon-checkin.png" alt="">
+              <span><strong>${escapeHTML(guide.title)}</strong><small>${escapeHTML(guide.summary)}</small></span>
+              <span class="kind-pill-inline ${progress.completedAt ? "kind-real" : "kind-practice"}">${progress.completedAt ? "Done" : `${percent}%`}</span>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function skillGuideDetailModal(guideId) {
+  const guide = SKILL_GUIDES.find((item) => item.id === guideId);
+  if (!guide) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="skill-guide-detail-title">
+        <div class="modal-top"><span class="risk-pill calm">Skill Guides</span><button class="ghost-circle" type="button" data-close aria-label="Close">x</button></div>
+        <h3 id="skill-guide-detail-title">Guide not found</h3>
+      </div>
+    `;
+  }
+  const progress = skillGuideProgress(guide.id);
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="skill-guide-detail-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">${escapeHTML(guide.category)}</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="skill-guide-detail-title">${escapeHTML(guide.title)}</h3>
+      <p class="muted">${escapeHTML(guide.summary)}</p>
+      <div class="ledger-sheet">
+        ${guide.steps.map((step, index) => `
+          <label class="check-option skill-guide-step">
+            <input type="checkbox" data-toggle-skill-guide-step="${escapeHTML(guide.id)}:${index}" ${progress.checkedSteps.includes(index) ? "checked" : ""}>
+            <span>${escapeHTML(step)}</span>
+          </label>
+        `).join("")}
+      </div>
+      ${progress.completedAt ? `<p class="verdict-stamp">Completed</p>` : ""}
+      <button class="secondary-action compact-action" type="button" data-open="skillGuides">Back to guides</button>
+    </div>
+  `;
+}
+
 // Unified Inbox: every "waiting for a response" mechanism used to fire
 // on its own - Self-Debt force-popped a modal, Ghost Roommate just sat
 // there, resurfacing had its own card - so there was no single place to
 // see everything actually asking for attention at once. This aggregates
-// the three real sources without inventing a new one.
+// the real sources without inventing a new one.
 function pendingInboxItems() {
   const items = [];
+  dueRealLifeEvents().forEach((event) => {
+    items.push({ kind: "realLifeEvent", label: event.title, detail: `Real due date - ${new Date(event.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}`, id: event.id });
+  });
   dueSelfDebts().forEach((debt) => {
     items.push({ kind: "selfDebt", label: debt.title, detail: "Self-Debt notice" });
   });
@@ -4285,6 +4705,7 @@ function pendingInboxItems() {
 
 function inboxModal() {
   const items = pendingInboxItems();
+  const realLifeEventItems = items.filter((item) => item.kind === "realLifeEvent");
   const selfDebtItems = items.filter((item) => item.kind === "selfDebt");
   const roommateItems = items.filter((item) => item.kind === "roommate");
   const resurfaceItems = items.filter((item) => item.kind === "resurface").slice(0, 8);
@@ -4303,6 +4724,13 @@ function inboxModal() {
         </section>
       ` : `
         <div class="ledger-sheet">
+          ${realLifeEventItems.map((item) => `
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
+              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
+              <button class="secondary-action compact-action" type="button" data-handle-real-life-event="${escapeHTML(item.id)}">Mark handled</button>
+            </article>
+          `).join("")}
           ${selfDebtItems.map((item) => `
             <article class="ledger-entry">
               <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
@@ -8899,6 +9327,8 @@ const screens = {
       icon: "icon-safety.png",
       tone: "progress-tone",
       items: [
+        { title: "Real Due Dates", text: "Rent, bills, renewals - real deadlines, not app-invented reminders.", modal: "realLifeEvents", icon: "icon-checkin.png", kind: "real" },
+        { title: "Skill Guides", text: "Cooking, laundry, renting, payslips - real step-by-step, not a chat.", modal: "skillGuides", icon: "icon-home.png", kind: "real" },
         { title: "Basic Tax Obligations", text: "Know what you actually owe, in plain English.", modal: "taxObligations", icon: "icon-receipt.png", kind: "real" },
         { title: "Share with a guardian", text: "A read-only Life Roadmap link - no login needed on their end.", modal: "guardianShareSetup", icon: "icon-profile.png", kind: "real" },
         { title: "Skill Exchange", text: "Trade what you know for what you need.", tab: "community", icon: "icon-chat.png", kind: "real" },
@@ -9397,7 +9827,14 @@ const modals = {
 
   calibration: () => calibrationModal(),
 
+  backupPassphrase: () => backupPassphraseModal(),
+
   inbox: () => inboxModal(),
+
+  realLifeEvents: () => realLifeEventsModal(),
+
+  skillGuides: () => skillGuidesModal(),
+  skillGuideDetail: (guideId) => skillGuideDetailModal(guideId),
 
   addKeyResult: (goalId) => addKeyResultModal(goalId),
   updateKeyResult: (payload) => updateKeyResultModal(payload),
@@ -10535,6 +10972,9 @@ function openModal(name, payload) {
   }
   if (name === "addKeyResult" && !modalLayer.classList.contains("is-open")) {
     roadmapError = "";
+  }
+  if (name === "realLifeEvents" && !modalLayer.classList.contains("is-open")) {
+    realLifeEventError = "";
   }
   if (name === "roadmapView" && !modalLayer.classList.contains("is-open")) {
     roadmapView = "timeline";
@@ -12876,6 +13316,9 @@ document.addEventListener("click", async (event) => {
   const saveMilestoneLetterButton = event.target.closest("[data-save-milestone-letter]");
   const resurfaceActionButton = event.target.closest("[data-resurface-action]");
   const generateRoadmapButton = event.target.closest("[data-generate-roadmap]");
+  const saveRealLifeEventButton = event.target.closest("[data-save-real-life-event]");
+  const handleRealLifeEventButton = event.target.closest("[data-handle-real-life-event]");
+  const deleteRealLifeEventButton = event.target.closest("[data-delete-real-life-event]");
   const saveKeyResultButton = event.target.closest("[data-save-key-result]");
   const saveKeyResultProgressButton = event.target.closest("[data-save-key-result-progress]");
   const deleteKeyResultButton = event.target.closest("[data-delete-key-result]");
@@ -12941,6 +13384,7 @@ document.addEventListener("click", async (event) => {
   const exportTrackerDataButton = event.target.closest("[data-export-tracker-data]");
   const cloudBackupButton = event.target.closest("[data-cloud-backup]");
   const cloudRestoreButton = event.target.closest("[data-cloud-restore]");
+  const submitBackupPassphraseButton = event.target.closest("[data-submit-backup-passphrase]");
   const editStory = event.target.closest("[data-edit-story]");
   const deleteStory = event.target.closest("[data-delete-story]");
   const saveStory = event.target.closest("[data-save-story]");
@@ -13470,13 +13914,16 @@ document.addEventListener("click", async (event) => {
     openSelfDebtNotice();
   }
   if (exportTrackerDataButton) {
-    exportTrackerData();
+    startExportBackup();
   }
   if (cloudBackupButton) {
-    await backupTrackerDataToCloud();
+    startCloudBackup();
   }
   if (cloudRestoreButton) {
-    await restoreTrackerDataFromCloud();
+    await startCloudRestore();
+  }
+  if (submitBackupPassphraseButton) {
+    await submitBackupPassphrase();
   }
   if (storyReader) openModal("storyReader", storyReader.dataset.storyId);
   if (editStory) openModal("storyEditor", editStory.dataset.editStory);
@@ -13843,6 +14290,31 @@ document.addEventListener("click", async (event) => {
     if (title) await generateRoadmapGoal(title, horizonInput ? horizonInput.value : "1-year");
   }
 
+  if (saveRealLifeEventButton) {
+    const titleInput = modalLayer.querySelector("#rle-title-input");
+    const dateInput = modalLayer.querySelector("#rle-date-input");
+    const recurrenceInput = modalLayer.querySelector("#rle-recurrence-input");
+    const noteInput = modalLayer.querySelector("#rle-note-input");
+    const title = cleanText(titleInput ? titleInput.value : "", 120);
+    const dueDate = dateInput ? dateInput.value : "";
+    if (!title || !dueDate) {
+      realLifeEventError = "Give it a name and a due date.";
+      openModal("realLifeEvents");
+    } else {
+      addRealLifeEvent({ title, dueDate, recurrence: recurrenceInput ? recurrenceInput.value : "once", note: noteInput ? noteInput.value : "" });
+      realLifeEventError = "";
+      openModal("realLifeEvents");
+    }
+  }
+  if (handleRealLifeEventButton) {
+    markRealLifeEventHandled(handleRealLifeEventButton.dataset.handleRealLifeEvent);
+    if (currentModalName === "inbox") openModal("inbox");
+    else openModal("realLifeEvents");
+  }
+  if (deleteRealLifeEventButton) {
+    deleteRealLifeEvent(deleteRealLifeEventButton.dataset.deleteRealLifeEvent);
+    openModal("realLifeEvents");
+  }
   if (saveKeyResultButton) {
     const goalId = saveKeyResultButton.dataset.saveKeyResult;
     const labelInput = modalLayer.querySelector("#kr-label-input");
@@ -14702,6 +15174,12 @@ document.addEventListener("input", (event) => {
   if (event.target && event.target.id === "resume-ats-jd") {
     resumeAtsJdDraft = event.target.value;
   }
+  if (event.target && event.target.id === "backup-passphrase-input") {
+    backupPassphraseInput = event.target.value;
+  }
+  if (event.target && event.target.id === "backup-passphrase-confirm") {
+    backupPassphraseConfirm = event.target.value;
+  }
 });
 
 document.addEventListener("change", async (event) => {
@@ -14711,8 +15189,14 @@ document.addEventListener("change", async (event) => {
     upload.value = "";
   }
   if (event.target && event.target.id === "import-tracker-file" && event.target.files && event.target.files[0]) {
-    importTrackerDataFromFile(event.target.files[0]);
+    startImportBackup(event.target.files[0]);
     event.target.value = "";
+  }
+  const skillGuideStepToggle = event.target && event.target.closest("[data-toggle-skill-guide-step]");
+  if (skillGuideStepToggle) {
+    const [guideId, stepIndex] = skillGuideStepToggle.dataset.toggleSkillGuideStep.split(":");
+    toggleSkillGuideStep(guideId, Number(stepIndex));
+    openModal("skillGuideDetail", guideId);
   }
   // Tapping an assessment answer auto-advances the swipe-card deck, instead
   // of requiring a separate "Next" tap - the card animates away and the
