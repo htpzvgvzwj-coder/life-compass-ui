@@ -2,11 +2,15 @@
 -- Run this once in the Supabase SQL editor for a fresh project.
 -- Everything here is additive: it does not touch any table Supabase creates
 -- for you (auth.users etc). Community used to be the only part of the app
--- using this database; the Guardian Sharing feature (see guardian_shares
--- below) is a deliberate, confirmed exception to that - Life Roadmap has no
--- Community/Supabase Auth requirement, so it needed its own unauthenticated,
--- token-gated table instead of reusing auth.uid()-scoped RLS. Every other
--- tab still keeps its existing local-only storage.
+-- using this database; two deliberate, confirmed exceptions since then:
+-- Guardian Sharing (see guardian_shares below) needed its own
+-- unauthenticated, token-gated table since Life Roadmap has no Community/
+-- Supabase Auth requirement; compass_backups (below) lets a signed-in
+-- Community user back up their entire local trackerState so a cleared
+-- cache or a new device doesn't lose everything - direct auth.uid()-scoped
+-- RLS, no service-role/moderation layer needed since it's private data
+-- only its owner can ever read or write. Every other tab still keeps its
+-- existing local-only storage.
 
 -- ---------------------------------------------------------------------------
 -- profiles
@@ -339,6 +343,31 @@ create table if not exists guardian_shares (
 
 alter table guardian_shares enable row level security;
 -- Intentionally no policies here - see comment above.
+
+-- ---------------------------------------------------------------------------
+-- compass_backups
+-- One row per signed-in user - their entire local trackerState, backed up
+-- on request. Unlike posts/opportunities_shared/skill_tags, this needs no
+-- moderation or service-role layer: it's private data, and RLS already
+-- guarantees only its own owner (auth.uid()) can ever read or write it, so
+-- normal client-side insert/update/select policies are safe here.
+-- ---------------------------------------------------------------------------
+create table if not exists compass_backups (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table compass_backups enable row level security;
+
+create policy "compass_backups_select_own" on compass_backups
+  for select to authenticated using (user_id = auth.uid());
+
+create policy "compass_backups_insert_own" on compass_backups
+  for insert to authenticated with check (user_id = auth.uid());
+
+create policy "compass_backups_update_own" on compass_backups
+  for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
 -- Seed data: migrate the 6 static communityGroups from app.js (lines ~322-365)

@@ -5087,6 +5087,7 @@ textarea {
 }
 
 .growth-chip {
+  position: relative;
   display: grid;
   gap: 8px;
   justify-items: center;
@@ -5098,6 +5099,55 @@ textarea {
   color: var(--color-ink);
   text-align: center;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+/* Real vs Practice: a real-world tool (real numbers/rules, or a real
+   usable artifact) reads differently at a glance from a practice/
+   reflection exercise - two contexts, one shared color language. */
+.kind-pill,
+.kind-pill-inline {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.kind-pill.kind-real,
+.kind-pill-inline.kind-real {
+  background: var(--color-mint-soft);
+  color: var(--color-teal-strong);
+}
+
+.kind-pill.kind-practice,
+.kind-pill-inline.kind-practice {
+  background: var(--color-faint);
+  color: var(--color-ink-faint);
+}
+
+.kind-pill {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+.kind-pill-inline {
+  display: inline-flex;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* A <label> styled as a button (wrapping a hidden file input) needs the
+   same centering a real <button> gets for free. */
+.file-input-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
 }
 
 .growth-chip:hover {

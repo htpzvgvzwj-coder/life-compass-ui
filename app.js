@@ -1459,6 +1459,232 @@ function saveTrackerState() {
   saveJson(scopedKey("steadyTrackerState"), trackerState);
 }
 
+// Data trust, phase 1 (GitHub research idea territory, but really just
+// honesty): everything here lives only in this browser's localStorage -
+// a cleared cache or a new device loses it all. Export/import is a real,
+// working safety net that ships with zero new infrastructure - phase 2
+// (cloud backup) is the actual fix, this is the "don't lose everything
+// today" stopgap.
+let backupImportError = "";
+
+function exportTrackerData() {
+  const payload = {
+    app: "Compass",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    email: userProfile.email,
+    trackerState
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `compass-backup-${dateKey()}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importTrackerDataFromFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || ""));
+      const incoming = parsed && typeof parsed === "object" && parsed.trackerState ? parsed.trackerState : parsed;
+      if (!incoming || typeof incoming !== "object") throw new Error("Not a Compass backup file.");
+      const normalized = normalizeTrackerState(incoming);
+      Object.keys(trackerState).forEach((key) => delete trackerState[key]);
+      Object.assign(trackerState, normalized);
+      saveTrackerState();
+      backupImportError = "";
+      renderScreen("settings");
+      triggerCheckInCelebration("Backup restored.");
+    } catch (error) {
+      console.error("[Backup] Import failed", error);
+      backupImportError = "That file doesn't look like a valid Compass backup.";
+      renderScreen("settings");
+    }
+  };
+  reader.readAsText(file);
+}
+
+// "Your Story": deliberately not a single aggregate score (streak %,
+// calibration %, KR %, badges, trust score already exist separately and
+// a new composite number would just be one more disconnected stat, and a
+// somewhat arbitrary one). Instead, a real chronological timeline built
+// only from events that already carry a real timestamp somewhere in
+// trackerState - milestones, Key Results hitting target, chain streak
+// thresholds (computed retrospectively from the same day-data the chain
+// graph uses), resolved Inspire action challenges, and the first
+// Judgment Calibration reading. Deliberately does not touch the generic
+// badges system (no reliable per-badge unlock date exists there without
+// adding new tracking state for a fairly decorative feature).
+function growthTimelineEvents() {
+  const myId = currentUserId();
+  const events = [];
+  myRoadmapGoals().forEach((goal) => {
+    (goal.milestones || []).forEach((milestone) => {
+      if (milestone.status === "done" && milestone.doneAt) {
+        events.push({ at: milestone.doneAt, label: `Reached "${cleanText(milestone.title, 80)}"`, detail: `Milestone for "${cleanText(goal.title, 60)}"` });
+      }
+    });
+    (goal.keyResults || []).forEach((kr) => {
+      if (kr.current >= kr.target && kr.updatedAt) {
+        events.push({ at: kr.updatedAt, label: `Hit the target for "${cleanText(kr.label, 60)}"`, detail: `Key Result for "${cleanText(goal.title, 60)}" - ${kr.current}${kr.unit}/${kr.target}${kr.unit}` });
+      }
+    });
+  });
+  const chainDays = habitChainDays(365);
+  const thresholds = [7, 30, 100];
+  const hit = new Set();
+  let run = 0;
+  chainDays.forEach((day) => {
+    if (day.active) {
+      run += 1;
+      thresholds.forEach((threshold) => {
+        if (run === threshold && !hit.has(threshold)) {
+          hit.add(threshold);
+          events.push({ at: `${day.key}T00:00:00.000Z`, label: `${threshold}-day streak reached`, detail: "Don't Break the Chain" });
+        }
+      });
+    } else {
+      run = 0;
+    }
+  });
+  trackerState.reflectionEntries
+    .filter((entry) => entry.user_id === myId && entry.mode === "storyActionChallenge" && entry.lastRating === "resolved" && entry.resurfacedAt)
+    .forEach((entry) => {
+      events.push({ at: entry.resurfacedAt, label: "Followed through on an Inspire action challenge", detail: cleanText(entry.content, 100) });
+    });
+  const calRecords = calibrationRecordsMine().slice().sort((a, b) => new Date(a.resolvedAt) - new Date(b.resolvedAt));
+  if (calRecords.length >= 3) {
+    events.push({ at: calRecords[2].resolvedAt, label: "First real Judgment Calibration reading", detail: "3 resolved Check-Backs - enough to see a real pattern" });
+  }
+  return events.sort((a, b) => new Date(b.at) - new Date(a.at));
+}
+
+function yourStoryCard() {
+  const events = growthTimelineEvents().slice(0, 12);
+  return `
+    <section class="profile-card">
+      <p class="eyebrow">Your Story</p>
+      <p class="muted">Real dated moments pulled from across everything you've actually done here - not a score, a timeline.</p>
+      ${events.length ? `
+        <div class="ledger-sheet">
+          ${events.map((event) => `
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(new Date(event.at).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }))}</p>
+              <p class="ledger-entry-text">${escapeHTML(event.label)}</p>
+              <p class="ledger-entry-note">${escapeHTML(event.detail)}</p>
+            </article>
+          `).join("")}
+        </div>
+      ` : `
+        <section class="empty-feature">
+          <img src="assets/icon-stories.png" alt="">
+          <div><strong>Your story starts now</strong><p>Real moments will collect here as you use Compass.</p></div>
+        </section>
+      `}
+    </section>
+  `;
+}
+
+// Data trust, phase 2: real cross-device backup, tied to Community
+// sign-in (reuses the one Supabase client/session Community already
+// maintains, rather than building a second auth system). Deliberately
+// manual ("Backup now"), not an auto-sync on every save - that would
+// need debouncing and real conflict resolution for editing on two
+// devices, which is a bigger project than this pass.
+let cloudBackupBusy = false;
+let cloudBackupStatus = "";
+
+async function backupTrackerDataToCloud() {
+  const client = typeof getCommunitySupabaseClient === "function" ? getCommunitySupabaseClient() : null;
+  if (!client || !hasCommunitySession()) {
+    cloudBackupStatus = "Sign in to Community first to back up to the cloud.";
+    renderScreen("settings");
+    return;
+  }
+  cloudBackupBusy = true;
+  cloudBackupStatus = "";
+  renderScreen("settings");
+  try {
+    const { error } = await client.from("compass_backups").upsert({
+      user_id: communityUserId(),
+      data: trackerState,
+      updated_at: new Date().toISOString()
+    });
+    if (error) throw error;
+    cloudBackupStatus = `Backed up to the cloud ${new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
+  } catch (error) {
+    console.error("[Backup] Cloud backup failed", error);
+    cloudBackupStatus = "Couldn't back up to the cloud right now. Please try again.";
+  } finally {
+    cloudBackupBusy = false;
+    renderScreen("settings");
+  }
+}
+
+async function restoreTrackerDataFromCloud() {
+  const client = typeof getCommunitySupabaseClient === "function" ? getCommunitySupabaseClient() : null;
+  if (!client || !hasCommunitySession()) {
+    cloudBackupStatus = "Sign in to Community first to restore from the cloud.";
+    renderScreen("settings");
+    return;
+  }
+  cloudBackupBusy = true;
+  cloudBackupStatus = "";
+  renderScreen("settings");
+  try {
+    const { data, error } = await client.from("compass_backups").select("data, updated_at").eq("user_id", communityUserId()).maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      cloudBackupStatus = "No cloud backup found for this Community account yet.";
+      return;
+    }
+    const normalized = normalizeTrackerState(data.data);
+    Object.keys(trackerState).forEach((key) => delete trackerState[key]);
+    Object.assign(trackerState, normalized);
+    saveTrackerState();
+    cloudBackupStatus = `Restored from the cloud backup saved ${new Date(data.updated_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
+    triggerCheckInCelebration("Restored from cloud backup.");
+  } catch (error) {
+    console.error("[Backup] Cloud restore failed", error);
+    cloudBackupStatus = "Couldn't restore from the cloud right now. Please try again.";
+  } finally {
+    cloudBackupBusy = false;
+    renderScreen("settings");
+  }
+}
+
+function yourDataCard() {
+  const signedIn = typeof hasCommunitySession === "function" && hasCommunitySession();
+  return `
+    <section class="profile-card">
+      <p class="eyebrow">Your Data</p>
+      <p class="muted">Everything here only lives in this browser. Clearing site data or switching devices loses it - back up regularly, especially before clearing your browser.</p>
+      ${backupImportError ? `<p class="form-error">${escapeHTML(backupImportError)}</p>` : ""}
+      <div class="profile-actions">
+        <button class="secondary-action compact-action" type="button" data-export-tracker-data>Back up my data</button>
+        <label class="secondary-action compact-action file-input-button">
+          Restore from backup
+          <input id="import-tracker-file" type="file" accept="application/json" hidden>
+        </label>
+      </div>
+      <div class="toggle-row"><span>Cross-device cloud backup</span><strong>${signedIn ? "Available" : "Sign in to Community"}</strong></div>
+      ${signedIn ? `
+        ${cloudBackupStatus ? `<p class="tiny-note">${escapeHTML(cloudBackupStatus)}</p>` : ""}
+        <div class="profile-actions">
+          <button class="secondary-action compact-action" type="button" data-cloud-backup ${cloudBackupBusy ? "disabled" : ""}>${cloudBackupBusy ? "Working..." : "Backup now"}</button>
+          <button class="secondary-action compact-action" type="button" data-cloud-restore ${cloudBackupBusy ? "disabled" : ""}>${cloudBackupBusy ? "Working..." : "Restore from cloud"}</button>
+        </div>
+      ` : `<button class="text-action" type="button" data-tab-jump="community">Sign in to Community to enable this</button>`}
+    </section>
+  `;
+}
+
 function saveContentState() {
   saveJson("steadyContentState", contentState);
 }
@@ -1631,8 +1857,18 @@ function growthActionAttributes(item) {
 // section headers fit without scrolling, tap one to open just that section.
 let expandedGrowthSections = {};
 
+// Real vs Practice: items grounded in real-world facts/consequences or a
+// real usable artifact (item.kind === "real") sort ahead of simulation/
+// roleplay/reflection exercises (item.kind === "practice") - untagged
+// items (personal data entry like journaling or goal-writing) are
+// neither, so they keep their original relative order after both.
 function growthHubSection({ id, title, subtitle, icon, tone = "", items = [] }) {
   const isOpen = Boolean(expandedGrowthSections[id]);
+  const rank = { real: 0, practice: 1 };
+  const sortedItems = items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => (rank[a.item.kind] ?? 1.5) - (rank[b.item.kind] ?? 1.5) || a.index - b.index)
+    .map(({ item }) => item);
   return `
     <section class="growth-hub-card ${tone} ${isOpen ? "is-open" : ""}">
       <button class="growth-hub-head" type="button" data-toggle-hub-section="${escapeHTML(id)}" aria-expanded="${isOpen ? "true" : "false"}">
@@ -1645,8 +1881,9 @@ function growthHubSection({ id, title, subtitle, icon, tone = "", items = [] }) 
       </button>
       ${isOpen ? `
         <div class="growth-chip-grid">
-          ${items.map((item) => `
+          ${sortedItems.map((item) => `
             <button class="growth-chip" type="button" ${growthActionAttributes(item)} title="${escapeHTML(item.text)}">
+              ${item.kind ? `<span class="kind-pill kind-${item.kind}">${item.kind === "real" ? "Real" : "Practice"}</span>` : ""}
               <img src="assets/${item.icon || icon}" alt="">
               <strong>${escapeHTML(item.title)}</strong>
             </button>
@@ -5271,7 +5508,7 @@ function futureSelfEntryCard() {
   return `
     <section class="mirror-form-card future-self-entry-card">
       <img class="future-self-entry-icon" src="assets/icon-time.png" alt="">
-      <p class="eyebrow">Future Self</p>
+      <p class="eyebrow">Future Self <span class="kind-pill-inline kind-practice">Practice</span></p>
       <h3>${snapshot ? "See your future self again" : "Meet your future self"}</h3>
       <p class="muted">${snapshot ? `Last generated ${escapeHTML(snapshot.displayTime)} - ${escapeHTML((FUTURE_SELF_HORIZONS.find((item) => item.value === snapshot.horizon) || {}).label || "")}.` : "See where today's path may lead."}</p>
       <button class="secondary-action compact-action" type="button" data-open="futureSelfView">${snapshot ? "View Future Self" : "Start Future Self"}</button>
@@ -5283,7 +5520,7 @@ function costOfLivingEntryCard() {
   return `
     <section class="mirror-form-card future-self-entry-card">
       <img class="future-self-entry-icon" src="assets/icon-money.png" alt="">
-      <p class="eyebrow">Real Cost of Living</p>
+      <p class="eyebrow">Real Cost of Living <span class="kind-pill-inline kind-real">Real</span></p>
       <h3>What does independent living actually cost?</h3>
       <p class="muted">Real Singapore estimates, not a game or a guess.</p>
       <button class="secondary-action compact-action" type="button" data-open="costOfLiving">Calculate</button>
@@ -5324,7 +5561,7 @@ function microInsuranceEntryCard() {
   return `
     <section class="mirror-form-card future-self-entry-card">
       <img class="future-self-entry-icon" src="assets/icon-money.png" alt="">
-      <p class="eyebrow">Safety Net Preview</p>
+      <p class="eyebrow">Safety Net Preview <span class="kind-pill-inline kind-practice">Practice</span></p>
       <h3>What could a safety net even cover?</h3>
       <p class="muted">A conceptual preview, not a real insurance product.</p>
       <button class="secondary-action compact-action" type="button" data-open="microInsurance">Preview a scenario</button>
@@ -6860,7 +7097,7 @@ function taxObligationsEntryCard() {
   return `
     <section class="mirror-form-card future-self-entry-card">
       <img class="future-self-entry-icon" src="assets/icon-money.png" alt="">
-      <p class="eyebrow">Basic Tax Obligations</p>
+      <p class="eyebrow">Basic Tax Obligations <span class="kind-pill-inline kind-real">Real</span></p>
       <h3>Know what you're actually on the hook for</h3>
       <p class="muted">${done ? `${done} of ${TAX_OBLIGATION_ITEMS.length} checked off.` : "A plain-language checklist, not a filing service."}</p>
       <button class="secondary-action compact-action" type="button" data-open="taxObligations">Open checklist</button>
@@ -8458,10 +8695,10 @@ const screens = {
 
     <div class="content-rail-title"><strong>More tools</strong><span>Scroll sideways</span></div>
     <div class="mirror-tools-row">
-      ${futureSelfEntryCard()}
       ${costOfLivingEntryCard()}
-      ${microInsuranceEntryCard()}
       ${taxObligationsEntryCard()}
+      ${futureSelfEntryCard()}
+      ${microInsuranceEntryCard()}
     </div>
 
     ${savedFutureDecisions().length ? futureReflectionList() : ""}
@@ -8598,7 +8835,7 @@ const screens = {
         { title: "Well-being check-in", text: "Mental wellness and emotional pressure.", modal: "assessment", icon: "icon-health.png" },
         { title: "Growth assessment", text: "Self-awareness and future planning.", modal: "assessment", icon: "icon-guide.png" },
         { title: "Journal", text: "Write what happened and what you learned.", modal: "journal", icon: "icon-learn.png" },
-        { title: "Self Archaeology", text: "Dig up an old month of entries as a field report, not nostalgia.", modal: "selfArchaeology", icon: "icon-time.png" },
+        { title: "Self Archaeology", text: "Dig up an old month of entries as a field report, not nostalgia.", modal: "selfArchaeology", icon: "icon-time.png", kind: "practice" },
         { title: "AI reflection insight", text: "Ask Compass to find one pattern.", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png" }
       ]
     })}
@@ -8612,12 +8849,12 @@ const screens = {
       icon: "icon-boundary.png",
       tone: "challenge-tone",
       items: [
-        { title: "7-Day Confidence Challenge", text: "Practice one brave action.", modal: "challengeHub", icon: "icon-spark.png" },
-        { title: "7-Day Study Focus Challenge", text: "Protect one focus block.", modal: "challengeHub", icon: "icon-learn.png" },
-        { title: "7-Day Gratitude Challenge", text: "Notice one honest good thing.", modal: "challengeHub", icon: "icon-mood.png" },
-        { title: "AI Roleplay Practice", text: "Practice real-life situations safely.", modal: "roleplayList", icon: "icon-chat.png" },
-        { title: "Ghost Roommate", text: "Move in with someone - a relationship that remembers.", modal: "ghostRoommate", icon: "icon-home.png" },
-        { title: "Failure Inoculation", text: "This week's task is designed to fail. That's the point.", modal: "failureInoculation", icon: "icon-warning.png" },
+        { title: "7-Day Confidence Challenge", text: "Practice one brave action.", modal: "challengeHub", icon: "icon-spark.png", kind: "practice" },
+        { title: "7-Day Study Focus Challenge", text: "Protect one focus block.", modal: "challengeHub", icon: "icon-learn.png", kind: "practice" },
+        { title: "7-Day Gratitude Challenge", text: "Notice one honest good thing.", modal: "challengeHub", icon: "icon-mood.png", kind: "practice" },
+        { title: "AI Roleplay Practice", text: "Practice real-life situations safely.", modal: "roleplayList", icon: "icon-chat.png", kind: "practice" },
+        { title: "Ghost Roommate", text: "Move in with someone - a relationship that remembers.", modal: "ghostRoommate", icon: "icon-home.png", kind: "practice" },
+        { title: "Failure Inoculation", text: "This week's task is designed to fail. That's the point.", modal: "failureInoculation", icon: "icon-warning.png", kind: "practice" },
         { title: "Streaks", text: "View simple progress counts.", modal: "badges", icon: "icon-time.png" },
         { title: "Achievements & Badges", text: "See what you have unlocked.", modal: "badges", icon: "icon-safety.png" }
       ]
@@ -8630,9 +8867,9 @@ const screens = {
       icon: "icon-work.png",
       tone: "career-tone",
       items: [
-        { title: "Career Studio", text: "Interview practice, resume builder, portfolio builder, and job matching.", modal: "careerStudio", icon: "icon-profile.png" },
-        { title: "Future Self Hiring", text: "Four future-you candidates interview for the job of who you become.", modal: "futureSelfHiring", icon: "icon-chat.png" },
-        { title: "Jury Duty on Yourself", text: "Put a real decision on trial - prosecution, defense, and a verdict.", modal: "juryTrial", icon: "icon-balance.png" }
+        { title: "Career Studio", text: "Interview practice, resume builder, portfolio builder, job matching, and a real paycheck/ATS check.", modal: "careerStudio", icon: "icon-profile.png", kind: "real" },
+        { title: "Future Self Hiring", text: "Four future-you candidates interview for the job of who you become.", modal: "futureSelfHiring", icon: "icon-chat.png", kind: "practice" },
+        { title: "Jury Duty on Yourself", text: "Put a real decision on trial - prosecution, defense, and a verdict.", modal: "juryTrial", icon: "icon-balance.png", kind: "practice" }
       ]
     })}
 
@@ -8651,7 +8888,7 @@ const screens = {
         { title: "Receipt record", text: "Track what you paid today.", modal: "receipt", icon: "icon-receipt.png" },
         { title: "Knowledge Vault", text: "Everything Future Mirror knows about you, in one place.", modal: "knowledgeVault", icon: "icon-learn.png" },
         { title: "AI Trace Log", text: "Is the AI coach actually helping? Every reply gets graded.", modal: "aiTraceLog", icon: "icon-assessment.png" },
-        { title: "Judgment Calibration", text: "When you say you're sure, how often are you actually right?", modal: "calibration", icon: "icon-balance.png" }
+        { title: "Judgment Calibration", text: "When you say you're sure, how often are you actually right?", modal: "calibration", icon: "icon-balance.png", kind: "real" }
       ]
     })}
 
@@ -8662,14 +8899,14 @@ const screens = {
       icon: "icon-safety.png",
       tone: "progress-tone",
       items: [
-        { title: "Basic Tax Obligations", text: "Know what you actually owe, in plain English.", modal: "taxObligations", icon: "icon-receipt.png" },
-        { title: "Inherited Debugging", text: "Refactor habits you didn't choose, issue by issue.", modal: "legacyDebugger", icon: "icon-settings.png" },
-        { title: "Self-Debt", text: "Pay your future self a debt, collected only when it's actually due.", modal: "selfDebtLedger", icon: "icon-money.png" },
-        { title: "Estate Auction", text: "Your time and habits, read out like an auction catalog.", modal: "estateAuction", icon: "icon-time.png" },
-        { title: "Safety Net Preview", text: "What a safety net might cover - concept only, not real cover.", modal: "microInsurance", icon: "icon-health.png" },
-        { title: "Share with a guardian", text: "A read-only Life Roadmap link - no login needed on their end.", modal: "guardianShareSetup", icon: "icon-profile.png" },
-        { title: "Skill Exchange", text: "Trade what you know for what you need.", tab: "community", icon: "icon-chat.png" },
-        { title: "SOS - get urgent help", text: "Real Singapore resources, always one tap away.", modal: "sosTriage", icon: "icon-warning.png" }
+        { title: "Basic Tax Obligations", text: "Know what you actually owe, in plain English.", modal: "taxObligations", icon: "icon-receipt.png", kind: "real" },
+        { title: "Share with a guardian", text: "A read-only Life Roadmap link - no login needed on their end.", modal: "guardianShareSetup", icon: "icon-profile.png", kind: "real" },
+        { title: "Skill Exchange", text: "Trade what you know for what you need.", tab: "community", icon: "icon-chat.png", kind: "real" },
+        { title: "SOS - get urgent help", text: "Real Singapore resources, always one tap away.", modal: "sosTriage", icon: "icon-warning.png", kind: "real" },
+        { title: "Inherited Debugging", text: "Refactor habits you didn't choose, issue by issue.", modal: "legacyDebugger", icon: "icon-settings.png", kind: "practice" },
+        { title: "Self-Debt", text: "Pay your future self a debt, collected only when it's actually due.", modal: "selfDebtLedger", icon: "icon-money.png", kind: "practice" },
+        { title: "Estate Auction", text: "Your time and habits, read out like an auction catalog.", modal: "estateAuction", icon: "icon-time.png", kind: "practice" },
+        { title: "Safety Net Preview", text: "What a safety net might cover - concept only, not real cover.", modal: "microInsurance", icon: "icon-health.png", kind: "practice" }
       ]
     })}
   `,
@@ -8782,6 +9019,8 @@ const screens = {
       <button class="secondary-action" type="button" data-open="receiptPlan">Receipt Plan</button>
       <button class="secondary-action" type="button" data-open="compassProfile">Compass AI Profile</button>
     </div>
+    ${yourStoryCard()}
+    ${yourDataCard()}
     ${adminStudio()}
     <button class="secondary-action signout-action" type="button" data-sign-out>Sign out</button>
   `
@@ -9268,22 +9507,27 @@ const modals = {
         <button class="wide-action" type="button" data-open="interviewPractice">
           <img src="assets/icon-boundary.png" alt="">
           <span><strong>Interview Practice</strong><small>Timed mock interviews with 3 realistic interviewer styles.</small></span>
+          <span class="kind-pill-inline kind-practice">Practice</span>
         </button>
         <button class="wide-action" type="button" data-open="resumeBuilder">
           <img src="assets/icon-work.png" alt="">
           <span><strong>Resume Builder</strong><small>Write your real experience - AI cleans up wording, never invents facts.</small></span>
+          <span class="kind-pill-inline kind-real">Real</span>
         </button>
         <button class="wide-action" type="button" data-open="portfolioBuilder">
           <img src="assets/icon-spark.png" alt="">
           <span><strong>Portfolio Builder</strong><small>A LinkedIn-style profile - about, projects, and skills, written from what you give it.</small></span>
+          <span class="kind-pill-inline kind-real">Real</span>
         </button>
         <button class="wide-action" type="button" data-open="jobMatching">
           <img src="assets/icon-learn.png" alt="">
           <span><strong>Job Matching</strong><small>See which role archetypes fit your saved Personal Blueprint.</small></span>
+          <span class="kind-pill-inline kind-real">Real</span>
         </button>
         <button class="wide-action" type="button" data-open="paycheckCalculator">
           <img src="assets/icon-work.png" alt="">
           <span><strong>Paycheck Reality Check</strong><small>See what a salary actually becomes after CPF and tax - real Singapore numbers, not a guess.</small></span>
+          <span class="kind-pill-inline kind-real">Real</span>
         </button>
       </div>
     </div>
@@ -12694,6 +12938,9 @@ document.addEventListener("click", async (event) => {
   const storyAiAction = event.target.closest("[data-story-ai-action]");
   const tryActionChallengeButton = event.target.closest("[data-try-action-challenge]");
   const viewSelfDebtNoticeButton = event.target.closest("[data-view-self-debt-notice]");
+  const exportTrackerDataButton = event.target.closest("[data-export-tracker-data]");
+  const cloudBackupButton = event.target.closest("[data-cloud-backup]");
+  const cloudRestoreButton = event.target.closest("[data-cloud-restore]");
   const editStory = event.target.closest("[data-edit-story]");
   const deleteStory = event.target.closest("[data-delete-story]");
   const saveStory = event.target.closest("[data-save-story]");
@@ -13221,6 +13468,15 @@ document.addEventListener("click", async (event) => {
   }
   if (viewSelfDebtNoticeButton) {
     openSelfDebtNotice();
+  }
+  if (exportTrackerDataButton) {
+    exportTrackerData();
+  }
+  if (cloudBackupButton) {
+    await backupTrackerDataToCloud();
+  }
+  if (cloudRestoreButton) {
+    await restoreTrackerDataFromCloud();
   }
   if (storyReader) openModal("storyReader", storyReader.dataset.storyId);
   if (editStory) openModal("storyEditor", editStory.dataset.editStory);
@@ -14453,6 +14709,10 @@ document.addEventListener("change", async (event) => {
   if (upload && upload.files && upload.files[0]) {
     await handlePdfUpload(upload.files[0]);
     upload.value = "";
+  }
+  if (event.target && event.target.id === "import-tracker-file" && event.target.files && event.target.files[0]) {
+    importTrackerDataFromFile(event.target.files[0]);
+    event.target.value = "";
   }
   // Tapping an assessment answer auto-advances the swipe-card deck, instead
   // of requiring a separate "Next" tap - the card animates away and the
