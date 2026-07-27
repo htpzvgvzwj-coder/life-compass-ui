@@ -50,6 +50,8 @@ const FUTURE_SCAN_STATIONS = [
   { id: "pressureTest", title: "Choice Pressure Test", blurb: "Check whether pressure, fear, or comparison is driving this.", group: "context", icon: "icon-boundary.png" },
   { id: "conflictMap", title: "Future Conflict Map", blurb: "See which of your goals are actually in tension here.", group: "context", icon: "icon-decide.png" },
   { id: "signalRadar", title: "Future Signal Radar", blurb: "Rate how ready you feel right now - not a score, a moment check.", group: "context", icon: "icon-mood.png" },
+  { id: "premortem", title: "Premortem", blurb: "Imagine this already failed. Work backward to find out why.", group: "context", icon: "icon-assessment.png" },
+  { id: "outsideView", title: "Outside View", blurb: "What usually happens to people in situations like this - not just your read on it.", group: "context", icon: "icon-spark.png" },
   { id: "pastSelfCheck", title: "Past-Self Consistency Check", blurb: "See what you chose in similar moments before.", group: "time", icon: "icon-guide.png" },
   { id: "driftDetector", title: "Drift Detector", blurb: "See if you're slowly drifting from where you said you wanted to go.", group: "time", icon: "icon-transport.png" },
   { id: "checkBack", title: "Check-Back", blurb: "Come back later and see if the prediction matched real life.", group: "time", icon: "icon-time.png" }
@@ -495,6 +497,12 @@ const defaultTrackerState = {
   // arrays. Plugs into the existing reflection-resurfacing system
   // (allReflectionLikeEntries/dueForResurfacing) as a third _source.
   futureScans: [],
+  // Judgment calibration (GitHub research idea, inspired by Decidr): a
+  // permanent record per resolved Check-Back, independent of the live
+  // checkBack station state (which can be reset/overwritten per scan) -
+  // this is what lets calibrationStats() aggregate across every decision
+  // the user has ever checked back on, not just the current one.
+  calibrationRecords: [],
   // Build Mode - a goal-based coach router and training path. Multiple
   // entries can be active at once because a user may want different coaches
   // for different goals.
@@ -1070,7 +1078,9 @@ let futureScanPressurePicks = [];
 let futureScanPressureOtherText = "";
 let futureScanSignalPicks = {}; // { energy: "Low"|"Medium"|"High", clarity, confidence, urgency }
 let futureScanCheckBackHorizon = ""; // selected horizon id, before scheduling
+let futureScanCheckBackConfidence = 70; // 0-100, before scheduling
 let futureScanCheckBackReportText = "";
+let futureScanCheckBackOutcomeMatch = ""; // "matched"|"partial"|"missed", before reporting
 let isFutureScanSynthesisLoading = false;
 let futureScanSynthesisError = "";
 let futureScanSuggestedStationIds = [];
@@ -1254,6 +1264,7 @@ function normalizeTrackerState(state) {
     roadmapGoals: Array.isArray(state.roadmapGoals) ? state.roadmapGoals : fallback.roadmapGoals,
     futureSelfSnapshots: Array.isArray(state.futureSelfSnapshots) ? state.futureSelfSnapshots : fallback.futureSelfSnapshots,
     futureScans: Array.isArray(state.futureScans) ? state.futureScans : fallback.futureScans,
+    calibrationRecords: Array.isArray(state.calibrationRecords) ? state.calibrationRecords : fallback.calibrationRecords,
     buildMode: {
       entries: Array.isArray(state.buildMode && state.buildMode.entries) ? state.buildMode.entries : fallback.buildMode.entries
     },
@@ -1708,6 +1719,8 @@ function realGrowthFacts() {
   if (openIssues.length || mergedIssues.length) facts.push(`Inherited Debugging: ${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} (${openIssues.map((issue) => issue.title).join(", ") || "none"}), ${mergedIssues.length} merged`);
   const activeDebts = trackerState.selfDebts.filter((debt) => debt.status === "active");
   if (activeDebts.length) facts.push(`Active Self-Debts: ${activeDebts.map((debt) => debt.title).join(", ")}`);
+  const calibration = calibrationStats();
+  if (calibration && calibration.read !== "not-enough") facts.push(`Judgment Calibration: across ${calibration.count} resolved Future Scan Check-Backs, average stated confidence ${calibration.avgConfidence}% vs actual match rate ${calibration.avgAccuracy}% - reads as ${calibration.read}`);
   const survivedRejections = failuresSurvivedCount();
   if (survivedRejections) facts.push(`Failure Inoculation: ${survivedRejections} rejection(s) survived`);
   const hiredSessions = trackerState.futureSelfHiring.sessions.filter((session) => session.hiredCandidateId);
@@ -7849,10 +7862,14 @@ async function runFutureScanSynthesis() {
 // Cross-station signal - a per-station "caution|positive|neutral" read, taken
 // straight from that station's own already-saved result (never a fresh AI
 // call), so a banner can point out when several independently-run stations
-// happen to agree. signalRadar and checkBack are deliberately excluded:
-// Signal Radar is explicitly "not a score" in its own framing, and Check-Back
-// is retrospective, not a read on the choice itself - folding either into an
-// aggregate would contradict what that station promises the user.
+// happen to agree. signalRadar, checkBack, premortem, and outsideView are
+// deliberately excluded: Signal Radar is explicitly "not a score" in its
+// own framing, Check-Back is retrospective, Premortem always produces
+// findings by construction (that's the exercise) so it would bias every
+// scan toward "caution" regardless of actual severity, and Outside View
+// is general information with no toward/away valence about this specific
+// choice - folding any of these into an aggregate would misrepresent what
+// that station actually promises the user.
 function futureScanStationSignal(stationId, result) {
   if (!result) return null;
   switch (stationId) {
@@ -7897,21 +7914,36 @@ function futureScanStationSignal(stationId, result) {
   }
 }
 
+// A track-record note, not a per-scan signal - only fires with enough
+// resolved Check-Backs to mean something (calibrationStats() already
+// gates on count>=3), and only for over/underconfidence, since
+// "calibrated" isn't something the user needs a nudge about.
+function calibrationSignalNote() {
+  const stats = calibrationStats();
+  if (!stats || stats.read === "not-enough" || stats.read === "calibrated") return "";
+  const tone = stats.read === "overconfident" ? "caution" : "positive";
+  const text = stats.read === "overconfident"
+    ? `Your Judgment Calibration track record shows you tend to run about ${stats.gap} points more confident than your outcomes support - worth weighing that here too.`
+    : `Your Judgment Calibration track record shows your outcomes hold up more often than your stated confidence suggests - your gut read has been trustworthy so far.`;
+  return `<div class="future-scan-signal-banner ${tone}">${escapeHTML(text)} <button class="text-action" type="button" data-open="calibration">See calibration</button></div>`;
+}
+
 function futureScanSignalBanner() {
   if (!activeFutureScan) return "";
   const signals = FUTURE_SCAN_STATIONS
     .map((station) => futureScanStationSignal(station.id, activeFutureScan.stations[station.id]))
     .filter(Boolean);
-  if (signals.length < 3) return "";
+  const calibrationNote = calibrationSignalNote();
+  if (signals.length < 3) return calibrationNote;
   const caution = signals.filter((item) => item === "caution").length;
   const positive = signals.filter((item) => item === "positive").length;
   if (caution >= 2 && caution > positive) {
-    return `<div class="future-scan-signal-banner caution"><strong>${caution} of ${signals.length}</strong> stations you've run are flagging caution here - might be worth a closer look before deciding.</div>`;
+    return `<div class="future-scan-signal-banner caution"><strong>${caution} of ${signals.length}</strong> stations you've run are flagging caution here - might be worth a closer look before deciding.</div>${calibrationNote}`;
   }
   if (positive >= 2 && positive > caution) {
-    return `<div class="future-scan-signal-banner positive"><strong>${positive} of ${signals.length}</strong> stations you've run are lining up in favor of this - a consistent signal so far.</div>`;
+    return `<div class="future-scan-signal-banner positive"><strong>${positive} of ${signals.length}</strong> stations you've run are lining up in favor of this - a consistent signal so far.</div>${calibrationNote}`;
   }
-  return `<div class="future-scan-signal-banner mixed">The stations you've run so far are giving mixed signals - might be worth checking a couple more angles.</div>`;
+  return `<div class="future-scan-signal-banner mixed">The stations you've run so far are giving mixed signals - might be worth checking a couple more angles.</div>${calibrationNote}`;
 }
 
 const screens = {
@@ -8142,7 +8174,8 @@ const screens = {
         { title: "Challenge progress", text: "Check 7-day challenge status.", modal: "growthProgress", icon: "icon-boundary.png" },
         { title: "Receipt record", text: "Track what you paid today.", modal: "receipt", icon: "icon-receipt.png" },
         { title: "Knowledge Vault", text: "Everything Future Mirror knows about you, in one place.", modal: "knowledgeVault", icon: "icon-learn.png" },
-        { title: "AI Trace Log", text: "Is the AI coach actually helping? Every reply gets graded.", modal: "aiTraceLog", icon: "icon-assessment.png" }
+        { title: "AI Trace Log", text: "Is the AI coach actually helping? Every reply gets graded.", modal: "aiTraceLog", icon: "icon-assessment.png" },
+        { title: "Judgment Calibration", text: "When you say you're sure, how often are you actually right?", modal: "calibration", icon: "icon-balance.png" }
       ]
     })}
 
@@ -8647,6 +8680,8 @@ const modals = {
 
   aiTraceLog: () => aiTraceLogModal(),
 
+  calibration: () => calibrationModal(),
+
 
   futureScanStation: (stationId) => {
     const station = FUTURE_SCAN_STATIONS.find((item) => item.id === stationId);
@@ -8671,6 +8706,8 @@ const modals = {
       signalRadar: futureScanSignalView,
       pastSelfCheck: futureScanPastSelfView,
       driftDetector: futureScanDriftView,
+      premortem: futureScanPremortemView,
+      outsideView: futureScanOutsideViewView,
       checkBack: futureScanCheckBackView
     }[stationId];
     return `
@@ -10059,8 +10096,12 @@ function summarizeFutureScanStationResult(stationId, result) {
       return result.headline ? `Past-Self Check found: ${result.headline}` : "";
     case "driftDetector":
       return result.headline ? `Drift Detector found: ${result.drift} - ${result.headline}` : "";
+    case "premortem":
+      return result.reasons && result.reasons.length ? `Premortem found: if this failed, likely reasons include ${result.reasons.map((item) => item.reason).join("; ")}.` : "";
+    case "outsideView":
+      return result.headline ? `Outside View found: ${result.headline}` : "";
     case "checkBack":
-      return result.status === "completed" && result.headline ? `Check-Back found: ${result.headline}` : "";
+      return result.status === "completed" && result.headline ? `Check-Back found: ${result.headline} (outcome ${result.outcomeMatch || "unrated"} against ${result.confidence}% confidence).` : "";
     default:
       return "";
   }
@@ -10099,7 +10140,9 @@ function resetFutureScan() {
   futureScanPressureOtherText = "";
   futureScanSignalPicks = {};
   futureScanCheckBackHorizon = "";
+  futureScanCheckBackConfidence = 70;
   futureScanCheckBackReportText = "";
+  futureScanCheckBackOutcomeMatch = "";
   futureScanSuggestedStationIds = [];
   activeFutureScan = null;
   futureScanError = "";
@@ -10748,6 +10791,121 @@ async function runFutureScanDrift() {
   }
 }
 
+// Premortem (GitHub research idea, based on Gary Klein's "prospective
+// hindsight" technique, also used by Kahneman/Tetlock): assuming a plan
+// has ALREADY failed and working backward surfaces far more specific,
+// concrete risks than prospectively asking "what could go wrong" - the
+// hindsight framing beats the foresight framing even though the content
+// being reasoned about is identical. Still runs on the shared
+// FUTURE_SCAN_SYSTEM_PROMPT and its "ground everything given, never
+// invent facts about the user" rule - only the failure scenario itself is
+// hypothetical, not any claim about the user.
+function futureScanPremortemView() {
+  const result = activeFutureScan.stations.premortem;
+  return `
+    <p class="muted">It's about 6 months from now. This choice went badly wrong. Work backward - what happened?</p>
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-premortem ${futureScanStationLoading === "premortem" ? "disabled" : ""}>${futureScanStationLoading === "premortem" ? "Working backward..." : result ? "Re-run Premortem" : "Run Premortem"}</button>
+    ${result ? `
+      <div class="advice-stack dossier-findings">
+        ${result.reasons.map((item) => `
+          <div>
+            <strong>${escapeHTML(item.reason)}</strong>
+            <span>Early sign: ${escapeHTML(item.earlySign)}</span>
+          </div>
+        `).join("")}
+      </div>
+      <p class="tiny-note">${escapeHTML(result.reflection)}</p>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanPremortem() {
+  futureScanStationError = "";
+  futureScanStationLoading = "premortem";
+  openModal("futureScanStation", "premortem");
+  try {
+    const prompt = `${scanContextText("premortem")}\n\nRun a premortem using prospective hindsight: imagine it is roughly 6 months from now and this exact choice has already gone badly wrong - assume the failure as a fact, don't hedge on whether it happened. Working backward from that failure, write 3 to 5 concrete, specific, plausible reasons it went wrong. Ground the situation itself only in what's given above - don't invent facts about the user - but you may reason about realistic real-world failure modes for a situation like this. For each reason, also give one early warning sign the user could realistically notice before it gets that far. Respond as strict JSON only: {"reasons":[{"reason":"string","earlySign":"string"}],"reflection":"one honest closing sentence, not advice, handing the decision back to the user"}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed || !Array.isArray(parsed.reasons)) throw new Error("Premortem reply was not valid JSON.");
+    const result = {
+      reasons: parsed.reasons.slice(0, 5).map((item) => ({
+        reason: cleanText(item.reason || "", 200),
+        earlySign: cleanText(item.earlySign || "", 160)
+      })).filter((item) => item.reason),
+      reflection: cleanText(parsed.reflection || "", 220),
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("premortem", result);
+  } catch (error) {
+    console.error("[Future Scan] Premortem failed", error);
+    futureScanStationError = "This scan is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "premortem");
+  }
+}
+
+// Outside View (GitHub research idea, based on Kahneman's reference-class
+// forecasting / "outside view"): every other Future Scan station is
+// deliberately restricted to only what the user has actually told
+// Compass. This station is the one deliberate exception - its entire
+// point is surfacing what generally happens to people in broadly similar
+// situations, which requires general world knowledge, not personal data.
+// It gets its own system prompt rather than FUTURE_SCAN_SYSTEM_PROMPT so
+// that exception is explicit and scoped to this one station only, and
+// still explicitly forbids inventing fake precise statistics.
+const FUTURE_SCAN_OUTSIDE_VIEW_SYSTEM_PROMPT = "You are the Outside View station inside Compass's Future Mirror, based on Daniel Kahneman's 'outside view' / reference-class forecasting idea: before trusting personal, case-specific reasoning, it helps to look at what generally happens to people in broadly similar situations. Unlike other Future Scan stations, you MAY draw on general real-world knowledge and common patterns here, not only what the user told you - but never state a specific statistic or percentage as if it were a precise verified fact (no invented numbers like \"73% of people\"); use honest qualitative language instead (\"many\", \"it's common for\", \"a frequent pattern is\"). Never claim to know anything specific about this individual user beyond what's given. Never state or imply what they should choose. Be concise, concrete, and youth-friendly, and clearly separate the general pattern from the user's specific situation - their case may differ.";
+
+function futureScanOutsideViewView() {
+  const result = activeFutureScan.stations.outsideView;
+  return `
+    <p class="muted">Before your own reasoning - what generally happens to people in situations like this?</p>
+    ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-run-scan-outside-view ${futureScanStationLoading === "outsideView" ? "disabled" : ""}>${futureScanStationLoading === "outsideView" ? "Checking..." : result ? "Re-check Outside View" : "Run Outside View"}</button>
+    ${result ? `
+      <div class="future-reflection-list">
+        <p><strong>${escapeHTML(result.headline)}</strong></p>
+        <p class="muted">${escapeHTML(result.reading)}</p>
+      </div>
+      <p class="tiny-note">A general pattern, not a read on you specifically - your situation may differ.</p>
+    ` : ""}
+  `;
+}
+
+async function runFutureScanOutsideView() {
+  futureScanStationError = "";
+  futureScanStationLoading = "outsideView";
+  openModal("futureScanStation", "outsideView");
+  try {
+    const prompt = `${scanContextText("outsideView")}\n\nGive the outside view: what generally tends to happen for people in a broadly similar situation to this one (the reference class), before layering on this user's own specific reasoning. Use honest qualitative language, never invented statistics. Keep it short. Respond as strict JSON only: {"headline":"string","reading":"string"}`;
+    const reply = await requestCompassDirect(FUTURE_SCAN_OUTSIDE_VIEW_SYSTEM_PROMPT, prompt);
+    const parsed = extractJsonObject(reply);
+    if (!parsed) throw new Error("Outside View reply was not valid JSON.");
+    const result = {
+      headline: cleanText(parsed.headline || "", 200),
+      reading: cleanText(parsed.reading || "", 400),
+      generatedAt: new Date().toISOString()
+    };
+    saveFutureScanStation("outsideView", result);
+  } catch (error) {
+    console.error("[Future Scan] Outside View failed", error);
+    futureScanStationError = "This scan is having trouble running right now. Please try again.";
+  } finally {
+    futureScanStationLoading = "";
+    openModal("futureScanStation", "outsideView");
+  }
+}
+
+// Calibration (GitHub research idea, inspired by Decidr): Check-Back
+// already compared prediction vs reality per-scan, but never captured HOW
+// confident the user was, and never kept that number anywhere once the
+// station reset - so there was no way to ask "when you say you're sure,
+// how often are you actually right?" across more than one decision. The
+// confidence slider (schedule time) and outcome-match buttons (report
+// time) feed calibrationStats() via a permanent record - see
+// resolveCalibrationRecord().
 function futureScanCheckBackView() {
   const result = activeFutureScan.stations.checkBack;
   if (!result) {
@@ -10756,6 +10914,10 @@ function futureScanCheckBackView() {
       <div class="mirror-example-row">
         ${FUTURE_SCAN_CHECKBACK_HORIZONS.map((horizon) => `<button type="button" class="${futureScanCheckBackHorizon === horizon.id ? "is-selected" : ""}" data-scan-checkback-horizon="${horizon.id}">${escapeHTML(horizon.label)}</button>`).join("")}
       </div>
+      <label class="mood-reflection-label">How confident are you this goes the way you expect?
+        <input id="scan-checkback-confidence" type="range" min="0" max="100" step="5" value="${futureScanCheckBackConfidence}">
+        <p class="tiny-note desk-hero-eyebrow" id="scan-checkback-confidence-label">${futureScanCheckBackConfidence}% confident</p>
+      </label>
       ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
       <button class="primary-action mirror-run-action" type="button" data-run-scan-checkback-schedule ${futureScanStationLoading === "checkBack" ? "disabled" : ""}>${futureScanStationLoading === "checkBack" ? "Scheduling..." : "Schedule Check-Back"}</button>
     `;
@@ -10765,11 +10927,16 @@ function futureScanCheckBackView() {
     return `
       <p class="eyebrow">Snapshot saved ${escapeHTML(result.scheduledDisplayTime || "")}</p>
       <p class="tiny-note">${escapeHTML(result.predictionNote)}</p>
+      <p class="tiny-note">You were ${result.confidence}% confident at the time.</p>
       <p class="muted">${due ? "It's time - what actually happened?" : `We'll check back around ${escapeHTML(result.dueDisplayTime || "")}. You can also report back early any time.`}</p>
       <div class="admin-form">
         <label>What actually happened?
           <textarea id="scan-checkback-report" placeholder="Tell me what really happened">${escapeHTML(futureScanCheckBackReportText)}</textarea>
         </label>
+      </div>
+      <p class="eyebrow">Did it match what you expected?</p>
+      <div class="mirror-example-row">
+        ${[["matched", "Matched"], ["partial", "Partially"], ["missed", "Didn't match"]].map(([id, label]) => `<button type="button" class="${futureScanCheckBackOutcomeMatch === id ? "is-selected" : ""}" data-scan-checkback-outcome="${id}">${label}</button>`).join("")}
       </div>
       ${futureScanStationError ? `<p class="form-error">${escapeHTML(futureScanStationError)}</p>` : ""}
       <button class="primary-action mirror-run-action" type="button" data-run-scan-checkback-report ${futureScanStationLoading === "checkBack" ? "disabled" : ""}>${futureScanStationLoading === "checkBack" ? "Comparing..." : "Compare with what I predicted"}</button>
@@ -10779,9 +10946,10 @@ function futureScanCheckBackView() {
     <div class="future-reflection-list">
       <p><strong>${escapeHTML(result.headline)}</strong></p>
       <p class="muted">${escapeHTML(result.reading)}</p>
-      <p class="tiny-note">Your snapshot: ${escapeHTML(result.predictionNote)}</p>
-      <p class="tiny-note">What happened: ${escapeHTML(result.actualOutcome)}</p>
+      <p class="tiny-note">Your snapshot: ${escapeHTML(result.predictionNote)} (${result.confidence}% confident)</p>
+      <p class="tiny-note">What happened: ${escapeHTML(result.actualOutcome)} - ${escapeHTML({ matched: "matched what you expected", partial: "partially matched", missed: "didn't match" }[result.outcomeMatch] || "")}</p>
     </div>
+    <button class="secondary-action compact-action" type="button" data-open="calibration">See your judgment calibration</button>
     <button class="secondary-action compact-action" type="button" data-reset-scan-checkback>Schedule another check-back</button>
   `;
 }
@@ -10806,6 +10974,7 @@ async function scheduleFutureScanCheckBack() {
       status: "scheduled",
       horizonId: horizon.id,
       predictionNote: cleanText(parsed.predictionNote, 260),
+      confidence: Math.max(0, Math.min(100, Math.round(futureScanCheckBackConfidence))),
       scheduledAt: new Date().toISOString(),
       scheduledDisplayTime: new Date().toLocaleString([], { month: "short", day: "numeric" }),
       resurfaceAt,
@@ -10816,6 +10985,7 @@ async function scheduleFutureScanCheckBack() {
     };
     saveFutureScanStation("checkBack", result);
     futureScanCheckBackHorizon = "";
+    futureScanCheckBackConfidence = 70;
   } catch (error) {
     console.error("[Future Scan] Check-back scheduling failed", error);
     futureScanStationError = "Scheduling is having trouble right now. Please try again.";
@@ -10825,6 +10995,104 @@ async function scheduleFutureScanCheckBack() {
   }
 }
 
+// The permanent calibration record - kept even if the checkBack station
+// is later reset/overwritten, so calibrationStats() can aggregate across
+// every decision the user has ever checked back on, not just the current
+// one. The user self-rates match quality (not the AI) so the number
+// reflects their own honest judgment, not a model's grading of them.
+function resolveCalibrationRecord({ scanId, confidence, outcomeMatch, situationSummary }) {
+  trackerState.calibrationRecords.push({
+    id: `cal-${Date.now()}`,
+    user_id: currentUserId(),
+    scanId,
+    confidence: Math.max(0, Math.min(100, Math.round(Number(confidence) || 0))),
+    outcomeMatch,
+    situationSummary: cleanText(situationSummary, 140),
+    resolvedAt: new Date().toISOString()
+  });
+  trackerState.calibrationRecords = trackerState.calibrationRecords.slice(-100);
+  saveTrackerState();
+}
+
+function calibrationRecordsMine() {
+  return trackerState.calibrationRecords.filter((record) => record.user_id === currentUserId());
+}
+
+// Overconfident/underconfident/calibrated reads the same way Decidr does:
+// stated confidence vs. self-rated actual outcome, averaged across every
+// resolved Check-Back. Needs at least 3 records before the read is
+// meaningful - fewer than that is just noise.
+function calibrationStats() {
+  const records = calibrationRecordsMine();
+  if (!records.length) return null;
+  const outcomeScore = { matched: 1, partial: 0.5, missed: 0 };
+  const avgConfidence = records.reduce((sum, record) => sum + record.confidence, 0) / records.length;
+  const avgAccuracy = (records.reduce((sum, record) => sum + (outcomeScore[record.outcomeMatch] ?? 0.5), 0) / records.length) * 100;
+  const gap = avgConfidence - avgAccuracy;
+  const read = records.length < 3 ? "not-enough" : gap > 15 ? "overconfident" : gap < -15 ? "underconfident" : "calibrated";
+  return {
+    count: records.length,
+    avgConfidence: Math.round(avgConfidence),
+    avgAccuracy: Math.round(avgAccuracy),
+    gap: Math.round(gap),
+    read,
+    records: records.slice().sort((a, b) => new Date(b.resolvedAt) - new Date(a.resolvedAt))
+  };
+}
+
+function calibrationRecordLedger(records) {
+  const outcomeLabel = { matched: "Matched", partial: "Partially matched", missed: "Didn't match" };
+  return `
+    <div class="content-rail-title"><strong>Resolved check-backs</strong><span>${records.length}</span></div>
+    <div class="ledger-sheet">
+      ${records.slice(0, 10).map((record) => `
+        <article class="ledger-entry">
+          <p class="ledger-entry-stamp">${escapeHTML(new Date(record.resolvedAt).toLocaleDateString([], { month: "short", day: "numeric" }))} &middot; ${record.confidence}% confident</p>
+          <p class="ledger-entry-text">${escapeHTML(record.situationSummary || "Untitled decision")}</p>
+          <p class="ledger-entry-note">Outcome: ${escapeHTML(outcomeLabel[record.outcomeMatch] || "unrated")}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+const CALIBRATION_READ_COPY = {
+  overconfident: (stats) => `Across ${stats.count} check-backs, you say you're about ${stats.gap} points more confident than your outcomes actually support. Worth building in a bit more margin next time you feel sure.`,
+  underconfident: (stats) => `Across ${stats.count} check-backs, your outcomes actually held up about ${Math.abs(stats.gap)} points more often than your stated confidence suggested. You may be more reliable than you give yourself credit for.`,
+  calibrated: (stats) => `Across ${stats.count} check-backs, your stated confidence and your actual outcomes track closely - your gut read on your own decisions holds up.`
+};
+
+function calibrationModal() {
+  const stats = calibrationStats();
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="calibration-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Judgment Calibration</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="calibration-title">How well do your predictions actually hold up?</h3>
+      <p class="muted">Every time you check back on a Future Scan, this compares the confidence you stated against what you self-rated as the outcome - not a personality score, just your own track record.</p>
+      ${!stats ? `
+        <section class="empty-feature">
+          <img src="assets/icon-time.png" alt="">
+          <div><strong>No resolved check-backs yet</strong><p>Run a Future Scan, schedule a Check-Back on it, then come back once it resolves.</p></div>
+        </section>
+      ` : stats.read === "not-enough" ? `
+        <p class="muted">${stats.count} check-back${stats.count === 1 ? "" : "s"} resolved so far - a real read needs at least 3.</p>
+        ${calibrationRecordLedger(stats.records)}
+      ` : `
+        <div class="desk-ledger">
+          <div class="desk-ledger-row"><span class="desk-ledger-label">Average stated confidence</span><span class="desk-ledger-value">${stats.avgConfidence}%</span></div>
+          <div class="desk-ledger-row"><span class="desk-ledger-label">Actual match rate</span><span class="desk-ledger-value">${stats.avgAccuracy}%</span></div>
+        </div>
+        <p class="verdict-stamp">Reading: ${escapeHTML(stats.read)}</p>
+        <p class="muted">${escapeHTML(CALIBRATION_READ_COPY[stats.read](stats))}</p>
+        ${calibrationRecordLedger(stats.records)}
+      `}
+    </div>
+  `;
+}
+
 async function submitFutureScanCheckBackReport() {
   const existing = activeFutureScan.stations.checkBack;
   if (!existing) return;
@@ -10832,6 +11100,11 @@ async function submitFutureScanCheckBackReport() {
   const report = cleanText(textarea ? textarea.value : futureScanCheckBackReportText, 500);
   if (!report) {
     futureScanStationError = "Tell me what actually happened first.";
+    openModal("futureScanStation", "checkBack");
+    return;
+  }
+  if (!futureScanCheckBackOutcomeMatch) {
+    futureScanStationError = "Pick whether it matched what you expected first.";
     openModal("futureScanStation", "checkBack");
     return;
   }
@@ -10848,12 +11121,20 @@ async function submitFutureScanCheckBackReport() {
       ...existing,
       status: "completed",
       actualOutcome: report,
+      outcomeMatch: futureScanCheckBackOutcomeMatch,
       headline: cleanText(parsed.headline || "Here's how it compared.", 200),
       reading: cleanText(parsed.reading || "", 400),
       completedAt: new Date().toISOString()
     };
     saveFutureScanStation("checkBack", result);
+    resolveCalibrationRecord({
+      scanId: activeFutureScan.id,
+      confidence: existing.confidence,
+      outcomeMatch: futureScanCheckBackOutcomeMatch,
+      situationSummary: activeFutureScan.scanContext ? activeFutureScan.scanContext.rawInput : ""
+    });
     futureScanCheckBackReportText = "";
+    futureScanCheckBackOutcomeMatch = "";
   } catch (error) {
     console.error("[Future Scan] Check-back comparison failed", error);
     futureScanStationError = "This comparison is having trouble running right now. Please try again.";
@@ -10871,6 +11152,8 @@ function resetFutureScanCheckBack() {
   saveTrackerState();
   futureScanCheckBackReportText = "";
   futureScanCheckBackHorizon = "";
+  futureScanCheckBackConfidence = 70;
+  futureScanCheckBackOutcomeMatch = "";
   openModal("futureScanStation", "checkBack");
 }
 
@@ -11782,7 +12065,10 @@ document.addEventListener("click", async (event) => {
   const runScanSignalButton = event.target.closest("[data-run-scan-signal]");
   const runScanPastSelfButton = event.target.closest("[data-run-scan-pastself]");
   const runScanDriftButton = event.target.closest("[data-run-scan-drift]");
+  const runScanPremortemButton = event.target.closest("[data-run-scan-premortem]");
+  const runScanOutsideViewButton = event.target.closest("[data-run-scan-outside-view]");
   const scanCheckBackHorizonButton = event.target.closest("[data-scan-checkback-horizon]");
+  const scanCheckBackOutcomeButton = event.target.closest("[data-scan-checkback-outcome]");
   const runScanCheckBackScheduleButton = event.target.closest("[data-run-scan-checkback-schedule]");
   const runScanCheckBackReportButton = event.target.closest("[data-run-scan-checkback-report]");
   const resetScanCheckBackButton = event.target.closest("[data-reset-scan-checkback]");
@@ -12603,8 +12889,14 @@ document.addEventListener("click", async (event) => {
   if (runScanSignalButton) await runFutureScanSignal();
   if (runScanPastSelfButton) await runFutureScanPastSelf();
   if (runScanDriftButton) await runFutureScanDrift();
+  if (runScanPremortemButton) await runFutureScanPremortem();
+  if (runScanOutsideViewButton) await runFutureScanOutsideView();
   if (scanCheckBackHorizonButton) {
     futureScanCheckBackHorizon = scanCheckBackHorizonButton.dataset.scanCheckbackHorizon;
+    openModal("futureScanStation", "checkBack");
+  }
+  if (scanCheckBackOutcomeButton) {
+    futureScanCheckBackOutcomeMatch = scanCheckBackOutcomeButton.dataset.scanCheckbackOutcome;
     openModal("futureScanStation", "checkBack");
   }
   if (runScanCheckBackScheduleButton) await scheduleFutureScanCheckBack();
@@ -13564,6 +13856,14 @@ document.addEventListener("input", (event) => {
     const label = modalLayer.querySelector("#mood-score-label");
     if (emoji) emoji.textContent = energyEmoji(score);
     if (label) label.textContent = energyLabel(score);
+  }
+  if (event.target && event.target.id === "scan-checkback-confidence") {
+    futureScanCheckBackConfidence = Number(event.target.value) || 0;
+    const label = modalLayer.querySelector("#scan-checkback-confidence-label");
+    if (label) label.textContent = `${futureScanCheckBackConfidence}% confident`;
+  }
+  if (event.target && event.target.id === "scan-checkback-report") {
+    futureScanCheckBackReportText = event.target.value;
   }
 });
 
