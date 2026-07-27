@@ -538,7 +538,8 @@ const defaultTrackerState = {
   juryTrials: { sessions: [] },
   archaeologyDigs: [],
   advancedModeReports: [],
-  aiTraces: []
+  aiTraces: [],
+  savedFeedItems: []
 };
 
 const dailyMissions = [
@@ -1281,7 +1282,8 @@ function normalizeTrackerState(state) {
     juryTrials: { sessions: Array.isArray(state.juryTrials && state.juryTrials.sessions) ? state.juryTrials.sessions : [] },
     archaeologyDigs: Array.isArray(state.archaeologyDigs) ? state.archaeologyDigs : [],
     advancedModeReports: Array.isArray(state.advancedModeReports) ? state.advancedModeReports : [],
-    aiTraces: Array.isArray(state.aiTraces) ? state.aiTraces : []
+    aiTraces: Array.isArray(state.aiTraces) ? state.aiTraces : [],
+    savedFeedItems: Array.isArray(state.savedFeedItems) ? state.savedFeedItems : []
   };
 }
 
@@ -2299,8 +2301,7 @@ function homeQuickAccessGrid() {
   const items = [
     ["icon-chat.png", "Compass AI", "Ask, plan, reflect", "compass"],
     ["icon-learn.png", "Growth", "Goals, journal, mood", "growth"],
-    ["icon-support.png", "Community", "Groups and support", "community"],
-    ["icon-work.png", "Opportunities", "Scholarships and internships", "opportunities"]
+    ["icon-support.png", "Discover", "Community, squads, and opportunities", "community"]
   ];
   return `
     <section class="home-quick-access">
@@ -4992,39 +4993,72 @@ function mergeLegacyIssue(issueId) {
   saveTrackerState();
 }
 
-function legacyIssueCard(issue) {
+function legacyIssueKanbanCard(issue) {
   return `
-    <article class="community-card">
-      <div class="community-card-top">
-        <span class="category-badge">${escapeHTML(legacyIssueStatusLabel(issue.status))}</span>
+    <button class="legacy-kanban-card" type="button" data-open="legacyIssueDetail" data-open-payload="${escapeHTML(issue.id)}">
+      <strong>${escapeHTML(issue.title)}</strong>
+      <span>${issue.prs.length} PR${issue.prs.length === 1 ? "" : "s"}</span>
+      ${issue.inheritedFrom ? `<small>${escapeHTML(issue.inheritedFrom)}</small>` : ""}
+    </button>
+  `;
+}
+
+// GitHub-style contribution graph, but for merges instead of commits - the
+// point is to make "you've actually been doing this" visible at a glance,
+// not just a number buried in a list.
+function legacyMergeActivityGraph() {
+  const weeks = 12;
+  const now = Date.now();
+  const counts = new Array(weeks).fill(0);
+  trackerState.legacyIssues.forEach((issue) => {
+    if (issue.status !== "merged" || !issue.mergedAt) return;
+    const daysAgo = Math.floor((now - new Date(issue.mergedAt).getTime()) / 86400000);
+    const weekIndex = weeks - 1 - Math.floor(daysAgo / 7);
+    if (weekIndex >= 0 && weekIndex < weeks) counts[weekIndex] += 1;
+  });
+  const max = Math.max(1, ...counts);
+  return `
+    <div class="legacy-activity-graph">
+      <p class="eyebrow">Merge activity - last ${weeks} weeks</p>
+      <div class="legacy-activity-cells">
+        ${counts.map((count) => {
+          const intensity = count === 0 ? 0 : Math.min(4, Math.ceil((count / max) * 4));
+          return `<span class="legacy-activity-cell" data-intensity="${intensity}" title="${count} merged this week"></span>`;
+        }).join("")}
       </div>
-      <h3>${escapeHTML(issue.title)}</h3>
-      <p class="muted">${issue.prs.length} PR${issue.prs.length === 1 ? "" : "s"} logged</p>
-      <div class="community-actions">
-        <button class="secondary-action compact-action" type="button" data-open="legacyIssueDetail" data-open-payload="${escapeHTML(issue.id)}">Open</button>
-      </div>
-    </article>
+    </div>
   `;
 }
 
 function legacyDebuggerModal() {
   const issues = trackerState.legacyIssues;
+  const columns = [
+    { id: "open", label: "Open", items: issues.filter((issue) => issue.status === "open") },
+    { id: "in-review", label: "In Review", items: issues.filter((issue) => issue.status === "in-review") },
+    { id: "merged", label: "Merged", items: issues.filter((issue) => issue.status === "merged") }
+  ];
   return `
-    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="legacy-debugger-title">
+    <div class="modal-card assessment-modal legacy-kanban-modal" role="dialog" aria-modal="true" aria-labelledby="legacy-debugger-title">
       <div class="modal-top">
         <span class="risk-pill calm">Inherited Debugging</span>
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="legacy-debugger-title">Refactor what you inherited</h3>
-      <p class="muted">A habit you picked up without choosing it isn't your fault - but it's your codebase now. Open an issue, log small PRs, merge when it actually sticks.</p>
+      <p class="muted">A habit you picked up without choosing it isn't your fault - but it's your codebase now.</p>
+      ${issues.some((issue) => issue.status === "merged") ? legacyMergeActivityGraph() : ""}
       <button class="primary-action compact-action" type="button" data-open="legacyIssueNew">New issue</button>
-      <div class="community-grid">
-        ${issues.length ? issues.map(legacyIssueCard).join("") : `
-          <section class="empty-feature">
-            <img src="assets/icon-boundary.png" alt="">
-            <div><strong>No issues yet</strong><p>Open your first one above.</p></div>
-          </section>
-        `}
+      <div class="legacy-kanban-board">
+        ${columns.map((column) => `
+          <div class="legacy-kanban-column">
+            <div class="legacy-kanban-column-head">
+              <strong>${escapeHTML(column.label)}</strong>
+              <span>${column.items.length}</span>
+            </div>
+            <div class="legacy-kanban-column-body">
+              ${column.items.length ? column.items.map(legacyIssueKanbanCard).join("") : `<p class="tiny-note">Nothing here yet</p>`}
+            </div>
+          </div>
+        `).join("")}
       </div>
     </div>
   `;
@@ -5384,47 +5418,84 @@ function computeEstateAuctionLots(sinceIso) {
   ];
 }
 
-function runEstateAuction() {
+// Session gives the auction real pacing - one lot on the block at a time,
+// each called through going-once / going-twice / sold before the next lot
+// comes up - instead of dumping every lot in one static list.
+let estateAuctionSession = null;
+const ESTATE_AUCTION_CALL_LINES = ["Opening the bidding.", "Going once.", "Going twice.", "SOLD."];
+
+function beginEstateAuction() {
+  const lots = computeEstateAuctionLots(trackerState.estateAuctions.lastAuctionAt);
+  estateAuctionSession = { lots, index: 0, callStage: 0 };
+}
+
+function callEstateAuctionLot() {
+  if (!estateAuctionSession) return;
+  estateAuctionSession.callStage = Math.min(3, estateAuctionSession.callStage + 1);
+}
+
+function advanceEstateAuctionLot() {
+  if (!estateAuctionSession || estateAuctionSession.index >= estateAuctionSession.lots.length - 1) return;
+  estateAuctionSession.index += 1;
+  estateAuctionSession.callStage = 0;
+}
+
+function finalizeEstateAuction() {
+  if (!estateAuctionSession) return null;
   const previousAuctionAt = trackerState.estateAuctions.lastAuctionAt;
-  const lots = computeEstateAuctionLots(previousAuctionAt);
-  const record = { id: `auction-${Date.now()}`, periodStart: previousAuctionAt, periodEnd: new Date().toISOString(), lots, heldAt: new Date().toISOString() };
+  const record = { id: `auction-${Date.now()}`, periodStart: previousAuctionAt, periodEnd: new Date().toISOString(), lots: estateAuctionSession.lots, heldAt: new Date().toISOString() };
   trackerState.estateAuctions.history = [record, ...trackerState.estateAuctions.history].slice(0, 24);
   trackerState.estateAuctions.lastAuctionAt = record.periodEnd;
   saveTrackerState();
+  estateAuctionSession = null;
   return record;
 }
 
 function estateAuctionModal() {
   const history = trackerState.estateAuctions.history;
-  const previewLots = computeEstateAuctionLots(trackerState.estateAuctions.lastAuctionAt);
+  if (!estateAuctionSession) {
+    const previewLots = computeEstateAuctionLots(trackerState.estateAuctions.lastAuctionAt);
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="estate-auction-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Estate Auction</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="estate-auction-title">Ladies and gentlemen, today's lots</h3>
+        <p class="muted">Everything you've generated since your last auction, called one lot at a time - not a guilt trip, just made visible.</p>
+        <p class="muted">${previewLots.length} lot${previewLots.length === 1 ? "" : "s"} up for auction today.</p>
+        <button class="primary-action compact-action" type="button" data-begin-estate-auction>Open the auction</button>
+        <div class="content-rail-title"><strong>Past auctions</strong><span>${history.length}</span></div>
+        <div class="future-reflection-list">
+          ${history.length ? history.slice(0, 6).map((record) => `
+            <article class="future-reflection-item">
+              <div>
+                <strong>${escapeHTML(new Date(record.heldAt).toLocaleDateString())}</strong>
+                ${record.lots.map((lot) => `<p>${escapeHTML(lot.title)}</p>`).join("")}
+              </div>
+            </article>
+          `).join("") : `<p class="muted">No past auctions yet.</p>`}
+        </div>
+      </div>
+    `;
+  }
+  const { lots, index, callStage } = estateAuctionSession;
+  const lot = lots[index];
+  const isLastLot = index >= lots.length - 1;
+  const isSold = callStage >= 3;
   return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="estate-auction-title">
       <div class="modal-top">
-        <span class="risk-pill calm">Estate Auction</span>
+        <span class="risk-pill calm">Lot ${index + 1} of ${lots.length}</span>
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
-      <h3 id="estate-auction-title">Ladies and gentlemen, today's lots</h3>
-      <p class="muted">Everything you've generated since your last auction, read out like an estate sale catalog - not a guilt trip, just made visible.</p>
-      <div class="advice-stack">
-        ${previewLots.map((lot, index) => `
-          <div>
-            <strong>Lot ${index + 1}: ${escapeHTML(lot.title)}</strong>
-            <span>${escapeHTML(lot.description)}</span>
-          </div>
-        `).join("")}
+      <h3 id="estate-auction-title">${escapeHTML(lot.title)}</h3>
+      <div class="auction-block ${isSold ? "is-sold" : ""}">
+        <p class="muted">${escapeHTML(lot.description)}</p>
+        <p class="auction-call-line">${escapeHTML(ESTATE_AUCTION_CALL_LINES[callStage])}</p>
+        ${isSold ? `<span class="auction-sold-stamp">SOLD</span>` : ""}
       </div>
-      <button class="primary-action compact-action" type="button" data-run-estate-auction>Gavel down - close this auction</button>
-      <div class="content-rail-title"><strong>Past auctions</strong><span>${history.length}</span></div>
-      <div class="future-reflection-list">
-        ${history.length ? history.slice(0, 6).map((record) => `
-          <article class="future-reflection-item">
-            <div>
-              <strong>${escapeHTML(new Date(record.heldAt).toLocaleDateString())}</strong>
-              ${record.lots.map((lot) => `<p>${escapeHTML(lot.title)}</p>`).join("")}
-            </div>
-          </article>
-        `).join("") : `<p class="muted">No past auctions yet.</p>`}
-      </div>
+      ${!isSold ? `<button class="primary-action compact-action" type="button" data-call-estate-lot>${callStage === 0 ? "Call the lot" : "Call again"}</button>` : isLastLot ? `<button class="primary-action compact-action" type="button" data-finalize-estate-auction>Close the auction</button>` : `<button class="primary-action compact-action" type="button" data-next-estate-lot>Next lot</button>`}
     </div>
   `;
 }
@@ -5833,6 +5904,11 @@ const ARCHAEOLOGY_SYSTEM_PROMPT = "You are writing a short, dry, deadpan archaeo
 
 let isArchaeologyLoading = false;
 let archaeologyError = "";
+let archaeologyExpandedKey = null;
+
+function toggleArchaeologyStratum(monthKey) {
+  archaeologyExpandedKey = archaeologyExpandedKey === monthKey ? null : monthKey;
+}
 
 function monthKeyOf(iso) {
   const date = new Date(iso);
@@ -5870,7 +5946,8 @@ function existingDig(monthKey) {
 async function excavateStratum(monthKey) {
   isArchaeologyLoading = true;
   archaeologyError = "";
-  openModal("selfArchaeology", monthKey);
+  archaeologyExpandedKey = monthKey;
+  openModal("selfArchaeology");
   try {
     const artifacts = archaeologyArtifactsForStratum(monthKey);
     const prompt = `Stratum date: ${monthKey}\n\nJournal artifacts recovered:\n${artifacts.journals.length ? artifacts.journals.map((text, index) => `${index + 1}. "${text}"`).join("\n") : "none"}\n\nMood readings recovered:\n${artifacts.moods.length ? artifacts.moods.map((text, index) => `${index + 1}. ${text}`).join("\n") : "none"}\n\nWrite a short archaeological field report about the individual who lived in this stratum, grounded only in the artifacts above - do not invent facts not present in them.`;
@@ -5883,53 +5960,68 @@ async function excavateStratum(monthKey) {
     archaeologyError = "Couldn't complete this excavation right now. Please try again.";
   } finally {
     isArchaeologyLoading = false;
-    if (isModalActive("selfArchaeology")) openModal("selfArchaeology", monthKey);
+    if (isModalActive("selfArchaeology")) openModal("selfArchaeology");
   }
 }
 
-function selfArchaeologyModal(monthKey) {
-  if (!monthKey) {
-    const strata = archaeologyAvailableStrata();
-    return `
-      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="archaeology-title">
-        <div class="modal-top">
-          <span class="risk-pill calm">Self Archaeology</span>
-          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
-        </div>
-        <h3 id="archaeology-title">Dig sites</h3>
-        <p class="muted">Each stratum is a past month of your real journal and mood entries, read back as a field report - not nostalgia, just observation.</p>
-        <div class="action-stack">
-          ${strata.length ? strata.map((key) => {
-            const dig = existingDig(key);
-            return `
-              <button class="wide-action" type="button" data-open="selfArchaeology" data-open-payload="${escapeHTML(key)}">
-                <img src="assets/icon-time.png" alt="">
-                <span><strong>${escapeHTML(key)}</strong><small>${dig ? "Excavated" : "Not yet excavated"}</small></span>
-              </button>
-            `;
-          }).join("") : `<p class="muted">No strata old enough to dig yet - write a few journal or mood entries and check back next month.</p>`}
-        </div>
-      </div>
-    `;
-  }
+// Layers render as a real stratigraphic column - oldest at the bottom, like
+// a genuine dig site cross-section - with band thickness and shade driven
+// by how many real artifacts that month actually holds, so a busy month
+// visibly reads as a richer layer before you ever expand it.
+function archaeologyRichness(density) {
+  if (density === 0) return "trace";
+  if (density < 4) return "sparse";
+  if (density < 10) return "moderate";
+  return "rich";
+}
+
+function archaeologyStratumLayer(monthKey, depthIndex) {
   const dig = existingDig(monthKey);
+  const artifacts = archaeologyArtifactsForStratum(monthKey);
+  const density = artifacts.journals.length + artifacts.moods.length;
+  const richness = archaeologyRichness(density);
+  const isExpanded = archaeologyExpandedKey === monthKey;
+  return `
+    <div class="strata-layer richness-${richness} ${isExpanded ? "is-expanded" : ""}" data-depth="${depthIndex % 6}">
+      <button class="strata-layer-head" type="button" data-toggle-stratum="${escapeHTML(monthKey)}">
+        <span class="strata-layer-label">
+          <strong>${escapeHTML(monthKey)}</strong>
+          <small>${density} artifact${density === 1 ? "" : "s"} recovered${dig ? " - excavated" : ""}</small>
+        </span>
+        <span class="strata-layer-caret">${isExpanded ? "−" : "+"}</span>
+      </button>
+      ${isExpanded ? `
+        <div class="strata-layer-body">
+          ${dig ? `
+            <p class="muted">${escapeHTML(dig.report)}</p>
+            <p class="tiny-note">Excavated ${escapeHTML(new Date(dig.excavatedAt).toLocaleDateString())}.</p>
+            <button class="secondary-action compact-action" type="button" data-excavate-stratum="${escapeHTML(monthKey)}" ${isArchaeologyLoading ? "disabled" : ""}>${isArchaeologyLoading ? "Re-excavating..." : "Re-excavate"}</button>
+          ` : `
+            <p class="muted">This layer hasn't been excavated yet.</p>
+            <button class="primary-action compact-action" type="button" data-excavate-stratum="${escapeHTML(monthKey)}" ${isArchaeologyLoading ? "disabled" : ""}>${isArchaeologyLoading ? "Excavating..." : "Begin excavation"}</button>
+          `}
+          ${archaeologyError ? `<p class="form-error">${escapeHTML(archaeologyError)}</p>` : ""}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function selfArchaeologyModal() {
+  const strata = archaeologyAvailableStrata();
   return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="archaeology-title">
       <div class="modal-top">
-        <span class="risk-pill calm">Stratum ${escapeHTML(monthKey)}</span>
+        <span class="risk-pill calm">Self Archaeology</span>
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
-      <h3 id="archaeology-title">Field report</h3>
-      ${dig ? `
-        <p class="muted">${escapeHTML(dig.report)}</p>
-        <p class="tiny-note">Excavated ${escapeHTML(new Date(dig.excavatedAt).toLocaleDateString())}.</p>
-        <button class="secondary-action compact-action" type="button" data-excavate-stratum="${escapeHTML(monthKey)}" ${isArchaeologyLoading ? "disabled" : ""}>${isArchaeologyLoading ? "Re-excavating..." : "Re-excavate"}</button>
-      ` : `
-        <p class="muted">This stratum hasn't been excavated yet.</p>
-        <button class="primary-action" type="button" data-excavate-stratum="${escapeHTML(monthKey)}" ${isArchaeologyLoading ? "disabled" : ""}>${isArchaeologyLoading ? "Excavating..." : "Begin excavation"}</button>
-      `}
-      ${archaeologyError ? `<p class="form-error">${escapeHTML(archaeologyError)}</p>` : ""}
-      <button class="secondary-action compact-action" type="button" data-open="selfArchaeology">Back to dig sites</button>
+      <h3 id="archaeology-title">Dig site cross-section</h3>
+      <p class="muted">Each layer is a past month of your real journal and mood entries. Deeper layers are older. Tap a layer to excavate it as a field report - not nostalgia, just observation.</p>
+      ${strata.length ? `
+        <div class="strata-column">
+          ${strata.map((key, index) => archaeologyStratumLayer(key, index)).join("")}
+        </div>
+      ` : `<p class="muted">No strata old enough to dig yet - write a few journal or mood entries and check back next month.</p>`}
     </div>
   `;
 }
@@ -6013,89 +6105,278 @@ function aiTraceLogModal() {
   `;
 }
 
-// Feed prototype (P0 of the Community x Opportunities merge plan): a
-// full-screen, one-item-at-a-time vertical stream mixing community posts
-// and official opportunities. Deliberately minimal - pure chronological-ish
-// interleave (no tag scoring yet), read-only (taps route to existing
-// external links, nothing new is created here), and does not touch the
-// bottom nav. The point of this phase is only to test whether the swipe
-// pacing itself feels good before investing in ranking/creation/nav work.
-let feedPrototypeIndex = 0;
-let feedPrototypeItems = [];
+// Real Community x Opportunities feed (supersedes the P0 modal prototype -
+// this is now the actual "community" tab content, not a beta demo behind a
+// button). Mixes 5 content types with real relevance scoring (tag overlap
+// against the user's own goals/roadmap, reusing CommunityMatching - the
+// same "big data" this app actually has, not a fabricated ML claim) plus a
+// freshness boost and a diversity rule so the feed doesn't read as five
+// separate lists concatenated. Save/heart is a real cross-type interaction,
+// not decorative. "Browse" mode (the old squads/wall/mentor/opportunity
+// list screens) still exists for deliberate lookup - see communityMergedScreen.
+let feedIndex = 0;
+let feedItems = [];
+let communityViewMode = "feed";
 
-function feedPrototypeBuildItems() {
-  const posts = (typeof communityPostsCacheSnapshot === "function" ? communityPostsCacheSnapshot() : [])
-    .filter((post) => post.status === "published");
-  const opportunities = opportunityItems.slice();
-  const items = [];
-  const max = Math.max(posts.length, opportunities.length);
-  for (let i = 0; i < max; i++) {
-    if (opportunities[i]) items.push({ type: "opportunity", data: opportunities[i] });
-    if (posts[i]) items.push({ type: "post", data: posts[i] });
+function feedUserTags() {
+  const goalText = [
+    userProfile.goals,
+    userProfile.dreamCareer,
+    ...(typeof myRoadmapGoals === "function" ? myRoadmapGoals().map((goal) => goal.title) : [])
+  ].filter(Boolean).join(" ");
+  return typeof CommunityMatching !== "undefined" ? CommunityMatching.extractTags(goalText) : [];
+}
+
+function feedFreshnessBoost(iso) {
+  if (!iso) return 0;
+  const hours = (Date.now() - new Date(iso).getTime()) / 3600000;
+  if (Number.isNaN(hours) || hours < 0) return 0;
+  return Math.max(0, 1 - hours / 72);
+}
+
+function feedItemIsSaved(type, id) {
+  return trackerState.savedFeedItems.some((item) => item.type === type && item.id === id);
+}
+
+function toggleFeedSave(type, id) {
+  if (feedItemIsSaved(type, id)) {
+    trackerState.savedFeedItems = trackerState.savedFeedItems.filter((item) => !(item.type === type && item.id === id));
+  } else {
+    trackerState.savedFeedItems = [{ type, id, savedAt: new Date().toISOString() }, ...trackerState.savedFeedItems].slice(0, 200);
   }
-  return items;
+  saveTrackerState();
 }
 
-function feedPrototypePostCard(post) {
+function skillCategoryLabelForFeed(categoryId) {
+  const category = BUILD_LIFE_MOMENT_CATEGORIES.find((item) => item.id === categoryId);
+  return category ? category.label : categoryId;
+}
+
+function feedBuildItems() {
+  const myTags = feedUserTags();
+  const signedIn = typeof hasCommunitySession === "function" && hasCommunitySession();
+  const myId = typeof communityUserId === "function" ? communityUserId() : null;
+  const raw = [];
+
+  opportunityItems.forEach((item) => {
+    raw.push({ type: "opportunity", id: item.id, data: item, score: CommunityMatching.scoreTagOverlap(myTags, item.tags || []) * 1.2 + 0.3 });
+  });
+
+  if (signedIn) {
+    (typeof communityOpportunitiesCacheSnapshot === "function" ? communityOpportunitiesCacheSnapshot() : [])
+      .filter((item) => item.status === "published")
+      .forEach((item) => {
+        raw.push({ type: "community-opportunity", id: item.id, data: item, score: CommunityMatching.scoreTagOverlap(myTags, item.tags || []) * 1.15 + feedFreshnessBoost(item.created_at) * 0.3 });
+      });
+
+    (typeof communityPostsCacheSnapshot === "function" ? communityPostsCacheSnapshot() : [])
+      .filter((post) => post.status === "published")
+      .forEach((post) => {
+        raw.push({ type: "post", id: post.id, data: post, score: 0.5 + feedFreshnessBoost(post.created_at) * 0.6 });
+      });
+
+    const squadMemberships = typeof communitySquadMembersCacheSnapshot === "function" ? communitySquadMembersCacheSnapshot() : [];
+    const mySquadIds = new Set(squadMemberships.filter((member) => member.user_id === myId).map((member) => member.squad_id));
+    (typeof communitySquadsCacheSnapshot === "function" ? communitySquadsCacheSnapshot() : [])
+      .filter((squad) => !mySquadIds.has(squad.id))
+      .forEach((squad) => {
+        raw.push({ type: "squad", id: squad.id, data: squad, score: CommunityMatching.scoreTagOverlap(myTags, squad.tags || []) + 0.25 });
+      });
+
+    (typeof communitySkillTagsCacheSnapshot === "function" ? communitySkillTagsCacheSnapshot() : [])
+      .filter((tag) => tag.status === "published" && tag.user_id !== myId)
+      .forEach((tag) => {
+        raw.push({ type: "skill", id: tag.id, data: tag, score: CommunityMatching.scoreTagOverlap(myTags, [tag.category]) * 0.9 + feedFreshnessBoost(tag.created_at) * 0.3 });
+      });
+  }
+
+  raw.sort((a, b) => b.score - a.score);
+  // Diversity pass: never let the same type occupy 3 slots in a row, so the
+  // ranked list doesn't just read back out as "all opportunities, then all
+  // posts" - swap in the next-best item of a different type when that
+  // would happen.
+  const ordered = [];
+  const recentTypes = [];
+  const pool = raw.slice();
+  while (pool.length) {
+    let pickIndex = 0;
+    if (recentTypes.length >= 2 && recentTypes[0] === recentTypes[1]) {
+      const altIndex = pool.findIndex((item) => item.type !== recentTypes[0]);
+      if (altIndex > 0) pickIndex = altIndex;
+    }
+    const [picked] = pool.splice(pickIndex, 1);
+    ordered.push(picked);
+    recentTypes.unshift(picked.type);
+    if (recentTypes.length > 2) recentTypes.pop();
+  }
+  return ordered;
+}
+
+function feedCardShell({ eyebrow, bodyHtml, footerHtml, type, id }) {
+  const saved = feedItemIsSaved(type, id);
   return `
-    <div class="feed-card-inner feed-card-post">
-      <p class="feed-card-eyebrow">Community post</p>
-      <p class="feed-card-body">${escapeHTML(post.body)}</p>
-      <p class="feed-card-meta">${escapeHTML(new Date(post.created_at).toLocaleDateString([], { month: "short", day: "numeric" }))}</p>
+    <div class="feed-card-inner feed-card-${escapeHTML(type)}">
+      <p class="feed-card-eyebrow">${escapeHTML(eyebrow)}</p>
+      ${bodyHtml}
+      ${footerHtml ? `<div class="feed-card-footer">${footerHtml}</div>` : ""}
     </div>
+    <button class="feed-card-save ${saved ? "is-saved" : ""}" type="button" data-feed-save="${escapeHTML(type)}:${escapeHTML(id)}" aria-label="${saved ? "Unsave" : "Save"}">${saved ? "&#9829;" : "&#9825;"}</button>
   `;
 }
 
-function feedPrototypeOpportunityCard(item) {
+function feedRenderCard(item) {
+  if (item.type === "opportunity") {
+    const data = item.data;
+    return feedCardShell({
+      type: item.type, id: item.id, eyebrow: data.category,
+      bodyHtml: `<h2 class="feed-card-title">${escapeHTML(data.title)}</h2><p class="feed-card-body">${escapeHTML(data.description)}</p>`,
+      footerHtml: `<button class="primary-action" type="button" data-open-link="${escapeHTML(data.applyUrl)}">View opportunity</button>`
+    });
+  }
+  if (item.type === "community-opportunity") {
+    const data = item.data;
+    return feedCardShell({
+      type: item.type, id: item.id, eyebrow: `${data.category} - Community-submitted`,
+      bodyHtml: `<h2 class="feed-card-title">${escapeHTML(data.title)}</h2><p class="feed-card-body">${escapeHTML(data.description)}</p>`,
+      footerHtml: `<button class="primary-action" type="button" data-open-link="${escapeHTML(data.link)}">View opportunity</button>`
+    });
+  }
+  if (item.type === "post") {
+    const data = item.data;
+    const profiles = typeof communityProfilesCacheSnapshot === "function" ? communityProfilesCacheSnapshot() : [];
+    const author = profiles.find((profile) => profile.id === data.author_id);
+    return feedCardShell({
+      type: item.type, id: item.id, eyebrow: `Community post${author ? ` - ${author.username}` : ""}`,
+      bodyHtml: `<p class="feed-card-body feed-card-body-lg">${escapeHTML(data.body)}</p>`,
+      footerHtml: `<span class="feed-card-meta">${escapeHTML(new Date(data.created_at).toLocaleDateString([], { month: "short", day: "numeric" }))}</span>`
+    });
+  }
+  if (item.type === "squad") {
+    const data = item.data;
+    return feedCardShell({
+      type: item.type, id: item.id, eyebrow: "Squad",
+      bodyHtml: `<h2 class="feed-card-title">${escapeHTML(data.title)}</h2><p class="feed-card-body">${escapeHTML(data.description)}</p>`,
+      footerHtml: `<button class="primary-action" type="button" data-join-squad="${escapeHTML(data.id)}">Join squad</button>`
+    });
+  }
+  if (item.type === "skill") {
+    const data = item.data;
+    const profiles = typeof communityProfilesCacheSnapshot === "function" ? communityProfilesCacheSnapshot() : [];
+    const author = profiles.find((profile) => profile.id === data.user_id);
+    return feedCardShell({
+      type: item.type, id: item.id, eyebrow: `${data.type === "offered" ? "Offering" : "Needs"} - ${skillCategoryLabelForFeed(data.category)}`,
+      bodyHtml: `<h2 class="feed-card-title">${escapeHTML(author ? author.username : "Member")}</h2><p class="feed-card-body">${escapeHTML(data.note)}</p>`,
+      footerHtml: `<button class="primary-action" type="button" data-open="communityAccountabilityRequest" data-open-payload="${escapeHTML(data.user_id)}">Request connection</button>`
+    });
+  }
+  return "";
+}
+
+function feedScreenHeader() {
   return `
-    <div class="feed-card-inner feed-card-opportunity">
-      <span class="category-badge">${escapeHTML(item.category)}</span>
-      <h2 class="feed-card-title">${escapeHTML(item.title)}</h2>
-      <p class="feed-card-body">${escapeHTML(item.description)}</p>
-      <button class="primary-action" type="button" data-open-link="${escapeHTML(item.applyUrl)}">View opportunity</button>
-    </div>
+    <header class="screen-head compact-head community-head">
+      <div>
+        <p class="eyebrow">Discover</p>
+        <h2 class="screen-title">Opportunities and people, all in one stream.</h2>
+        <p class="screen-subtitle">Ranked by what's actually relevant to your saved goals - not a fixed list.</p>
+      </div>
+      <div class="avatar"><img src="assets/icon-support.png" alt=""></div>
+    </header>
   `;
 }
 
-function feedPrototypeModal() {
-  if (!feedPrototypeItems.length) feedPrototypeItems = feedPrototypeBuildItems();
-  const item = feedPrototypeItems[feedPrototypeIndex];
+function feedScreenContent() {
+  feedItems = feedBuildItems();
+  feedIndex = Math.min(feedIndex, Math.max(0, feedItems.length - 1));
+  const item = feedItems[feedIndex];
+  const signedIn = typeof hasCommunitySession === "function" && hasCommunitySession();
   return `
-    <div class="feed-proto-shell">
-      <button class="ghost-circle light feed-proto-close" type="button" data-close aria-label="Close">x</button>
+    <div class="feed-inline-shell">
+      ${!signedIn ? `
+        <div class="feed-signin-banner">
+          <span>Sign in to Community to see posts, squads, and skill exchange mixed in too.</span>
+          <button class="secondary-action compact-action" type="button" data-community-view-mode="browse">Sign in</button>
+        </div>
+      ` : ""}
       ${item ? `
         <div class="feed-swipe-card" data-swipe-mode="feed">
-          ${item.type === "post" ? feedPrototypePostCard(item.data) : feedPrototypeOpportunityCard(item.data)}
+          ${feedRenderCard(item)}
         </div>
       ` : `
         <div class="feed-swipe-card">
           <div class="feed-card-inner">
             <p class="feed-card-eyebrow">Feed</p>
-            <p class="feed-card-body">Nothing to show yet - sign in to Community for posts, or check back for more opportunities.</p>
+            <p class="feed-card-body">Nothing to show right now - check back soon.</p>
           </div>
         </div>
       `}
       <div class="feed-proto-side">
-        <button class="feed-proto-nav" type="button" data-feed-proto-prev ${feedPrototypeIndex === 0 ? "disabled" : ""} aria-label="Previous">&uarr;</button>
-        <span class="feed-proto-progress">${feedPrototypeItems.length ? `${feedPrototypeIndex + 1}/${feedPrototypeItems.length}` : "0/0"}</span>
-        <button class="feed-proto-nav" type="button" data-feed-proto-next ${!feedPrototypeItems.length || feedPrototypeIndex >= feedPrototypeItems.length - 1 ? "disabled" : ""} aria-label="Next">&darr;</button>
+        <button class="feed-proto-nav" type="button" data-feed-prev ${feedIndex === 0 ? "disabled" : ""} aria-label="Previous">&uarr;</button>
+        <span class="feed-proto-progress">${feedItems.length ? `${feedIndex + 1}/${feedItems.length}` : "0/0"}</span>
+        <button class="feed-proto-nav" type="button" data-feed-next ${!feedItems.length || feedIndex >= feedItems.length - 1 ? "disabled" : ""} aria-label="Next">&darr;</button>
       </div>
     </div>
   `;
 }
 
+function communityMergedScreen() {
+  return `
+    <div class="mirror-example-row mode-toggle-row community-mode-toggle">
+      <button type="button" class="${communityViewMode === "feed" ? "is-selected" : ""}" data-community-view-mode="feed">Feed</button>
+      <button type="button" class="${communityViewMode === "browse" ? "is-selected" : ""}" data-community-view-mode="browse">Browse</button>
+    </div>
+    ${communityViewMode === "feed"
+      ? feedScreenHeader() + feedScreenContent()
+      : (hasCommunitySession() ? communityAuthedScreen() : communityAuthGateScreen()) + communityBrowseOpportunitiesSection()}
+  `;
+}
+
+// Ported from the old standalone "opportunities" tab - Browse mode is the
+// deliberate-lookup escape hatch (search a specific category, not just take
+// what the feed ranks highest), so nothing from the old screen is lost,
+// just relocated under Browse.
+function communityBrowseOpportunitiesSection() {
+  return `
+    <section class="opportunity-hero-card">
+      <div>
+        <p class="eyebrow">Future builder</p>
+        <h3>Find the next door you can actually open.</h3>
+        <p>These are curated starting points, not individual postings - save what's useful, search real openings through trusted external sites, or ask Compass AI to recommend what fits your age, interests, goals, and career direction.</p>
+      </div>
+      ${opportunityStats()}
+    </section>
+    ${opportunityRecommendationCard()}
+    <div class="category-tabs opportunity-tabs">
+      ${opportunityCategories.map((category) => `
+        <button type="button" data-opportunity-category="${escapeHTML(category)}" class="${category === opportunityCategory ? "is-selected" : ""}">${escapeHTML(category)}</button>
+      `).join("")}
+    </div>
+    <div class="content-rail-title"><strong>${escapeHTML(opportunityCategory === "All" ? "All opportunities" : opportunityCategory)}</strong><span>${visibleOpportunities().length} items</span></div>
+    <div class="opportunity-feed">${opportunityCards()}</div>
+    ${communityOpportunitiesRail()}
+  `;
+}
+
 // Same low-level pointer-drag pattern as mountSwipeCard, adapted for
 // single-direction vertical paging instead of binary left/right - a feed
-// only ever has "next" / "back", not "yes" / "no".
+// only ever has "next" / "back", not "yes" / "no". Queries the whole
+// document (not modalLayer) since the feed now lives inline in screenRoot.
 function mountFeedSwipeCard() {
-  const card = modalLayer.querySelector('.feed-swipe-card[data-swipe-mode="feed"]');
-  if (!card) return;
+  const card = document.querySelector('.feed-swipe-card[data-swipe-mode="feed"]');
+  if (!card || card.dataset.feedSwipeMounted === "true") return;
+  card.dataset.feedSwipeMounted = "true";
   const threshold = 70;
   let dragging = false;
   let startY = 0;
   let dy = 0;
 
   function onPointerDown(event) {
+    // Cards contain real interactive buttons (View opportunity, Join squad,
+    // Save...). Without this check, setPointerCapture below grabs every
+    // pointerdown inside the card - including taps on those buttons - and
+    // their clicks never fire. Only start a drag when the tap didn't land
+    // on a button/link/input.
+    if (event.target.closest("button, a, input, textarea, select")) return;
     dragging = true;
     dy = 0;
     startY = event.clientY;
@@ -6113,9 +6394,9 @@ function mountFeedSwipeCard() {
     if (!dragging) return;
     dragging = false;
     card.classList.remove("is-dragging");
-    if (dy < -threshold && feedPrototypeIndex < feedPrototypeItems.length - 1) {
+    if (dy < -threshold && feedIndex < feedItems.length - 1) {
       await commit(1);
-    } else if (dy > threshold && feedPrototypeIndex > 0) {
+    } else if (dy > threshold && feedIndex > 0) {
       await commit(-1);
     } else {
       card.style.transform = "";
@@ -6126,8 +6407,8 @@ function mountFeedSwipeCard() {
     card.style.transform = "";
     card.classList.add(direction > 0 ? "is-exit-feed-up" : "is-exit-feed-down");
     await new Promise((resolve) => setTimeout(resolve, 180));
-    feedPrototypeIndex = Math.max(0, Math.min(feedPrototypeItems.length - 1, feedPrototypeIndex + direction));
-    if (isModalActive("feedPrototype")) openModal("feedPrototype");
+    feedIndex = Math.max(0, Math.min(feedItems.length - 1, feedIndex + direction));
+    if (activeTab === "community") renderScreen("community");
   }
 
   card.addEventListener("pointerdown", onPointerDown);
@@ -6466,24 +6747,54 @@ function archiveSelfDebt(debtId) {
   saveTrackerState();
 }
 
-function selfDebtCard(debt) {
-  const due = selfDebtIsDue(debt);
-  return `
-    <article class="community-card">
-      <div class="community-card-top">
-        <span class="category-badge">${escapeHTML(debt.status === "active" ? (due ? "Due" : "Active") : "Acknowledged")}</span>
-      </div>
-      <h3>${escapeHTML(debt.title)}</h3>
-      <p class="muted">${escapeHTML(selfDebtTriggerLabel(debt.triggerType))} - ${debt.triggerThresholdDays} days</p>
-      <div class="community-actions">
+// A debt's "pressure" is how close its real drift signal is to firing,
+// expressed on the same 0-100 weather scale Personal Weather already uses
+// (WEATHER_CONDITIONS) - so "70% pressure" and "overcast" are the same
+// number read two ways, not two separate systems.
+function selfDebtPressureRatio(debt) {
+  if (debt.status !== "active") return 0;
+  return Math.max(0, Math.min(1, selfDebtDriftDays(debt) / debt.triggerThresholdDays));
+}
+
+function selfDebtPressureCondition(ratio) {
+  return weatherConditionForScore(Math.round((1 - ratio) * 100));
+}
+
+function selfDebtPressureRow(debt) {
+  if (debt.status !== "active") {
+    return `
+      <div class="debt-pressure-row is-settled">
+        <div class="debt-pressure-row-head">
+          <strong>${escapeHTML(debt.title)}</strong>
+          <span>Acknowledged</span>
+        </div>
         <button class="secondary-action compact-action" type="button" data-archive-self-debt="${escapeHTML(debt.id)}">Delete</button>
       </div>
-    </article>
+    `;
+  }
+  const ratio = selfDebtPressureRatio(debt);
+  const pct = Math.round(ratio * 100);
+  const condition = selfDebtPressureCondition(ratio);
+  const level = WEATHER_CONDITIONS.indexOf(condition);
+  return `
+    <div class="debt-pressure-row">
+      <div class="debt-pressure-row-head">
+        <strong>${escapeHTML(debt.title)}</strong>
+        <span>${condition.icon} ${escapeHTML(condition.label)}</span>
+      </div>
+      <div class="debt-pressure-bar"><div class="debt-pressure-bar-fill" data-level="${level}" style="width:${pct}%"></div></div>
+      <p class="tiny-note">${escapeHTML(selfDebtTriggerLabel(debt.triggerType))} - ${pct}% toward the ${debt.triggerThresholdDays}-day threshold</p>
+      <button class="secondary-action compact-action" type="button" data-archive-self-debt="${escapeHTML(debt.id)}">Delete</button>
+    </div>
   `;
 }
 
 function selfDebtLedgerModal() {
   const debts = trackerState.selfDebts;
+  const active = debts.filter((debt) => debt.status === "active");
+  const overallRatio = active.length ? Math.max(...active.map(selfDebtPressureRatio)) : 0;
+  const overallCondition = selfDebtPressureCondition(overallRatio);
+  const overallLevel = WEATHER_CONDITIONS.indexOf(overallCondition);
   return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="self-debt-title">
       <div class="modal-top">
@@ -6492,9 +6803,18 @@ function selfDebtLedgerModal() {
       </div>
       <h3 id="self-debt-title">Pay your future self a debt</h3>
       <p class="muted">Write a commitment now. Compass says nothing about it until real drift actually shows up - then it collects, like an overdue notice, not a reminder.</p>
+      ${active.length ? `
+        <div class="pressure-gauge" data-level="${overallLevel}" style="--pressure: ${Math.round(overallRatio * 100)}">
+          <div class="pressure-gauge-center">
+            <strong>${overallCondition.icon}</strong>
+            <span>${escapeHTML(overallCondition.label)}</span>
+          </div>
+        </div>
+        <p class="tiny-note pressure-gauge-caption">Overall pressure across ${active.length} open debt${active.length === 1 ? "" : "s"} - same weather system as your Personal Weather forecast.</p>
+      ` : ""}
       <button class="primary-action compact-action" type="button" data-open="selfDebtNew">Open a new debt</button>
-      <div class="community-grid">
-        ${debts.length ? debts.map(selfDebtCard).join("") : `
+      <div class="debt-pressure-list">
+        ${debts.length ? debts.map(selfDebtPressureRow).join("") : `
           <section class="empty-feature">
             <img src="assets/icon-warning.png" alt="">
             <div><strong>No debts open yet</strong><p>Open one above.</p></div>
@@ -7748,7 +8068,7 @@ const screens = {
         { title: "Dream lifestyle", text: "Define balance, money, and health.", modal: "growthGoals", icon: "icon-balance.png" },
         { title: "Future Mirror", text: "Simulate decision impact.", tab: "future", icon: "icon-guide.png" },
         { title: "Life Simulator", text: "Explore adult-life choices in 3D.", tab: "simulator", icon: "icon-home.png" },
-        { title: "Opportunity Hub", text: "Find scholarships, internships, and skill paths.", tab: "opportunities", icon: "icon-money.png" },
+        { title: "Opportunity Hub", text: "Find scholarships, internships, and skill paths.", tab: "community", icon: "icon-money.png" },
         { title: "AI goal planning", text: "Turn dreams into next steps.", prompt: growthPromptFromData("a simple goal plan with one next action"), icon: "icon-chat.png" }
       ]
     })}
@@ -7882,47 +8202,7 @@ const screens = {
     </section>
   `,
 
-  opportunities: () => `
-    <header class="screen-head compact-head opportunity-head">
-      <div>
-        <p class="eyebrow">Opportunity Hub</p>
-        <h2 class="screen-title">Build your future outside the app.</h2>
-        <p class="screen-subtitle">Discover jobs, internships, scholarships, competitions, volunteering, and learn-to-earn paths.</p>
-      </div>
-      <div class="avatar"><img src="assets/icon-work.png" alt=""></div>
-    </header>
-
-    <section class="opportunity-hero-card">
-      <div>
-        <p class="eyebrow">Future builder</p>
-        <h3>Find the next door you can actually open.</h3>
-        <p>These are curated starting points, not individual postings - save what's useful, search real openings through trusted external sites, or ask Compass AI to recommend what fits your age, interests, goals, and career direction.</p>
-      </div>
-      ${opportunityStats()}
-    </section>
-
-    <section class="mirror-form-card">
-      <p class="eyebrow">Beta</p>
-      <h3>Try the new Feed</h3>
-      <p class="muted">Community posts and opportunities, mixed into one full-screen swipe-through stream - an early read-only prototype, not the final navigation.</p>
-      <button class="primary-action compact-action" type="button" data-open="feedPrototype">Open Feed (beta)</button>
-    </section>
-
-    ${opportunityRecommendationCard()}
-
-    <div class="category-tabs opportunity-tabs">
-      ${opportunityCategories.map((category) => `
-        <button type="button" data-opportunity-category="${escapeHTML(category)}" class="${category === opportunityCategory ? "is-selected" : ""}">${escapeHTML(category)}</button>
-      `).join("")}
-    </div>
-
-    <div class="content-rail-title"><strong>${escapeHTML(opportunityCategory === "All" ? "All opportunities" : opportunityCategory)}</strong><span>${visibleOpportunities().length} items</span></div>
-    <div class="opportunity-feed">${opportunityCards()}</div>
-
-    ${communityOpportunitiesRail()}
-  `,
-
-  community: () => (hasCommunitySession() ? communityAuthedScreen() : communityAuthGateScreen()),
+  community: () => communityMergedScreen(),
 
   stories: () => `
     <header class="screen-head compact-head inspire-head">
@@ -8359,13 +8639,12 @@ const modals = {
   juryTrial: () => juryTrialModal(),
   juryAppeal: () => juryAppealModal(),
 
-  selfArchaeology: (monthKey) => selfArchaeologyModal(monthKey),
+  selfArchaeology: () => selfArchaeologyModal(),
 
   advancedMode: () => advancedModeModal(),
 
   aiTraceLog: () => aiTraceLogModal(),
 
-  feedPrototype: () => feedPrototypeModal(),
 
   futureScanStation: (stationId) => {
     const station = FUTURE_SCAN_STATIONS.find((item) => item.id === stationId);
@@ -9429,6 +9708,7 @@ function renderScreen(tab) {
   }
   screenRoot.innerHTML = getScreen(tab);
   bindRenderedNavigation(screenRoot);
+  if (tab === "community") mountFeedSwipeCard();
   const navTab = tab === "assess" || tab === "compass" ? "home" : tab === "simulator" ? "growth" : tab;
   navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.tab === navTab));
   const activePortraitId = computeActivePortraitId(tab);
@@ -9518,17 +9798,17 @@ function openModal(name, payload) {
     juryError = "";
     isJuryLoading = false;
   }
+  if (name === "estateAuction" && !modalLayer.classList.contains("is-open")) {
+    estateAuctionSession = null;
+  }
   if (name === "selfArchaeology" && !modalLayer.classList.contains("is-open")) {
     archaeologyError = "";
     isArchaeologyLoading = false;
+    archaeologyExpandedKey = null;
   }
   if (name === "advancedMode" && !modalLayer.classList.contains("is-open")) {
     advancedModeError = "";
     isAdvancedModeLoading = false;
-  }
-  if (name === "feedPrototype" && !modalLayer.classList.contains("is-open")) {
-    feedPrototypeIndex = 0;
-    feedPrototypeItems = [];
   }
   if (name === "discoverYourself" && !modalLayer.classList.contains("is-open")) {
     blueprintActiveSession = 1;
@@ -9579,6 +9859,10 @@ function mountSwipeCard() {
   }
 
   function onPointerDown(event) {
+    // Same fix as mountFeedSwipeCard: the Skip/Yes buttons are real
+    // interactive children of this card - don't swallow their taps into a
+    // drag-start.
+    if (event.target.closest("button, a, input, textarea, select")) return;
     dragging = true;
     dx = 0;
     startX = event.clientX;
@@ -11622,15 +11906,21 @@ document.addEventListener("click", async (event) => {
   const askHiringFollowupButton = event.target.closest("[data-ask-hiring-followup]");
   const hireCandidateButton = event.target.closest("[data-hire-candidate]");
   const newHiringSessionButton = event.target.closest("[data-new-hiring-session]");
-  const runEstateAuctionButton = event.target.closest("[data-run-estate-auction]");
+  const beginEstateAuctionButton = event.target.closest("[data-begin-estate-auction]");
+  const callEstateLotButton = event.target.closest("[data-call-estate-lot]");
+  const nextEstateLotButton = event.target.closest("[data-next-estate-lot]");
+  const finalizeEstateAuctionButton = event.target.closest("[data-finalize-estate-auction]");
   const startJuryTrialButton = event.target.closest("[data-start-jury-trial]");
   const testifyJuryButton = event.target.closest("[data-testify-jury]");
   const submitJuryAppealButton = event.target.closest("[data-submit-jury-appeal]");
   const excavateStratumButton = event.target.closest("[data-excavate-stratum]");
+  const toggleStratumButton = event.target.closest("[data-toggle-stratum]");
   const runAdvancedModeButton = event.target.closest("[data-run-advanced-mode]");
   const toggleHubSectionButton = event.target.closest("[data-toggle-hub-section]");
-  const feedProtoPrevButton = event.target.closest("[data-feed-proto-prev]");
-  const feedProtoNextButton = event.target.closest("[data-feed-proto-next]");
+  const feedPrevButton = event.target.closest("[data-feed-prev]");
+  const feedNextButton = event.target.closest("[data-feed-next]");
+  const feedSaveButton = event.target.closest("[data-feed-save]");
+  const communityViewModeButton = event.target.closest("[data-community-view-mode]");
   const tryAdvancedFindingButton = event.target.closest("[data-try-advanced-finding]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
 
@@ -11809,8 +12099,20 @@ document.addEventListener("click", async (event) => {
     hiringError = "";
     openModal("futureSelfHiring");
   }
-  if (runEstateAuctionButton) {
-    runEstateAuction();
+  if (beginEstateAuctionButton) {
+    beginEstateAuction();
+    openModal("estateAuction");
+  }
+  if (callEstateLotButton) {
+    callEstateAuctionLot();
+    openModal("estateAuction");
+  }
+  if (nextEstateLotButton) {
+    advanceEstateAuctionLot();
+    openModal("estateAuction");
+  }
+  if (finalizeEstateAuctionButton) {
+    finalizeEstateAuction();
     openModal("estateAuction");
   }
   if (startJuryTrialButton) {
@@ -11838,6 +12140,10 @@ document.addEventListener("click", async (event) => {
   if (excavateStratumButton) {
     await excavateStratum(excavateStratumButton.dataset.excavateStratum);
   }
+  if (toggleStratumButton) {
+    toggleArchaeologyStratum(toggleStratumButton.dataset.toggleStratum);
+    openModal("selfArchaeology");
+  }
   if (runAdvancedModeButton) {
     await runAdvancedModeDiagnostic();
   }
@@ -11849,13 +12155,22 @@ document.addEventListener("click", async (event) => {
     expandedGrowthSections[id] = !expandedGrowthSections[id];
     renderScreen("growth");
   }
-  if (feedProtoPrevButton) {
-    feedPrototypeIndex = Math.max(0, feedPrototypeIndex - 1);
-    openModal("feedPrototype");
+  if (feedPrevButton) {
+    feedIndex = Math.max(0, feedIndex - 1);
+    renderScreen("community");
   }
-  if (feedProtoNextButton) {
-    feedPrototypeIndex = Math.min(feedPrototypeItems.length - 1, feedPrototypeIndex + 1);
-    openModal("feedPrototype");
+  if (feedNextButton) {
+    feedIndex = Math.min(feedItems.length - 1, feedIndex + 1);
+    renderScreen("community");
+  }
+  if (feedSaveButton) {
+    const [type, id] = String(feedSaveButton.dataset.feedSave || "").split(":");
+    toggleFeedSave(type, id);
+    renderScreen("community");
+  }
+  if (communityViewModeButton) {
+    communityViewMode = communityViewModeButton.dataset.communityViewMode === "browse" ? "browse" : "feed";
+    renderScreen("community");
   }
   if (sosGetHelpButton) {
     const textInput = modalLayer.querySelector("#sos-input-text");
@@ -12019,7 +12334,7 @@ document.addEventListener("click", async (event) => {
   }
   if (opportunityCategoryButton) {
     opportunityCategory = opportunityCategoryButton.dataset.opportunityCategory || "All";
-    renderScreen("opportunities");
+    renderScreen("community");
   }
   if (opportunityAi) {
     renderScreen("compass");
@@ -13002,7 +13317,7 @@ document.addEventListener("click", async (event) => {
       if (result.status === "blocked") {
         openModal("safety", result.reason);
       } else {
-        renderScreen("opportunities");
+        renderScreen("community");
       }
     } catch (err) {
       saveCommunityOpportunityButton.disabled = false;

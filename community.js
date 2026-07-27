@@ -871,7 +871,7 @@
   function communityOpportunitiesRail() {
     if (hasCommunitySession() && !communityDataLoaded && !communityDataLoading) {
       refreshCommunityData().then(() => {
-        if (window.activeTab === "opportunities" && typeof window.renderScreen === "function") window.renderScreen("opportunities");
+        if (window.activeTab === "community" && typeof window.renderScreen === "function") window.renderScreen("community");
       });
     }
     if (!hasCommunitySession()) {
@@ -1024,6 +1024,10 @@
   window.communityPostsCacheSnapshot = () => communityPostsCache;
   window.communitySquadMembersCacheSnapshot = () => communitySquadMembersCache;
   window.communityAccountabilityConnectionsSnapshot = () => communityAccountabilityConnectionsCache;
+  window.communitySquadsCacheSnapshot = () => communitySquadsCache;
+  window.communityOpportunitiesCacheSnapshot = () => communityOpportunitiesCache;
+  window.communitySkillTagsCacheSnapshot = () => communitySkillTagsCache;
+  window.communityProfilesCacheSnapshot = () => communityProfilesCache;
 
   window.getCommunityAuthMode = () => communityAuthMode;
   window.setCommunityAuthMode = (mode) => { communityAuthMode = mode; };

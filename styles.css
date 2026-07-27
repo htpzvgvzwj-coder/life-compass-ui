@@ -3046,25 +3046,35 @@ body.life-sim-active .sos-fab {
   font-weight: 600;
 }
 
-/* Feed prototype (P0) - deliberately full-bleed and dark, distinct from the
-   app's usual light modal chrome, since this is meant to feel like an
-   immersive stream, not another form screen. */
-.feed-proto-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
+/* The real merged Community x Opportunities feed - embedded inline in the
+   "community" screen (not a modal anymore), but still deliberately dark and
+   immersive against the app's usual light chrome, so it reads as a distinct
+   stream rather than another form screen. */
+.feed-inline-shell {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: radial-gradient(circle at 50% 18%, rgba(200, 169, 107, 0.2), transparent 55%), #0d0d0d;
-  padding: 24px 16px;
+  border-radius: 28px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 12%, rgba(200, 169, 107, 0.22), transparent 55%), #0d0d0d;
+  padding: 20px 16px 28px;
+  margin-top: 12px;
 }
 
-.feed-proto-close {
-  position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  left: 16px;
-  z-index: 2;
+.feed-signin-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 12px;
 }
 
 .feed-swipe-card[data-swipe-mode="feed"] {
@@ -3100,6 +3110,7 @@ body.life-sim-active .sos-fab {
 }
 
 .feed-card-inner {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -3177,6 +3188,346 @@ body.life-sim-active .sos-fab {
   color: rgba(255, 255, 255, 0.7);
   font-size: 11px;
   font-family: var(--font-sans);
+}
+
+.community-mode-toggle {
+  margin-bottom: 14px;
+}
+
+.feed-card-save {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 17px;
+  backdrop-filter: blur(4px);
+  transition: transform 150ms ease, background 150ms ease;
+}
+
+.feed-card-save.is-saved {
+  background: var(--color-danger);
+}
+
+.feed-card-save:active {
+  transform: scale(0.9);
+}
+
+/* Inherited Debugging: a real kanban board, not a flat list - each column
+   is its own visual lane so status reads spatially, plus a GitHub-style
+   contribution graph for merge activity. */
+.legacy-kanban-board {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 6px;
+}
+
+.legacy-kanban-column {
+  flex: 0 0 auto;
+  width: 150px;
+  scroll-snap-align: start;
+  border-radius: 16px;
+  background: var(--color-surface-soft);
+  padding: 10px;
+}
+
+.legacy-kanban-column-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.legacy-kanban-column-head span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-faint);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.legacy-kanban-column-body {
+  display: grid;
+  gap: 8px;
+}
+
+.legacy-kanban-card {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid rgba(26, 26, 26, 0.06);
+  border-radius: 12px;
+  background: var(--color-surface);
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(26, 26, 26, 0.06);
+  transition: transform 150ms ease;
+}
+
+.legacy-kanban-card:active {
+  transform: scale(0.96);
+}
+
+.legacy-kanban-card strong {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.legacy-kanban-card span {
+  font-size: 10px;
+  color: var(--color-muted);
+}
+
+.legacy-kanban-card small {
+  font-size: 9px;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.legacy-activity-graph {
+  margin: 10px 0;
+}
+
+.legacy-activity-cells {
+  display: flex;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.legacy-activity-cell {
+  width: 100%;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--color-faint);
+}
+
+.legacy-activity-cell[data-intensity="1"] { background: var(--color-mint-soft); }
+.legacy-activity-cell[data-intensity="2"] { background: color-mix(in srgb, var(--color-mint) 55%, var(--color-mint-soft)); }
+.legacy-activity-cell[data-intensity="3"] { background: color-mix(in srgb, var(--color-mint) 80%, transparent); }
+.legacy-activity-cell[data-intensity="4"] { background: var(--color-mint); }
+
+/* Self-Debt: a live pressure gauge instead of a static card list, reading
+   off the same 0-4 weather scale Personal Weather uses (WEATHER_CONDITIONS)
+   so the two features visibly share one signal. */
+.pressure-gauge {
+  position: relative;
+  width: 128px;
+  height: 128px;
+  margin: 16px auto 6px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--gauge-color, var(--color-mint)) calc(var(--pressure, 0) * 1%), var(--color-faint) 0);
+  transition: background 400ms ease;
+}
+
+.pressure-gauge[data-level="0"] { --gauge-color: var(--color-mint); }
+.pressure-gauge[data-level="1"] { --gauge-color: #8fc9e0; }
+.pressure-gauge[data-level="2"] { --gauge-color: #d9b35c; }
+.pressure-gauge[data-level="3"] { --gauge-color: #d98a4a; }
+.pressure-gauge[data-level="4"] { --gauge-color: #c95c4a; }
+
+.pressure-gauge::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: inset 0 2px 6px rgba(26, 26, 26, 0.08);
+}
+
+.pressure-gauge-center {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.pressure-gauge-center strong {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.pressure-gauge-center span {
+  font-size: 11px;
+  color: var(--color-muted);
+}
+
+.pressure-gauge-caption {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.debt-pressure-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.debt-pressure-row {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--color-surface-soft);
+}
+
+.debt-pressure-row.is-settled {
+  opacity: 0.6;
+}
+
+.debt-pressure-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.debt-pressure-row-head span {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.debt-pressure-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-faint);
+  overflow: hidden;
+}
+
+.debt-pressure-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 400ms ease;
+}
+
+.debt-pressure-bar-fill[data-level="0"] { background: var(--color-mint); }
+.debt-pressure-bar-fill[data-level="1"] { background: #8fc9e0; }
+.debt-pressure-bar-fill[data-level="2"] { background: #d9b35c; }
+.debt-pressure-bar-fill[data-level="3"] { background: #d98a4a; }
+.debt-pressure-bar-fill[data-level="4"] { background: #c95c4a; }
+
+/* Estate Auction: one lot on the block at a time, called through its own
+   going-once/going-twice/sold cadence instead of a one-shot list dump. */
+.auction-block {
+  position: relative;
+  margin: 14px 0;
+  padding: 18px 16px;
+  border-radius: 16px;
+  background: var(--color-surface-soft);
+  text-align: center;
+  overflow: hidden;
+}
+
+.auction-block.is-sold {
+  background: color-mix(in srgb, var(--color-mint) 14%, var(--color-surface-soft));
+}
+
+.auction-call-line {
+  margin-top: 8px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 15px;
+}
+
+.auction-sold-stamp {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 4px 14px;
+  border: 2px solid var(--color-mint);
+  border-radius: 6px;
+  color: var(--color-mint);
+  font-weight: 800;
+  letter-spacing: 2px;
+  transform: rotate(-6deg) scale(1.15);
+  animation: auctionStampIn 260ms ease;
+}
+
+@keyframes auctionStampIn {
+  from { opacity: 0; transform: rotate(-6deg) scale(1.6); }
+  to { opacity: 1; transform: rotate(-6deg) scale(1.15); }
+}
+
+/* Self Archaeology: a real stratigraphic cross-section - oldest month at
+   the bottom, band thickness/shade driven by actual artifact density -
+   instead of a flat list of month buttons. */
+.strata-column {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 3px;
+  margin-top: 14px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.strata-layer {
+  background: var(--earth-tone, #ded1b8);
+}
+
+.strata-layer[data-depth="0"] { --earth-tone: #e4d7bd; }
+.strata-layer[data-depth="1"] { --earth-tone: #d9c7a3; }
+.strata-layer[data-depth="2"] { --earth-tone: #cdb98d; }
+.strata-layer[data-depth="3"] { --earth-tone: #bfa878; }
+.strata-layer[data-depth="4"] { --earth-tone: #ad9464; }
+.strata-layer[data-depth="5"] { --earth-tone: #9a8153; }
+
+.strata-layer-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: #2c2416;
+  text-align: left;
+}
+
+.strata-layer.richness-trace .strata-layer-head { padding-block: 8px; opacity: 0.75; }
+.strata-layer.richness-sparse .strata-layer-head { padding-block: 10px; }
+.strata-layer.richness-moderate .strata-layer-head { padding-block: 14px; }
+.strata-layer.richness-rich .strata-layer-head { padding-block: 18px; font-weight: 600; }
+
+.strata-layer-label {
+  display: grid;
+  gap: 1px;
+}
+
+.strata-layer-label small {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.strata-layer-caret {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.strata-layer-body {
+  padding: 0 14px 16px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #2c2416;
+}
+
+.strata-layer-body .muted,
+.strata-layer-body .tiny-note {
+  color: #55492f;
 }
 
 .mood-reflection-label {
@@ -4634,22 +4985,6 @@ textarea {
 
 .story-reader-modal > .primary-action {
   margin-top: 14px;
-}
-
-.opportunity-head {
-  padding: 16px;
-  border-radius: 24px;
-  background:
-    linear-gradient(135deg, rgba(26, 26, 26, 0.93), rgba(52, 68, 34, 0.78)),
-    url("assets/bg-learn-feature.png");
-  background-size: cover;
-  background-position: center;
-  color: #fff;
-}
-
-.opportunity-head .screen-subtitle,
-.opportunity-head .eyebrow {
-  color: rgba(255, 255, 255, 0.76);
 }
 
 .opportunity-hero-card,
