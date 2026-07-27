@@ -3860,14 +3860,27 @@ body.life-sim-active .sos-fab {
   color: var(--color-ink);
 }
 
+/* Form/receipt archetype: paycheck and tax numbers look like the real
+   document they stand in for - tabular monospace figures, dashed tear
+   lines between rows, a ruled total instead of just larger text. */
+.paycheck-result-card {
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
 .paycheck-result-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px solid var(--color-faint);
-  font-size: 13px;
+  border-bottom: 1px dashed var(--color-line);
+  font-size: 12.5px;
+}
+
+.paycheck-result-row strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .paycheck-result-row:last-child {
@@ -3875,12 +3888,38 @@ body.life-sim-active .sos-fab {
 }
 
 .paycheck-result-final {
-  padding-top: 10px;
-  font-size: 15px;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 2px solid var(--color-ink);
+  border-bottom: none;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .paycheck-result-final strong {
-  color: var(--color-calm-ink, var(--color-ink));
+  color: var(--color-teal-strong);
+  font-size: 16px;
+  font-family: var(--font-mono);
+}
+
+/* Tax checklist: a filed obligation gets a stamp and a rule, same visual
+   language as the dossier exhibits, since it's the same "you've dealt
+   with this" idea applied to a form instead of a case file. */
+.tax-checklist > div {
+  position: relative;
+}
+
+.tax-checklist > div.is-unlocked {
+  border-left: 3px solid var(--color-teal);
+  background: var(--color-mint-soft);
+  border-radius: 0;
+}
+
+.tax-item-stamp {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  margin-left: 0;
 }
 
 .empty-state-card {
@@ -9254,6 +9293,35 @@ body {
   border: 1px solid var(--color-line);
   box-shadow: none;
 }
+
+/* Noticeboard archetype: squads/mentors/skill listings sit slightly
+   pinned and off-grid rather than perfectly uniform, like cards actually
+   pinned to a board over time. */
+.community-grid {
+  align-items: start;
+}
+
+.community-grid > .community-card {
+  position: relative;
+}
+
+.community-grid > .community-card::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 50%;
+  background: var(--color-amber);
+  box-shadow: 0 1px 2px rgba(20, 24, 26, 0.35);
+}
+
+.community-grid > .community-card:nth-child(4n+1) { transform: rotate(-0.6deg); }
+.community-grid > .community-card:nth-child(4n+2) { transform: rotate(0.5deg); }
+.community-grid > .community-card:nth-child(4n+3) { transform: rotate(-0.4deg); }
+.community-grid > .community-card:nth-child(4n+4) { transform: rotate(0.7deg); }
 
 .future-letter-card {
   background: var(--color-bg-deep);

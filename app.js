@@ -9363,13 +9363,13 @@ const modals = {
       </div>
       <button class="primary-action" type="button" data-calc-cost-of-living>Calculate</button>
       ${costOfLivingResult ? `
-        <div class="future-reflection-list">
-          ${costOfLivingResult.rows.map((row) => `<p class="tiny-note"><strong>${escapeHTML(row.label)}</strong>: $${row.range[0]}-${row.range[1]}/month</p>`).join("")}
+        <div class="resume-preview-card paycheck-result-card">
+          ${costOfLivingResult.rows.map((row) => `<div class="paycheck-result-row"><span>${escapeHTML(row.label)}</span><strong>$${row.range[0]}-${row.range[1]}/mo</strong></div>`).join("")}
+          <div class="paycheck-result-row paycheck-result-final"><span>Estimated total</span><strong>$${costOfLivingResult.total[0]}-${costOfLivingResult.total[1]}/mo</strong></div>
         </div>
-        <p class="muted"><strong>Estimated total: $${costOfLivingResult.total[0]}-${costOfLivingResult.total[1]}/month</strong></p>
-        <div class="future-reflection-list">
+        <div class="ledger-sheet">
           <p class="eyebrow">Often forgotten one-time costs</p>
-          ${COST_OF_LIVING_ONE_TIME_NOTES.map((note) => `<p class="tiny-note">${escapeHTML(note)}</p>`).join("")}
+          ${COST_OF_LIVING_ONE_TIME_NOTES.map((note) => `<p class="ledger-entry-note">${escapeHTML(note)}</p>`).join("")}
         </div>
       ` : ""}
     </div>
@@ -9387,12 +9387,13 @@ const modals = {
         </div>
         <h3 id="tax-obligations-title">What you're actually on the hook for</h3>
         <p class="muted">General information to help you understand your own filing obligations, based on how IRAS explains them - not tax advice, and this app never files or fills in anything for you. Check off items as you understand them; that's just for your own tracking.</p>
-        <p class="tiny-note">${done} of ${TAX_OBLIGATION_ITEMS.length} checked off</p>
-        <div class="advice-stack">
+        <p class="tiny-note desk-hero-eyebrow">${done} / ${TAX_OBLIGATION_ITEMS.length} filed</p>
+        <div class="advice-stack tax-checklist">
           ${TAX_OBLIGATION_ITEMS.map((item) => {
             const checked = !!trackerState.taxChecklist[item.id];
             return `
               <div class="${checked ? "is-unlocked" : ""}">
+                ${checked ? `<span class="exhibit-stamp tax-item-stamp">Filed</span>` : ""}
                 <strong>${escapeHTML(item.title)}</strong>
                 <span>${escapeHTML(item.why)}</span>
                 <ul class="tiny-note-list">
