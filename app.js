@@ -3714,10 +3714,21 @@ function reflectionCheckInStreak() {
   return consecutiveDayStreak(entries, (entry) => entry.createdAt);
 }
 
+// A tally row instead of an emoji chip - the streak reads as marks on a
+// sheet you've been keeping, not a gamified badge.
 function streakChipHTML(streakInfo, noun) {
-  if (streakInfo.streak <= 0) return `<span class="streak-chip is-fresh">🌟 Start your ${noun} streak today</span>`;
-  if (!streakInfo.checkedInToday) return `<span class="streak-chip is-at-risk">⚠️ ${streakInfo.streak}-day ${noun} streak - keep it alive today</span>`;
-  return `<span class="streak-chip is-active">🔥 ${streakInfo.streak}-day ${noun} streak</span>`;
+  const count = Math.max(0, streakInfo.streak);
+  const cells = 7;
+  const filled = Math.min(count, cells);
+  const label = count > 0
+    ? `${count}-day ${noun} streak${streakInfo.checkedInToday ? "" : " - not logged today"}`
+    : `Start your ${noun} streak today`;
+  return `
+    <div class="tally-row ${count > 0 && !streakInfo.checkedInToday ? "is-at-risk" : ""}">
+      <div class="tally-marks">${Array.from({ length: cells }).map((_, i) => `<span class="tally-mark ${i < filled ? "is-filled" : ""}"></span>`).join("")}</div>
+      <span class="tally-label">${escapeHTML(label)}</span>
+    </div>
+  `;
 }
 
 function energyLabel(score) {
@@ -5773,7 +5784,7 @@ function advancedModeModal() {
       ${report ? `
         <p class="tiny-note">Last run ${escapeHTML(new Date(report.generatedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</p>
         ${report.findings.length ? `
-          <div class="advice-stack">
+          <div class="advice-stack dossier-findings">
             ${report.findings.map((finding) => `
               <div>
                 <strong>${escapeHTML(finding.title)}</strong>
@@ -7718,6 +7729,19 @@ function futureScanClarifySection() {
   `;
 }
 
+// Dossier archetype: a station reads as a numbered exhibit in a case file -
+// "Filed" once it's actually been run, "Open" while it's still outstanding -
+// instead of a generic risk-pill badge.
+function futureScanStationCard(station, done) {
+  return `
+    <button class="wide-action exhibit-row" type="button" data-open="futureScanStation" data-open-payload="${escapeHTML(station.id)}">
+      <img src="assets/${escapeHTML(station.icon)}" alt="">
+      <span><strong>${escapeHTML(station.title)}</strong><small>${escapeHTML(station.blurb)}</small></span>
+      ${done ? `<span class="exhibit-stamp">Filed</span>` : `<span class="exhibit-pending">Open</span>`}
+    </button>
+  `;
+}
+
 function futureScanStationGrid() {
   if (!activeFutureScan) return "";
   return `
@@ -7731,16 +7755,7 @@ function futureScanStationGrid() {
         <p class="eyebrow future-scan-group-title">${escapeHTML(group.title)}</p>
         <p class="tiny-note future-scan-group-subtitle">${escapeHTML(group.subtitle)}</p>
         <div class="action-stack future-scan-grid">
-          ${FUTURE_SCAN_STATIONS.filter((station) => station.group === group.id).map((station) => {
-            const done = activeFutureScan.stations && activeFutureScan.stations[station.id];
-            return `
-              <button class="wide-action" type="button" data-open="futureScanStation" data-open-payload="${escapeHTML(station.id)}">
-                <img src="assets/${escapeHTML(station.icon)}" alt="">
-                <span><strong>${escapeHTML(station.title)}</strong><small>${escapeHTML(station.blurb)}</small></span>
-                ${done ? `<span class="risk-pill calm">Done</span>` : ""}
-              </button>
-            `;
-          }).join("")}
+          ${FUTURE_SCAN_STATIONS.filter((station) => station.group === group.id).map((station) => futureScanStationCard(station, activeFutureScan.stations && activeFutureScan.stations[station.id])).join("")}
         </div>
       </div>
     `).join("")}
@@ -7766,16 +7781,7 @@ function futureScanSuggestedSection() {
       <p class="eyebrow future-scan-group-title">Suggested for this</p>
       <p class="tiny-note future-scan-group-subtitle">Picked for this specific situation, not a fixed default.</p>
       <div class="action-stack future-scan-grid">
-        ${suggested.map((station) => {
-          const done = activeFutureScan.stations && activeFutureScan.stations[station.id];
-          return `
-            <button class="wide-action" type="button" data-open="futureScanStation" data-open-payload="${escapeHTML(station.id)}">
-              <img src="assets/${escapeHTML(station.icon)}" alt="">
-              <span><strong>${escapeHTML(station.title)}</strong><small>${escapeHTML(station.blurb)}</small></span>
-              ${done ? `<span class="risk-pill calm">Done</span>` : ""}
-            </button>
-          `;
-        }).join("")}
+        ${suggested.map((station) => futureScanStationCard(station, activeFutureScan.stations && activeFutureScan.stations[station.id])).join("")}
       </div>
     </div>
   `;
@@ -7794,14 +7800,14 @@ function futureScanSynthesisCard() {
   const synthesis = activeFutureScan.synthesis;
   const isStale = synthesis && synthesis.basedOn !== completedIds.join(",");
   return `
-    <div class="future-scan-synthesis-card">
+    <div class="future-scan-synthesis-card ${synthesis ? "is-filed" : ""}">
       ${synthesis ? `
-        <p class="eyebrow">Synthesis${isStale ? " - new results since this was generated" : ""}</p>
+        <p class="verdict-stamp">Case verdict${isStale ? " - new exhibits filed since" : ""}</p>
         <p><strong>${escapeHTML(synthesis.headline)}</strong></p>
         <p class="muted">${escapeHTML(synthesis.reading)}</p>
       ` : `
         <p class="eyebrow">Synthesis</p>
-        <p class="muted">You've run ${completedIds.length} stations on this situation - want the full picture instead of one at a time?</p>
+        <p class="muted">You've filed ${completedIds.length} exhibits on this situation - want the full picture instead of one at a time?</p>
       `}
       ${futureScanSynthesisError ? `<p class="form-error">${escapeHTML(futureScanSynthesisError)}</p>` : ""}
       <button class="secondary-action compact-action" type="button" data-run-scan-synthesis ${isFutureScanSynthesisLoading ? "disabled" : ""}>${isFutureScanSynthesisLoading ? "Synthesizing..." : synthesis ? (isStale ? "Refresh synthesis" : "Re-run synthesis") : "Generate synthesis"}</button>
@@ -8971,16 +8977,13 @@ const modals = {
       <button class="primary-action" type="button" data-save-mood>Save mood</button>
       ${trackerState.mood.entries.filter((entry) => entry.user_id === currentUserId()).length ? `
         <div class="content-rail-title"><strong>Recent reflections</strong><span></span></div>
-        <div class="future-reflection-list">
+        <div class="ledger-sheet">
           ${trackerState.mood.entries.filter((entry) => entry.user_id === currentUserId()).slice(0, 5).map((entry) => `
-            <article class="future-reflection-item">
-              <div>
-                <strong>${escapeHTML(entry.label)} - ${entry.score}/100</strong>
-                <p>${escapeHTML(entry.note)}</p>
-                ${entry.affectedChoice ? `<p class="tiny-note">Affected: ${escapeHTML(entry.affectedChoice)}</p>` : ""}
-                ${entry.tomorrowAdjustment ? `<p class="tiny-note">Adjustment: ${escapeHTML(entry.tomorrowAdjustment)}</p>` : ""}
-                <small>${escapeHTML(entry.display_time || "")}</small>
-              </div>
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(entry.display_time || "")} &middot; ${escapeHTML(entry.label)} &middot; ${entry.score}/100</p>
+              <p class="ledger-entry-text">${escapeHTML(entry.note)}</p>
+              ${entry.affectedChoice ? `<p class="ledger-entry-note">Affected: ${escapeHTML(entry.affectedChoice)}</p>` : ""}
+              ${entry.tomorrowAdjustment ? `<p class="ledger-entry-note">Adjustment: ${escapeHTML(entry.tomorrowAdjustment)}</p>` : ""}
             </article>
           `).join("")}
         </div>
@@ -9436,11 +9439,11 @@ const modals = {
         <textarea id="journal-entry-input" class="journal-input" placeholder="Today I noticed..."></textarea>
         <p class="form-error" id="journal-error" aria-live="polite"></p>
         <button class="primary-action" type="button" data-save-journal>Save journal entry</button>
-        <div class="journal-list">
+        <div class="ledger-sheet">
           ${entries.length ? entries.map((entry) => `
-            <article class="journal-entry">
-              <strong>${escapeHTML(entry.display_time)}</strong>
-              <p>${escapeHTML(entry.text)}</p>
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(entry.display_time)}</p>
+              <p class="ledger-entry-text">${escapeHTML(entry.text)}</p>
             </article>
           `).join("") : `
             <section class="empty-feature">

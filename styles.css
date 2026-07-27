@@ -2839,6 +2839,33 @@ h3 {
   background: var(--color-bg);
 }
 
+/* Dossier archetype: Advanced Mode findings read as numbered exhibits, not
+   generic advice bullets - scoped to this wrapper class only, since
+   .advice-stack itself is shared by many unrelated features. */
+.dossier-findings {
+  counter-reset: exhibit;
+}
+
+.dossier-findings > div {
+  position: relative;
+  border-radius: 0;
+  border-left: 3px solid var(--color-teal);
+  background: var(--color-surface);
+  padding-left: 14px;
+}
+
+.dossier-findings > div::before {
+  counter-increment: exhibit;
+  content: "Exhibit " counter(exhibit, decimal-leading-zero);
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+  margin-bottom: 4px;
+}
+
 .advice-stack strong,
 .advice-stack span {
   display: block;
@@ -3991,30 +4018,78 @@ textarea {
   filter: invert(1);
 }
 
-.streak-chip {
-  display: inline-flex;
+/* Ledger archetype: streaks read as marks on a tally sheet, entries read
+   as dated log lines - not gamified badges or a stack of cards. */
+.tally-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   margin: 8px 0 4px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.streak-chip.is-active {
-  background: #fdecc8;
-  color: #7a4b00;
-}
-
-.streak-chip.is-at-risk {
-  background: #fde3df;
-  color: #92352a;
-}
-
-.streak-chip.is-fresh {
+  padding: 8px 10px;
   background: var(--color-surface-soft);
-  color: var(--color-muted);
+  border-left: 3px solid var(--color-teal);
+}
+
+.tally-row.is-at-risk {
+  border-left-color: var(--color-amber);
+}
+
+.tally-marks {
+  display: flex;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.tally-mark {
+  width: 8px;
+  height: 14px;
+  background: var(--color-faint);
+}
+
+.tally-mark.is-filled {
+  background: var(--color-teal);
+}
+
+.tally-row.is-at-risk .tally-mark.is-filled {
+  background: var(--color-amber);
+}
+
+.tally-label {
+  font-size: 11.5px;
+  color: var(--color-ink-soft);
+  font-weight: 600;
+}
+
+.ledger-sheet {
+  display: grid;
+  margin-top: 14px;
+  border-top: 1px solid var(--color-line);
+}
+
+.ledger-entry {
+  padding: 12px 2px;
+  border-bottom: 1px dashed var(--color-line);
+}
+
+.ledger-entry-stamp {
+  margin: 0 0 4px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  color: var(--color-ink-faint);
+}
+
+.ledger-entry-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-ink);
+  line-height: 1.5;
+}
+
+.ledger-entry-note {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--color-ink-soft);
 }
 
 .mood-emoji-grid {
@@ -4978,9 +5053,9 @@ textarea {
   min-height: 138px;
   margin-top: 12px;
   padding: 12px;
-  border: 1px solid var(--color-faint);
-  border-radius: 20px;
-  background: #fff;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   resize: vertical;
 }
 
@@ -5557,7 +5632,54 @@ textarea {
 
 .future-scan-synthesis-card {
   border-radius: var(--radius-lg);
-  border-color: rgba(26, 26, 26, 0.1);
+  border-color: var(--color-line);
+  background: var(--color-surface);
+}
+
+.future-scan-synthesis-card.is-filed {
+  border-color: var(--color-teal);
+  background: var(--color-mint-soft);
+}
+
+/* Dossier archetype: exhibits get filed, not just "done". */
+.exhibit-row {
+  position: relative;
+}
+
+.exhibit-stamp,
+.exhibit-pending {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 2px;
+  white-space: nowrap;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.exhibit-stamp {
+  border: 1.2px solid var(--color-teal);
+  color: var(--color-teal-strong);
+  transform: rotate(-3deg);
+}
+
+.exhibit-pending {
+  color: var(--color-ink-faint);
+  border: 1px dashed var(--color-line);
+}
+
+.verdict-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-teal-strong);
+  margin: 0 0 2px;
 }
 
 .mirror-error-card {
