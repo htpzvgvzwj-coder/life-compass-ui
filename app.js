@@ -4663,11 +4663,12 @@ function skillGuideDetailModal(guideId) {
       </div>
       <h3 id="skill-guide-detail-title">${escapeHTML(guide.title)}</h3>
       <p class="muted">${escapeHTML(guide.summary)}</p>
-      <div class="ledger-sheet">
+      <div class="skill-step-list">
         ${guide.steps.map((step, index) => `
-          <label class="check-option skill-guide-step">
+          <label class="skill-step-row">
             <input type="checkbox" data-toggle-skill-guide-step="${escapeHTML(guide.id)}:${index}" ${progress.checkedSteps.includes(index) ? "checked" : ""}>
-            <span>${escapeHTML(step)}</span>
+            <span class="skill-step-box" aria-hidden="true"></span>
+            <span class="skill-step-text">${escapeHTML(step)}</span>
           </label>
         `).join("")}
       </div>
