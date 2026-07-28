@@ -4755,10 +4755,48 @@ function toggleSkillGuideStep(guideId, stepIndex) {
 // (see the reflection pattern-tags near legacyIssues, e.g. "conflict-avoidance")
 // rather than an AI call, so the very first thing a new user sees never
 // depends on a network round-trip.
+// Expanded from 5 to 13 categories (self-critique finding): the original
+// list only covered a fraction of what SKILL_GUIDES grew to, so most real
+// answers fell through to the generic Growth Hub fallback despite the
+// feature's whole promise being a specific first recommendation. Also fixes
+// a real mismatch the narrower version shipped with: Ghost Roommate's
+// personas (see GHOST_ROOMMATE_PERSONAS) are flatmates, not romantic
+// partners, so romantic-relationship wording now routes to the
+// end-a-relationship-well guide instead, and only literal roommate/flatmate
+// wording routes to Ghost Roommate. "rent" moved out of payslip's keywords
+// into renting's, since someone asking about renting a room almost never
+// means their payslip.
 const ONBOARDING_FEATURE_SUGGESTIONS = [
   {
-    id: "money",
-    keywords: ["money", "rent", "pay", "salary", "budget", "cpf", "tax", "debt", "credit", "bank", "financ"],
+    id: "cooking",
+    keywords: ["cook", "cooking", "meal", "recipe", "kitchen"],
+    label: "Cook one simple, real meal",
+    detail: "A meal you can actually make without a recipe app open the whole time.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "cook-simple-meal"
+  },
+  {
+    id: "laundry",
+    keywords: ["laundry", "washing machine", "wash my clothes"],
+    label: "Do laundry without ruining anything",
+    detail: "Reading a care label takes 10 seconds and saves your clothes.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "do-laundry"
+  },
+  {
+    id: "renting",
+    keywords: ["rent a room", "renting", "landlord", "tenancy", "lease", "moving out", "apartment", "flat hunting", "rental", " rent "],
+    label: "What to check before renting a room",
+    detail: "The questions that actually prevent a bad tenancy, not just \"is the room nice\".",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "before-renting-room"
+  },
+  {
+    id: "payslip",
+    keywords: ["payslip", "salary", "cpf", "tax", "paycheck", "wage", "take-home pay"],
     label: "Understand your own payslip",
     detail: "A Skill Guide that walks through every line on a real payslip, so a wrong number doesn't slip past you.",
     tab: "growth",
@@ -4766,14 +4804,74 @@ const ONBOARDING_FEATURE_SUGGESTIONS = [
     payload: "read-payslip"
   },
   {
-    id: "relationship",
-    keywords: ["relationship", "breakup", "break up", "partner", "boyfriend", "girlfriend", "family", "roommate", "flatmate", "friend"],
+    id: "first-aid",
+    keywords: ["first aid", "injury", "bleeding", "burned", "burnt my", "wound", "hospital", "clinic"],
+    label: "Basic first aid at home",
+    detail: "The handful of things worth actually knowing before you need them.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "basic-first-aid"
+  },
+  {
+    id: "sim-plan",
+    keywords: ["sim card", "phone plan", "phone bill", "mobile plan", "telco"],
+    label: "Choosing a SIM or phone plan",
+    detail: "What actually matters versus what's just marketing.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "choosing-sim-plan"
+  },
+  {
+    id: "job-offer",
+    keywords: ["job offer", "contract", "employer", "career", "interview", "resume", "cv", "internship"],
+    label: "Reading a job offer before you sign",
+    detail: "The contract clauses that matter more than the salary number at the top.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "read-job-offer"
+  },
+  {
+    id: "breakup",
+    keywords: ["breakup", "break up", "ex-girlfriend", "ex-boyfriend", "boyfriend", "girlfriend", "partner", "dating", "dump"],
+    label: "Ending a relationship without ghosting or blowing up",
+    detail: "The difference between a clean ending and a mess that follows you both around.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "end-a-relationship-well"
+  },
+  {
+    id: "civic",
+    keywords: ["vote", "voting", "election", "national service", "civic", "town council"],
+    label: "Voting and the civic duties you'll actually run into",
+    detail: "What's automatic, what you have to act on yourself, and what's just internet noise.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "civic-duties-basics"
+  },
+  {
+    id: "credit",
+    keywords: ["credit card", "loan", "debt", "interest rate", "borrow money"],
+    label: "Getting your first credit card or line of credit right",
+    detail: "The habits that decide whether credit becomes a tool or a trap.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "first-credit-line"
+  },
+  {
+    id: "roommate",
+    keywords: ["roommate", "flatmate", "housemate", "living with someone", "share a room", "shared flat"],
     label: "Living with someone (Ghost Roommate)",
     detail: "A relationship that remembers, week after week - practice the hard conversations here before they happen for real.",
     tab: "growth",
     open: "ghostRoommate",
     payload: ""
   },
+  // "mind" and "decision" deliberately checked last: their keywords (stress,
+  // stuck, confused, unsure...) are generic emotional/mental-state words
+  // that commonly co-occur with a more specific topic above (e.g. "living
+  // with my roommate is stressful" should route to roommate, not mind) -
+  // putting them last means a concrete topic always wins the match first,
+  // and these only catch answers that never named a concrete topic at all.
   {
     id: "mind",
     keywords: ["stress", "anxious", "anxiety", "mental", "lonely", "overwhelmed", "burnout", "sad", "depress"],
@@ -4791,15 +4889,6 @@ const ONBOARDING_FEATURE_SUGGESTIONS = [
     tab: "growth",
     open: "juryTrial",
     payload: ""
-  },
-  {
-    id: "job",
-    keywords: ["job", "career", "work", "interview", "resume", "cv", "internship"],
-    label: "Reading a job offer before you sign",
-    detail: "The contract clauses that matter more than the salary number at the top.",
-    tab: "growth",
-    open: "skillGuideDetail",
-    payload: "read-job-offer"
   }
 ];
 
