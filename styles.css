@@ -2473,6 +2473,8 @@ h3 {
 
 .modal-card {
   width: min(100%, 360px);
+  max-height: min(88vh, 790px);
+  overflow: auto;
   padding: 20px;
   border-radius: var(--radius-xl);
   background: #fff;

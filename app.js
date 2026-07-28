@@ -1980,19 +1980,8 @@ function compassProfileForAI() {
   return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, cleanText(value, 900)]).filter(([, value]) => value));
 }
 
-function hasCompassProfile() {
-  return Object.keys(compassProfileForAI()).length > 0;
-}
-
 function userInitial() {
   return escapeHTML(((userProfile.username || "S").trim().charAt(0) || "S").toUpperCase());
-}
-
-function greetingWord() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
 }
 
 function formatCurrency(value) {
@@ -2045,18 +2034,6 @@ function hideAuth() {
 
 function featureEnabled(key) {
   return settingsState.features[key] !== false;
-}
-
-function featureCard({ title, text, icon, tab, modal, adminOnly = false }) {
-  if (adminOnly && !isAdmin()) return "";
-  const action = tab ? `data-tab-jump="${tab}"` : `data-open="${modal}"`;
-  return `
-    <button class="feature-card" type="button" ${action}>
-      <img src="assets/${icon}" alt="">
-      <span>${title}</span>
-      <p>${text}</p>
-    </button>
-  `;
 }
 
 const growthChallenges = [
@@ -2836,46 +2813,6 @@ function homeLedgerRows(skipKind) {
         </button>
       `).join("")}
     </div>
-  `;
-}
-
-function todayChoiceCard() {
-  const latest = trackerState.futureMirror && trackerState.futureMirror.latest;
-  return `
-    <section class="today-choice-card">
-      <div>
-        <p class="eyebrow">Today's Choice</p>
-        <h3>${latest ? escapeHTML(latest.question) : "What decision is asking for your attention?"}</h3>
-        <p>${latest ? "Review your latest simulated paths or run a new mirror before choosing." : "Try one decision question and compare possible short-term and long-term impact."}</p>
-      </div>
-      <button class="secondary-action compact-action" type="button" data-tab-jump="future">${latest ? "View mirror" : "Start"}</button>
-    </section>
-  `;
-}
-
-function growthProgressHomeSummary() {
-  const latest = latestRealMoodEntry();
-  const mission = todayMission();
-  const completed = todayMissionProgress();
-  return `
-    <section class="home-summary-card">
-      <p class="eyebrow">Reflection progress</p>
-      <div class="home-summary-grid">
-        <span><strong>${weeklyMissionCount()}</strong>Week wins</span>
-        <span><strong>${trackerState.journalEntries.filter((entry) => entry.user_id === currentUserId()).length}</strong>Journal</span>
-        <span><strong>${latest ? Number(latest.score) : trackerState.mood.score}</strong>Energy</span>
-      </div>
-      ${mission ? `
-        <div class="home-mission-mini">
-          <div>
-            <strong>${escapeHTML(mission.title)}</strong>
-            <p>${escapeHTML(completed ? "Nice. You completed today's mission." : mission.description)}</p>
-          </div>
-          <button class="${completed ? "secondary-action" : "primary-action"} compact-action" type="button" data-complete-mission ${completed ? "disabled" : ""}>${completed ? "Done" : "Mark done"}</button>
-        </div>
-      ` : ""}
-      <button class="text-action" type="button" data-tab-jump="future">Open Future Mirror</button>
-    </section>
   `;
 }
 
@@ -4185,22 +4122,6 @@ function lifeVersePresentationPause(kind = "soft", duration = 420) {
       }, 180);
     }, duration);
   });
-}
-
-function growthHubPreviewCard() {
-  return `
-    <section class="growth-preview-card">
-      <div>
-        <p class="eyebrow">Growth Hub preview</p>
-        <h3>Goals, reflection, opportunities, and lessons.</h3>
-        <p>Keep building the person your future choices are pointing toward.</p>
-      </div>
-      <div class="growth-preview-actions">
-        <button class="secondary-action compact-action" type="button" data-tab-jump="future">Future Mirror</button>
-        <button class="secondary-action compact-action" type="button" data-tab-jump="stories">Inspire Hub</button>
-      </div>
-    </section>
-  `;
 }
 
 const FUTURE_SELF_HORIZONS = [
@@ -5881,8 +5802,16 @@ function archiveGhostRoommateStint(state) {
 
 function roommateStintStats() {
   const history = trackerState.roommateStintHistory || [];
-  const conflictCount = history.filter((stint) => stint.endedReason === "conflict").length;
-  return { total: history.length, conflictCount };
+  // Bug fix: a relationship that just broke down (resolveGhostRoommateWeek
+  // sets active:false + moveOutReason) isn't archived into history until the
+  // player actually clicks "Move out" or picks someone new - without this,
+  // the persona-picker screen would undercount by exactly one right at the
+  // moment it matters most: immediately after a fresh breakdown.
+  const live = trackerState.ghostRoommate;
+  const pending = (live && live.personaId && !live.active && live.moveOutReason) ? [{ endedReason: "conflict" }] : [];
+  const combined = [...pending, ...history];
+  const conflictCount = combined.filter((stint) => stint.endedReason === "conflict").length;
+  return { total: combined.length, conflictCount };
 }
 
 async function moveInGhostRoommate(personaId) {
@@ -9791,7 +9720,8 @@ const screens = {
         { title: "Future Readiness Assessment", text: "Adulthood, decisions, money, resilience, well-being, and self-awareness.", modal: "assessment", icon: "icon-assessment.png" },
         { title: "Journal", text: "Write what happened and what you learned.", modal: "journal", icon: "icon-learn.png" },
         { title: "Self Archaeology", text: "Dig up an old month of entries as a field report, not nostalgia.", modal: "selfArchaeology", icon: "icon-time.png", kind: "practice" },
-        { title: "AI reflection insight", text: "Ask Compass to find one pattern.", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png" }
+        { title: "AI reflection insight", text: "Ask Compass to find one pattern.", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png" },
+        { title: "Discuss your mirror safely", text: "Share a reflection prompt with a trusted peer, mentor, or your Support Circle.", modal: "growthCommunity", icon: "icon-support.png" }
       ]
     })}
 
@@ -10700,6 +10630,7 @@ const modals = {
       <label class="mood-reflection-label">What did it affect - a choice, a conversation, your plans?<textarea id="mood-affected" aria-label="What it affected" placeholder="Optional"></textarea></label>
       <label class="mood-reflection-label">How will you adjust tomorrow?<textarea id="mood-adjustment" aria-label="Tomorrow's adjustment" placeholder="Optional"></textarea></label>
       <button class="primary-action" type="button" data-save-mood>Save mood</button>
+      ${trackerState.moodSuggestion ? `<button class="secondary-action compact-action" type="button" data-open="moodGuidance">See your suggestion</button>` : ""}
       ${trackerState.mood.entries.filter((entry) => entry.user_id === currentUserId()).length ? `
         <div class="content-rail-title"><strong>Recent reflections</strong><span></span></div>
         <div class="ledger-sheet">
