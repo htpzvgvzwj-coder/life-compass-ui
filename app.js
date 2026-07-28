@@ -4599,6 +4599,92 @@ const SKILL_GUIDES = [
       "Know how to check your own usage so a surprise bill doesn't happen.",
       "Know the cancellation process and any early-termination fee before you sign up."
     ]
+  },
+  {
+    id: "read-job-offer",
+    title: "Reading a job offer before you sign",
+    category: "Work",
+    summary: "The lines that matter more than the salary number at the top.",
+    steps: [
+      "Check the basic salary versus the total package - allowances, bonuses, and CPF are separate from your monthly cash salary; don't confuse the headline number with what lands in your account.",
+      "Read the notice period both ways - how much notice you owe them, and whether it's the same length if they let you go.",
+      "Check if there's a training bond or liability clause - some jobs require you to repay training costs if you leave within a set period.",
+      "Confirm your actual job scope in writing, not just the job title - a vague scope makes it easy for work to quietly get added later.",
+      "Check leave entitlement (annual, sick, and any other type) - Singapore's legal minimum isn't generous, so know exactly what you're getting.",
+      "Ask what happens during probation - notice period is often shorter, and confirmation isn't always automatic.",
+      "Don't sign the same day you receive it - a real offer survives you taking a day or two to read it properly."
+    ]
+  },
+  {
+    id: "end-a-relationship-well",
+    title: "Ending a relationship without ghosting or blowing up",
+    category: "Relationships",
+    summary: "The difference between a clean ending and a mess that follows you both around.",
+    steps: [
+      "Decide before the conversation what you actually want to say - a vague reason found in the moment tends to hurt more than a clear, honest one.",
+      "Have the conversation in person or by call if the relationship was serious - a text is for a few dates, not months or years.",
+      "Say it plainly instead of softening it into confusion - \"I don't want to continue this\" is kinder long-term than a fade-out that leaves someone waiting.",
+      "Expect them to be upset and let them be, without trying to argue them out of their reaction.",
+      "Don't relitigate the decision after it's made - reopening it to feel better yourself just extends their pain.",
+      "Sort out shared practical things (belongings, shared accounts, mutual friends) directly and early, not through other people.",
+      "Give yourself and them real space afterward - checking in \"as friends\" immediately usually serves your guilt, not their healing."
+    ]
+  },
+  {
+    id: "build-support-before-crisis",
+    title: "Building support before you're in crisis",
+    category: "Mind",
+    summary: "The SOS button is for emergencies - this is for the months before you'd ever need it.",
+    steps: [
+      "Name one person you'd actually call at 2am if things got bad, and check that assumption with them instead of just assuming it.",
+      "Know the difference between venting to a friend and needing a professional - ongoing changes in mood, sleep, or appetite are signs to see someone trained, not just talk it out.",
+      "Save a low-cost or free counselling option now (school counsellor, community health, a helpline) before you need it urgently - looking it up mid-crisis is much harder.",
+      "Notice your own early warning signs - what you tend to do differently in the weeks before you feel really low - so you can catch it earlier next time.",
+      "Build one small, boring routine that doesn't depend on motivation, like a regular sleep time or one meal you always eat - it holds you up when everything else feels like too much.",
+      "Tell at least one person your actual state sometimes, not just \"I'm fine\" - isolation is what turns a bad week into a bad month."
+    ]
+  },
+  {
+    id: "civic-duties-basics",
+    title: "Voting and the civic duties you'll actually run into",
+    category: "Civic",
+    summary: "What's automatic, what you have to act on yourself, and what's just internet noise.",
+    steps: [
+      "Check your voter registration when you turn 21 - most citizens are auto-registered, but your address on record needs to match where you actually live.",
+      "Update your registered address with ICA whenever you move - it affects your polling station and other official correspondence, not just voting.",
+      "Know that voting is compulsory in Singapore - missing an election without a valid reason means you'll need to re-register before you can vote again.",
+      "If you receive an official notice for jury-adjacent civic service, like being called as a witness, respond to it properly - ignoring it has real consequences, unlike a random text.",
+      "Keep your particulars updated with the relevant authority if you have an NS liability, even after ORD - reservist matters follow your actual NRIC address, not wherever you used to live.",
+      "Know what your Town Council and MP's Meet-the-People sessions are actually for, so you know where to raise a real local issue instead of just posting about it."
+    ]
+  },
+  {
+    id: "first-credit-line",
+    title: "Getting your first credit card or line of credit right",
+    category: "Money",
+    summary: "The habits that decide whether credit becomes a tool or a trap.",
+    steps: [
+      "Understand that paying only the \"minimum sum\" still charges interest on the rest - credit card interest in Singapore is typically far higher than any savings account pays you.",
+      "Set up full auto-payment from your bank account if you can, so you're never late by accident.",
+      "Treat your credit limit as not your money - a higher limit just means the bank thinks you're a safe bet, not that you can afford more.",
+      "Check the annual fee and whether it's waived for the first year only or ongoing - a \"free\" card can start charging you later.",
+      "Track what you've charged during the month, not just at the statement date - it's easy to lose track between purchases and the bill arriving.",
+      "If you ever can't pay the full bill, pay more than the minimum if at all possible and stop using the card until it's cleared - the debt compounds faster than most people expect."
+    ]
+  },
+  {
+    id: "roommate-conflict",
+    title: "Resolving a conflict with a roommate or flatmate",
+    category: "Housing",
+    summary: "How to fix the actual problem instead of just getting quietly resentful.",
+    steps: [
+      "Name the specific behavior, not the person's character - \"the dishes sit for days\" lands better than \"you're messy\".",
+      "Raise it early and directly instead of letting it build - a small annoyance mentioned once is easier to hear than three months of silent frustration coming out at once.",
+      "Pick a normal, calm moment to talk, not right after the thing that annoyed you happened.",
+      "Agree on a concrete, specific fix together, like a chore schedule or a quiet-hours cutoff, rather than a vague \"let's be better about it\".",
+      "Write down shared agreements on rent, bills, and chores somewhere both of you can see, so \"I thought we agreed\" arguments have an actual reference.",
+      "If the same issue keeps coming back after you've raised it clearly, treat that as your answer about whether the living situation actually works long-term."
+    ]
   }
 ];
 
