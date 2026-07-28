@@ -1,4 +1,35 @@
-﻿const screenRoot = document.querySelector("#screen-root");
+﻿// Voice guide (self-critique finding): Compass deliberately does not use one
+// flat tone - a feature built for roleplay drama and a feature built to teach
+// laundry shouldn't sound the same, and forcing them to would flatten what
+// makes each one work. Every feature belongs to exactly one of three lanes;
+// pick the lane a new feature's actual job matches, don't invent a fourth.
+//
+//   Direct/Utilitarian - Skill Guides, Real Due Dates, payslip/tax content,
+//     onboarding. Plain, short sentences. No metaphor, no roleplay framing.
+//   Reflective/Analytical - Judgment Calibration, Progress, Your Story,
+//     Career Studio's scoring surfaces. Explains its own reasoning; treats
+//     the user as capable of following the logic, not just the verdict.
+//   Dramatic/Roleplay - Jury Duty, Ghost Roommate, Estate Auction, Future
+//     Mirror's stations. Committed to its bit (courtroom, tenancy, auction
+//     house) rather than breaking character to explain itself.
+//
+// Ground rules that hold underneath all three lanes, regardless of register:
+//   - Always second person ("you"), never third person about the user.
+//   - No fake-AI cheeriness or exclamation marks used as enthusiasm filler.
+//   - Concrete and Singapore-grounded over generic ("CPF contribution", not
+//     "your retirement savings"; "S$5", not "a small amount" when a number
+//     is knowable).
+//   - Errors state what broke and what to do about it - never apologize,
+//     never say just "Something went wrong."
+// These four hold across every lane because they're about respecting the
+// user, not about register - a courtroom can still be concrete and specific.
+//
+// The lane split matters for feature *content* (titles, body copy, roleplay
+// dialogue). It intentionally does NOT apply to shared chrome - modal close
+// buttons, generic error/loading/empty states - which should read the same
+// everywhere regardless of which lane the surrounding feature is in, since
+// that's the text users actually compare side by side.
+const screenRoot = document.querySelector("#screen-root");
 const modalLayer = document.querySelector("#modal-layer");
 const authLayer = document.querySelector("#onboarding-layer");
 const authForm = document.querySelector("#onboarding-form");
@@ -34,7 +65,7 @@ const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you aug
 const FUTURE_SELF_SYSTEM_PROMPT = "You are the Future Self module inside Compass's Future Mirror. You write a vivid, specific, first-person, present-tense scene of what the user's future self might be living, grounded only in their real saved data. This is never a prediction - always conditional (\"if you continue,\" \"this path suggests,\" \"you may be\"), never deterministic (\"you will be\"). Prioritize a vivid narrated scene over a dry stat summary - vividness is what makes this effective, not certainty. Be honest about low confidence when the user's saved data is thin rather than fabricating specific detail to sound impressive.";
 const DETERMINISTIC_PHRASES = ["you will be", "you will have", "you'll be", "you'll have", "you are going to be", "guaranteed", "definitely will"];
 const COMMUNITY_COMPOSE_ASSIST_SYSTEM_PROMPT = "You help reword a single Community post for a youth self-growth app so it is kinder, clearer, and safer to publish. Keep the same meaning and rough length. Remove any full name, address, school schedule, phone number, or password. Do not add new claims or advice that wasn't already implied. Reply with only the reworded post text, no preamble, no quotes, no markdown.";
-const COMPASS_API_ERROR = "Sorry, Compass AI is having trouble responding right now. Please try again.";
+const COMPASS_API_ERROR = "Couldn't reach Compass AI right now. Please try again.";
 const COMPASS_API_URL = window.location.protocol === "file:" ? "http://localhost:5179/api/compass-chat" : "/api/compass-chat";
 
 // Future Scan station catalog - all 10 stations are fully implemented; each
@@ -557,7 +588,16 @@ const defaultTrackerState = {
   archaeologyDigs: [],
   advancedModeReports: [],
   aiTraces: [],
-  savedFeedItems: []
+  savedFeedItems: [],
+  // Cold-start onboarding (self-critique finding): a brand-new user with zero
+  // data previously landed straight on a generic Today's Desk fallback with
+  // no context for what Compass is or where to start. This is a one-time,
+  // skippable first-run sequence shown right after character creation only -
+  // see firstRunOnboardingModal() and suggestOnboardingFeature(). completedAt
+  // is stamped the moment the sequence opens (not when it's finished), so any
+  // dismissal path - Skip, the real suggestion, or the modal's own close
+  // button - counts as "seen" and it never reopens.
+  onboarding: { completedAt: null, seedAnswer: "" }
 };
 
 const dailyMissions = [
@@ -1113,6 +1153,9 @@ let buildTrainingDraft = "";
 let assessmentStep = 0;
 let assessmentDraft = { answers: {}, freeText: "", preferences: [] };
 
+let onboardingStep = 1;
+let onboardingAnswerDraft = "";
+
 // Discover Yourself (Future Mirror bible Ch.3) - three short sessions rather
 // than one long form, each producing a new Blueprint version. Personality/
 // motivation/learning/work/decision fields are scenario-based ("what do you
@@ -1306,7 +1349,8 @@ function normalizeTrackerState(state) {
     archaeologyDigs: Array.isArray(state.archaeologyDigs) ? state.archaeologyDigs : [],
     advancedModeReports: Array.isArray(state.advancedModeReports) ? state.advancedModeReports : [],
     aiTraces: Array.isArray(state.aiTraces) ? state.aiTraces : [],
-    savedFeedItems: Array.isArray(state.savedFeedItems) ? state.savedFeedItems : []
+    savedFeedItems: Array.isArray(state.savedFeedItems) ? state.savedFeedItems : [],
+    onboarding: (state.onboarding && typeof state.onboarding === "object") ? { ...fallback.onboarding, ...state.onboarding } : fallback.onboarding
   };
 }
 
@@ -1796,7 +1840,7 @@ async function submitBackupPassphrase() {
     }
   } catch (error) {
     console.error("[Backup] Passphrase action failed", error);
-    backupPassphraseError = mode === "import" || mode === "cloudRestore" ? "Wrong passphrase, or this backup is corrupted." : "Something went wrong. Please try again.";
+    backupPassphraseError = mode === "import" || mode === "cloudRestore" ? "Wrong passphrase, or this backup is corrupted." : "Couldn't encrypt and save this backup right now. Please try again.";
   } finally {
     backupPassphraseBusy = false;
     if (backupPassphraseError) openModal("backupPassphrase");
@@ -4704,6 +4748,133 @@ function toggleSkillGuideStep(guideId, stepIndex) {
   saveTrackerState();
 }
 
+// First-run onboarding (self-critique finding): the app had months of
+// returning-user depth work but zero cold-start design - a brand-new user
+// with no data saw only the generic Today's Desk fallback. This keyword
+// match follows the same literal-keyword idiom already used elsewhere
+// (see the reflection pattern-tags near legacyIssues, e.g. "conflict-avoidance")
+// rather than an AI call, so the very first thing a new user sees never
+// depends on a network round-trip.
+const ONBOARDING_FEATURE_SUGGESTIONS = [
+  {
+    id: "money",
+    keywords: ["money", "rent", "pay", "salary", "budget", "cpf", "tax", "debt", "credit", "bank", "financ"],
+    label: "Understand your own payslip",
+    detail: "A Skill Guide that walks through every line on a real payslip, so a wrong number doesn't slip past you.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "read-payslip"
+  },
+  {
+    id: "relationship",
+    keywords: ["relationship", "breakup", "break up", "partner", "boyfriend", "girlfriend", "family", "roommate", "flatmate", "friend"],
+    label: "Living with someone (Ghost Roommate)",
+    detail: "A relationship that remembers, week after week - practice the hard conversations here before they happen for real.",
+    tab: "growth",
+    open: "ghostRoommate",
+    payload: ""
+  },
+  {
+    id: "mind",
+    keywords: ["stress", "anxious", "anxiety", "mental", "lonely", "overwhelmed", "burnout", "sad", "depress"],
+    label: "Building support before you're in crisis",
+    detail: "A Skill Guide on setting up real support before you need it urgently - the SOS button is only for the emergency itself.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "build-support-before-crisis"
+  },
+  {
+    id: "decision",
+    keywords: ["decide", "decision", "stuck", "confused", "choice", "choose", "unsure", "not sure"],
+    label: "Put a real decision on trial (Jury Duty)",
+    detail: "Prosecution, defense, and an honest verdict on whether you actually have enough clarity to decide yet.",
+    tab: "growth",
+    open: "juryTrial",
+    payload: ""
+  },
+  {
+    id: "job",
+    keywords: ["job", "career", "work", "interview", "resume", "cv", "internship"],
+    label: "Reading a job offer before you sign",
+    detail: "The contract clauses that matter more than the salary number at the top.",
+    tab: "growth",
+    open: "skillGuideDetail",
+    payload: "read-job-offer"
+  }
+];
+
+function suggestOnboardingFeature(answerText) {
+  const text = (answerText || "").toLowerCase();
+  const match = ONBOARDING_FEATURE_SUGGESTIONS.find((entry) => entry.keywords.some((keyword) => text.includes(keyword)));
+  return match || {
+    id: "general",
+    label: "Growth Hub",
+    detail: "Everything here starts the same way: pick one small, real thing and start there.",
+    tab: "growth",
+    open: null,
+    payload: ""
+  };
+}
+
+function captureOnboardingDraft() {
+  const textarea = modalLayer.querySelector("#onboarding-answer-input");
+  if (textarea) onboardingAnswerDraft = textarea.value;
+}
+
+function firstRunOnboardingModal() {
+  if (onboardingStep === 1) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="first-run-onboarding-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Step 1 of 3</span>
+          <button class="ghost-circle" type="button" data-skip-onboarding aria-label="Skip">x</button>
+        </div>
+        <h3 id="first-run-onboarding-title">Compass, in one line</h3>
+        <p class="muted">A place to practice the parts of being an adult nobody rehearses with you first - real decisions, real skills, real follow-through - before they happen for real.</p>
+        <button class="primary-action" type="button" data-onboarding-next>Continue</button>
+      </div>
+    `;
+  }
+  if (onboardingStep === 2) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="first-run-onboarding-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Step 2 of 3</span>
+          <button class="ghost-circle" type="button" data-skip-onboarding aria-label="Skip">x</button>
+        </div>
+        <h3 id="first-run-onboarding-title">One real question first</h3>
+        <p class="muted">What's one thing about being an adult you're not sure you're ready for? Answer in your own words - it shapes what we show you next.</p>
+        <div class="admin-form">
+          <label>
+            <textarea id="onboarding-answer-input" maxlength="200" placeholder="Example: I don't actually know how my payslip works">${escapeHTML(onboardingAnswerDraft)}</textarea>
+          </label>
+        </div>
+        <div class="assessment-footer">
+          <button class="secondary-action" type="button" data-onboarding-back>Back</button>
+          <button class="primary-action" type="button" data-onboarding-next>Continue</button>
+        </div>
+      </div>
+    `;
+  }
+  const suggestion = suggestOnboardingFeature(onboardingAnswerDraft);
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="first-run-onboarding-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Step 3 of 3</span>
+        <button class="ghost-circle" type="button" data-skip-onboarding aria-label="Skip">x</button>
+      </div>
+      <h3 id="first-run-onboarding-title">Start with this one</h3>
+      <p class="muted">${escapeHTML(suggestion.detail)}</p>
+      <div class="wide-action">
+        <img src="assets/icon-checkin.png" alt="">
+        <span><strong>${escapeHTML(suggestion.label)}</strong></span>
+      </div>
+      <button class="primary-action" type="button" data-onboarding-finish data-onboarding-tab="${escapeHTML(suggestion.tab)}" data-onboarding-open="${escapeHTML(suggestion.open || "")}" data-onboarding-payload="${escapeHTML(suggestion.payload || "")}">Try it now</button>
+      <button class="secondary-action compact-action" type="button" data-skip-onboarding>Skip, take me to Home</button>
+    </div>
+  `;
+}
+
 function skillGuidesModal() {
   return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="skill-guides-title">
@@ -6839,7 +7010,7 @@ async function testifyToJury(answer) {
     }
   } catch (error) {
     console.error("[Jury Trial] testimony round failed", error);
-    juryError = "Something went wrong mid-trial. Please try again.";
+    juryError = "Couldn't get the next round of testimony right now. Please try again.";
   } finally {
     isJuryLoading = false;
     if (isModalActive("juryTrial")) openModal("juryTrial");
@@ -9548,6 +9719,8 @@ async function loadObjaverseCredits() {
 }
 
 const modals = {
+  firstRunOnboarding: () => firstRunOnboardingModal(),
+
   username: () => `
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="username-title">
       <div class="modal-top">
@@ -11114,6 +11287,15 @@ function openModal(name, payload) {
   // from a previously failed station bleeds into the next station's modal.
   if (name === "futureScanStation" && !modalLayer.classList.contains("is-open")) {
     futureScanStationError = "";
+  }
+  if (name === "firstRunOnboarding" && !modalLayer.classList.contains("is-open")) {
+    onboardingStep = 1;
+    onboardingAnswerDraft = "";
+    // Stamped on open, not on finish/skip - every dismissal path (the x
+    // button, backdrop click, Skip, or the real suggestion) should count as
+    // "seen" so this sequence never opens a second time for the same user.
+    trackerState.onboarding.completedAt = new Date().toISOString();
+    saveTrackerState();
   }
   modalLayer.innerHTML = getModal(name, payload) || "";
   modalLayer.classList.add("is-open");
@@ -13304,6 +13486,7 @@ if (openingNarrativeContinueButton) {
     hideOpeningNarrative();
     renderScreen("home");
     refreshStaticScreens();
+    if (!trackerState.onboarding.completedAt) openModal("firstRunOnboarding");
   });
 }
 
@@ -13374,6 +13557,10 @@ document.addEventListener("click", async (event) => {
   const readinessAi = event.target.closest("[data-readiness-ai]");
   const nextAssessment = event.target.closest("[data-next-assessment]");
   const prevAssessment = event.target.closest("[data-prev-assessment]");
+  const onboardingNext = event.target.closest("[data-onboarding-next]");
+  const onboardingBack = event.target.closest("[data-onboarding-back]");
+  const skipOnboarding = event.target.closest("[data-skip-onboarding]");
+  const finishOnboarding = event.target.closest("[data-onboarding-finish]");
   const prevBlueprintStepButton = event.target.closest("[data-prev-blueprint-step]");
   const swipeTapButton = event.target.closest("[data-swipe-tap]");
   const answerBlueprintScenarioButton = event.target.closest("[data-answer-blueprint-scenario]");
@@ -14135,6 +14322,31 @@ document.addEventListener("click", async (event) => {
     captureAssessmentDraft();
     assessmentStep = Math.max(0, assessmentStep - 1);
     openModal("assessment");
+  }
+
+  if (onboardingNext) {
+    captureOnboardingDraft();
+    onboardingStep = Math.min(3, onboardingStep + 1);
+    openModal("firstRunOnboarding");
+  }
+
+  if (onboardingBack) {
+    captureOnboardingDraft();
+    onboardingStep = Math.max(1, onboardingStep - 1);
+    openModal("firstRunOnboarding");
+  }
+
+  if (skipOnboarding) {
+    closeModal();
+  }
+
+  if (finishOnboarding) {
+    const targetTab = finishOnboarding.dataset.onboardingTab;
+    const targetOpen = finishOnboarding.dataset.onboardingOpen;
+    const targetPayload = finishOnboarding.dataset.onboardingPayload || "";
+    closeModal();
+    if (targetTab) renderScreen(targetTab);
+    if (targetOpen) openModal(targetOpen, targetPayload);
   }
 
   if (submitAssessment) {
