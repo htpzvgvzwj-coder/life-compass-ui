@@ -597,7 +597,23 @@ const defaultTrackerState = {
   // is stamped the moment the sequence opens (not when it's finished), so any
   // dismissal path - Skip, the real suggestion, or the modal's own close
   // button - counts as "seen" and it never reopens.
-  onboarding: { completedAt: null, seedAnswer: "" }
+  onboarding: { completedAt: null, seedAnswer: "" },
+  // "Real consequences" (self-critique finding): Ghost Roommate and Jury
+  // Duty both used to discard every episode's outcome the moment it ended -
+  // a relationship breakdown wiped trackerState.ghostRoommate back to a
+  // blank slate, and a decision could be re-litigated endlessly with no
+  // record. These two arrays are permanent, independent of the live episode
+  // state (same pattern as calibrationRecords vs the live checkBack
+  // station) - see archiveGhostRoommateStint() and deliverJuryVerdict().
+  roommateStintHistory: [],
+  juryVerdictHistory: [],
+  // Habit-chain break reflection (self-critique finding): habitChainStats()
+  // only ever showed a number - when a streak broke, nothing asked why, so
+  // the user never practiced diagnosing their own broken structure. See
+  // pendingChainBreakReflection(). lastAcknowledgedBreakDate prevents the
+  // same break being asked about twice.
+  habitChainReflections: [],
+  lastAcknowledgedBreakDate: null
 };
 
 const dailyMissions = [
@@ -1350,7 +1366,11 @@ function normalizeTrackerState(state) {
     advancedModeReports: Array.isArray(state.advancedModeReports) ? state.advancedModeReports : [],
     aiTraces: Array.isArray(state.aiTraces) ? state.aiTraces : [],
     savedFeedItems: Array.isArray(state.savedFeedItems) ? state.savedFeedItems : [],
-    onboarding: (state.onboarding && typeof state.onboarding === "object") ? { ...fallback.onboarding, ...state.onboarding } : fallback.onboarding
+    onboarding: (state.onboarding && typeof state.onboarding === "object") ? { ...fallback.onboarding, ...state.onboarding } : fallback.onboarding,
+    roommateStintHistory: Array.isArray(state.roommateStintHistory) ? state.roommateStintHistory : fallback.roommateStintHistory,
+    juryVerdictHistory: Array.isArray(state.juryVerdictHistory) ? state.juryVerdictHistory : fallback.juryVerdictHistory,
+    habitChainReflections: Array.isArray(state.habitChainReflections) ? state.habitChainReflections : fallback.habitChainReflections,
+    lastAcknowledgedBreakDate: state.lastAcknowledgedBreakDate || null
   };
 }
 
@@ -1685,6 +1705,19 @@ function growthTimelineEvents() {
   SKILL_GUIDES.forEach((guide) => {
     const progress = skillGuideProgress(guide.id);
     if (progress.completedAt) events.push({ at: progress.completedAt, label: `Completed the "${guide.title}" guide`, detail: "Skill Guide" });
+  });
+  (trackerState.roommateStintHistory || []).forEach((stint) => {
+    events.push({
+      at: stint.endedAt,
+      label: `${stint.personaName} moved out after ${stint.weeksLived} week${stint.weeksLived === 1 ? "" : "s"}`,
+      detail: stint.endedReason === "conflict" ? "Ghost Roommate - relationship broke down" : "Ghost Roommate - ended on your terms"
+    });
+  });
+  (trackerState.juryVerdictHistory || []).forEach((verdict) => {
+    events.push({ at: verdict.deliveredAt, label: `Jury verdict on "${cleanText(verdict.decision, 60)}"`, detail: cleanText(verdict.ruling, 120) });
+  });
+  (trackerState.habitChainReflections || []).forEach((reflection) => {
+    events.push({ at: reflection.recordedAt, label: "Named what broke a streak", detail: cleanText(reflection.answer, 120) || "Don't Break the Chain" });
   });
   return events.sort((a, b) => new Date(b.at) - new Date(a.at));
 }
@@ -2128,9 +2161,48 @@ function habitChainStats(cells) {
   return { current, longest };
 }
 
+// "Self-generated structure" (self-critique finding): a broken chain used
+// to be purely a number resetting to 0 - nothing ever asked why, so the
+// user never practiced the actual skill of diagnosing their own broken
+// structure. Scans backward from yesterday (today isn't "failed" until
+// it's over) and flags the most recent active->inactive transition within
+// the last 2 weeks, stopping immediately if yesterday was already active -
+// an old, already-recovered-from break isn't worth dredging up.
+function pendingChainBreakReflection() {
+  const cells = habitChainDays(14);
+  const todayKey = dateKey(new Date());
+  for (let i = cells.length - 1; i >= 1; i--) {
+    if (cells[i].key === todayKey) continue;
+    if (cells[i].active) return null;
+    if (!cells[i].active && cells[i - 1].active) {
+      return cells[i].key === trackerState.lastAcknowledgedBreakDate ? null : { brokeOnDate: cells[i].key };
+    }
+  }
+  return null;
+}
+
+function saveChainBreakReflection(brokeOnDate, answer) {
+  const clean = cleanText(answer, 200);
+  if (clean) {
+    trackerState.habitChainReflections = [
+      { brokeOnDate, answer: clean, recordedAt: new Date().toISOString() },
+      ...(trackerState.habitChainReflections || [])
+    ].slice(0, 50);
+  }
+  trackerState.lastAcknowledgedBreakDate = brokeOnDate;
+  saveTrackerState();
+}
+
+function skipChainBreakReflection(brokeOnDate) {
+  trackerState.lastAcknowledgedBreakDate = brokeOnDate;
+  saveTrackerState();
+}
+
 function habitChainGraph() {
   const cells = habitChainDays(84);
   const stats = habitChainStats(cells);
+  const breakReflection = pendingChainBreakReflection();
+  const recentReflections = (trackerState.habitChainReflections || []).slice(0, 3);
   return `
     <div class="legacy-activity-graph habit-chain-graph">
       <div class="modal-action-row">
@@ -2141,6 +2213,20 @@ function habitChainGraph() {
         ${cells.map((cell) => `<span class="habit-chain-cell ${cell.active ? "is-active" : ""}" title="${escapeHTML(cell.key)}${cell.active ? " - showed up" : ""}"></span>`).join("")}
       </div>
       <p class="tiny-note">Counts a day if you checked in on mood or wrote a journal entry - the two things here with a real daily timestamp.</p>
+      ${breakReflection ? `
+        <div class="admin-form chain-break-reflection">
+          <label>Your streak broke on ${escapeHTML(new Date(`${breakReflection.brokeOnDate}T00:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }))}. What got in the way?<textarea id="chain-break-reflection-input" maxlength="200" placeholder="Optional - one honest line"></textarea></label>
+          <div class="modal-actions-row">
+            <button class="secondary-action compact-action" type="button" data-skip-chain-reflection="${escapeHTML(breakReflection.brokeOnDate)}">Skip</button>
+            <button class="primary-action compact-action" type="button" data-save-chain-reflection="${escapeHTML(breakReflection.brokeOnDate)}">Save</button>
+          </div>
+        </div>
+      ` : ""}
+      ${recentReflections.length ? `
+        <div class="advice-stack">
+          ${recentReflections.map((reflection) => `<div><strong>${escapeHTML(new Date(`${reflection.brokeOnDate}T00:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }))}</strong><span>${escapeHTML(reflection.answer)}</span></div>`).join("")}
+        </div>
+      ` : ""}
     </div>
   `;
 }
@@ -5018,10 +5104,51 @@ function skillGuideDetailModal(guideId) {
           </label>
         `).join("")}
       </div>
+      ${(() => {
+        // "Support network isn't automatically assigned" (self-critique
+        // finding): this specific step used to be a bare checkbox,
+        // completely disconnected from the real Support Circle contact
+        // list - checking it proved nothing. If it's checked but no real
+        // contact has ever been saved, say so plainly instead of letting
+        // the checkbox lie.
+        if (guide.id !== "build-support-before-crisis" || !progress.checkedSteps.includes(0)) return "";
+        const hasContact = trackerState.supportContacts.some((contact) => contact.user_id === currentUserId() || !contact.user_id);
+        if (hasContact) return "";
+        return `
+          <div class="tiny-note desk-hero-connection">
+            You checked this off, but your Support Circle is still empty.
+            <button class="text-action" type="button" data-open="supportEditor">Actually add them</button>
+          </div>
+        `;
+      })()}
       ${progress.completedAt ? `<p class="verdict-stamp">Completed</p>` : ""}
       <button class="secondary-action compact-action" type="button" data-open="skillGuides">Back to guides</button>
     </div>
   `;
+}
+
+// "Support network isn't automatically assigned" (self-critique finding):
+// supportContacts used to be an inert address book - add someone, and
+// Compass never brought it up again. Two gentle, honest triggers: the
+// circle has been empty for a while (past the first few onboarding days),
+// or every saved contact is established (14+ days old, so a contact you
+// just added isn't held against you) and none has been messaged in 30+
+// days. Never fires on day one - onboarding.completedAt is the age anchor.
+function pendingSupportNetworkNudge() {
+  const myId = currentUserId();
+  const contacts = trackerState.supportContacts.filter((contact) => contact.user_id === myId || !contact.user_id);
+  const daysSince = (iso) => (iso ? (Date.now() - new Date(iso).getTime()) / 86400000 : Infinity);
+  if (!contacts.length) {
+    return daysSince(trackerState.onboarding.completedAt) >= 3
+      ? { label: "Your Support Circle is still empty", detail: "Add one real person you'd actually reach out to" }
+      : null;
+  }
+  const allEstablished = contacts.every((contact) => daysSince(contact.created_at) >= 14);
+  const mostRecentMessageAt = contacts.reduce((latest, contact) => Math.max(latest, contact.lastMessagedAt ? new Date(contact.lastMessagedAt).getTime() : 0), 0);
+  if (allEstablished && daysSince(mostRecentMessageAt ? new Date(mostRecentMessageAt).toISOString() : null) >= 30) {
+    return { label: "It's been a while since you reached out to your Support Circle", detail: "30+ days since you last messaged anyone there" };
+  }
+  return null;
 }
 
 // Unified Inbox: every "waiting for a response" mechanism used to fire
@@ -5047,6 +5174,8 @@ function pendingInboxItems() {
   dueForResurfacing().forEach((entry) => {
     items.push({ kind: "resurface", label: cleanText(entry.content, 100), detail: "Worth another look", entry });
   });
+  const supportNudge = pendingSupportNetworkNudge();
+  if (supportNudge) items.push({ kind: "supportNetwork", label: supportNudge.label, detail: supportNudge.detail });
   return items;
 }
 
@@ -5056,6 +5185,7 @@ function inboxModal() {
   const selfDebtItems = items.filter((item) => item.kind === "selfDebt");
   const roommateItems = items.filter((item) => item.kind === "roommate");
   const resurfaceItems = items.filter((item) => item.kind === "resurface").slice(0, 8);
+  const supportNetworkItems = items.filter((item) => item.kind === "supportNetwork");
   return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="inbox-title">
       <div class="modal-top">
@@ -5102,6 +5232,13 @@ function inboxModal() {
                 <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:resolved">Resolved</button>
                 <button class="text-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:snooze">Not now</button>
               </div>
+            </article>
+          `).join("")}
+          ${supportNetworkItems.map((item) => `
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
+              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
+              <button class="secondary-action compact-action" type="button" data-open="supportCircle">Open Support Circle</button>
             </article>
           `).join("")}
         </div>
@@ -5720,7 +5857,39 @@ function ghostRoommateRelationshipLabel(score) {
   return "Rocky";
 }
 
+// "Real consequences" (self-critique finding): a stint used to just vanish
+// the moment it ended - relationship collapsed or the player moved out,
+// and trackerState.ghostRoommate was blown away with no record. This
+// captures the outcome into a permanent history before that happens, so a
+// pattern (e.g. repeatedly ending in conflict) is visible instead of
+// silently resetting to a clean slate every time. Safe to call on an empty
+// or already-inactive state - it only archives if a real stint happened.
+function archiveGhostRoommateStint(state) {
+  if (!state || !state.personaId) return;
+  const persona = ghostRoommatePersona(state);
+  trackerState.roommateStintHistory = [
+    {
+      personaName: persona.name,
+      weeksLived: state.week || 0,
+      finalRelationship: state.relationship,
+      endedReason: state.moveOutReason ? "conflict" : "voluntary",
+      endedAt: new Date().toISOString()
+    },
+    ...(trackerState.roommateStintHistory || [])
+  ].slice(0, 30);
+}
+
+function roommateStintStats() {
+  const history = trackerState.roommateStintHistory || [];
+  const conflictCount = history.filter((stint) => stint.endedReason === "conflict").length;
+  return { total: history.length, conflictCount };
+}
+
 async function moveInGhostRoommate(personaId) {
+  // Archive whatever stint is already sitting here first - covers the case
+  // where a relationship already broke down (active:false) but the player
+  // never explicitly clicked "Move out" before choosing someone new.
+  archiveGhostRoommateStint(trackerState.ghostRoommate);
   const persona = GHOST_ROOMMATE_PERSONAS.find((item) => item.id === personaId) || GHOST_ROOMMATE_PERSONAS[0];
   ghostRoommateLoading = true;
   ghostRoommateError = "";
@@ -5826,6 +5995,7 @@ async function startNextGhostRoommateWeek() {
 }
 
 function moveOutGhostRoommate() {
+  archiveGhostRoommateStint(trackerState.ghostRoommate);
   trackerState.ghostRoommate = { active: false, personaId: null, startedAt: null, week: 0, relationship: 60, history: [], moveOutReason: "", currentWeek: null };
   saveTrackerState();
 }
@@ -5842,6 +6012,11 @@ function ghostRoommateModal() {
         <h3 id="ghost-roommate-title">Move in with someone</h3>
         <p class="muted">Not a one-off roleplay - this relationship remembers, and it keeps going week after week until you move out.</p>
         ${state && state.moveOutReason ? `<p class="tiny-note">${escapeHTML(state.moveOutReason)}</p>` : ""}
+        ${(() => {
+          const stats = roommateStintStats();
+          if (stats.total < 2) return "";
+          return `<p class="tiny-note desk-hero-connection">${stats.conflictCount} of your last ${stats.total} roommates moved out because of conflict.</p>`;
+        })()}
         <div class="action-stack">
           ${GHOST_ROOMMATE_PERSONAS.map((persona) => `
             <button class="wide-action" type="button" data-move-in-roommate="${escapeHTML(persona.id)}">
@@ -7113,6 +7288,15 @@ async function deliverJuryVerdict(session) {
     ruling: parsed && parsed.ruling ? cleanText(parsed.ruling, 200) : "The court needs a clearer record before ruling - consider testifying further.",
     reasoning: parsed && parsed.reasoning ? cleanText(parsed.reasoning, 400) : ""
   };
+  // "Real consequences" (self-critique finding): nothing used to stop a
+  // decision being re-litigated indefinitely until the verdict felt better -
+  // this permanent record (independent of the 20-session live-trial cap) is
+  // what juryTrialModal's decision-input screen reads to make that pattern
+  // visible to the user themselves, instead of quietly enabling it.
+  trackerState.juryVerdictHistory = [
+    { decision: session.decision, ruling: session.verdict.ruling, deliveredAt: new Date().toISOString() },
+    ...(trackerState.juryVerdictHistory || [])
+  ].slice(0, 50);
   saveTrackerState();
 }
 
@@ -7255,6 +7439,12 @@ function juryTrialModal() {
         </div>
         <h3 id="jury-title">Put a real decision on trial</h3>
         <p class="muted">The Judge only asks questions and never advises. Prosecution and Defense genuinely argue against and for it. The verdict won't tell you what to choose - it rules on whether you actually have enough clarity to decide yet.</p>
+        ${trackerState.juryVerdictHistory.length ? `
+          <p class="tiny-note desk-hero-connection">You've put ${trackerState.juryVerdictHistory.length} decision${trackerState.juryVerdictHistory.length === 1 ? "" : "s"} on trial before. Re-trying the same one over and over instead of acting on a verdict is itself worth noticing.</p>
+          <div class="advice-stack">
+            ${trackerState.juryVerdictHistory.slice(0, 2).map((verdict) => `<div><strong>${escapeHTML(cleanText(verdict.decision, 60))}</strong><span>${escapeHTML(verdict.ruling)}</span></div>`).join("")}
+          </div>
+        ` : ""}
         <div class="admin-form">
           <label>What decision are you stuck on?<textarea id="jury-decision-input" maxlength="300" placeholder="Example: Whether to take the internship offer or stay in school full-time"></textarea></label>
         </div>
@@ -13782,6 +13972,8 @@ document.addEventListener("click", async (event) => {
   const toggleStratumButton = event.target.closest("[data-toggle-stratum]");
   const runAdvancedModeButton = event.target.closest("[data-run-advanced-mode]");
   const toggleHubSectionButton = event.target.closest("[data-toggle-hub-section]");
+  const saveChainReflectionButton = event.target.closest("[data-save-chain-reflection]");
+  const skipChainReflectionButton = event.target.closest("[data-skip-chain-reflection]");
   const feedPrevButton = event.target.closest("[data-feed-prev]");
   const feedNextButton = event.target.closest("[data-feed-next]");
   const feedSaveButton = event.target.closest("[data-feed-save]");
@@ -14018,6 +14210,15 @@ document.addEventListener("click", async (event) => {
   if (toggleHubSectionButton) {
     const id = toggleHubSectionButton.dataset.toggleHubSection;
     expandedGrowthSections[id] = !expandedGrowthSections[id];
+    renderScreen("growth");
+  }
+  if (saveChainReflectionButton) {
+    const input = screenRoot.querySelector("#chain-break-reflection-input");
+    saveChainBreakReflection(saveChainReflectionButton.dataset.saveChainReflection, input ? input.value : "");
+    renderScreen("growth");
+  }
+  if (skipChainReflectionButton) {
+    skipChainBreakReflection(skipChainReflectionButton.dataset.skipChainReflection);
     renderScreen("growth");
   }
   if (feedPrevButton) {
@@ -15412,6 +15613,11 @@ document.addEventListener("click", async (event) => {
   if (messageContact) {
     const contact = trackerState.supportContacts.find((item) => item.id === messageContact.dataset.messageContact && (item.user_id === currentUserId() || !item.user_id));
     if (contact) {
+      // Best-effort signal for pendingSupportNetworkNudge() - clicking
+      // through doesn't prove the message was actually sent, but it's a
+      // real intent-to-reach-out timestamp, which is what the nudge needs.
+      contact.lastMessagedAt = new Date().toISOString();
+      saveTrackerState();
       const raw = contact.phone.trim();
       const digits = raw.replace(/[^\d]/g, "");
       if (contact.preferred_contact_method === "WhatsApp" && digits) {
