@@ -9234,14 +9234,7 @@ const screens = {
       items: [
         { title: "Discover Yourself", text: "Build your Personal Blueprint - the foundation for everything else here.", modal: "discoverYourself", icon: "icon-profile.png" },
         { title: "Life Roadmap", text: "Turn a goal into concrete monthly milestones.", modal: "roadmapView", icon: "icon-time.png" },
-        { title: "Personal goals", text: "Write what you want to build.", modal: "growthGoals", icon: "icon-spark.png" },
-        { title: "Vision Board", text: "Collect your direction in one place.", modal: "growthGoals", icon: "icon-stories.png" },
-        { title: "Dream university", text: "Save your study direction.", modal: "growthGoals", icon: "icon-assessment.png" },
-        { title: "Dream career", text: "Name the work life you want.", modal: "growthGoals", icon: "icon-work.png" },
-        { title: "Dream lifestyle", text: "Define balance, money, and health.", modal: "growthGoals", icon: "icon-balance.png" },
-        { title: "Future Mirror", text: "Simulate decision impact.", tab: "future", icon: "icon-guide.png" },
-        { title: "Life Simulator", text: "Explore adult-life choices in 3D.", tab: "simulator", icon: "icon-home.png" },
-        { title: "Opportunity Hub", text: "Find scholarships, internships, and skill paths.", tab: "community", icon: "icon-money.png" },
+        { title: "Goals & Dreams", text: "Personal goals, vision board, dream university/career/lifestyle - one form.", modal: "growthGoals", icon: "icon-spark.png" },
         { title: "AI goal planning", text: "Turn dreams into next steps.", prompt: growthPromptFromData("a simple goal plan with one next action"), icon: "icon-chat.png" }
       ]
     })}
@@ -9256,12 +9249,9 @@ const screens = {
         { title: "Daily reflection", text: "A 3-minute rotating prompt - mood, stress, growth, or procrastination.", modal: "dailyReflection", icon: "icon-spark.png" },
         { title: "Weekly letter", text: "A short note to you, next week.", modal: "weeklyLetter", icon: "icon-chat.png" },
         { title: "Milestone letter", text: "Write to your future self, further out.", modal: "milestoneLetter", icon: "icon-stories.png" },
-        { title: "Daily Check-In", text: "Log today's mood and energy.", modal: "mood", icon: "icon-checkin.png" },
-        { title: "Mood tracking", text: "Review how you have been feeling.", modal: "mood", icon: "icon-mood.png" },
+        { title: "Mood check-in", text: "Log today's mood and energy, and review how you've been feeling.", modal: "mood", icon: "icon-checkin.png" },
         { title: "Personal Weather Forecast", text: "A predictive 7-day forecast, built from your real mood pattern.", modal: "personalWeather", icon: "icon-warning.png" },
-        { title: "Future Readiness Assessment", text: "Adulthood, decisions, money, resilience.", modal: "assessment", icon: "icon-assessment.png" },
-        { title: "Well-being check-in", text: "Mental wellness and emotional pressure.", modal: "assessment", icon: "icon-health.png" },
-        { title: "Growth assessment", text: "Self-awareness and future planning.", modal: "assessment", icon: "icon-guide.png" },
+        { title: "Future Readiness Assessment", text: "Adulthood, decisions, money, resilience, well-being, and self-awareness.", modal: "assessment", icon: "icon-assessment.png" },
         { title: "Journal", text: "Write what happened and what you learned.", modal: "journal", icon: "icon-learn.png" },
         { title: "Self Archaeology", text: "Dig up an old month of entries as a field report, not nostalgia.", modal: "selfArchaeology", icon: "icon-time.png", kind: "practice" },
         { title: "AI reflection insight", text: "Ask Compass to find one pattern.", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png" }
@@ -9277,14 +9267,11 @@ const screens = {
       icon: "icon-boundary.png",
       tone: "challenge-tone",
       items: [
-        { title: "7-Day Confidence Challenge", text: "Practice one brave action.", modal: "challengeHub", icon: "icon-spark.png", kind: "practice" },
-        { title: "7-Day Study Focus Challenge", text: "Protect one focus block.", modal: "challengeHub", icon: "icon-learn.png", kind: "practice" },
-        { title: "7-Day Gratitude Challenge", text: "Notice one honest good thing.", modal: "challengeHub", icon: "icon-mood.png", kind: "practice" },
+        { title: "7-Day Challenges", text: "Confidence, study focus, or gratitude - pick one.", modal: "challengeHub", icon: "icon-spark.png", kind: "practice" },
         { title: "AI Roleplay Practice", text: "Practice real-life situations safely.", modal: "roleplayList", icon: "icon-chat.png", kind: "practice" },
         { title: "Ghost Roommate", text: "Move in with someone - a relationship that remembers.", modal: "ghostRoommate", icon: "icon-home.png", kind: "practice" },
         { title: "Failure Inoculation", text: "This week's task is designed to fail. That's the point.", modal: "failureInoculation", icon: "icon-warning.png", kind: "practice" },
-        { title: "Streaks", text: "View simple progress counts.", modal: "badges", icon: "icon-time.png" },
-        { title: "Achievements & Badges", text: "See what you have unlocked.", modal: "badges", icon: "icon-safety.png" }
+        { title: "Badges & Streaks", text: "Progress counts and what you've unlocked.", modal: "badges", icon: "icon-time.png" }
       ]
     })}
 
@@ -9308,11 +9295,7 @@ const screens = {
       icon: "icon-balance.png",
       tone: "progress-tone",
       items: [
-        { title: "Weekly AI Report", text: "Summarize this week's real data.", prompt: growthPromptFromData("a short weekly growth report"), icon: "icon-chat.png" },
-        { title: "Monthly Growth Report", text: "Plan next month's direction.", prompt: growthPromptFromData("a monthly growth report and next focus"), icon: "icon-stories.png" },
-        { title: "Mood trend", text: "See your latest mood pattern.", modal: "growthProgress", icon: "icon-mood.png" },
-        { title: "Goal progress", text: "Review saved dreams and goals.", modal: "growthProgress", icon: "icon-spark.png" },
-        { title: "Challenge progress", text: "Check 7-day challenge status.", modal: "growthProgress", icon: "icon-boundary.png" },
+        { title: "Progress Reports", text: "Mood, goals, and challenge status, plus a weekly or monthly AI report - all from real saved data.", modal: "growthProgress", icon: "icon-chat.png" },
         { title: "Receipt record", text: "Track what you paid today.", modal: "receipt", icon: "icon-receipt.png" },
         { title: "Knowledge Vault", text: "Everything Future Mirror knows about you, in one place.", modal: "knowledgeVault", icon: "icon-learn.png" },
         { title: "AI Trace Log", text: "Is the AI coach actually helping? Every reply gets graded.", modal: "aiTraceLog", icon: "icon-assessment.png" },
