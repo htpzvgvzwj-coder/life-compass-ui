@@ -1719,6 +1719,26 @@ function growthTimelineEvents() {
   (trackerState.habitChainReflections || []).forEach((reflection) => {
     events.push({ at: reflection.recordedAt, label: "Named what broke a streak", detail: cleanText(reflection.answer, 120) || "Don't Break the Chain" });
   });
+  // Self-critique finding: Community has its own real activity (posts,
+  // accountability connections) with genuine timestamps, but none of it
+  // ever fed into Your Story - reaching out for real, timestamped support
+  // was invisible to the one place meant to reflect everything you've
+  // actually done. Guarded since a Compass account has no obligation to
+  // ever sign into Community - checkCommunityAchievements() already reads
+  // these same two snapshots the same way.
+  if (typeof hasCommunitySession === "function" && hasCommunitySession()) {
+    const communityMyId = communityUserId();
+    (typeof communityPostsCacheSnapshot === "function" ? communityPostsCacheSnapshot() : [])
+      .filter((post) => post.author_id === communityMyId && post.status === "published")
+      .forEach((post) => {
+        events.push({ at: post.created_at, label: "Posted to the Community wall", detail: cleanText(post.body, 120) });
+      });
+    (typeof communityAccountabilityConnectionsSnapshot === "function" ? communityAccountabilityConnectionsSnapshot() : [])
+      .filter((connection) => connection.status === "accepted" && (connection.requester_id === communityMyId || connection.recipient_id === communityMyId))
+      .forEach((connection) => {
+        events.push({ at: connection.responded_at || connection.created_at, label: "Connected with an accountability partner", detail: "Community" });
+      });
+  }
   return events.sort((a, b) => new Date(b.at) - new Date(a.at));
 }
 
@@ -11230,6 +11250,10 @@ const modals = {
 
   communityOpportunitySubmit: () => communityOpportunitySubmitModal(),
 
+  communityReport: () => communityReportModal(),
+
+  communityMembersBlocked: () => communityMembersBlockedModal(),
+
   safety: (reason = "") => `
     <div class="modal-card dark-modal" role="dialog" aria-modal="true" aria-labelledby="safety-title">
       <div class="modal-top">
@@ -13835,6 +13859,10 @@ document.addEventListener("click", async (event) => {
   const acceptAccountabilityRequestButton = event.target.closest("[data-accept-accountability-request]");
   const declineAccountabilityRequestButton = event.target.closest("[data-decline-accountability-request]");
   const saveContactHintButton = event.target.closest("[data-save-contact-hint]");
+  const blockCommunityUserButton = event.target.closest("[data-block-community-user]");
+  const unblockCommunityUserButton = event.target.closest("[data-unblock-community-user]");
+  const openCommunityReportButton = event.target.closest("[data-open-community-report]");
+  const submitCommunityReportButton = event.target.closest("[data-submit-community-report]");
   const submitMentorApplicationButton = event.target.closest("[data-submit-mentor-application]");
   const saveSkillTagButton = event.target.closest("[data-save-skill-tag]");
   const deleteSkillTagButton = event.target.closest("[data-delete-skill-tag]");
@@ -15352,6 +15380,38 @@ document.addEventListener("click", async (event) => {
     await saveAccountabilityContactHint(connectionId, hint);
     await refreshCommunityData();
     renderScreen("community");
+  }
+
+  if (blockCommunityUserButton) {
+    if (window.confirm("Block this member? You won't see their posts, and neither of you can send new connection requests.")) {
+      await blockCommunityUser(blockCommunityUserButton.dataset.blockCommunityUser);
+      renderScreen("community");
+      if (isModalActive("communityMembersBlocked")) openModal("communityMembersBlocked");
+    }
+  }
+
+  if (unblockCommunityUserButton) {
+    await unblockCommunityUser(unblockCommunityUserButton.dataset.unblockCommunityUser);
+    renderScreen("community");
+    if (isModalActive("communityMembersBlocked")) openModal("communityMembersBlocked");
+  }
+
+  if (openCommunityReportButton) {
+    const [type, id, userId] = openCommunityReportButton.dataset.openCommunityReport.split(":");
+    communityReportTarget = { type, id: id || null, userId: userId || null };
+    communityReportError = "";
+    openModal("communityReport");
+  }
+
+  if (submitCommunityReportButton) {
+    const reasonInput = modalLayer.querySelector("#community-report-reason");
+    const ok = await submitCommunityReport(reasonInput ? reasonInput.value : "");
+    if (ok) {
+      communityReportTarget = null;
+      closeModal();
+    } else {
+      openModal("communityReport");
+    }
   }
 
   if (submitMentorApplicationButton) {

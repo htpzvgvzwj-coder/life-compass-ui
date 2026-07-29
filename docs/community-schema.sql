@@ -312,6 +312,67 @@ create index if not exists skill_tags_category_type_idx on skill_tags (category,
 create index if not exists skill_tags_user_id_idx on skill_tags (user_id);
 
 -- ---------------------------------------------------------------------------
+-- community_blocks
+-- Self-critique finding: accountability partners are algorithmically matched
+-- (no vetting - only mentor_profiles is manually reviewed) and are actively
+-- encouraged to exchange real external contact info via contact_reveal. A
+-- bad match after connecting had zero recourse. Purely private preference
+-- data, like compass_backups - no service-role/moderation layer needed,
+-- since a block only ever affects what the blocker themself sees.
+-- ---------------------------------------------------------------------------
+create table if not exists community_blocks (
+  id uuid primary key default gen_random_uuid(),
+  blocker_id uuid not null references auth.users (id) on delete cascade,
+  blocked_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (blocker_id, blocked_id)
+);
+
+alter table community_blocks enable row level security;
+
+create policy "community_blocks_select_own" on community_blocks
+  for select to authenticated using (blocker_id = auth.uid());
+
+create policy "community_blocks_insert_own" on community_blocks
+  for insert to authenticated with check (blocker_id = auth.uid());
+
+create policy "community_blocks_delete_own" on community_blocks
+  for delete to authenticated using (blocker_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
+-- community_reports
+-- Self-critique finding: the wall's own copy calls it "a moderated support
+-- wall", which was only true pre-publish (see the posts table's AI safety
+-- check) - there was no way to flag a post, skill tag, opportunity, or a
+-- specific user's behavior after the fact. No admin UI here either, by the
+-- same deliberate choice already made for mentor_applications: the owner
+-- reviews reports manually in the Supabase SQL editor
+-- (select * from community_reports where status = 'open' order by created_at)
+-- and acts on them there (e.g. update posts set status = 'blocked' ...).
+-- No AI moderation needed on the report itself since it is never shown to
+-- any other user - direct auth.uid()-scoped insert is safe, same shape as
+-- community_blocks above.
+-- ---------------------------------------------------------------------------
+create table if not exists community_reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id uuid not null references auth.users (id) on delete cascade,
+  target_type text not null check (target_type in ('post', 'opportunity', 'skill_tag', 'user')),
+  target_id uuid,
+  target_user_id uuid references auth.users (id) on delete set null,
+  reason text not null check (char_length(reason) between 4 and 500),
+  status text not null default 'open' check (status in ('open', 'reviewed')),
+  created_at timestamptz not null default now()
+);
+
+alter table community_reports enable row level security;
+
+create policy "community_reports_select_own" on community_reports
+  for select to authenticated using (reporter_id = auth.uid());
+
+create policy "community_reports_insert_own" on community_reports
+  for insert to authenticated with check (reporter_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
 -- guardian_shares
 -- Backs the Guardian read-only share feature on Life Roadmap. Life Roadmap
 -- goals/milestones live only in the browser's localStorage, and using them

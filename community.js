@@ -38,6 +38,21 @@
 
   let pendingMilestoneShare = null;
 
+  // Report/block (self-critique finding): accountability partners are
+  // algorithmically matched with no vetting and are actively encouraged to
+  // exchange real external contact info once connected - there was no
+  // recourse if a match went badly, and the wall's own copy called it "a
+  // moderated support wall" when moderation only ever covered pre-publish
+  // content. Both caches are scoped to the signed-in user only (RLS:
+  // blocker_id/reporter_id = auth.uid()), same private-data shape as
+  // compass_backups.
+  let communityBlocksCache = [];
+  let communityMyReportsCache = [];
+  let communityBlockBusy = false;
+  let communityReportTarget = null;
+  let communityReportBusy = false;
+  let communityReportError = "";
+
   function communityProfilesById() {
     const map = new Map();
     communityProfilesCache.forEach((profile) => map.set(profile.id, profile));
@@ -46,6 +61,26 @@
 
   function communityProfileFor(userId) {
     return communityProfilesById().get(userId) || null;
+  }
+
+  function blockedCommunityUserIds() {
+    const myId = communityUserId();
+    return new Set(communityBlocksCache.filter((row) => row.blocker_id === myId).map((row) => row.blocked_id));
+  }
+
+  function isCommunityUserBlocked(userId) {
+    return blockedCommunityUserIds().has(userId);
+  }
+
+  // For target_type "user" there is no item id (target_id is always null),
+  // so matching on target_id alone would treat "reported user A" as also
+  // covering user B, C... - match on target_user_id for that case instead.
+  function hasReportedCommunityTarget(targetType, targetId, targetUserId) {
+    const myId = communityUserId();
+    return communityMyReportsCache.some((row) => {
+      if (row.reporter_id !== myId || row.target_type !== targetType) return false;
+      return targetType === "user" ? row.target_user_id === targetUserId : row.target_id === targetId;
+    });
   }
 
   function communitySquadMemberCount(squadId) {
@@ -86,7 +121,7 @@
     if (!hasCommunitySession() || communityDataLoading) return;
     communityDataLoading = true;
     try {
-      const [squads, squadMembers, posts, opportunities, profiles, optIns, connections, mentorProfiles, mentorApplications, skillTags] = await Promise.all([
+      const [squads, squadMembers, posts, opportunities, profiles, optIns, connections, mentorProfiles, mentorApplications, skillTags, blocks, myReports] = await Promise.all([
         fetchCommunityTable("squads", (q) => q.order("is_seeded", { ascending: false }).order("created_at", { ascending: true })),
         fetchCommunityTable("squad_members"),
         fetchCommunityTable("posts", (q) => q.order("created_at", { ascending: false }).limit(60)),
@@ -96,7 +131,9 @@
         fetchCommunityTable("accountability_connections"),
         fetchCommunityTable("mentor_profiles"),
         fetchCommunityTable("mentor_applications"),
-        fetchCommunityTable("skill_tags", (q) => q.order("created_at", { ascending: false }).limit(120))
+        fetchCommunityTable("skill_tags", (q) => q.order("created_at", { ascending: false }).limit(120)),
+        fetchCommunityTable("community_blocks"),
+        fetchCommunityTable("community_reports")
       ]);
       communitySquadsCache = squads;
       communitySquadMembersCache = squadMembers;
@@ -108,6 +145,8 @@
       communityMentorProfilesCache = mentorProfiles;
       communityMyMentorApplicationsCache = mentorApplications;
       communitySkillTagsCache = skillTags;
+      communityBlocksCache = blocks;
+      communityMyReportsCache = myReports;
       communityMyProfile = profiles.find((profile) => profile.id === communityUserId()) || null;
       communityDataLoaded = true;
       communityDataError = "";
@@ -306,6 +345,8 @@
   function communityWallPostCard(post) {
     const author = communityProfileFor(post.author_id);
     const squad = post.squad_id ? communitySquadsCache.find((item) => item.id === post.squad_id) : null;
+    const isMine = post.author_id === communityUserId();
+    const reported = hasReportedCommunityTarget("post", post.id);
     return `
       <article class="${post.status === "pending" ? "is-pending" : ""}">
         <strong>${escapeHTML(author ? author.username : "Member")}${author ? ` - trust ${Math.round(author.community_trust_snapshot || 0)}` : ""}</strong>
@@ -315,11 +356,14 @@
           ${post.post_type === "milestone" ? `<span class="risk-pill calm">Milestone</span>` : ""}
           ${post.status === "pending" ? `<span class="risk-pill calm">Checking...</span>` : ""}
         </small>
+        ${!isMine ? `<button class="text-action" type="button" data-open-community-report="post:${escapeHTML(post.id)}:${escapeHTML(post.author_id)}" ${reported ? "disabled" : ""}>${reported ? "Reported" : "Report"}</button>` : ""}
       </article>
     `;
   }
 
   function communityWall() {
+    const blocked = blockedCommunityUserIds();
+    const visiblePosts = communityPostsCache.filter((post) => !blocked.has(post.author_id));
     return `
       <section class="community-wall-card">
         <div class="section-row">
@@ -330,7 +374,7 @@
           <button class="secondary-action compact-action" type="button" data-open="communityPost">Post</button>
         </div>
         <div class="community-wall-list">
-          ${communityPostsCache.length ? communityPostsCache.map(communityWallPostCard).join("") : `
+          ${visiblePosts.length ? visiblePosts.map(communityWallPostCard).join("") : `
             <article class="empty-wall">
               <strong>No posts yet</strong>
               <p>Write a calm anonymous note, question, or encouragement. Do not include private details.</p>
@@ -470,7 +514,9 @@
     const mine = myAccountabilityOptIn();
     if (!mine) return [];
     const myId = communityUserId();
+    const blocked = blockedCommunityUserIds();
     return rankedAccountabilityCandidatesFor(myId, mine)
+      .filter(({ entry }) => !blocked.has(entry.user_id))
       .slice(0, 3)
       .map(({ entry }) => {
         const theirTopPicks = rankedAccountabilityCandidatesFor(entry.user_id, entry).slice(0, 3).map((item) => item.entry.user_id);
@@ -503,6 +549,12 @@
             <label>Your contact hint (optional)<input type="text" data-contact-hint-input="${escapeHTML(connection.id)}" maxlength="140" value="${escapeHTML(reveal[myHintKey] || "")}" placeholder="e.g. an Instagram handle or Discord tag"></label>
           </div>
           <button class="secondary-action compact-action" type="button" data-save-contact-hint="${escapeHTML(connection.id)}">Save contact hint</button>
+        ` : ""}
+        ${connection.status !== "declined" ? `
+          <div class="profile-actions">
+            <button class="text-action" type="button" data-open-community-report="user::${escapeHTML(otherId)}" ${hasReportedCommunityTarget("user", null, otherId) ? "disabled" : ""}>Report</button>
+            <button class="text-action danger-text" type="button" data-block-community-user="${escapeHTML(otherId)}">Block</button>
+          </div>
         ` : ""}
       </article>
     `;
@@ -623,6 +675,81 @@
   }
 
   // ---------------------------------------------------------------------
+  // Block / Report (self-critique finding) - see community_blocks and
+  // community_reports in docs/community-schema.sql. Both write directly
+  // from the client (no privileged endpoint, no AI moderation needed) since
+  // neither is ever shown to any other user - a block only changes what the
+  // blocker themself sees, and a report is reviewed manually by the owner
+  // in the Supabase SQL editor, same deliberate no-admin-UI shape already
+  // used for mentor_applications.
+  // ---------------------------------------------------------------------
+
+  async function blockCommunityUser(userId) {
+    if (!userId || userId === communityUserId()) return false;
+    const client = getCommunitySupabaseClient();
+    if (!client) return false;
+    communityBlockBusy = true;
+    try {
+      const { error } = await client.from("community_blocks").insert({ blocker_id: communityUserId(), blocked_id: userId });
+      if (error) {
+        console.error("[Community] blockCommunityUser failed", error);
+        return false;
+      }
+      communityBlocksCache = [...communityBlocksCache, { blocker_id: communityUserId(), blocked_id: userId }];
+      return true;
+    } finally {
+      communityBlockBusy = false;
+    }
+  }
+
+  async function unblockCommunityUser(userId) {
+    const client = getCommunitySupabaseClient();
+    if (!client) return false;
+    communityBlockBusy = true;
+    try {
+      const { error } = await client.from("community_blocks").delete().eq("blocker_id", communityUserId()).eq("blocked_id", userId);
+      if (error) {
+        console.error("[Community] unblockCommunityUser failed", error);
+        return false;
+      }
+      communityBlocksCache = communityBlocksCache.filter((row) => !(row.blocker_id === communityUserId() && row.blocked_id === userId));
+      return true;
+    } finally {
+      communityBlockBusy = false;
+    }
+  }
+
+  async function submitCommunityReport(reason) {
+    if (!communityReportTarget) return false;
+    const client = getCommunitySupabaseClient();
+    if (!client) return false;
+    communityReportBusy = true;
+    communityReportError = "";
+    try {
+      const row = {
+        reporter_id: communityUserId(),
+        target_type: communityReportTarget.type,
+        target_id: communityReportTarget.id || null,
+        target_user_id: communityReportTarget.userId || null,
+        reason: String(reason || "").trim()
+      };
+      if (row.reason.length < 4) {
+        communityReportError = "Say a little more about what's wrong (at least a few words).";
+        return false;
+      }
+      const { error } = await client.from("community_reports").insert(row);
+      if (error) {
+        communityReportError = error.message || "Couldn't submit that report right now. Please try again.";
+        return false;
+      }
+      communityMyReportsCache = [...communityMyReportsCache, row];
+      return true;
+    } finally {
+      communityReportBusy = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // Skill Exchange - "I can offer X" / "I need X" listings tagged with one
   // of the 6 BUILD_LIFE_MOMENT_CATEGORIES (app.js). Connecting reuses
   // accountability_connections as-is, same as Community Mentors below - a
@@ -637,8 +764,9 @@
 
   function browsableSkillTags() {
     const myId = communityUserId();
+    const blocked = blockedCommunityUserIds();
     return communitySkillTagsCache
-      .filter((tag) => tag.status === "published" && tag.user_id !== myId && tag.type === skillExchangeBrowseType)
+      .filter((tag) => tag.status === "published" && tag.user_id !== myId && !blocked.has(tag.user_id) && tag.type === skillExchangeBrowseType)
       .filter((tag) => !skillExchangeFilterCategory || tag.category === skillExchangeFilterCategory);
   }
 
@@ -671,6 +799,7 @@
         <small>trust ${Math.round((profile && profile.community_trust_snapshot) || 0)}${badgeCount ? ` - ${badgeCount} badge${badgeCount === 1 ? "" : "s"}` : ""}</small>
         <div class="community-actions">
           <button class="primary-action compact-action" type="button" data-open="communityAccountabilityRequest" data-open-payload="${escapeHTML(tag.user_id)}">Request connection</button>
+          <button class="text-action" type="button" data-open-community-report="skill_tag:${escapeHTML(tag.id)}:${escapeHTML(tag.user_id)}" ${hasReportedCommunityTarget("skill_tag", tag.id) ? "disabled" : ""}>Report</button>
         </div>
       </article>
     `;
@@ -784,7 +913,8 @@
   function suggestedMentors() {
     const mine = myAccountabilityOptIn();
     const myId = communityUserId();
-    const pool = communityMentorProfilesCache.filter((entry) => entry.user_id !== myId);
+    const blocked = blockedCommunityUserIds();
+    const pool = communityMentorProfilesCache.filter((entry) => entry.user_id !== myId && !blocked.has(entry.user_id));
     if (!mine) return pool;
     return [...pool].sort((a, b) => CommunityMatching.scoreTagOverlap(mine.goal_tags || [], b.focus_tags || []) - CommunityMatching.scoreTagOverlap(mine.goal_tags || [], a.focus_tags || []));
   }
@@ -804,7 +934,11 @@
               <strong>${escapeHTML(communityProfileFor(mentor.user_id) ? communityProfileFor(mentor.user_id).username : "Mentor")}</strong>
               <p>${escapeHTML(mentor.bio)}</p>
               ${mentor.focus_tags && mentor.focus_tags.length ? `<p class="muted">${mentor.focus_tags.map((tag) => escapeHTML(tag)).join(" · ")}</p>` : ""}
-              <button class="primary-action compact-action" type="button" data-open="communityAccountabilityRequest" data-open-payload="${escapeHTML(mentor.user_id)}">Request to connect</button>
+              <div class="profile-actions">
+                <button class="primary-action compact-action" type="button" data-open="communityAccountabilityRequest" data-open-payload="${escapeHTML(mentor.user_id)}">Request to connect</button>
+                <button class="text-action" type="button" data-open-community-report="user::${escapeHTML(mentor.user_id)}" ${hasReportedCommunityTarget("user", null, mentor.user_id) ? "disabled" : ""}>Report</button>
+                <button class="text-action danger-text" type="button" data-block-community-user="${escapeHTML(mentor.user_id)}">Block</button>
+              </div>
             </article>
           `).join("")}
         ` : `<p class="muted">No mentors yet - check back soon.</p>`}
@@ -849,6 +983,59 @@
   }
 
   // ---------------------------------------------------------------------
+  // Report / Block modals (self-critique finding - see docs/community-schema.sql)
+  // ---------------------------------------------------------------------
+
+  const COMMUNITY_REPORT_TARGET_LABELS = { post: "post", opportunity: "shared opportunity", skill_tag: "skill listing", user: "member" };
+
+  function communityReportModal() {
+    const label = communityReportTarget ? (COMMUNITY_REPORT_TARGET_LABELS[communityReportTarget.type] || "item") : "item";
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-report-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Report</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="community-report-title">Report this ${escapeHTML(label)}</h3>
+        <p class="muted">This is reviewed manually - it's never shown to anyone else. What's wrong with it?</p>
+        <div class="admin-form">
+          <label>Reason<textarea id="community-report-reason" maxlength="500" placeholder="Example: shared personal contact details in a squad post"></textarea></label>
+          <p class="form-error" id="community-report-error" aria-live="polite">${escapeHTML(communityReportError)}</p>
+        </div>
+        <button class="primary-action" type="button" data-submit-community-report ${communityReportBusy ? "disabled" : ""}>${communityReportBusy ? "Submitting..." : "Submit report"}</button>
+      </div>
+    `;
+  }
+
+  function communityMembersBlockedModal() {
+    const myId = communityUserId();
+    const blocked = communityBlocksCache.filter((row) => row.blocker_id === myId);
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-blocked-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Blocked members</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="community-blocked-title">Blocked members</h3>
+        <p class="muted">You won't see posts, opportunities, or listings from anyone blocked here, and neither of you can send new connection requests.</p>
+        ${blocked.length ? `
+          <div class="action-stack">
+            ${blocked.map((row) => {
+              const profile = communityProfileFor(row.blocked_id);
+              return `
+                <div class="wide-action">
+                  <span><strong>${escapeHTML(profile ? profile.username : "Member")}</strong></span>
+                  <button class="secondary-action compact-action" type="button" data-unblock-community-user="${escapeHTML(row.blocked_id)}" ${communityBlockBusy ? "disabled" : ""}>Unblock</button>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        ` : `<p class="muted">Nobody blocked.</p>`}
+      </div>
+    `;
+  }
+
+  // ---------------------------------------------------------------------
   // Crowdsourced opportunities (idea 10)
   // ---------------------------------------------------------------------
 
@@ -866,6 +1053,7 @@
         <div class="profile-actions">
           <button class="primary-action compact-action" type="button" data-open-link="${escapeHTML(item.link)}">View</button>
           <button class="secondary-action compact-action" type="button" data-prepare-opportunity="${escapeHTML(item.title)}" data-prepare-opportunity-category="${escapeHTML(item.category)}">Prepare with Compass</button>
+          ${item.submitted_by && item.submitted_by !== communityUserId() ? `<button class="text-action" type="button" data-open-community-report="opportunity:${escapeHTML(item.id)}:${escapeHTML(item.submitted_by)}" ${hasReportedCommunityTarget("opportunity", item.id) ? "disabled" : ""}>Report</button>` : ""}
         </div>
       </article>
     `;
@@ -886,10 +1074,12 @@
         </section>
       `;
     }
+    const blockedOpportunitySubmitters = blockedCommunityUserIds();
+    const visibleOpportunities = communityOpportunitiesCache.filter((item) => !blockedOpportunitySubmitters.has(item.submitted_by));
     return `
-      <div class="content-rail-title"><strong>Community-submitted</strong><span>${communityOpportunitiesCache.length} items</span></div>
+      <div class="content-rail-title"><strong>Community-submitted</strong><span>${visibleOpportunities.length} items</span></div>
       <div class="opportunity-feed">
-        ${communityOpportunitiesCache.length ? communityOpportunitiesCache.map(communityOpportunityCard).join("") : `
+        ${visibleOpportunities.length ? visibleOpportunities.map(communityOpportunityCard).join("") : `
           <section class="empty-feature">
             <img src="assets/icon-work.png" alt="">
             <div><strong>No community opportunities yet</strong><p>Share one below.</p></div>
@@ -960,7 +1150,7 @@
         <div>
           <p class="eyebrow">Growth Community</p>
           <h2 class="screen-title">Find people growing in the same direction.</h2>
-          <p class="screen-subtitle">Not dating. Real squads, goal groups, accountability partners, and a moderated support wall.</p>
+          <p class="screen-subtitle">Not dating. Real squads, goal groups, accountability partners, and a support wall - screened before it's posted, and every post, listing, and connection can be reported or blocked after the fact too.</p>
         </div>
         <div class="avatar"><img src="assets/icon-support.png" alt=""></div>
       </header>
@@ -976,7 +1166,10 @@
           <span><strong>${communityPostsCache.filter((post) => post.status === "published").length}</strong>Posts</span>
           <span><strong>${Math.round((communityMyProfile && communityMyProfile.community_trust_snapshot) || 0)}</strong>Your trust</span>
         </div>
-        <button class="secondary-action compact-action" type="button" data-community-sign-out>Sign out of Community</button>
+        <div class="profile-actions">
+          <button class="secondary-action compact-action" type="button" data-open="communityMembersBlocked">Blocked members</button>
+          <button class="secondary-action compact-action" type="button" data-community-sign-out>Sign out of Community</button>
+        </div>
       </section>
 
       ${growthPartnerCard()}
@@ -1040,6 +1233,7 @@
   window.communityOpportunitiesCacheSnapshot = () => communityOpportunitiesCache;
   window.communitySkillTagsCacheSnapshot = () => communitySkillTagsCache;
   window.communityProfilesCacheSnapshot = () => communityProfilesCache;
+  window.communityMyMentorApplicationsSnapshot = () => communityMyMentorApplicationsCache;
 
   window.getCommunityAuthMode = () => communityAuthMode;
   window.setCommunityAuthMode = (mode) => { communityAuthMode = mode; };
