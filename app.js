@@ -5235,7 +5235,7 @@ const STARTER_PATHS = [
       { id: "direction-blueprint", title: "Build Personal Blueprint", detail: "Compass works better when it knows your values, strengths, and decision style.", modal: "discoverYourself" },
       { id: "direction-goals", title: "Save goals and dreams", detail: "Put the future you keep thinking about somewhere concrete.", modal: "growthGoals" },
       { id: "direction-roadmap", title: "Create a Life Roadmap", detail: "Turn a direction into monthly milestones.", modal: "roadmapView" },
-      { id: "direction-ai", title: "Ask Compass for one next step", detail: "Use AI after your real data exists, not as a vague oracle.", prompt: growthPromptFromData("one practical next step for my future direction using my saved profile") }
+      { id: "direction-ai", title: "Ask Compass for one next step", detail: "Use AI after your real data exists, not as a vague oracle.", promptRequest: "one practical next step for my future direction using my saved profile" }
     ]
   },
   {
@@ -5303,6 +5303,7 @@ function starterPathStepActionAttributes(step) {
   if (step.discoverMode) return `data-discover-mode-jump="${escapeHTML(step.discoverMode)}"`;
   if (step.modal) return `data-open="${escapeHTML(step.modal)}"${step.payload ? ` data-open-payload="${escapeHTML(step.payload)}"` : ""}`;
   if (step.tab) return `data-tab-jump="${escapeHTML(step.tab)}"`;
+  if (step.promptRequest) return `data-growth-prompt="${escapeHTML(cleanText(growthPromptFromData(step.promptRequest), 1800))}"`;
   if (step.prompt) return `data-growth-prompt="${escapeHTML(cleanText(step.prompt, 1800))}"`;
   return "";
 }
