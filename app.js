@@ -5146,6 +5146,23 @@ function pendingSupportNetworkNudge() {
 // there, resurfacing had its own card - so there was no single place to
 // see everything actually asking for attention at once. This aggregates
 // the real sources without inventing a new one.
+// Self-critique finding: the Inbox grew to 6 item kinds that were pushed
+// (and rendered) in a fixed code order with no priority at all, so a
+// sustained low-mood signal - the one thing this app's own research pass
+// concluded matters most - landed dead last, under routine bill reminders
+// and up to 8 optional "worth another look" reflections. Ordering now
+// follows the same Real/Practice logic the rest of the app uses: real
+// wellbeing and real external consequences outrank app-invented practice
+// prompts. Lower number = surfaced first.
+const INBOX_PRIORITY = {
+  moodTrend: 0,      // a real, sustained distress signal - highest human stakes
+  realLifeEvent: 1,  // a real external deadline the user set, with real consequences
+  selfDebt: 2,       // a commitment to themselves, delivered only on genuine drift
+  supportNetwork: 3, // wellbeing, but a slow-burn gap rather than an active signal
+  roommate: 4,       // a simulated character waiting - practice, not real
+  resurface: 5       // optional revisits, genuinely fine to leave sitting
+};
+
 function pendingInboxItems() {
   const items = [];
   dueRealLifeEvents().forEach((event) => {
@@ -5168,17 +5185,64 @@ function pendingInboxItems() {
   if (supportNudge) items.push({ kind: "supportNetwork", label: supportNudge.label, detail: supportNudge.detail });
   const moodTrendNudge = pendingMoodTrendNudge();
   if (moodTrendNudge) items.push({ kind: "moodTrend", label: moodTrendNudge.label, detail: moodTrendNudge.detail, mostRecentAt: moodTrendNudge.mostRecentAt });
-  return items;
+  // Stable sort: within the same priority tier, original insertion order is
+  // preserved (e.g. due dates stay in the order dueRealLifeEvents() returns).
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => (INBOX_PRIORITY[a.item.kind] ?? 9) - (INBOX_PRIORITY[b.item.kind] ?? 9) || a.index - b.index)
+    .map(({ item }) => item);
+}
+
+// One renderer per kind, dispatched from the single priority-sorted list -
+// replaces six hardcoded blocks whose order silently decided what the user
+// saw first.
+function inboxItemActions(item) {
+  if (item.kind === "moodTrend") {
+    return `
+      <div class="profile-actions">
+        <button class="secondary-action compact-action" type="button" data-open="supportCircle" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">Support Circle</button>
+        <button class="secondary-action compact-action" type="button" data-open="skillGuideDetail" data-open-payload="build-support-before-crisis" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">Build support</button>
+        <button class="secondary-action compact-action" type="button" data-open="communityEncouragement" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">Been There</button>
+        <button class="text-action" type="button" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">I'm okay, thanks</button>
+      </div>
+    `;
+  }
+  if (item.kind === "realLifeEvent") {
+    return `<button class="secondary-action compact-action" type="button" data-handle-real-life-event="${escapeHTML(item.id)}">Mark handled</button>`;
+  }
+  if (item.kind === "selfDebt") {
+    return `<button class="secondary-action compact-action" type="button" data-view-self-debt-notice>View</button>`;
+  }
+  if (item.kind === "supportNetwork") {
+    return `<button class="secondary-action compact-action" type="button" data-open="supportCircle">Open Support Circle</button>`;
+  }
+  if (item.kind === "roommate") {
+    return `<button class="secondary-action compact-action" type="button" data-open="ghostRoommate">Open</button>`;
+  }
+  if (item.kind === "resurface") {
+    return `
+      <div class="profile-actions">
+        <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:relevant">Still relevant</button>
+        <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:somewhat">Somewhat</button>
+        <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:resolved">Resolved</button>
+        <button class="text-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:snooze">Not now</button>
+      </div>
+    `;
+  }
+  return "";
 }
 
 function inboxModal() {
-  const items = pendingInboxItems();
-  const realLifeEventItems = items.filter((item) => item.kind === "realLifeEvent");
-  const selfDebtItems = items.filter((item) => item.kind === "selfDebt");
-  const roommateItems = items.filter((item) => item.kind === "roommate");
-  const resurfaceItems = items.filter((item) => item.kind === "resurface").slice(0, 8);
-  const supportNetworkItems = items.filter((item) => item.kind === "supportNetwork");
-  const moodTrendItems = items.filter((item) => item.kind === "moodTrend");
+  const allItems = pendingInboxItems();
+  // Resurfaced reflections are the one unbounded source (every overdue
+  // entry qualifies), so they stay capped - without it they could bury
+  // everything above them despite being the lowest priority.
+  let resurfaceShown = 0;
+  const items = allItems.filter((item) => {
+    if (item.kind !== "resurface") return true;
+    resurfaceShown += 1;
+    return resurfaceShown <= 8;
+  });
   return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="inbox-title">
       <div class="modal-top">
@@ -5186,7 +5250,7 @@ function inboxModal() {
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="inbox-title">${items.length ? `${items.length} thing${items.length === 1 ? "" : "s"} waiting` : "Nothing waiting"}</h3>
-      <p class="muted">Everything actually asking for a response, in one place - nothing here interrupts you on its own anymore.</p>
+      <p class="muted">Everything actually asking for a response, most pressing first - nothing here interrupts you on its own anymore.</p>
       ${!items.length ? `
         <section class="empty-feature">
           <img src="assets/icon-checkin.png" alt="">
@@ -5194,56 +5258,11 @@ function inboxModal() {
         </section>
       ` : `
         <div class="ledger-sheet">
-          ${realLifeEventItems.map((item) => `
-            <article class="ledger-entry">
+          ${items.map((item) => `
+            <article class="ledger-entry${INBOX_PRIORITY[item.kind] <= 1 ? " is-priority" : ""}">
               <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
               <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
-              <button class="secondary-action compact-action" type="button" data-handle-real-life-event="${escapeHTML(item.id)}">Mark handled</button>
-            </article>
-          `).join("")}
-          ${selfDebtItems.map((item) => `
-            <article class="ledger-entry">
-              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
-              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
-              <button class="secondary-action compact-action" type="button" data-view-self-debt-notice>View</button>
-            </article>
-          `).join("")}
-          ${roommateItems.map((item) => `
-            <article class="ledger-entry">
-              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
-              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
-              <button class="secondary-action compact-action" type="button" data-open="ghostRoommate">Open</button>
-            </article>
-          `).join("")}
-          ${resurfaceItems.map((item) => `
-            <article class="ledger-entry">
-              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
-              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
-              <div class="profile-actions">
-                <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:relevant">Still relevant</button>
-                <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:somewhat">Somewhat</button>
-                <button class="secondary-action compact-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:resolved">Resolved</button>
-                <button class="text-action" type="button" data-resurface-action="${escapeHTML(item.entry.id)}:snooze">Not now</button>
-              </div>
-            </article>
-          `).join("")}
-          ${supportNetworkItems.map((item) => `
-            <article class="ledger-entry">
-              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
-              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
-              <button class="secondary-action compact-action" type="button" data-open="supportCircle">Open Support Circle</button>
-            </article>
-          `).join("")}
-          ${moodTrendItems.map((item) => `
-            <article class="ledger-entry">
-              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
-              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
-              <div class="profile-actions">
-                <button class="secondary-action compact-action" type="button" data-open="supportCircle" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">Support Circle</button>
-                <button class="secondary-action compact-action" type="button" data-open="skillGuideDetail" data-open-payload="build-support-before-crisis" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">Build support</button>
-                <button class="secondary-action compact-action" type="button" data-open="communityEncouragement" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">Been There</button>
-                <button class="text-action" type="button" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">I'm okay, thanks</button>
-              </div>
+              ${inboxItemActions(item)}
             </article>
           `).join("")}
         </div>
@@ -10053,7 +10072,7 @@ const screens = {
         { title: "Skill Exchange", text: "Trade what you know for what you need.", tab: "community", icon: "icon-chat.png", kind: "real" },
         { title: "SOS - get urgent help", text: "Real Singapore resources, always one tap away.", modal: "sosTriage", icon: "icon-warning.png", kind: "real" },
         { title: "Build support before crisis", text: "Singapore's own youth mental health data says this matters as much as SOS - not just one guide among many.", modal: "buildSupportGuide", icon: "icon-support.png", kind: "real" },
-        { title: "Been There", text: "Anonymous, one-time encouragement to or from someone who's been where you are.", tab: "community", icon: "icon-support.png", kind: "real" },
+        { title: "Been There", text: "Anonymous, one-time encouragement to or from someone who's been where you are.", modal: "communityEncouragement", icon: "icon-support.png", kind: "real" },
         { title: "Inherited Debugging", text: "Refactor habits you didn't choose, issue by issue.", modal: "legacyDebugger", icon: "icon-settings.png", kind: "practice" },
         { title: "Self-Debt", text: "Pay your future self a debt, collected only when it's actually due.", modal: "selfDebtLedger", icon: "icon-money.png", kind: "practice" },
         { title: "Estate Auction", text: "Your time and habits, read out like an auction catalog.", modal: "estateAuction", icon: "icon-time.png", kind: "practice" },

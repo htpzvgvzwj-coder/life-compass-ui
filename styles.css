@@ -4286,6 +4286,15 @@ textarea {
   animation: fadeRiseIn 220ms ease both;
 }
 
+/* Inbox priority tier: a quiet left rule, not a red alarm - a sustained
+   low-mood signal or a real overdue deadline should read as "look here
+   first" without turning the Inbox into something that feels alarming to
+   open. */
+.ledger-entry.is-priority {
+  padding-left: 10px;
+  border-left: 2px solid var(--color-ink);
+}
+
 .ledger-entry:nth-child(1) { animation-delay: 0ms; }
 .ledger-entry:nth-child(2) { animation-delay: 30ms; }
 .ledger-entry:nth-child(3) { animation-delay: 60ms; }

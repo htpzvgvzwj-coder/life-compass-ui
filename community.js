@@ -1147,6 +1147,24 @@
   const BEEN_THERE_CATEGORIES = (typeof BUILD_LIFE_MOMENT_CATEGORIES !== "undefined" ? BUILD_LIFE_MOMENT_CATEGORIES : []);
 
   function communityEncouragementModal() {
+    // Reachable directly from the Growth Hub and the Inbox mood-trend
+    // nudge, not just from inside an already-signed-in Community screen -
+    // so it has to state the sign-in requirement plainly instead of
+    // rendering an empty, silently broken form (communityUserId() is null
+    // without a session). Same shape as communityOpportunitiesRail's gate.
+    if (!hasCommunitySession()) {
+      return `
+        <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-encouragement-title">
+          <div class="modal-top">
+            <span class="risk-pill calm">Been There</span>
+            <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+          </div>
+          <h3 id="community-encouragement-title">Anonymous, one-time encouragement</h3>
+          <p class="muted">Both sides stay anonymous, and it's a one-time message - no ongoing relationship. It needs a Community account so a message can actually reach someone.</p>
+          <button class="primary-action" type="button" data-tab-jump="community">Go to Community to sign in</button>
+        </div>
+      `;
+    }
     const unread = communityEncouragementsCache.filter((row) => !row.read_at);
     return `
       <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-encouragement-title">

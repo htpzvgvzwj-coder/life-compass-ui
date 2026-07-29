@@ -4,6 +4,7 @@ const path = require("path");
 
 const root = path.join(__dirname, "..");
 const appSource = fs.readFileSync(path.join(root, "app.js"), "utf8");
+const communitySource = fs.readFileSync(path.join(root, "community.js"), "utf8");
 
 function section(source, startMarker, endMarker) {
   const start = source.indexOf(startMarker);
@@ -38,10 +39,10 @@ const trendFn = section(appSource, "function recentMoodTrend", "function pending
 assert.ok(trendFn.includes("entries.length < 3") && trendFn.includes("< 40"), "requires a real sustained pattern (3+ consecutive low check-ins), not a single rough day");
 assert.ok(appSource.includes("function pendingMoodTrendNudge"), "mood trend nudge exists");
 assert.ok(appSource.includes("function acknowledgeMoodTrendNudge"), "the nudge can be acknowledged so it doesn't repeat for the same window");
-const inboxSection = section(appSource, "function pendingInboxItems", "function inboxModal");
+const inboxSection = section(appSource, "function pendingInboxItems", "function inboxItemActions");
 assert.ok(inboxSection.includes("pendingMoodTrendNudge()"), "the mood trend nudge is aggregated into the Inbox");
-const inboxModalSection = section(appSource, "function inboxModal", "let dailyReflectionPromptIndex");
-assert.ok(inboxModalSection.includes("data-dismiss-mood-trend-nudge") && inboxModalSection.includes('data-open-payload="build-support-before-crisis"') && inboxModalSection.includes('data-open="communityEncouragement"'), "the mood trend nudge links to real support resources (Support Circle, the crisis-prep guide, Been There), not just a bare acknowledgement");
+const inboxActionsSection = section(appSource, "function inboxItemActions", "function inboxModal");
+assert.ok(inboxActionsSection.includes("data-dismiss-mood-trend-nudge") && inboxActionsSection.includes('data-open-payload="build-support-before-crisis"') && inboxActionsSection.includes('data-open="communityEncouragement"'), "the mood trend nudge links to real support resources (Support Circle, the crisis-prep guide, Been There), not just a bare acknowledgement");
 
 // The crisis-prep guide now has its own direct Growth Hub entry point,
 // proportionate to the real scale of the problem, instead of being one of
@@ -49,7 +50,12 @@ assert.ok(inboxModalSection.includes("data-dismiss-mood-trend-nudge") && inboxMo
 assert.ok(appSource.includes('buildSupportGuide: () => skillGuideDetailModal("build-support-before-crisis")'), "build-support-before-crisis has a dedicated modal wrapper for a direct entry point");
 const practicalSection = section(appSource, 'title: "Practical & Safety"', "Safety Net Preview");
 assert.ok(practicalSection.includes('modal: "buildSupportGuide"'), "Build support before crisis is a direct Growth Hub chip, not buried inside the generic Skill Guides list");
-assert.ok(practicalSection.includes('tab: "community"') && practicalSection.includes("Been There"), "Been There also has a direct Growth Hub entry point");
+// Been There opens its own modal directly. It used to be a bare
+// tab: "community" jump, which dumped the user on the Community screen
+// with no Been There in sight - a chip whose label promised a specific
+// feature but only delivered a tab switch.
+assert.ok(practicalSection.includes('modal: "communityEncouragement"') && practicalSection.includes("Been There"), "the Been There chip opens Been There itself, not just the Community tab");
+assert.ok(communitySource.includes("if (!hasCommunitySession()) {"), "Been There states the sign-in requirement instead of rendering a silently broken empty form when reached without a session");
 
 // --- Behavioral: actually execute recentMoodTrend()/pendingMoodTrendNudge()
 // against mock trackerState, not just confirm the source mentions them. ---
@@ -85,5 +91,38 @@ assert.ok(firstNudge, "3 real consecutive low check-ins is a genuine sustained p
 // Already acknowledged for this exact window - must not repeat.
 acknowledgeMoodTrendNudge(firstNudge.mostRecentAt);
 assert.strictEqual(pendingMoodTrendNudge(), null, "an acknowledged window must not re-trigger the same nudge");
+
+// --- Self-critique finding: the Inbox grew to 6 item kinds pushed and
+// rendered in a fixed code order with no priority, so the mood-trend
+// signal - the thing the research pass concluded matters most - rendered
+// dead last, under routine bills and up to 8 optional reflections. ---
+assert.ok(appSource.includes("const INBOX_PRIORITY = {"), "the Inbox has an explicit priority table rather than relying on push order");
+const priorityMatch = appSource.match(/const INBOX_PRIORITY = (\{[\s\S]*?\n\});/);
+assert.ok(priorityMatch, "could extract the INBOX_PRIORITY table from app.js");
+// eslint-disable-next-line no-eval
+const INBOX_PRIORITY = eval(`(${priorityMatch[1]})`);
+assert.ok(INBOX_PRIORITY.moodTrend < INBOX_PRIORITY.realLifeEvent, "a sustained distress signal outranks a routine bill");
+assert.ok(INBOX_PRIORITY.realLifeEvent < INBOX_PRIORITY.roommate, "a real external deadline outranks a simulated roleplay character waiting");
+assert.ok(INBOX_PRIORITY.roommate < INBOX_PRIORITY.resurface, "optional revisits sort last");
+Object.keys(INBOX_PRIORITY).forEach((kind) => {
+  assert.strictEqual(typeof INBOX_PRIORITY[kind], "number", `${kind} has a real numeric priority`);
+});
+
+// Sorting must be stable within a tier so same-kind items keep the order
+// their source function returned them in (e.g. due dates by date).
+const mockItems = [
+  { kind: "resurface", label: "r1" },
+  { kind: "moodTrend", label: "mood" },
+  { kind: "realLifeEvent", label: "bill-1" },
+  { kind: "resurface", label: "r2" },
+  { kind: "realLifeEvent", label: "bill-2" },
+  { kind: "roommate", label: "roomie" }
+];
+const sorted = mockItems
+  .map((item, index) => ({ item, index }))
+  .sort((a, b) => (INBOX_PRIORITY[a.item.kind] ?? 9) - (INBOX_PRIORITY[b.item.kind] ?? 9) || a.index - b.index)
+  .map(({ item }) => item);
+assert.strictEqual(sorted[0].label, "mood", "the mood-trend signal sorts to the very top, not last");
+assert.deepStrictEqual(sorted.map((i) => i.label), ["mood", "bill-1", "bill-2", "roomie", "r1", "r2"], "full ordering is correct and stable within each tier");
 
 console.log("Research-grounded features regression tests passed.");
