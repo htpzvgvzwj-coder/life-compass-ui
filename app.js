@@ -44,6 +44,7 @@ const openingNarrativeContinueButton = document.querySelector("#opening-narrativ
 const navItems = [...document.querySelectorAll(".nav-item")];
 const viewButtons = [...document.querySelectorAll(".view-button")];
 const staticScreens = [...document.querySelectorAll("[data-static-screen]")];
+const desktopRightRail = document.querySelector("#desktop-right-rail");
 
 const portraitLayer = document.querySelector("#portrait-layer");
 const portraitImageEl = document.querySelector("#portrait-image");
@@ -1245,6 +1246,10 @@ let blueprintMicroInsightText = "";
 let inspireSearch = "";
 let inspireCategory = "All";
 let opportunityCategory = "All";
+let discoverStageFilter = "all";
+let discoverNeedFilter = "all";
+let discoverTimeFilter = "all";
+let commandQuery = "";
 let lifeSimInstance = null;
 const userProfile = loadJson("steadyUserProfile", defaultUserProfile);
 const trackerState = normalizeTrackerState(loadJson(scopedKey("steadyTrackerState"), defaultTrackerState));
@@ -2607,16 +2612,129 @@ function progressReportCards() {
   `;
 }
 
-function visibleOpportunities() {
-  return opportunityItems.filter((item) => opportunityCategory === "All" || item.category === opportunityCategory);
-}
-
 function savedOpportunityRecord(id) {
   return trackerState.savedOpportunities.find((item) => item.user_id === currentUserId() && item.opportunity_id === id) || null;
 }
 
 function savedOpportunityCount() {
   return trackerState.savedOpportunities.filter((item) => item.user_id === currentUserId()).length;
+}
+
+const DISCOVER_STAGE_FILTERS = [
+  { id: "all", label: "Any stage" },
+  { id: "secondary", label: "Secondary" },
+  { id: "ite-poly-jc", label: "ITE / Poly / JC" },
+  { id: "ns-working", label: "NS / Working" }
+];
+
+const DISCOVER_NEED_FILTERS = [
+  { id: "all", label: "Any need" },
+  { id: "career", label: "Career" },
+  { id: "money", label: "Money" },
+  { id: "study", label: "Study" },
+  { id: "confidence", label: "Confidence" },
+  { id: "support", label: "Support" }
+];
+
+const DISCOVER_TIME_FILTERS = [
+  { id: "all", label: "Any time" },
+  { id: "quick", label: "10 min" },
+  { id: "weekend", label: "Weekend" },
+  { id: "month", label: "1 month+" }
+];
+
+function opportunityFilterText(item) {
+  return [
+    item.category,
+    item.type,
+    item.title,
+    item.description,
+    item.difficulty,
+    item.prepNeeded,
+    ...(item.tags || [])
+  ].join(" ").toLowerCase();
+}
+
+function opportunityMatchesStage(item) {
+  if (discoverStageFilter === "all") return true;
+  const text = opportunityFilterText(item);
+  if (discoverStageFilter === "secondary") {
+    return item.difficulty === "Beginner" || text.includes("student") || text.includes("youth") || text.includes("volunteer") || item.category === "Learn & Earn";
+  }
+  if (discoverStageFilter === "ite-poly-jc") {
+    return item.difficulty !== "Advanced" || ["Internships", "Scholarships", "Competitions", "Learn & Earn"].includes(item.category);
+  }
+  if (discoverStageFilter === "ns-working") {
+    return ["Jobs", "Internships", "Learn & Earn", "Volunteer Opportunities"].includes(item.category) || text.includes("entry-level") || text.includes("remote");
+  }
+  return true;
+}
+
+function opportunityMatchesNeed(item) {
+  if (discoverNeedFilter === "all") return true;
+  const text = opportunityFilterText(item);
+  const category = item.category;
+  const needMatches = {
+    career: ["career", "internship", "entry-level", "resume", "portfolio", "job", "technology", "business"],
+    money: ["income", "part-time", "earn", "money", "remote", "freelance"],
+    study: ["scholarship", "university", "education", "study", "financial aid", "coding"],
+    confidence: ["leadership", "communication", "pitching", "teamwork", "confidence", "content"],
+    support: ["volunteer", "community", "impact", "ngo", "service", "network"]
+  };
+  if (discoverNeedFilter === "career" && ["Jobs", "Internships"].includes(category)) return true;
+  if (discoverNeedFilter === "study" && category === "Scholarships") return true;
+  if (discoverNeedFilter === "money" && category === "Learn & Earn") return true;
+  if (discoverNeedFilter === "support" && category === "Volunteer Opportunities") return true;
+  return (needMatches[discoverNeedFilter] || []).some((word) => text.includes(word));
+}
+
+function opportunityMatchesTime(item) {
+  if (discoverTimeFilter === "all") return true;
+  const text = opportunityFilterText(item);
+  if (discoverTimeFilter === "quick") {
+    return item.category === "Learn & Earn" || item.difficulty === "Beginner" || text.includes("30 minutes") || text.includes("short");
+  }
+  if (discoverTimeFilter === "weekend") {
+    return ["Volunteer Opportunities", "Competitions", "Learn & Earn"].includes(item.category) || text.includes("few free hours");
+  }
+  if (discoverTimeFilter === "month") {
+    return ["Internships", "Scholarships", "Competitions", "Jobs"].includes(item.category) || item.difficulty === "Advanced";
+  }
+  return true;
+}
+
+function visibleOpportunities() {
+  return opportunityItems.filter((item) => {
+    const categoryMatches = opportunityCategory === "All" || item.category === opportunityCategory;
+    return categoryMatches && opportunityMatchesStage(item) && opportunityMatchesNeed(item) && opportunityMatchesTime(item);
+  });
+}
+
+function discoverFilterGroup(label, name, options, activeId) {
+  return `
+    <div class="discover-filter-group" aria-label="${escapeHTML(label)}">
+      <span>${escapeHTML(label)}</span>
+      <div>
+        ${options.map((option) => `
+          <button type="button" class="${activeId === option.id ? "is-selected" : ""}" data-discover-filter="${escapeHTML(name)}:${escapeHTML(option.id)}">${escapeHTML(option.label)}</button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function discoverMarketplaceFilters() {
+  return `
+    <section class="discover-marketplace-panel">
+      <div>
+        <p class="eyebrow">Filters</p>
+        <h3>Find a door that fits your current life.</h3>
+      </div>
+      ${discoverFilterGroup("Stage", "stage", DISCOVER_STAGE_FILTERS, discoverStageFilter)}
+      ${discoverFilterGroup("Need", "need", DISCOVER_NEED_FILTERS, discoverNeedFilter)}
+      ${discoverFilterGroup("Time", "time", DISCOVER_TIME_FILTERS, discoverTimeFilter)}
+    </section>
+  `;
 }
 
 function opportunityProfileFacts() {
@@ -3051,6 +3169,191 @@ function adultingReadinessOverviewCard() {
       </div>
     </section>
   `;
+}
+
+function adultingReadinessSummary() {
+  const dimensions = adultingReadinessDimensions();
+  const total = dimensions.reduce((sum, item) => sum + item.score, 0);
+  const percent = Math.round((total / (dimensions.length * 3)) * 100);
+  const weakest = dimensions.slice().sort((a, b) => a.score - b.score)[0] || dimensions[0];
+  return { dimensions, percent, weakest };
+}
+
+function nextStarterStep() {
+  const path = activeStarterPath();
+  if (!path) return null;
+  const completed = trackerState.starterPath.completedStepIds || [];
+  return path.steps.find((step) => !completed.includes(step.id)) || path.steps[0] || null;
+}
+
+function savedOpportunityForRail() {
+  const record = trackerState.savedOpportunities.find((item) => item.user_id === currentUserId());
+  if (!record) return null;
+  return opportunityItems.find((item) => item.id === record.opportunity_id) || null;
+}
+
+function upcomingRealLifeEventForRail() {
+  const events = typeof myRealLifeEvents === "function" ? myRealLifeEvents() : [];
+  return events
+    .filter((event) => event.status !== "done")
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0] || null;
+}
+
+function desktopRightRailHtml(tab) {
+  const focus = todaysDeskFocus();
+  const path = activeStarterPath();
+  const nextStep = nextStarterStep();
+  const readiness = adultingReadinessSummary();
+  const savedOpportunity = savedOpportunityForRail();
+  const dueEvent = upcomingRealLifeEventForRail();
+  const supportCount = trackerState.supportContacts.filter((contact) => contact.user_id === currentUserId() || !contact.user_id).length;
+  const savedCount = savedOpportunityCount();
+  return `
+    <section class="rail-card rail-focus-card">
+      <p class="eyebrow">Today</p>
+      <h3>${escapeHTML(focus.title)}</h3>
+      <p>${path ? `Active path: ${escapeHTML(path.label)}.` : "Choose one starter path so Compass can turn the app into a route."}</p>
+      ${nextStep ? `<button class="primary-action compact-action" type="button" ${starterPathStepActionAttributes(nextStep)}>Continue next step</button>` : `<button class="primary-action compact-action" type="button" data-open="firstRunOnboarding">Pick starter path</button>`}
+    </section>
+    <section class="rail-card rail-readiness-card">
+      <div class="rail-score-row">
+        <div>
+          <p class="eyebrow">Readiness</p>
+          <h3>${readiness.percent}% real-signal ready</h3>
+        </div>
+        <span>${escapeHTML(readiness.weakest.label)}</span>
+      </div>
+      <div class="rail-meter"><span style="width:${readiness.percent}%"></span></div>
+      <p>Weakest area right now: ${escapeHTML(readiness.weakest.detail)}.</p>
+      <button class="secondary-action compact-action" type="button" ${readiness.weakest.attr}>Improve ${escapeHTML(readiness.weakest.label)}</button>
+    </section>
+    <section class="rail-card">
+      <p class="eyebrow">Adult-Life Map</p>
+      <div class="rail-map-list">
+        ${readiness.dimensions.map((item) => `
+          <button type="button" ${item.attr} class="${tab && item.id === tab ? "is-current" : ""}">
+            <span>${escapeHTML(item.label)}</span>
+            <strong>${escapeHTML(item.action)} · ${Math.round((item.score / 3) * 100)}%</strong>
+          </button>
+        `).join("")}
+      </div>
+    </section>
+    <section class="rail-card rail-saved-card">
+      <p class="eyebrow">Saved / Due</p>
+      ${savedOpportunity ? `<h3>${escapeHTML(savedOpportunity.title)}</h3><p>${escapeHTML(savedOpportunity.category)} · saved opportunity ${savedCount > 1 ? `+${savedCount - 1} more` : ""}</p><button class="secondary-action compact-action" type="button" data-community-view-mode="opportunities">Open Discover</button>` : `<h3>No saved opportunity yet</h3><p>Use Discover to save a door you may actually open.</p><button class="secondary-action compact-action" type="button" data-discover-mode-jump="opportunities">Browse doors</button>`}
+      ${dueEvent ? `<div class="rail-due-note"><span>Due</span><strong>${escapeHTML(dueEvent.title)}</strong></div>` : ""}
+    </section>
+    <section class="rail-card rail-trust-card">
+      <p class="eyebrow">Safety / Trust</p>
+      <h3>${supportCount ? `${supportCount} support contact${supportCount === 1 ? "" : "s"} ready` : "Support Circle is empty"}</h3>
+      <div class="rail-action-pair">
+        <button class="secondary-action compact-action" type="button" data-open="supportCircle">Support</button>
+        <button class="secondary-action compact-action" type="button" data-open="aiTrustCenter">AI trust</button>
+      </div>
+    </section>
+  `;
+}
+
+function refreshDesktopRightRail(tab = activeTab) {
+  if (!desktopRightRail) return;
+  desktopRightRail.innerHTML = desktopRightRailHtml(tab);
+}
+
+function commandLauncherCommands() {
+  return [
+    { id: "home", title: "Today plan", detail: "Starter path, readiness, and next action.", lane: "Home", tab: "home", icon: "icon-home.png", keywords: ["home", "today", "starter", "readiness"] },
+    { id: "future-scan", title: "Run Future Scan", detail: "Check identity, values, hidden costs, and no-action future.", lane: "Decide", tab: "decide", icon: "icon-decide.png", keywords: ["decision", "choose", "future scan", "risk"] },
+    { id: "cost-living", title: "Real Cost of Living", detail: "Estimate SG-style living costs before a decision.", lane: "Decide", tab: "decide", open: "costOfLiving", icon: "icon-money.png", keywords: ["money", "cost", "budget", "rent"] },
+    { id: "tax", title: "Basic Tax Obligations", detail: "Plain-English tax checklist.", lane: "Decide", tab: "decide", open: "taxObligations", icon: "icon-receipt.png", keywords: ["tax", "cpf", "income"] },
+    { id: "blueprint", title: "Discover Yourself", detail: "Build the profile that powers better recommendations.", lane: "Build", tab: "build", open: "discoverYourself", icon: "icon-profile.png", keywords: ["profile", "blueprint", "identity", "values"] },
+    { id: "roadmap", title: "Life Roadmap", detail: "Turn a goal into monthly milestones.", lane: "Build", tab: "build", open: "roadmapView", icon: "icon-time.png", keywords: ["roadmap", "goal", "plan", "milestone"] },
+    { id: "mood", title: "Mood Check-In", detail: "Log today's mood and energy.", lane: "Build", tab: "build", open: "mood", icon: "icon-mood.png", keywords: ["mood", "energy", "check in"] },
+    { id: "career-studio", title: "Career Studio", detail: "Resume, portfolio, interviews, job matching, paycheck checks.", lane: "Practice", tab: "practice", open: "careerStudio", icon: "icon-work.png", keywords: ["career", "resume", "interview", "job"] },
+    { id: "skill-guides", title: "Skill Guides", detail: "Payslips, renting, SIM plans, cooking, first aid, and more.", lane: "Practice", tab: "practice", open: "skillGuides", icon: "icon-guide.png", keywords: ["skills", "adulting", "guide", "home"] },
+    { id: "due-dates", title: "Real Due Dates", detail: "Track bills, renewals, rent, and real deadlines.", lane: "Practice", tab: "practice", open: "realLifeEvents", icon: "icon-checkin.png", keywords: ["deadline", "due", "bill", "reminder"] },
+    { id: "opportunities", title: "Discover Opportunities", detail: "Browse doors by stage, need, time, and category.", lane: "Discover", tab: "discover", discoverMode: "opportunities", icon: "icon-support.png", keywords: ["opportunity", "internship", "scholarship", "volunteer"] },
+    { id: "people", title: "Find People", detail: "Mentors, skill exchange, accountability, Been There.", lane: "Discover", tab: "discover", discoverMode: "people", icon: "icon-chat.png", keywords: ["people", "mentor", "skill exchange", "support"] },
+    { id: "groups", title: "Find Groups", detail: "Goal squads and community groups.", lane: "Discover", tab: "discover", discoverMode: "groups", icon: "icon-support.png", keywords: ["group", "squad", "community"] },
+    { id: "ai-profile", title: "Compass AI Profile", detail: "Control what Compass may use.", lane: "Profile", tab: "profile", open: "compassProfile", icon: "icon-chat.png", keywords: ["ai", "profile", "memory"] },
+    { id: "trust", title: "AI Trust Center", detail: "See what AI uses and inspect trace logs.", lane: "Profile", tab: "profile", open: "aiTrustCenter", icon: "icon-assessment.png", keywords: ["trust", "privacy", "data", "ai"] },
+    { id: "sos", title: "SOS Support", detail: "Urgent support and safety categories.", lane: "Safety", open: "sosTriage", icon: "icon-warning.png", keywords: ["sos", "help", "urgent", "safety"] }
+  ];
+}
+
+function commandLauncherMatches(command, query) {
+  if (!query) return true;
+  const haystack = [command.title, command.detail, command.lane, ...(command.keywords || [])].join(" ").toLowerCase();
+  return query.toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
+}
+
+function commandLauncherResults(query = commandQuery) {
+  const commands = commandLauncherCommands().filter((command) => commandLauncherMatches(command, query));
+  return commands.length ? commands.slice(0, 9) : commandLauncherCommands().slice(0, 6);
+}
+
+function commandLauncherResultsHtml(query = commandQuery) {
+  const commands = commandLauncherResults(query);
+  const hasQuery = cleanText(query, 120);
+  return `
+    <div class="command-result-grid">
+      ${commands.map((command) => `
+        <button class="command-result-card" type="button" data-command-run="${escapeHTML(command.id)}">
+          <img src="assets/${escapeHTML(command.icon)}" alt="">
+          <span>${escapeHTML(command.lane)}</span>
+          <strong>${escapeHTML(command.title)}</strong>
+          <small>${escapeHTML(command.detail)}</small>
+        </button>
+      `).join("")}
+    </div>
+    ${hasQuery ? `<button class="command-ask-ai" type="button" data-command-run="ask-ai">Ask Compass AI about "${escapeHTML(hasQuery)}"</button>` : ""}
+  `;
+}
+
+function commandLauncherModal() {
+  return `
+    <div class="modal-card command-palette-card" role="dialog" aria-modal="true" aria-labelledby="command-palette-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Command center</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="command-palette-title">Go straight to the thing you need.</h3>
+      <label class="command-search-field">
+        <span>Search Compass</span>
+        <input id="command-search-input" type="search" value="${escapeHTML(commandQuery)}" data-command-search placeholder="Try resume, money, mentor, scholarship, rent...">
+      </label>
+      <div data-command-results>${commandLauncherResultsHtml(commandQuery)}</div>
+    </div>
+  `;
+}
+
+function mountCommandLauncher() {
+  const input = modalLayer.querySelector("[data-command-search]");
+  if (!input) return;
+  requestAnimationFrame(() => {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+}
+
+async function runCommandLauncher(id) {
+  const query = cleanText(commandQuery, 180);
+  closeModal();
+  if (id === "ask-ai") {
+    renderScreen("compass");
+    if (query) await sendChatMessage(`Help me with this adult-life question: ${query}`);
+    return;
+  }
+  const command = commandLauncherCommands().find((item) => item.id === id);
+  if (!command) return;
+  if (command.discoverMode) {
+    communityViewMode = command.discoverMode;
+    renderScreen("discover");
+  } else if (command.tab) {
+    renderScreen(command.tab);
+  }
+  if (command.open) {
+    openModal(command.open);
+  }
 }
 
 function lifeVerseState() {
@@ -8537,9 +8840,10 @@ function discoverOpportunitiesSection() {
       <div>
         <p class="eyebrow">Opportunities</p>
         <h3>Find a real door, then prepare before applying.</h3>
-        <p>Curated routes stay separate from community-submitted listings so the user can compare calmly.</p>
+        <p>Filter by where you are, what you need, and how much time you can give. Save a door, then use Compass to prepare.</p>
       </div>
     </section>
+    ${discoverMarketplaceFilters()}
     ${communityBrowseOpportunitiesSection()}
   `;
 }
@@ -10991,6 +11295,8 @@ async function loadObjaverseCredits() {
 }
 
 const modals = {
+  commandLauncher: () => commandLauncherModal(),
+
   firstRunOnboarding: () => firstRunOnboardingModal(),
 
   username: () => `
@@ -12497,6 +12803,7 @@ function renderScreen(tab) {
   }
   screenRoot.innerHTML = getScreen(tab);
   bindRenderedNavigation(screenRoot);
+  refreshDesktopRightRail(tab);
   if (tab === "discover") mountFeedSwipeCard();
   const navTab = tab === "assess" || tab === "compass" ? "home" : tab === "simulator" ? "practice" : tab === "stories" ? "build" : tab;
   navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.tab === navTab));
@@ -12647,6 +12954,7 @@ function openModal(name, payload) {
   modalLayer.setAttribute("aria-hidden", "false");
   mountSwipeCard();
   mountFeedSwipeCard();
+  if (name === "commandLauncher") mountCommandLauncher();
 }
 
 // Generic swipe-card drag physics, mounted directly on the DOM element after
@@ -14839,6 +15147,21 @@ navItems.forEach((item) => {
   item.addEventListener("click", () => renderScreen(item.dataset.tab));
 });
 
+document.addEventListener("input", (event) => {
+  const commandSearchInput = event.target.closest("[data-command-search]");
+  if (!commandSearchInput) return;
+  commandQuery = cleanText(commandSearchInput.value, 120);
+  const results = modalLayer.querySelector("[data-command-results]");
+  if (results) results.innerHTML = commandLauncherResultsHtml(commandQuery);
+});
+
+document.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    openModal("commandLauncher");
+  }
+});
+
 document.addEventListener("click", async (event) => {
   const opener = event.target.closest("[data-open]");
   const closer = event.target.closest("[data-close]");
@@ -15058,8 +15381,16 @@ document.addEventListener("click", async (event) => {
   const feedNextButton = event.target.closest("[data-feed-next]");
   const feedSaveButton = event.target.closest("[data-feed-save]");
   const communityViewModeButton = event.target.closest("[data-community-view-mode]");
+  const discoverFilterButton = event.target.closest("[data-discover-filter]");
+  const commandRunButton = event.target.closest("[data-command-run]");
   const tryAdvancedFindingButton = event.target.closest("[data-try-advanced-finding]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
+
+  if (commandRunButton) {
+    event.preventDefault();
+    await runCommandLauncher(commandRunButton.dataset.commandRun);
+    return;
+  }
 
   if (opener) {
     if (opener.dataset.open === "communityPost") setPendingMilestoneShare(null);
@@ -15324,6 +15655,13 @@ document.addEventListener("click", async (event) => {
     const requestedMode = communityViewModeButton.dataset.communityViewMode;
     const normalizedMode = requestedMode === "browse" ? "opportunities" : requestedMode === "feed" ? "for-you" : requestedMode;
     communityViewMode = DISCOVER_VIEW_MODES.some((mode) => mode.id === normalizedMode) ? normalizedMode : "for-you";
+    renderScreen("discover");
+  }
+  if (discoverFilterButton) {
+    const [group, value] = String(discoverFilterButton.dataset.discoverFilter || "").split(":");
+    if (group === "stage" && DISCOVER_STAGE_FILTERS.some((item) => item.id === value)) discoverStageFilter = value;
+    if (group === "need" && DISCOVER_NEED_FILTERS.some((item) => item.id === value)) discoverNeedFilter = value;
+    if (group === "time" && DISCOVER_TIME_FILTERS.some((item) => item.id === value)) discoverTimeFilter = value;
     renderScreen("discover");
   }
   if (sosGetHelpButton) {

@@ -62,8 +62,9 @@
             <span class="status-dots"><i></i><i></i><i></i></span>
           </div>
           <div class="desktop-command-bar">
-            <button class="desktop-command-search" type="button" data-tab-jump="decide">
-              <span>Search decisions, skills, opportunities...</span>
+            <button class="desktop-command-search" type="button" data-open="commandLauncher">
+              <span>Search tools, decisions, skills, opportunities...</span>
+              <kbd>Ctrl K</kbd>
             </button>
             <div class="desktop-command-actions">
               <button type="button" data-open="assessment">Readiness</button>
@@ -106,7 +107,7 @@
           </nav>
         </div>
 
-        <aside class="desktop-right-rail" aria-label="Adult-life dashboard summary">
+        <aside class="desktop-right-rail" id="desktop-right-rail" aria-label="Adult-life dashboard summary">
           <section class="rail-card rail-focus-card">
             <p class="eyebrow">Today</p>
             <h3>Pick one real next step.</h3>
