@@ -15294,6 +15294,12 @@ document.addEventListener("click", async (event) => {
       openModal("challengeHub");
       renderScreen(activeTab);
       refreshStaticScreens();
+      // Bug fix (self-critique finding): the button's own visible text
+      // already changes from "Start" to "Restart" on success, but that's
+      // subtle enough on a quick tap to genuinely read as "nothing
+      // happened" - a real, reported case of this exact confusion. Every
+      // other check-in-style action in the app confirms with this toast.
+      triggerCheckInCelebration(`Started "${challenge.title}"`);
     }
   }
 
