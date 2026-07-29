@@ -613,7 +613,11 @@ const defaultTrackerState = {
   // pendingChainBreakReflection(). lastAcknowledgedBreakDate prevents the
   // same break being asked about twice.
   habitChainReflections: [],
-  lastAcknowledgedBreakDate: null
+  lastAcknowledgedBreakDate: null,
+  // Mood trend -> support resources (research-grounded finding, see
+  // recentMoodTrend()/pendingMoodTrendNudge()). Prevents the same
+  // sustained-low-mood window from re-triggering the Inbox nudge twice.
+  lastMoodTrendNudgeAt: null
 };
 
 const dailyMissions = [
@@ -1370,7 +1374,8 @@ function normalizeTrackerState(state) {
     roommateStintHistory: Array.isArray(state.roommateStintHistory) ? state.roommateStintHistory : fallback.roommateStintHistory,
     juryVerdictHistory: Array.isArray(state.juryVerdictHistory) ? state.juryVerdictHistory : fallback.juryVerdictHistory,
     habitChainReflections: Array.isArray(state.habitChainReflections) ? state.habitChainReflections : fallback.habitChainReflections,
-    lastAcknowledgedBreakDate: state.lastAcknowledgedBreakDate || null
+    lastAcknowledgedBreakDate: state.lastAcknowledgedBreakDate || null,
+    lastMoodTrendNudgeAt: state.lastMoodTrendNudgeAt || null
   };
 }
 
@@ -1700,7 +1705,9 @@ function growthTimelineEvents() {
     events.push({ at: calRecords[2].resolvedAt, label: "First real Judgment Calibration reading", detail: "3 resolved Check-Backs - enough to see a real pattern" });
   }
   myRealLifeEvents().filter((event) => event.lastHandledAt).forEach((event) => {
-    events.push({ at: event.lastHandledAt, label: `Handled "${cleanText(event.title, 80)}"`, detail: "Real Due Date" });
+    events.push(event.category === "milestone"
+      ? { at: event.lastHandledAt, label: `Reached a milestone: "${cleanText(event.title, 80)}"`, detail: "Life Milestone" }
+      : { at: event.lastHandledAt, label: `Handled "${cleanText(event.title, 80)}"`, detail: "Real Due Date" });
   });
   SKILL_GUIDES.forEach((guide) => {
     const progress = skillGuideProgress(guide.id);
@@ -4493,7 +4500,29 @@ function dueRealLifeEvents() {
   return myRealLifeEvents().filter((event) => event.status !== "done" && new Date(event.dueDate).getTime() <= now);
 }
 
-function addRealLifeEvent({ title, dueDate, recurrence, note }) {
+// Singapore milestone tracking (research-grounded finding): Youth STEPS
+// (National Youth Council) found home ownership still ranks as a real,
+// concrete adulthood marker for Singapore youth specifically, unlike the
+// global "liquid adulthood" drift away from fixed milestones - but the
+// only content Compass had for this (Real Cost of Living, Basic Tax
+// Obligations) was static, read-once reference material, not something
+// that gets actively tracked and remembered the way a real due date does.
+// Deliberately event-based, not figure-based (no income ceilings, grant
+// amounts, or CPF thresholds) - those change and Compass hand-writing a
+// stale or wrong number would be real financial misinformation, unlike a
+// practice roleplay getting a detail wrong. category: "milestone" reuses
+// the exact same due-date/handled/recurrence machinery as a bill, just
+// tagged and displayed separately, and feeds Your Story with its own
+// phrasing (see growthTimelineEvents()).
+const SG_MILESTONE_TEMPLATES = [
+  "Started my first CPF contributions",
+  "Submitted a BTO application",
+  "BTO ballot results out",
+  "HDB key collection - moved into my own home",
+  "Completed National Service (ORD)"
+];
+
+function addRealLifeEvent({ title, dueDate, recurrence, note, category }) {
   trackerState.realLifeEvents.push({
     id: `rle-${Date.now()}`,
     user_id: currentUserId(),
@@ -4501,6 +4530,7 @@ function addRealLifeEvent({ title, dueDate, recurrence, note }) {
     dueDate,
     recurrence: ["once", "monthly", "yearly"].includes(recurrence) ? recurrence : "once",
     note: cleanText(note, 240),
+    category: category === "milestone" ? "milestone" : "recurring",
     status: "active",
     createdAt: new Date().toISOString(),
     lastHandledAt: null
@@ -4533,7 +4563,23 @@ function deleteRealLifeEvent(id) {
 
 function realLifeEventsModal() {
   const events = myRealLifeEvents().filter((event) => event.status !== "done").sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+  const bills = events.filter((event) => event.category !== "milestone");
+  const milestones = events.filter((event) => event.category === "milestone");
   const now = Date.now();
+  const renderEvent = (event) => {
+    const due = new Date(event.dueDate).getTime() <= now;
+    return `
+      <article class="ledger-entry">
+        <p class="ledger-entry-stamp">${escapeHTML(new Date(event.dueDate).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }))}${event.recurrence !== "once" ? ` - repeats ${event.recurrence}` : ""}${due ? " - due" : ""}</p>
+        <p class="ledger-entry-text">${escapeHTML(event.title)}</p>
+        ${event.note ? `<p class="ledger-entry-note">${escapeHTML(event.note)}</p>` : ""}
+        <div class="profile-actions">
+          <button class="secondary-action compact-action" type="button" data-handle-real-life-event="${escapeHTML(event.id)}">${event.category === "milestone" ? "Mark reached" : (event.recurrence === "once" ? "Mark done" : "Mark handled")}</button>
+          <button class="text-action" type="button" data-delete-real-life-event="${escapeHTML(event.id)}">Remove</button>
+        </div>
+      </article>
+    `;
+  };
   return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="real-life-events-title">
       <div class="modal-top">
@@ -4553,25 +4599,28 @@ function realLifeEventsModal() {
           </select>
         </label>
         <label>Note (optional)<input id="rle-note-input" type="text" maxlength="240" placeholder="Optional details"></label>
+        <label class="check-option">
+          <input type="checkbox" id="rle-category-input">
+          <span>This is a life milestone, not a recurring bill</span>
+        </label>
       </div>
       ${realLifeEventError ? `<p class="form-error">${escapeHTML(realLifeEventError)}</p>` : ""}
       <button class="primary-action" type="button" data-save-real-life-event>Add</button>
-      <div class="content-rail-title"><strong>Tracking</strong><span>${events.length}</span></div>
+
+      <div class="content-rail-title"><strong>Or track a Singapore milestone</strong><span></span></div>
+      <p class="tiny-note">Home ownership specifically still shows up as a real adulthood marker for Singapore youth (Youth STEPS, National Youth Council) - unlike a bill, these get tracked with their own real date, not just read about once.</p>
+      <div class="mirror-example-row">
+        ${SG_MILESTONE_TEMPLATES.map((title) => `<button type="button" data-sg-milestone-template="${escapeHTML(title)}">${escapeHTML(title)}</button>`).join("")}
+      </div>
+
+      ${milestones.length ? `
+        <div class="content-rail-title"><strong>Life milestones</strong><span>${milestones.length}</span></div>
+        <div class="ledger-sheet">${milestones.map(renderEvent).join("")}</div>
+      ` : ""}
+
+      <div class="content-rail-title"><strong>Bills & deadlines</strong><span>${bills.length}</span></div>
       <div class="ledger-sheet">
-        ${events.length ? events.map((event) => {
-          const due = new Date(event.dueDate).getTime() <= now;
-          return `
-            <article class="ledger-entry">
-              <p class="ledger-entry-stamp">${escapeHTML(new Date(event.dueDate).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }))}${event.recurrence !== "once" ? ` - repeats ${event.recurrence}` : ""}${due ? " - due" : ""}</p>
-              <p class="ledger-entry-text">${escapeHTML(event.title)}</p>
-              ${event.note ? `<p class="ledger-entry-note">${escapeHTML(event.note)}</p>` : ""}
-              <div class="profile-actions">
-                <button class="secondary-action compact-action" type="button" data-handle-real-life-event="${escapeHTML(event.id)}">${event.recurrence === "once" ? "Mark done" : "Mark handled"}</button>
-                <button class="text-action" type="button" data-delete-real-life-event="${escapeHTML(event.id)}">Remove</button>
-              </div>
-            </article>
-          `;
-        }).join("") : `<p class="muted">Nothing tracked yet.</p>`}
+        ${bills.length ? bills.map(renderEvent).join("") : `<p class="muted">Nothing tracked yet.</p>`}
       </div>
     </div>
   `;
@@ -5117,6 +5166,8 @@ function pendingInboxItems() {
   });
   const supportNudge = pendingSupportNetworkNudge();
   if (supportNudge) items.push({ kind: "supportNetwork", label: supportNudge.label, detail: supportNudge.detail });
+  const moodTrendNudge = pendingMoodTrendNudge();
+  if (moodTrendNudge) items.push({ kind: "moodTrend", label: moodTrendNudge.label, detail: moodTrendNudge.detail, mostRecentAt: moodTrendNudge.mostRecentAt });
   return items;
 }
 
@@ -5127,6 +5178,7 @@ function inboxModal() {
   const roommateItems = items.filter((item) => item.kind === "roommate");
   const resurfaceItems = items.filter((item) => item.kind === "resurface").slice(0, 8);
   const supportNetworkItems = items.filter((item) => item.kind === "supportNetwork");
+  const moodTrendItems = items.filter((item) => item.kind === "moodTrend");
   return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="inbox-title">
       <div class="modal-top">
@@ -5180,6 +5232,18 @@ function inboxModal() {
               <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
               <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
               <button class="secondary-action compact-action" type="button" data-open="supportCircle">Open Support Circle</button>
+            </article>
+          `).join("")}
+          ${moodTrendItems.map((item) => `
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(item.detail)}</p>
+              <p class="ledger-entry-text">${escapeHTML(item.label)}</p>
+              <div class="profile-actions">
+                <button class="secondary-action compact-action" type="button" data-open="supportCircle" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">Support Circle</button>
+                <button class="secondary-action compact-action" type="button" data-open="skillGuideDetail" data-open-payload="build-support-before-crisis" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">Build support</button>
+                <button class="secondary-action compact-action" type="button" data-open="communityEncouragement" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">Been There</button>
+                <button class="text-action" type="button" data-dismiss-mood-trend-nudge="${escapeHTML(item.mostRecentAt)}">I'm okay, thanks</button>
+              </div>
             </article>
           `).join("")}
         </div>
@@ -7094,6 +7158,40 @@ function personalWeatherForecast() {
     });
   }
   return days;
+}
+
+// "Psychological resilience" (research-grounded finding): Singapore's own
+// National Youth Mental Health Study found roughly 1 in 3 youth aged
+// 15-35 report severe distress, worst in the 20-24 bracket - Compass's
+// core demographic. Personal Weather Forecast already surfaces mood
+// trend, but only passively, as a chart you have to go look at - nothing
+// ever connected a real, sustained low-mood pattern to the actual support
+// resources that already exist (Support Circle, Been There, the
+// build-support-before-crisis guide). This is that connection. Requires
+// at least 3 real, consecutive low check-ins, not one rough day - a
+// single bad day is normal and shouldn't trigger anything.
+function recentMoodTrend() {
+  const myId = currentUserId();
+  const entries = trackerState.mood.entries
+    .filter((entry) => entry.user_id === myId || !entry.user_id)
+    .slice()
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 5);
+  if (entries.length < 3) return null;
+  if (!entries.every((entry) => Number(entry.score) < 40)) return null;
+  return { count: entries.length, mostRecentAt: entries[0].created_at };
+}
+
+function pendingMoodTrendNudge() {
+  const trend = recentMoodTrend();
+  if (!trend) return null;
+  if (trackerState.lastMoodTrendNudgeAt === trend.mostRecentAt) return null;
+  return { label: `${trend.count} mood check-ins in a row have been low`, detail: "Might be worth reaching out to someone, not just riding it out.", mostRecentAt: trend.mostRecentAt };
+}
+
+function acknowledgeMoodTrendNudge(mostRecentAt) {
+  trackerState.lastMoodTrendNudgeAt = mostRecentAt;
+  saveTrackerState();
 }
 
 function personalWeatherFronts() {
@@ -9954,6 +10052,8 @@ const screens = {
         { title: "Share with a guardian", text: "A read-only Life Roadmap link - no login needed on their end.", modal: "guardianShareSetup", icon: "icon-profile.png", kind: "real" },
         { title: "Skill Exchange", text: "Trade what you know for what you need.", tab: "community", icon: "icon-chat.png", kind: "real" },
         { title: "SOS - get urgent help", text: "Real Singapore resources, always one tap away.", modal: "sosTriage", icon: "icon-warning.png", kind: "real" },
+        { title: "Build support before crisis", text: "Singapore's own youth mental health data says this matters as much as SOS - not just one guide among many.", modal: "buildSupportGuide", icon: "icon-support.png", kind: "real" },
+        { title: "Been There", text: "Anonymous, one-time encouragement to or from someone who's been where you are.", tab: "community", icon: "icon-support.png", kind: "real" },
         { title: "Inherited Debugging", text: "Refactor habits you didn't choose, issue by issue.", modal: "legacyDebugger", icon: "icon-settings.png", kind: "practice" },
         { title: "Self-Debt", text: "Pay your future self a debt, collected only when it's actually due.", modal: "selfDebtLedger", icon: "icon-money.png", kind: "practice" },
         { title: "Estate Auction", text: "Your time and habits, read out like an auction catalog.", modal: "estateAuction", icon: "icon-time.png", kind: "practice" },
@@ -10459,6 +10559,11 @@ const modals = {
 
   skillGuides: () => skillGuidesModal(),
   skillGuideDetail: (guideId) => skillGuideDetailModal(guideId),
+  // Direct Growth Hub entry point for this one guide specifically -
+  // growthActionAttributes() only ever emits a bare data-open, no payload,
+  // so item.modal can't target skillGuideDetail("build-support-before-crisis")
+  // directly the way the generic Skill Guides list can.
+  buildSupportGuide: () => skillGuideDetailModal("build-support-before-crisis"),
 
   addKeyResult: (goalId) => addKeyResultModal(goalId),
   updateKeyResult: (payload) => updateKeyResultModal(payload),
@@ -13968,6 +14073,8 @@ document.addEventListener("click", async (event) => {
   const saveRealLifeEventButton = event.target.closest("[data-save-real-life-event]");
   const handleRealLifeEventButton = event.target.closest("[data-handle-real-life-event]");
   const deleteRealLifeEventButton = event.target.closest("[data-delete-real-life-event]");
+  const sgMilestoneTemplateButton = event.target.closest("[data-sg-milestone-template]");
+  const dismissMoodTrendNudgeButton = event.target.closest("[data-dismiss-mood-trend-nudge]");
   const saveKeyResultButton = event.target.closest("[data-save-key-result]");
   const saveKeyResultProgressButton = event.target.closest("[data-save-key-result-progress]");
   const deleteKeyResultButton = event.target.closest("[data-delete-key-result]");
@@ -14995,13 +15102,14 @@ document.addEventListener("click", async (event) => {
     const dateInput = modalLayer.querySelector("#rle-date-input");
     const recurrenceInput = modalLayer.querySelector("#rle-recurrence-input");
     const noteInput = modalLayer.querySelector("#rle-note-input");
+    const categoryInput = modalLayer.querySelector("#rle-category-input");
     const title = cleanText(titleInput ? titleInput.value : "", 120);
     const dueDate = dateInput ? dateInput.value : "";
     if (!title || !dueDate) {
       realLifeEventError = "Give it a name and a due date.";
       openModal("realLifeEvents");
     } else {
-      addRealLifeEvent({ title, dueDate, recurrence: recurrenceInput ? recurrenceInput.value : "once", note: noteInput ? noteInput.value : "" });
+      addRealLifeEvent({ title, dueDate, recurrence: recurrenceInput ? recurrenceInput.value : "once", note: noteInput ? noteInput.value : "", category: (categoryInput && categoryInput.checked) ? "milestone" : "recurring" });
       realLifeEventError = "";
       openModal("realLifeEvents");
     }
@@ -15014,6 +15122,28 @@ document.addEventListener("click", async (event) => {
   if (deleteRealLifeEventButton) {
     deleteRealLifeEvent(deleteRealLifeEventButton.dataset.deleteRealLifeEvent);
     openModal("realLifeEvents");
+  }
+  if (sgMilestoneTemplateButton) {
+    const titleInput = modalLayer.querySelector("#rle-title-input");
+    const categoryInput = modalLayer.querySelector("#rle-category-input");
+    if (titleInput) titleInput.value = sgMilestoneTemplateButton.dataset.sgMilestoneTemplate;
+    if (categoryInput) categoryInput.checked = true;
+    const dateInput = modalLayer.querySelector("#rle-date-input");
+    if (dateInput) dateInput.focus();
+  }
+  if (dismissMoodTrendNudgeButton) {
+    // Runs alongside whichever data-open this button also carries (Support
+    // Circle / the crisis-prep guide / Been There) - taking any one of
+    // those actions is itself a real response, not just the explicit
+    // "I'm okay" dismissal, so all four count as acknowledged. Only the
+    // plain "I'm okay, thanks" button has no data-open of its own to
+    // refresh the modal afterward - without this it stayed open with a
+    // stale, now-acknowledged item still showing and blocked every click
+    // behind it (a real, confirmed bug caught while testing this).
+    acknowledgeMoodTrendNudge(dismissMoodTrendNudgeButton.dataset.dismissMoodTrendNudge);
+    if (!dismissMoodTrendNudgeButton.hasAttribute("data-open")) {
+      openModal("inbox");
+    }
   }
   if (saveKeyResultButton) {
     const goalId = saveKeyResultButton.dataset.saveKeyResult;
