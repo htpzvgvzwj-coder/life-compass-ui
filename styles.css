@@ -9922,3 +9922,480 @@ body {
   color: var(--color-ink-soft);
   white-space: nowrap;
 }
+
+/* ===========================================================================
+   Responsive command center shell
+   Keeps every existing Compass feature, but stops presenting the public app as
+   only a phone mockup on larger screens.
+   =========================================================================== */
+.desktop-sidebar,
+.desktop-right-rail,
+.desktop-command-bar {
+  display: none;
+}
+
+@media (min-width: 921px) {
+  body.compass-public-app:not(.life-sim-active) {
+    overflow: hidden;
+    background:
+      linear-gradient(90deg, rgba(15, 110, 92, 0.08) 0 1px, transparent 1px 100%),
+      linear-gradient(180deg, rgba(28, 35, 33, 0.035) 0 1px, transparent 1px 100%),
+      #e6e9df;
+    background-size: 48px 48px, 48px 48px, auto;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .page-shell {
+    width: min(100% - 40px, 1480px);
+    height: 100dvh;
+    min-height: 720px;
+    padding: 20px 0;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .prototype-view.app-workspace.is-active {
+    display: grid;
+    grid-template-columns: 238px minmax(0, 1fr) 300px;
+    gap: 16px;
+    align-items: stretch;
+    height: calc(100dvh - 40px);
+    min-height: 680px;
+  }
+
+  .desktop-sidebar,
+  .desktop-right-rail {
+    display: flex;
+    min-height: 0;
+    border: 1px solid rgba(120, 132, 118, 0.45);
+    border-radius: 14px;
+    background: rgba(244, 245, 239, 0.86);
+    box-shadow: 0 18px 45px rgba(28, 35, 33, 0.12);
+    backdrop-filter: blur(16px);
+  }
+
+  .desktop-sidebar {
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .desktop-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid rgba(120, 132, 118, 0.34);
+  }
+
+  .desktop-brand-mark {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border-radius: 9px;
+    background: #1c2321;
+    color: #fdfdfa;
+    font-weight: 850;
+  }
+
+  .desktop-brand strong,
+  .rail-card h3 {
+    display: block;
+    margin: 0;
+    color: var(--color-ink);
+  }
+
+  .desktop-brand span:not(.desktop-brand-mark) {
+    display: block;
+    margin-top: 2px;
+    color: var(--color-ink-soft);
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  .desktop-nav {
+    display: grid;
+    gap: 7px;
+    margin-top: 18px;
+  }
+
+  .desktop-nav .nav-item {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    min-height: 44px;
+    justify-items: start;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--color-ink-soft);
+    font-size: 14px;
+    font-weight: 740;
+    text-align: left;
+  }
+
+  .desktop-nav .nav-item:hover {
+    border-color: rgba(15, 110, 92, 0.22);
+    background: rgba(223, 234, 229, 0.74);
+    color: var(--color-ink);
+  }
+
+  .desktop-nav .nav-item.is-active {
+    border-color: rgba(15, 110, 92, 0.38);
+    background: #0b5646;
+    color: #fdfdfa;
+  }
+
+  .desktop-nav .nav-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .desktop-sidebar-footer {
+    margin-top: auto;
+    padding-top: 18px;
+  }
+
+  .desktop-sos-action {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 58px;
+    padding: 10px;
+    border: 1px solid rgba(181, 67, 46, 0.28);
+    border-radius: 10px;
+    background: #f6e7e2;
+    color: #6b1f14;
+    text-align: left;
+  }
+
+  .desktop-sos-action span {
+    display: grid;
+    width: 42px;
+    height: 38px;
+    place-items: center;
+    border-radius: 8px;
+    background: #b5432e;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 850;
+  }
+
+  .desktop-sos-action strong {
+    font-size: 13px;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .phone-shell:not(.board-phone) {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: none;
+    height: calc(100dvh - 40px);
+    min-height: 680px;
+    border: 1px solid rgba(120, 132, 118, 0.5);
+    border-radius: 14px;
+    background: #f4f5ef;
+    box-shadow: 0 24px 60px rgba(28, 35, 33, 0.16);
+  }
+
+  body.compass-public-app:not(.life-sim-active) .phone-status {
+    display: none;
+  }
+
+  .desktop-command-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex: 0 0 auto;
+    min-height: 70px;
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(120, 132, 118, 0.34);
+    background: rgba(253, 253, 250, 0.82);
+  }
+
+  .desktop-command-search {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 42px;
+    padding: 0 14px;
+    border: 1px solid rgba(120, 132, 118, 0.5);
+    border-radius: 8px;
+    background: #eef0e8;
+    color: var(--color-ink-soft);
+    text-align: left;
+  }
+
+  .desktop-command-search::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    margin-right: 10px;
+    border: 2px solid currentColor;
+    border-radius: 999px;
+    box-shadow: 5px 5px 0 -3px currentColor;
+    opacity: 0.78;
+  }
+
+  .desktop-command-search span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-command-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .desktop-command-actions button {
+    min-height: 38px;
+    padding: 0 12px;
+    border: 1px solid rgba(15, 110, 92, 0.28);
+    border-radius: 8px;
+    background: #dfeae5;
+    color: #0b5646;
+    font-size: 12px;
+    font-weight: 760;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .app-screen {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    padding: 24px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.45), transparent 220px),
+      #e9ece3;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .bottom-nav,
+  body.compass-public-app:not(.life-sim-active) .sos-fab {
+    display: none;
+  }
+
+  .desktop-right-rail {
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    overflow: auto;
+  }
+
+  .rail-card {
+    padding: 16px;
+    border: 1px solid rgba(120, 132, 118, 0.34);
+    border-radius: 10px;
+    background: rgba(253, 253, 250, 0.78);
+  }
+
+  .rail-card p {
+    margin-bottom: 12px;
+    color: var(--color-ink-soft);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .rail-focus-card {
+    background:
+      linear-gradient(135deg, rgba(28, 35, 33, 0.95), rgba(15, 110, 92, 0.82)),
+      #1c2321;
+    color: #fdfdfa;
+  }
+
+  .rail-focus-card .eyebrow,
+  .rail-focus-card h3,
+  .rail-focus-card p {
+    color: #fdfdfa;
+  }
+
+  .rail-focus-card p {
+    opacity: 0.78;
+  }
+
+  .rail-map-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .rail-map-list button {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid rgba(120, 132, 118, 0.35);
+    border-radius: 8px;
+    background: #eef0e8;
+    color: var(--color-ink);
+    text-align: left;
+  }
+
+  .rail-map-list span {
+    color: var(--color-ink-faint);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .rail-map-list strong {
+    font-size: 13px;
+    line-height: 1.25;
+  }
+
+  .rail-trust-card {
+    margin-top: auto;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .screen-head {
+    align-items: center;
+    padding: 4px 0 10px;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .screen-title {
+    max-width: 760px;
+    font-size: clamp(28px, 3.1vw, 44px);
+    line-height: 1.02;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .screen-subtitle {
+    max-width: 760px;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .adult-prep-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    grid-template-areas:
+      "copy actions"
+      "focus actions";
+    gap: 24px;
+    align-items: end;
+    min-height: 250px;
+    padding: 28px;
+    border-radius: 14px;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .adult-prep-hero > div:first-child {
+    grid-area: copy;
+    align-self: start;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .adult-prep-hero h2 {
+    max-width: 660px;
+    margin-bottom: 10px;
+    font-size: clamp(34px, 4vw, 56px);
+    line-height: 1;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .adult-prep-hero-actions {
+    grid-area: actions;
+    align-self: center;
+    display: grid;
+    justify-content: flex-start;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .adult-prep-focus {
+    grid-area: focus;
+    align-self: stretch;
+    grid-template-columns: 1fr;
+    align-content: end;
+    padding: 18px;
+    border-radius: 10px;
+    background: rgba(253, 253, 250, 0.14);
+  }
+
+  body.compass-public-app:not(.life-sim-active) .starter-path-card,
+  body.compass-public-app:not(.life-sim-active) .adulting-readiness-card,
+  body.compass-public-app:not(.life-sim-active) .discover-home-card,
+  body.compass-public-app:not(.life-sim-active) .growth-hero-card,
+  body.compass-public-app:not(.life-sim-active) .mirror-form-card,
+  body.compass-public-app:not(.life-sim-active) .home-quick-access,
+  body.compass-public-app:not(.life-sim-active) .profile-card,
+  body.compass-public-app:not(.life-sim-active) .profile-hero {
+    border: 1px solid rgba(120, 132, 118, 0.34);
+    border-radius: 10px;
+    background-color: rgba(253, 253, 250, 0.86);
+    box-shadow: 0 12px 26px rgba(28, 35, 33, 0.08);
+  }
+
+  body.compass-public-app:not(.life-sim-active) .starter-path-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body.compass-public-app:not(.life-sim-active) .adulting-readiness-grid,
+  body.compass-public-app:not(.life-sim-active) .growth-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body.compass-public-app:not(.life-sim-active) .home-quick-access .feature-grid,
+  body.compass-public-app:not(.life-sim-active) .mirror-tools-row,
+  body.compass-public-app:not(.life-sim-active) .discover-recommendation-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  body.compass-public-app:not(.life-sim-active) .mode-toggle-row.discover-mode-toggle {
+    position: sticky;
+    top: -24px;
+    z-index: 3;
+    padding: 12px;
+    border: 1px solid rgba(120, 132, 118, 0.34);
+    border-radius: 10px;
+    background: rgba(244, 245, 239, 0.94);
+    backdrop-filter: blur(14px);
+  }
+}
+
+@media (min-width: 921px) and (max-width: 1180px) {
+  body.compass-public-app:not(.life-sim-active) .prototype-view.app-workspace.is-active {
+    grid-template-columns: 84px minmax(0, 1fr) 280px;
+  }
+
+  .desktop-brand div,
+  .desktop-nav .nav-item {
+    font-size: 0;
+  }
+
+  .desktop-brand {
+    justify-content: center;
+  }
+
+  .desktop-nav .nav-item {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 0;
+  }
+
+  .desktop-sidebar {
+    padding: 14px 12px;
+  }
+
+  .desktop-sos-action {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 8px;
+  }
+
+  .desktop-sos-action strong {
+    display: none;
+  }
+}
+
+@media (max-width: 920px) {
+  .desktop-sidebar,
+  .desktop-right-rail,
+  .desktop-command-bar {
+    display: none !important;
+  }
+}
+
+@media (max-width: 680px) {
+  body.compass-public-app:not(.life-sim-active) .sos-fab {
+    right: max(16px, env(safe-area-inset-right));
+    bottom: calc(86px + max(12px, env(safe-area-inset-bottom)));
+    width: 58px;
+    height: 58px;
+    box-shadow: 0 10px 24px rgba(181, 67, 46, 0.28);
+  }
+}

@@ -13,11 +13,62 @@
   </head>
   <body class="compass-public-app">
     <main class="page-shell">
-      <section class="prototype-view is-active" id="app-view">
-        <div class="phone-shell" aria-label="Compass mobile app">
+      <section class="prototype-view app-workspace is-active" id="app-view">
+        <aside class="desktop-sidebar" aria-label="Primary navigation">
+          <div class="desktop-brand">
+            <span class="desktop-brand-mark">C</span>
+            <div>
+              <strong>Compass</strong>
+              <span>Adult-Life Prep</span>
+            </div>
+          </div>
+          <nav class="desktop-nav" aria-label="Desktop primary">
+            <button class="nav-item is-active" type="button" data-tab="home">
+              <img class="nav-icon" src="assets/icon-home.png" alt="">
+              Home
+            </button>
+            <button class="nav-item signature-nav" type="button" data-tab="decide">
+              <img class="nav-icon" src="assets/icon-decide.png" alt="">
+              Decide
+            </button>
+            <button class="nav-item" type="button" data-tab="build">
+              <img class="nav-icon" src="assets/icon-learn.png" alt="">
+              Build
+            </button>
+            <button class="nav-item" type="button" data-tab="practice">
+              <img class="nav-icon" src="assets/icon-work.png" alt="">
+              Practice
+            </button>
+            <button class="nav-item" type="button" data-tab="discover">
+              <img class="nav-icon" src="assets/icon-support.png" alt="">
+              Discover
+            </button>
+            <button class="nav-item" type="button" data-tab="profile">
+              <img class="nav-icon" src="assets/icon-settings.png" alt="">
+              Profile
+            </button>
+          </nav>
+          <div class="desktop-sidebar-footer">
+            <button class="desktop-sos-action" type="button" data-open="sosTriage">
+              <span>SOS</span>
+              <strong>Need support?</strong>
+            </button>
+          </div>
+        </aside>
+
+        <div class="phone-shell app-surface" aria-label="Compass adult-life prep workspace">
           <div class="phone-status">
             <span>9:41</span>
             <span class="status-dots"><i></i><i></i><i></i></span>
+          </div>
+          <div class="desktop-command-bar">
+            <button class="desktop-command-search" type="button" data-tab-jump="decide">
+              <span>Search decisions, skills, opportunities...</span>
+            </button>
+            <div class="desktop-command-actions">
+              <button type="button" data-open="assessment">Readiness</button>
+              <button type="button" data-open="compassProfile">AI Profile</button>
+            </div>
           </div>
           <div class="portrait-layer" id="portrait-layer" aria-hidden="true">
             <div class="portrait-card">
@@ -54,6 +105,29 @@
             </button>
           </nav>
         </div>
+
+        <aside class="desktop-right-rail" aria-label="Adult-life dashboard summary">
+          <section class="rail-card rail-focus-card">
+            <p class="eyebrow">Today</p>
+            <h3>Pick one real next step.</h3>
+            <p>Use Decide for choices, Build for direction, Practice for reality skills, and Discover for doors you can open.</p>
+            <button class="primary-action compact-action" type="button" data-tab-jump="home">Go to today plan</button>
+          </section>
+          <section class="rail-card">
+            <p class="eyebrow">Adult-Life Map</p>
+            <div class="rail-map-list">
+              <button type="button" data-tab-jump="decide"><span>Decisions</span><strong>Scan before choosing</strong></button>
+              <button type="button" data-tab-jump="build"><span>Direction</span><strong>Profile, goals, roadmap</strong></button>
+              <button type="button" data-tab-jump="practice"><span>Reality Skills</span><strong>Money, work, home, support</strong></button>
+              <button type="button" data-tab-jump="discover"><span>Doors</span><strong>People and opportunities</strong></button>
+            </div>
+          </section>
+          <section class="rail-card rail-trust-card">
+            <p class="eyebrow">Trust</p>
+            <h3>AI help stays inspectable.</h3>
+            <button class="secondary-action compact-action" type="button" data-open="aiTrustCenter">Open trust center</button>
+          </section>
+        </aside>
       </section>
     </main>
 
