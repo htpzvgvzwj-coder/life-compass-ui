@@ -1245,7 +1245,7 @@
   function communityOpportunitiesRail() {
     if (hasCommunitySession() && !communityDataLoaded && !communityDataLoading) {
       refreshCommunityData().then(() => {
-        if (window.activeTab === "community" && typeof window.renderScreen === "function") window.renderScreen("community");
+        if ((window.activeTab === "community" || window.activeTab === "discover") && typeof window.renderScreen === "function") window.renderScreen(window.activeTab);
       });
     }
     if (!hasCommunitySession()) {
@@ -1253,7 +1253,7 @@
         <section class="community-theme-banner">
           <p class="eyebrow">Community-submitted opportunities</p>
           <p>Sign in to Community to see and share opportunities other real members found.</p>
-          <button class="secondary-action compact-action" type="button" data-tab-jump="community">Go to Community</button>
+          <button class="secondary-action compact-action" type="button" data-tab-jump="discover">Go to Discover</button>
         </section>
       `;
     }
@@ -1322,10 +1322,51 @@
   // Full authed screen
   // ---------------------------------------------------------------------
 
+  function refreshCommunityScreenWhenReady() {
+    if (!communityDataLoaded && !communityDataLoading) {
+      refreshCommunityData().then(() => {
+        if ((window.activeTab === "community" || window.activeTab === "discover") && typeof window.renderScreen === "function") window.renderScreen(window.activeTab);
+      });
+    }
+  }
+
+  function communityPeopleSection() {
+    refreshCommunityScreenWhenReady();
+    return `
+      ${growthPartnerCard()}
+      ${accountabilityMatchCard()}
+      <section class="accountability-match-card">
+        <p class="eyebrow">Been There</p>
+        <h3>Anonymous, one-time encouragement - no ongoing relationship.</h3>
+        <p class="muted">Lighter than an accountability partner. Send one honest message to a stranger stuck where you once were, or opt in to be that stranger for someone else.</p>
+        <button class="primary-action compact-action" type="button" data-open="communityEncouragement">Open Been There${communityEncouragementsCache.filter((row) => !row.read_at).length ? ` (${communityEncouragementsCache.filter((row) => !row.read_at).length} new)` : ""}</button>
+      </section>
+      ${communitySkillExchangeSection()}
+      ${communityMentorSection()}
+    `;
+  }
+
+  function communityGroupsSection() {
+    refreshCommunityScreenWhenReady();
+    return `
+      ${communitySuggestedSquadsRail()}
+      <div class="content-rail-title"><strong>Growth squads</strong><span>${communitySquadsCache.length} groups</span></div>
+      <div class="community-grid">${communityCards()}</div>
+    `;
+  }
+
+  function communityUpdatesSection() {
+    refreshCommunityScreenWhenReady();
+    return `
+      ${communityThemeCard()}
+      ${communityWall()}
+    `;
+  }
+
   function communityAuthedScreen() {
     if (!communityDataLoaded && !communityDataLoading) {
       refreshCommunityData().then(() => {
-        if (window.activeTab === "community" && typeof window.renderScreen === "function") window.renderScreen("community");
+        if ((window.activeTab === "community" || window.activeTab === "discover") && typeof window.renderScreen === "function") window.renderScreen(window.activeTab);
       });
     }
     return `
@@ -1385,6 +1426,9 @@
   window.refreshCommunityData = refreshCommunityData;
   window.communityAuthGateScreen = communityAuthGateScreen;
   window.communityAuthedScreen = communityAuthedScreen;
+  window.communityPeopleSection = communityPeopleSection;
+  window.communityGroupsSection = communityGroupsSection;
+  window.communityUpdatesSection = communityUpdatesSection;
   window.communityCards = communityCards;
   window.communityWall = communityWall;
   window.communityGroupModal = communityGroupModal;

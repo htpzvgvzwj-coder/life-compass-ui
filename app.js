@@ -598,6 +598,7 @@ const defaultTrackerState = {
   // dismissal path - Skip, the real suggestion, or the modal's own close
   // button - counts as "seen" and it never reopens.
   onboarding: { completedAt: null, seedAnswer: "" },
+  starterPath: { id: "", selectedAt: null, completedStepIds: [] },
   // "Real consequences" (self-critique finding): Ghost Roommate and Jury
   // Duty both used to discard every episode's outcome the moment it ended -
   // a relationship breakdown wiped trackerState.ghostRoommate back to a
@@ -1175,6 +1176,7 @@ let assessmentDraft = { answers: {}, freeText: "", preferences: [] };
 
 let onboardingStep = 1;
 let onboardingAnswerDraft = "";
+let onboardingStarterPathDraft = "";
 
 // Discover Yourself (Future Mirror bible Ch.3) - three short sessions rather
 // than one long form, each producing a new Blueprint version. Personality/
@@ -1371,6 +1373,9 @@ function normalizeTrackerState(state) {
     aiTraces: Array.isArray(state.aiTraces) ? state.aiTraces : [],
     savedFeedItems: Array.isArray(state.savedFeedItems) ? state.savedFeedItems : [],
     onboarding: (state.onboarding && typeof state.onboarding === "object") ? { ...fallback.onboarding, ...state.onboarding } : fallback.onboarding,
+    starterPath: (state.starterPath && typeof state.starterPath === "object")
+      ? { ...fallback.starterPath, ...state.starterPath, completedStepIds: Array.isArray(state.starterPath.completedStepIds) ? state.starterPath.completedStepIds : [] }
+      : fallback.starterPath,
     roommateStintHistory: Array.isArray(state.roommateStintHistory) ? state.roommateStintHistory : fallback.roommateStintHistory,
     juryVerdictHistory: Array.isArray(state.juryVerdictHistory) ? state.juryVerdictHistory : fallback.juryVerdictHistory,
     habitChainReflections: Array.isArray(state.habitChainReflections) ? state.habitChainReflections : fallback.habitChainReflections,
@@ -2070,7 +2075,7 @@ const growthChallenges = [
 ];
 
 function growthActionAttributes(item) {
-  if (item.modal) return `data-open="${escapeHTML(item.modal)}"`;
+  if (item.modal) return `data-open="${escapeHTML(item.modal)}"${item.payload ? ` data-open-payload="${escapeHTML(item.payload)}"` : ""}`;
   if (item.tab) return `data-tab-jump="${escapeHTML(item.tab)}"`;
   if (item.prompt) return `data-growth-prompt="${escapeHTML(cleanText(item.prompt, 1800))}"`;
   return "";
@@ -2874,16 +2879,17 @@ function lifeVerseHomeSpotlight() {
 
 function homeQuickAccessGrid() {
   const items = [
-    ["icon-chat.png", "Compass AI", "Ask, plan, reflect", "compass"],
-    ["icon-learn.png", "Growth", "Goals, journal, mood", "growth"],
-    ["icon-support.png", "Discover", "Community, squads, and opportunities", "community"]
+    ["icon-decide.png", "Decide", "Future Scan, trials, calibration", "decide"],
+    ["icon-spark.png", "Build", "Direction, goals, mood, progress", "build"],
+    ["icon-work.png", "Practice", "Career, money, home, support skills", "practice"],
+    ["icon-support.png", "Discover", "Opportunities, people, groups, updates", "discover"]
   ];
   return `
     <section class="home-quick-access">
       <div class="section-row">
         <div>
-          <p class="eyebrow">Quick Access</p>
-          <h3>All tools stay connected to Future Mirror.</h3>
+          <p class="eyebrow">Core routes</p>
+          <h3>Four ways to prepare for adult life.</h3>
         </div>
       </div>
       <div class="home-quick-grid">
@@ -2894,16 +2900,154 @@ function homeQuickAccessGrid() {
             <span>${text}</span>
           </button>
         `).join("")}
-        <button type="button" data-jump-future-scan>
-          <img src="assets/icon-guide.png" alt="">
-          <strong>Future Scan</strong>
-          <span>See the truth before you choose</span>
-        </button>
-        <button type="button" data-jump-build-mode>
-          <img src="assets/icon-decide.png" alt="">
-          <strong>Build Mode</strong>
-          <span>AI coach training</span>
-        </button>
+      </div>
+    </section>
+  `;
+}
+
+function adultPrepHero() {
+  const focus = todaysDeskFocus();
+  const path = activeStarterPath();
+  const progress = starterPathProgress(path);
+  return `
+    <section class="adult-prep-hero">
+      <div>
+        <p class="eyebrow">Singapore youth adult-life prep</p>
+        <h2>${path ? escapeHTML(path.title) : "Start adult life with a rehearsal plan."}</h2>
+        <p>${path ? escapeHTML(path.detail) : "Compass helps you decide, build direction, practice reality skills, and find doors you can actually open."}</p>
+      </div>
+      <div class="adult-prep-hero-actions">
+        ${path ? `
+          <span class="adult-prep-progress"><strong>${progress.done}/${progress.total}</strong> starter steps</span>
+          <button class="primary-action compact-action" type="button" ${starterPathStepActionAttributes(path.steps.find((step) => !(trackerState.starterPath.completedStepIds || []).includes(step.id)) || path.steps[0])}>Continue path</button>
+        ` : `
+          <button class="primary-action compact-action" type="button" data-open="firstRunOnboarding">Choose starter path</button>
+        `}
+        <button class="secondary-action compact-action" type="button" data-open="aiTrustCenter">AI trust</button>
+      </div>
+      <div class="adult-prep-focus">
+        <span>${escapeHTML(focus.eyebrow)}</span>
+        <strong>${escapeHTML(focus.title)}</strong>
+      </div>
+    </section>
+  `;
+}
+
+function homeStarterPathCard() {
+  const path = activeStarterPath();
+  if (!path) {
+    return `
+      <section class="starter-path-card">
+        <div class="section-row">
+          <div>
+            <p class="eyebrow">Starter path</p>
+            <h3>Pick the first adult-life area to train.</h3>
+          </div>
+        </div>
+        <div class="starter-path-picker home-path-picker">
+          ${STARTER_PATHS.map((item) => `
+            <button type="button" data-select-starter-path="${escapeHTML(item.id)}">
+              <img src="assets/${escapeHTML(item.icon)}" alt="">
+              <span><strong>${escapeHTML(item.shortLabel)}</strong><small>${escapeHTML(item.label)}</small></span>
+            </button>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  }
+  const progress = starterPathProgress(path);
+  return `
+    <section class="starter-path-card">
+      <div class="section-row">
+        <div>
+          <p class="eyebrow">Your starter path</p>
+          <h3>${escapeHTML(path.label)}: ${escapeHTML(path.title)}</h3>
+        </div>
+        <span class="risk-pill calm">${progress.percent}%</span>
+      </div>
+      <p class="muted">${escapeHTML(path.detail)}</p>
+      ${starterPathStepRows(path)}
+      <button class="secondary-action compact-action" type="button" data-open="firstRunOnboarding">Change path</button>
+    </section>
+  `;
+}
+
+function adultingReadinessDimensions() {
+  const myId = currentUserId();
+  const guideProgress = Object.values(trackerState.skillGuideProgress || {});
+  const completedGuides = guideProgress.filter((progress) => progress && progress.completedAt).length;
+  const startedGuides = guideProgress.filter((progress) => progress && Array.isArray(progress.checkedSteps) && progress.checkedSteps.length).length;
+  const openGoalCount = myRoadmapGoals().length;
+  const supportCount = trackerState.supportContacts.filter((contact) => contact.user_id === myId || !contact.user_id).length;
+  const interviewCount = trackerState.careerStudio.interviewSessions.filter((session) => session.user_id === myId && session.completedAt).length;
+  const decisionCount = savedFutureDecisions().length + trackerState.futureScans.filter((scan) => scan.user_id === myId).length + trackerState.juryTrials.sessions.length;
+  return [
+    {
+      id: "money",
+      label: "Money",
+      score: Math.min(3, trackerState.receipts.length + (trackerState.careerStudio.paycheckCheck ? 1 : 0) + (Object.values(trackerState.taxChecklist || {}).some(Boolean) ? 1 : 0)),
+      detail: trackerState.receipts.length ? `${trackerState.receipts.length} receipt signals saved` : "No real spending signal yet",
+      action: "Record spending",
+      attr: `data-open="receipt"`
+    },
+    {
+      id: "direction",
+      label: "Direction",
+      score: Math.min(3, (latestBlueprint() ? 1 : 0) + (cleanText(userProfile.goals, 20) ? 1 : 0) + (openGoalCount ? 1 : 0)),
+      detail: openGoalCount ? `${openGoalCount} roadmap goal${openGoalCount === 1 ? "" : "s"}` : "No roadmap goal yet",
+      action: "Build map",
+      attr: `data-tab-jump="build"`
+    },
+    {
+      id: "decisions",
+      label: "Decisions",
+      score: Math.min(3, decisionCount),
+      detail: decisionCount ? `${decisionCount} decision practice signal${decisionCount === 1 ? "" : "s"}` : "No decision run yet",
+      action: "Run scan",
+      attr: `data-tab-jump="decide"`
+    },
+    {
+      id: "skills",
+      label: "Skills",
+      score: Math.min(3, completedGuides + startedGuides + interviewCount),
+      detail: completedGuides ? `${completedGuides} guide${completedGuides === 1 ? "" : "s"} completed` : `${startedGuides + interviewCount} practice signal${startedGuides + interviewCount === 1 ? "" : "s"}`,
+      action: "Practice",
+      attr: `data-tab-jump="practice"`
+    },
+    {
+      id: "support",
+      label: "Support",
+      score: Math.min(3, supportCount + ((trackerState.mood.entries || []).length ? 1 : 0) + (typeof hasCommunitySession === "function" && hasCommunitySession() ? 1 : 0)),
+      detail: supportCount ? `${supportCount} trusted contact${supportCount === 1 ? "" : "s"}` : "Support Circle is empty",
+      action: "Set support",
+      attr: `data-open="supportCircle"`
+    }
+  ];
+}
+
+function adultingReadinessOverviewCard() {
+  const dimensions = adultingReadinessDimensions();
+  const total = dimensions.reduce((sum, item) => sum + item.score, 0);
+  const percent = Math.round((total / (dimensions.length * 3)) * 100);
+  return `
+    <section class="adulting-readiness-card">
+      <div class="section-row">
+        <div>
+          <p class="eyebrow">Adulting readiness</p>
+          <h3>${percent}% ready by real signals</h3>
+        </div>
+        <button class="secondary-action compact-action" type="button" data-open="assessment">Assess</button>
+      </div>
+      <div class="adulting-meter"><span style="width:${percent}%"></span></div>
+      <div class="adulting-readiness-grid">
+        ${dimensions.map((item) => `
+          <article>
+            <div class="readiness-score"><span style="width:${Math.round((item.score / 3) * 100)}%"></span></div>
+            <strong>${escapeHTML(item.label)}</strong>
+            <p>${escapeHTML(item.detail)}</p>
+            <button class="text-action" type="button" ${item.attr}>${escapeHTML(item.action)}</button>
+          </article>
+        `).join("")}
       </div>
     </section>
   `;
@@ -4981,6 +5125,213 @@ function suggestOnboardingFeature(answerText) {
   };
 }
 
+const STARTER_PATHS = [
+  {
+    id: "money",
+    label: "Money basics",
+    shortLabel: "Money",
+    keywords: ["money", "budget", "spend", "saving", "save", "salary", "payslip", "paycheck", "cpf", "tax", "rent", "bill", "debt", "credit"],
+    title: "Protect your first real income",
+    detail: "Estimate living costs, track one real expense, understand pay, and avoid tax or debt surprises.",
+    icon: "icon-money.png",
+    tab: "practice",
+    steps: [
+      { id: "money-cost", title: "Estimate a monthly baseline", detail: "Use SG-style housing, transport, food, and phone costs before you commit.", modal: "costOfLiving" },
+      { id: "money-receipt", title: "Record one real payment", detail: "Make spending visible first; budgets work better after that.", modal: "receipt" },
+      { id: "money-payslip", title: "Learn to read a payslip", detail: "Know gross pay, CPF-style deductions, take-home pay, and what looks wrong.", modal: "skillGuideDetail", payload: "read-payslip" },
+      { id: "money-tax", title: "Check basic tax obligations", detail: "Separate what you owe from what sounds scary online.", modal: "taxObligations" }
+    ]
+  },
+  {
+    id: "career",
+    label: "First job readiness",
+    shortLabel: "Career",
+    keywords: ["job", "career", "interview", "resume", "cv", "portfolio", "internship", "work", "employer", "offer", "contract"],
+    title: "Get ready for your first serious opportunity",
+    detail: "Build a resume, practice interview answers, read offers clearly, and prepare for real applications.",
+    icon: "icon-work.png",
+    tab: "practice",
+    steps: [
+      { id: "career-studio", title: "Open Career Studio", detail: "Resume, portfolio, interview practice, job matching, and paycheck checks live together.", modal: "careerStudio" },
+      { id: "career-interview", title: "Practice a job interview", detail: "Answer out loud before an interview counts.", modal: "roleplayList" },
+      { id: "career-offer", title: "Read a job offer before signing", detail: "Check role, probation, hours, pay, notice, and restrictions.", modal: "skillGuideDetail", payload: "read-job-offer" },
+      { id: "career-opportunities", title: "Find a reachable opportunity", detail: "Browse youth-friendly routes and prepare with Compass.", discoverMode: "opportunities" }
+    ]
+  },
+  {
+    id: "home",
+    label: "Living independently",
+    shortLabel: "Home",
+    keywords: ["home", "move", "moving out", "rent", "room", "landlord", "laundry", "cook", "meal", "roommate", "flatmate", "chores"],
+    title: "Run the basics of daily life",
+    detail: "Practice the unglamorous skills: renting, food, laundry, bills, and sharing space.",
+    icon: "icon-home.png",
+    tab: "practice",
+    steps: [
+      { id: "home-rent", title: "Check before renting a room", detail: "Ask the boring questions before a bad tenancy becomes your problem.", modal: "skillGuideDetail", payload: "before-renting-room" },
+      { id: "home-laundry", title: "Do laundry without damage", detail: "Read labels, sort simply, and avoid expensive mistakes.", modal: "skillGuideDetail", payload: "do-laundry" },
+      { id: "home-cooking", title: "Cook one simple meal", detail: "Own one repeatable meal before you optimize anything.", modal: "skillGuideDetail", payload: "cook-simple-meal" },
+      { id: "home-roommate", title: "Practice shared-living conflict", detail: "Ghost Roommate remembers how you handle week-by-week tension.", modal: "ghostRoommate" }
+    ]
+  },
+  {
+    id: "decisions",
+    label: "Decision making",
+    shortLabel: "Decide",
+    keywords: ["decide", "decision", "choice", "choose", "confused", "unsure", "future", "stuck", "risk", "regret"],
+    title: "Make choices without drifting",
+    detail: "Use Future Scan, evidence checks, and reflection to decide with less panic and more structure.",
+    icon: "icon-decide.png",
+    tab: "decide",
+    steps: [
+      { id: "decide-scan", title: "Run a Future Scan", detail: "See hidden costs, pressure, drift, and no-action consequences.", tab: "decide" },
+      { id: "decide-trial", title: "Put one choice on trial", detail: "Use prosecution, defense, and verdict before you commit.", modal: "juryTrial" },
+      { id: "decide-future-self", title: "Ask Future Self for a scene", detail: "Not a prediction; a vivid consequence check.", modal: "futureSelfView" },
+      { id: "decide-calibration", title: "Review judgment calibration", detail: "Learn whether your confidence has matched outcomes over time.", modal: "calibration" }
+    ]
+  },
+  {
+    id: "wellbeing",
+    label: "Wellbeing and support",
+    shortLabel: "Support",
+    keywords: ["stress", "anxious", "anxiety", "mental", "sad", "lonely", "burnout", "overwhelmed", "support", "help", "crisis", "counsellor"],
+    title: "Build support before life gets heavy",
+    detail: "Track your state, set up trusted people, learn safe support steps, and keep urgent help one tap away.",
+    icon: "icon-support.png",
+    tab: "build",
+    steps: [
+      { id: "wellbeing-mood", title: "Log mood and energy", detail: "A real trend beats trying to remember how you have been.", modal: "mood" },
+      { id: "wellbeing-circle", title: "Set up Support Circle", detail: "Name people before you need them urgently.", modal: "supportCircle" },
+      { id: "wellbeing-support-guide", title: "Build support before crisis", detail: "A practical guide for asking early, not only at breaking point.", modal: "buildSupportGuide" },
+      { id: "wellbeing-sos", title: "Know the SOS route", detail: "Urgent support resources stay separate from normal coaching.", modal: "sosTriage" }
+    ]
+  },
+  {
+    id: "relationships",
+    label: "People and boundaries",
+    shortLabel: "People",
+    keywords: ["friend", "parent", "teacher", "relationship", "breakup", "conflict", "boundary", "talk", "communication", "dating", "partner"],
+    title: "Handle people without avoiding everything",
+    detail: "Practice clear conversations, boundaries, endings, and low-pressure encouragement.",
+    icon: "icon-boundary.png",
+    tab: "practice",
+    steps: [
+      { id: "people-roleplay", title: "Roleplay a hard conversation", detail: "Practice conflict, help-seeking, or boundaries safely.", modal: "roleplayList" },
+      { id: "people-breakup", title: "End a relationship cleanly", detail: "Avoid ghosting, cruelty, and unclear endings.", modal: "skillGuideDetail", payload: "end-a-relationship-well" },
+      { id: "people-community", title: "Use Been There", detail: "Anonymous one-time encouragement, not a risky ongoing connection.", modal: "communityEncouragement" },
+      { id: "people-discover", title: "Find people growing in the same direction", detail: "Move from random community feed to purpose-based people and groups.", discoverMode: "people" }
+    ]
+  },
+  {
+    id: "direction",
+    label: "Future direction",
+    shortLabel: "Direction",
+    keywords: ["goal", "dream", "direction", "purpose", "university", "course", "study", "identity", "who am i", "future self", "plan"],
+    title: "Turn vague future anxiety into a map",
+    detail: "Build your Personal Blueprint, goals, roadmap, and future self scenes from your own answers.",
+    icon: "icon-spark.png",
+    tab: "build",
+    steps: [
+      { id: "direction-blueprint", title: "Build Personal Blueprint", detail: "Compass works better when it knows your values, strengths, and decision style.", modal: "discoverYourself" },
+      { id: "direction-goals", title: "Save goals and dreams", detail: "Put the future you keep thinking about somewhere concrete.", modal: "growthGoals" },
+      { id: "direction-roadmap", title: "Create a Life Roadmap", detail: "Turn a direction into monthly milestones.", modal: "roadmapView" },
+      { id: "direction-ai", title: "Ask Compass for one next step", detail: "Use AI after your real data exists, not as a vague oracle.", prompt: growthPromptFromData("one practical next step for my future direction using my saved profile") }
+    ]
+  },
+  {
+    id: "opportunities",
+    label: "Opportunities and network",
+    shortLabel: "Opportunities",
+    keywords: ["scholarship", "competition", "volunteer", "opportunity", "mentor", "network", "community", "squad", "skill exchange", "portfolio"],
+    title: "Find doors you can actually open",
+    detail: "Use Discover deliberately: opportunities first, then people, groups, mentors, and skill exchange.",
+    icon: "icon-guide.png",
+    tab: "discover",
+    steps: [
+      { id: "opp-browse", title: "Browse opportunities by category", detail: "Start with a reachable route, not a random feed.", discoverMode: "opportunities" },
+      { id: "opp-prepare", title: "Prepare one application", detail: "Turn an opportunity into resume, portfolio, and interview actions.", modal: "careerStudio" },
+      { id: "opp-skills", title: "Use Skill Exchange", detail: "Trade what you can offer for what you need to learn.", discoverMode: "people" },
+      { id: "opp-groups", title: "Join or create a growth squad", detail: "A group is useful only when it has a clear goal.", discoverMode: "groups" }
+    ]
+  }
+];
+
+function starterPathById(id) {
+  return STARTER_PATHS.find((path) => path.id === id) || null;
+}
+
+function starterPathFromText(answerText) {
+  const text = ` ${String(answerText || "").toLowerCase()} `;
+  return STARTER_PATHS.find((path) => path.keywords.some((keyword) => text.includes(String(keyword).toLowerCase()))) || STARTER_PATHS[0];
+}
+
+function activeStarterPath() {
+  return starterPathById(trackerState.starterPath && trackerState.starterPath.id) || null;
+}
+
+function starterPathProgress(path = activeStarterPath()) {
+  if (!path) return { done: 0, total: 0, percent: 0 };
+  const doneIds = new Set((trackerState.starterPath && trackerState.starterPath.completedStepIds) || []);
+  const done = path.steps.filter((step) => doneIds.has(step.id)).length;
+  return { done, total: path.steps.length, percent: Math.round((done / path.steps.length) * 100) };
+}
+
+function selectStarterPath(id, seedAnswer = onboardingAnswerDraft) {
+  const path = starterPathById(id) || starterPathFromText(seedAnswer);
+  trackerState.onboarding.seedAnswer = cleanText(seedAnswer || "", 200);
+  trackerState.starterPath = {
+    id: path.id,
+    selectedAt: trackerState.starterPath && trackerState.starterPath.selectedAt ? trackerState.starterPath.selectedAt : new Date().toISOString(),
+    completedStepIds: Array.isArray(trackerState.starterPath && trackerState.starterPath.completedStepIds) ? trackerState.starterPath.completedStepIds : []
+  };
+  onboardingStarterPathDraft = path.id;
+  saveTrackerState();
+  return path;
+}
+
+function toggleStarterStep(stepId) {
+  const path = activeStarterPath();
+  if (!path || !path.steps.some((step) => step.id === stepId)) return;
+  const ids = new Set(trackerState.starterPath.completedStepIds || []);
+  if (ids.has(stepId)) ids.delete(stepId);
+  else ids.add(stepId);
+  trackerState.starterPath.completedStepIds = [...ids];
+  saveTrackerState();
+}
+
+function starterPathStepActionAttributes(step) {
+  if (step.discoverMode) return `data-discover-mode-jump="${escapeHTML(step.discoverMode)}"`;
+  if (step.modal) return `data-open="${escapeHTML(step.modal)}"${step.payload ? ` data-open-payload="${escapeHTML(step.payload)}"` : ""}`;
+  if (step.tab) return `data-tab-jump="${escapeHTML(step.tab)}"`;
+  if (step.prompt) return `data-growth-prompt="${escapeHTML(cleanText(step.prompt, 1800))}"`;
+  return "";
+}
+
+function starterPathStepRows(path, { showTrackers = true } = {}) {
+  if (!path) return "";
+  const doneIds = new Set((trackerState.starterPath && trackerState.starterPath.completedStepIds) || []);
+  return `
+    <div class="starter-step-list">
+      ${path.steps.map((step, index) => {
+        const done = doneIds.has(step.id);
+        return `
+          <article class="starter-step ${done ? "is-done" : ""}">
+            <span class="starter-step-index">${index + 1}</span>
+            <div>
+              <strong>${escapeHTML(step.title)}</strong>
+              <p>${escapeHTML(step.detail)}</p>
+              <div class="starter-step-actions">
+                <button class="secondary-action compact-action" type="button" ${starterPathStepActionAttributes(step)}>Open</button>
+                ${showTrackers ? `<button class="text-action" type="button" data-toggle-starter-step="${escapeHTML(step.id)}">${done ? "Undo" : "Mark done"}</button>` : ""}
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function captureOnboardingDraft() {
   const textarea = modalLayer.querySelector("#onboarding-answer-input");
   if (textarea) onboardingAnswerDraft = textarea.value;
@@ -4994,8 +5345,16 @@ function firstRunOnboardingModal() {
           <span class="risk-pill calm">Step 1 of 3</span>
           <button class="ghost-circle" type="button" data-skip-onboarding aria-label="Skip">x</button>
         </div>
-        <h3 id="first-run-onboarding-title">Compass, in one line</h3>
-        <p class="muted">A place to practice the parts of being an adult nobody rehearses with you first - real decisions, real skills, real follow-through - before they happen for real.</p>
+        <h3 id="first-run-onboarding-title">Adult life, rehearsed before it gets expensive</h3>
+        <p class="muted">Compass is not a pile of growth features. It is a Singapore youth adult-life prep tool: decide clearly, build direction, practice real skills, and find useful opportunities.</p>
+        <div class="adulting-onboarding-grid">
+          ${[
+            ["Decide", "Compare paths before choosing."],
+            ["Build", "Turn vague future thoughts into a map."],
+            ["Practice", "Try real-world skills before they count."],
+            ["Discover", "Find opportunities, people, and groups with purpose."]
+          ].map(([label, text]) => `<div><strong>${label}</strong><span>${text}</span></div>`).join("")}
+        </div>
         <button class="primary-action" type="button" data-onboarding-next>Continue</button>
       </div>
     `;
@@ -5007,12 +5366,20 @@ function firstRunOnboardingModal() {
           <span class="risk-pill calm">Step 2 of 3</span>
           <button class="ghost-circle" type="button" data-skip-onboarding aria-label="Skip">x</button>
         </div>
-        <h3 id="first-run-onboarding-title">One real question first</h3>
-        <p class="muted">What's one thing about being an adult you're not sure you're ready for? Answer in your own words - it shapes what we show you next.</p>
+        <h3 id="first-run-onboarding-title">Pick the adult-life part you want help with first</h3>
+        <p class="muted">You can type your own worry, or tap a starter route. This only chooses your first path; every tool stays available.</p>
         <div class="admin-form">
           <label>
             <textarea id="onboarding-answer-input" maxlength="200" placeholder="Example: I don't actually know how my payslip works">${escapeHTML(onboardingAnswerDraft)}</textarea>
           </label>
+        </div>
+        <div class="starter-path-picker">
+          ${STARTER_PATHS.map((path) => `
+            <button class="${onboardingStarterPathDraft === path.id ? "is-selected" : ""}" type="button" data-select-starter-path="${escapeHTML(path.id)}">
+              <img src="assets/${escapeHTML(path.icon)}" alt="">
+              <span><strong>${escapeHTML(path.shortLabel)}</strong><small>${escapeHTML(path.label)}</small></span>
+            </button>
+          `).join("")}
         </div>
         <div class="assessment-footer">
           <button class="secondary-action" type="button" data-onboarding-back>Back</button>
@@ -5022,19 +5389,24 @@ function firstRunOnboardingModal() {
     `;
   }
   const suggestion = suggestOnboardingFeature(onboardingAnswerDraft);
+  const path = starterPathById(onboardingStarterPathDraft) || starterPathFromText(onboardingAnswerDraft);
+  const firstStep = path.steps[0];
   return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="first-run-onboarding-title">
       <div class="modal-top">
         <span class="risk-pill calm">Step 3 of 3</span>
         <button class="ghost-circle" type="button" data-skip-onboarding aria-label="Skip">x</button>
       </div>
-      <h3 id="first-run-onboarding-title">Start with this one</h3>
-      <p class="muted">${escapeHTML(suggestion.detail)}</p>
-      <div class="wide-action">
-        <img src="assets/icon-checkin.png" alt="">
-        <span><strong>${escapeHTML(suggestion.label)}</strong></span>
+      <h3 id="first-run-onboarding-title">Start with ${escapeHTML(path.label)}</h3>
+      <p class="muted">${escapeHTML(path.detail)}</p>
+      <div class="starter-path-recommendation">
+        <div>
+          <img src="assets/${escapeHTML(path.icon)}" alt="">
+          <span><strong>${escapeHTML(path.title)}</strong><small>${escapeHTML(suggestion.detail)}</small></span>
+        </div>
+        ${starterPathStepRows(path, { showTrackers: false })}
       </div>
-      <button class="primary-action" type="button" data-onboarding-finish data-onboarding-tab="${escapeHTML(suggestion.tab)}" data-onboarding-open="${escapeHTML(suggestion.open || "")}" data-onboarding-payload="${escapeHTML(suggestion.payload || "")}">Try it now</button>
+      <button class="primary-action" type="button" data-onboarding-finish data-onboarding-path="${escapeHTML(path.id)}" data-onboarding-tab="${escapeHTML(firstStep.tab || path.tab || suggestion.tab)}" data-onboarding-open="${escapeHTML(firstStep.modal || suggestion.open || "")}" data-onboarding-payload="${escapeHTML(firstStep.payload || suggestion.payload || "")}" data-onboarding-discover-mode="${escapeHTML(firstStep.discoverMode || "")}">Start my path</button>
       <button class="secondary-action compact-action" type="button" data-skip-onboarding>Skip, take me to Home</button>
     </div>
   `;
@@ -7869,7 +8241,14 @@ function aiTraceLogModal() {
 // list screens) still exists for deliberate lookup - see communityMergedScreen.
 let feedIndex = 0;
 let feedItems = [];
-let communityViewMode = "feed";
+let communityViewMode = "for-you";
+const DISCOVER_VIEW_MODES = [
+  { id: "for-you", label: "For You" },
+  { id: "opportunities", label: "Opportunities" },
+  { id: "people", label: "People" },
+  { id: "groups", label: "Groups" },
+  { id: "updates", label: "Updates" }
+];
 
 function feedUserTags() {
   const goalText = [
@@ -8097,14 +8476,115 @@ function feedScreenContent() {
 }
 
 function communityMergedScreen() {
+  const activeMode = DISCOVER_VIEW_MODES.some((mode) => mode.id === communityViewMode) ? communityViewMode : "for-you";
   return `
-    <div class="mirror-example-row mode-toggle-row community-mode-toggle">
-      <button type="button" class="${communityViewMode === "feed" ? "is-selected" : ""}" data-community-view-mode="feed">Feed</button>
-      <button type="button" class="${communityViewMode === "browse" ? "is-selected" : ""}" data-community-view-mode="browse">Browse</button>
+    <header class="screen-head compact-head community-head">
+      <div>
+        <p class="eyebrow">Discover</p>
+        <h2 class="screen-title">Opportunities, people, groups, and updates without the mess.</h2>
+        <p class="screen-subtitle">Choose the kind of discovery you need instead of scrolling through every community feature at once.</p>
+      </div>
+      <div class="avatar"><img src="assets/icon-support.png" alt=""></div>
+    </header>
+    <div class="mirror-example-row mode-toggle-row community-mode-toggle discover-mode-toggle">
+      ${DISCOVER_VIEW_MODES.map((mode) => `<button type="button" class="${activeMode === mode.id ? "is-selected" : ""}" data-community-view-mode="${escapeHTML(mode.id)}">${escapeHTML(mode.label)}</button>`).join("")}
     </div>
-    ${communityViewMode === "feed"
-      ? feedScreenHeader() + feedScreenContent()
-      : (hasCommunitySession() ? communityAuthedScreen() : communityAuthGateScreen()) + communityBrowseOpportunitiesSection()}
+    ${discoverModeContent(activeMode)}
+  `;
+}
+
+function discoverModeContent(mode) {
+  if (mode === "opportunities") return discoverOpportunitiesSection();
+  if (mode === "people") return discoverPeopleSection();
+  if (mode === "groups") return discoverGroupsSection();
+  if (mode === "updates") return discoverUpdatesSection();
+  return discoverForYouSection();
+}
+
+function discoverForYouSection() {
+  const path = activeStarterPath();
+  const nextStep = path ? path.steps.find((step) => !(trackerState.starterPath.completedStepIds || []).includes(step.id)) || path.steps[0] : null;
+  const recommendations = feedBuildItems().slice(0, 3);
+  return `
+    <section class="discover-home-card">
+      <div>
+        <p class="eyebrow">For You</p>
+        <h3>${path ? `Next from ${escapeHTML(path.label)}` : "Start with a purpose, not a feed."}</h3>
+        <p>${path ? escapeHTML(path.detail) : "Pick a starter path on Home, then Discover can point you toward opportunities, people, and groups that fit what you are trying to build."}</p>
+      </div>
+      <div class="profile-actions">
+        ${nextStep ? `<button class="primary-action compact-action" type="button" ${starterPathStepActionAttributes(nextStep)}>Continue starter path</button>` : `<button class="primary-action compact-action" type="button" data-tab-jump="home">Pick starter path</button>`}
+        <button class="secondary-action compact-action" type="button" data-community-view-mode="opportunities">Browse opportunities</button>
+      </div>
+    </section>
+    ${opportunityRecommendationCard()}
+    <div class="content-rail-title"><strong>Relevant right now</strong><span>${recommendations.length} cards</span></div>
+    <div class="discover-recommendation-list">
+      ${recommendations.length ? recommendations.map((item) => `<article class="discover-recommendation-card">${feedRenderCard(item)}</article>`).join("") : `
+        <section class="empty-feature">
+          <img src="assets/icon-guide.png" alt="">
+          <div><strong>No recommendations yet</strong><p>Add goals or sign in to Community for richer matches.</p></div>
+        </section>
+      `}
+    </div>
+  `;
+}
+
+function discoverOpportunitiesSection() {
+  return `
+    <section class="discover-home-card">
+      <div>
+        <p class="eyebrow">Opportunities</p>
+        <h3>Find a real door, then prepare before applying.</h3>
+        <p>Curated routes stay separate from community-submitted listings so the user can compare calmly.</p>
+      </div>
+    </section>
+    ${communityBrowseOpportunitiesSection()}
+  `;
+}
+
+function discoverPeopleSection() {
+  if (!(typeof hasCommunitySession === "function" && hasCommunitySession())) return communityAuthGateScreen();
+  return `
+    <section class="discover-home-card">
+      <div>
+        <p class="eyebrow">People</p>
+        <h3>Find support by purpose, not random popularity.</h3>
+        <p>Accountability, skill exchange, mentorship, and Been There stay together here.</p>
+      </div>
+      <button class="secondary-action compact-action" type="button" data-open="communityMembersBlocked">Blocked members</button>
+    </section>
+    ${typeof communityPeopleSection === "function" ? communityPeopleSection() : `${growthPartnerCard()}${communitySkillExchangeSection()}${communityMentorSection()}`}
+  `;
+}
+
+function discoverGroupsSection() {
+  if (!(typeof hasCommunitySession === "function" && hasCommunitySession())) return communityAuthGateScreen();
+  return `
+    <section class="discover-home-card">
+      <div>
+        <p class="eyebrow">Groups</p>
+        <h3>Join a squad only when the goal is clear.</h3>
+        <p>Goal groups and squads are separated from posts so group discovery does not feel like a messy feed.</p>
+      </div>
+      <button class="primary-action compact-action" type="button" data-open="communityCreateSquad">Create a squad</button>
+    </section>
+    ${typeof communityGroupsSection === "function" ? communityGroupsSection() : `<div class="community-grid">${communityCards()}</div>`}
+  `;
+}
+
+function discoverUpdatesSection() {
+  if (!(typeof hasCommunitySession === "function" && hasCommunitySession())) return communityAuthGateScreen();
+  return `
+    <section class="discover-home-card">
+      <div>
+        <p class="eyebrow">Updates</p>
+        <h3>Community posts and weekly prompts live here.</h3>
+        <p>Updates are useful when you want signal from the community, not when you are trying to find a job, person, or group.</p>
+      </div>
+      <button class="secondary-action compact-action" type="button" data-community-sign-out>Sign out of Community</button>
+    </section>
+    ${typeof communityUpdatesSection === "function" ? communityUpdatesSection() : communityWall()}
   `;
 }
 
@@ -8185,7 +8665,7 @@ function mountFeedSwipeCard() {
     card.classList.add(direction > 0 ? "is-exit-feed-up" : "is-exit-feed-down");
     await new Promise((resolve) => setTimeout(resolve, 180));
     feedIndex = Math.max(0, Math.min(feedItems.length - 1, feedIndex + direction));
-    if (activeTab === "community") renderScreen("community");
+    if (activeTab === "discover") renderScreen("discover");
   }
 
   card.addEventListener("pointerdown", onPointerDown);
@@ -9838,13 +10318,297 @@ function futureScanSignalBanner() {
   return `<div class="future-scan-signal-banner mixed">The stations you've run so far are giving mixed signals - might be worth checking a couple more angles.</div>${calibrationNote}`;
 }
 
+function decideScreen() {
+  return `
+    <header class="screen-head compact-head mirror-head">
+      <div>
+        <p class="eyebrow">Decide</p>
+        <h2 class="screen-title">Practice choices before they become real consequences.</h2>
+        <p class="screen-subtitle">Future Scan, Build Mode, and advanced decision labs stay together here.</p>
+      </div>
+      <div class="avatar"><img src="assets/icon-decide.png" alt=""></div>
+    </header>
+    <section class="mirror-form-card">
+      <div class="home-quick-grid mirror-mode-grid">
+        <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">
+          <img src="assets/icon-guide.png" alt="">
+          <strong>Future Scan</strong>
+        </button>
+        <button type="button" class="${futureMirrorMode === "build" ? "is-selected" : ""}" data-future-mirror-mode="build">
+          <img src="assets/icon-decide.png" alt="">
+          <strong>Build Mode</strong>
+        </button>
+        <button type="button" class="${futureMirrorMode === "advanced" ? "is-selected" : ""}" data-future-mirror-mode="advanced">
+          <img src="assets/icon-balance.png" alt="">
+          <strong>Advanced</strong>
+        </button>
+      </div>
+      ${futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorMode === "advanced" ? advancedModeEntrySection() : futureScanEntrySection()}
+    </section>
+    <div class="content-rail-title"><strong>Decision support</strong><span>Use when a choice feels expensive</span></div>
+    <div class="mirror-tools-row">
+      ${costOfLivingEntryCard()}
+      ${taxObligationsEntryCard()}
+      ${futureSelfEntryCard()}
+      ${microInsuranceEntryCard()}
+    </div>
+    ${savedFutureDecisions().length ? futureReflectionList() : ""}
+  `;
+}
+
+function buildScreen() {
+  return `
+    <header class="screen-head compact-head growth-head">
+      <div>
+        <p class="eyebrow">Build</p>
+        <h2 class="screen-title">Turn your future direction into a living plan.</h2>
+        <p class="screen-subtitle">Blueprint, goals, check-ins, progress, and inspiration stay here so growth feels connected.</p>
+      </div>
+      <div class="avatar"><img src="assets/icon-spark.png" alt=""></div>
+    </header>
+    <section class="growth-hero-card">
+      <div>
+        <p class="eyebrow">Your adult-life build map</p>
+        <h3>Know yourself, set a direction, then keep checking reality.</h3>
+        <p>Build is for identity, goals, mood, reflection, progress, and the story you are trying to write next.</p>
+      </div>
+      ${growthOverviewStats()}
+    </section>
+    ${blueprintSummaryCard()}
+    ${resurfacingCard()}
+    ${growthSuggestionCard()}
+    ${growthHubSection({
+      id: "build-profile",
+      title: "My Compass Profile",
+      subtitle: "The personal context that makes every recommendation less generic.",
+      icon: "icon-profile.png",
+      tone: "goals-tone",
+      items: [
+        { title: "Discover Yourself", text: "Build your Personal Blueprint - the foundation for Future Self, Decision Compass, Roadmap, and AI Coach.", modal: "discoverYourself", icon: "icon-profile.png", kind: "real" },
+        { title: "Future Readiness Assessment", text: "Check adulthood readiness across money, decisions, resilience, relationships, independence, and direction.", modal: "assessment", icon: "icon-assessment.png", kind: "real" },
+        { title: "Compass AI Profile", text: "Control the age, interests, goals, stress triggers, and support style Compass may use.", modal: "compassProfile", icon: "icon-chat.png", kind: "real" },
+        { title: "Knowledge Vault", text: "See what Compass knows from real saved data.", modal: "knowledgeVault", icon: "icon-learn.png", kind: "real" }
+      ]
+    })}
+    ${growthHubSection({
+      id: "build-plan",
+      title: "Future Plan",
+      subtitle: "Turn a vague future into goals, milestones, and future-self scenes.",
+      icon: "icon-time.png",
+      tone: "reflection-tone",
+      items: [
+        { title: "Goals & Dreams", text: "Personal goals, dream university, career direction, lifestyle, and vision board.", modal: "growthGoals", icon: "icon-spark.png", kind: "real" },
+        { title: "Life Roadmap", text: "Turn one goal into monthly milestones and track progress.", modal: "roadmapView", icon: "icon-time.png", kind: "real" },
+        { title: "Future Self", text: "Generate a conditional scene from your current path.", modal: "futureSelfView", icon: "icon-stories.png", kind: "practice" },
+        { title: "Weekly letter", text: "Write to you, next week.", modal: "weeklyLetter", icon: "icon-chat.png" },
+        { title: "Milestone letter", text: "Write to a future self further out.", modal: "milestoneLetter", icon: "icon-stories.png" },
+        { title: "AI goal planning", text: "Turn dreams into one realistic next step.", prompt: growthPromptFromData("a simple goal plan with one next action"), icon: "icon-chat.png" }
+      ]
+    })}
+    ${growthHubSection({
+      id: "build-checkin",
+      title: "Check-In",
+      subtitle: "Daily and weekly signals that keep the plan honest.",
+      icon: "icon-checkin.png",
+      tone: "challenge-tone",
+      items: [
+        { title: "Daily reflection", text: "A 3-minute rotating prompt.", modal: "dailyReflection", icon: "icon-spark.png", kind: "real" },
+        { title: "Mood check-in", text: "Log today's mood and energy.", modal: "mood", icon: "icon-mood.png", kind: "real" },
+        { title: "Journal", text: "Write what happened and what you learned.", modal: "journal", icon: "icon-learn.png", kind: "real" },
+        { title: "Personal Weather Forecast", text: "A 7-day forecast built from your real mood pattern.", modal: "personalWeather", icon: "icon-warning.png", kind: "real" },
+        { title: "Support Circle", text: "Keep trusted people reachable before stress peaks.", modal: "supportCircle", icon: "icon-support.png", kind: "real" },
+        { title: "AI reflection insight", text: "Ask Compass to find one pattern from saved data.", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png" }
+      ]
+    })}
+    ${habitChainGraph()}
+    ${growthHubSection({
+      id: "build-progress",
+      title: "Progress",
+      subtitle: "Review what is changing without hunting through the app.",
+      icon: "icon-balance.png",
+      tone: "progress-tone",
+      items: [
+        { title: "Progress Reports", text: "Mood, goals, challenges, Career Studio, and Community signals together.", modal: "growthProgress", icon: "icon-chat.png", kind: "real" },
+        { title: "Badges & Streaks", text: "Progress counts and what you have unlocked.", modal: "badges", icon: "icon-time.png", kind: "real" },
+        { title: "AI Trace Log", text: "Check whether AI help is grounded and useful.", modal: "aiTraceLog", icon: "icon-assessment.png", kind: "real" },
+        { title: "Judgment Calibration", text: "When you say you are sure, how often are you right?", modal: "calibration", icon: "icon-balance.png", kind: "real" },
+        { title: "Debt of Inaction", text: "What you keep not doing, detected from real saved patterns.", modal: "avoidancePatterns", icon: "icon-warning.png", kind: "real" }
+      ]
+    })}
+    ${growthHubSection({
+      id: "build-inspiration",
+      title: "Inspiration",
+      subtitle: "Use stories as reflection fuel, not as a separate content island.",
+      icon: "icon-stories.png",
+      tone: "reflection-tone",
+      items: [
+        { title: "Inspire Hub", text: "Creators, athletes, leaders, entrepreneurs, and pressure-to-growth stories.", tab: "stories", icon: "icon-stories.png" },
+        { title: "Story of the day", text: "Read one story and turn one lesson into an action.", modal: "storyReader", payload: (contentState.stories[0] || {}).id || "", icon: "icon-spark.png" },
+        { title: "Discuss your mirror safely", text: "Share a reflection prompt with a trusted peer, mentor, or Support Circle.", modal: "growthCommunity", icon: "icon-support.png" }
+      ]
+    })}
+  `;
+}
+
+function practiceScreen() {
+  return `
+    <header class="screen-head compact-head">
+      <div>
+        <p class="eyebrow">Practice</p>
+        <h2 class="screen-title">Train the parts of adult life people expect you to know.</h2>
+        <p class="screen-subtitle">Career, money, home, support, communication, and reality labs live here instead of being scattered through Growth.</p>
+      </div>
+      <div class="avatar"><img src="assets/icon-work.png" alt=""></div>
+    </header>
+    <section class="growth-hero-card practice-hero-card">
+      <div>
+        <p class="eyebrow">Practical adulting toolkit</p>
+        <h3>Try the skill here before the real world tests it.</h3>
+        <p>Start with the normal basics first; advanced reality labs stay lower on the page.</p>
+      </div>
+      <div class="growth-stat-grid">
+        <span><strong>${SKILL_GUIDES.length}</strong>Guides</span>
+        <span><strong>${trackerState.careerStudio.interviewSessions.length}</strong>Interviews</span>
+        <span><strong>${trackerState.receipts.length}</strong>Receipts</span>
+        <span><strong>${trackerState.realLifeEvents.length}</strong>Due dates</span>
+      </div>
+    </section>
+    ${homeStarterPathCard()}
+    ${growthHubSection({
+      id: "practice-career",
+      title: "Career Studio",
+      subtitle: "First job readiness without pretending experience appears from nowhere.",
+      icon: "icon-work.png",
+      tone: "career-tone",
+      items: [
+        { title: "Career Studio", text: "Interview practice, resume builder, portfolio builder, job matching, and paycheck/ATS checks.", modal: "careerStudio", icon: "icon-profile.png", kind: "real" },
+        { title: "AI Roleplay Practice", text: "Practice interviews, help-seeking, conflict, and boundaries.", modal: "roleplayList", icon: "icon-chat.png", kind: "practice" },
+        { title: "Read a job offer", text: "Contract clauses that matter more than the salary number.", modal: "skillGuideDetail", payload: "read-job-offer", icon: "icon-work.png", kind: "real" },
+        { title: "Understand your payslip", text: "Gross pay, deductions, take-home pay, and error checks.", modal: "skillGuideDetail", payload: "read-payslip", icon: "icon-receipt.png", kind: "real" },
+        { title: "Future Self Hiring", text: "Four future-you candidates interview for who you become.", modal: "futureSelfHiring", icon: "icon-chat.png", kind: "practice" }
+      ]
+    })}
+    ${growthHubSection({
+      id: "practice-practical",
+      title: "Practical & Safety",
+      subtitle: "The unglamorous stuff nobody warns you about.",
+      icon: "icon-safety.png",
+      tone: "progress-tone",
+      items: [
+        { title: "Real Due Dates", text: "Rent, bills, renewals - real deadlines, not app-invented reminders.", modal: "realLifeEvents", icon: "icon-checkin.png", kind: "real" },
+        { title: "Skill Guides", text: "Cooking, laundry, renting, payslips, SIM plans, credit, first aid, and more.", modal: "skillGuides", icon: "icon-home.png", kind: "real" },
+        { title: "Real Cost of Living", text: "Estimate SG-style living costs before choosing a path.", modal: "costOfLiving", icon: "icon-money.png", kind: "real" },
+        { title: "Basic Tax Obligations", text: "Know what you actually owe, in plain English.", modal: "taxObligations", icon: "icon-receipt.png", kind: "real" },
+        { title: "Receipt record", text: "Track what you paid today.", modal: "receipt", icon: "icon-receipt.png", kind: "real" },
+        { title: "Build support before crisis", text: "Singapore youth mental-health realities deserve a direct support plan, not a hidden guide.", modal: "buildSupportGuide", icon: "icon-support.png", kind: "real" },
+        { title: "Been There", text: "Anonymous, one-time encouragement to or from someone who has been where you are.", modal: "communityEncouragement", icon: "icon-support.png", kind: "real" },
+        { title: "SOS - get urgent help", text: "Urgent resources stay one tap away and separate from normal coaching.", modal: "sosTriage", icon: "icon-warning.png", kind: "real" },
+        { title: "Safety Net Preview", text: "What a safety net might cover - concept only, not real cover.", modal: "microInsurance", icon: "icon-health.png", kind: "practice" }
+      ]
+    })}
+    ${growthHubSection({
+      id: "practice-people",
+      title: "People, Home, and Boundaries",
+      subtitle: "Practice the conversations that decide whether adult life stays manageable.",
+      icon: "icon-boundary.png",
+      tone: "reflection-tone",
+      items: [
+        { title: "Ghost Roommate", text: "Move in with someone - a relationship that remembers.", modal: "ghostRoommate", icon: "icon-home.png", kind: "practice" },
+        { title: "Ending a relationship well", text: "A clean ending without ghosting or blowing up.", modal: "skillGuideDetail", payload: "end-a-relationship-well", icon: "icon-boundary.png", kind: "real" },
+        { title: "Living with someone", text: "Check agreements, chores, quiet hours, and repair conversations.", modal: "skillGuideDetail", payload: "before-renting-room", icon: "icon-home.png", kind: "real" },
+        { title: "Skill Exchange", text: "Trade what you know for what you need.", tab: "discover", icon: "icon-chat.png", kind: "real" }
+      ]
+    })}
+    ${growthHubSection({
+      id: "practice-advanced",
+      title: "Advanced Reality Labs",
+      subtitle: "Use these after basics when you want harder self-honesty.",
+      icon: "icon-balance.png",
+      tone: "challenge-tone",
+      items: [
+        { title: "Jury Duty on Yourself", text: "Put a real decision on trial.", modal: "juryTrial", icon: "icon-balance.png", kind: "practice" },
+        { title: "Failure Inoculation", text: "This week's task is designed to fail. That is the point.", modal: "failureInoculation", icon: "icon-warning.png", kind: "practice" },
+        { title: "Inherited Debugging", text: "Refactor habits you did not choose, issue by issue.", modal: "legacyDebugger", icon: "icon-settings.png", kind: "practice" },
+        { title: "Self-Debt", text: "Pay your future self a debt when it is actually due.", modal: "selfDebtLedger", icon: "icon-money.png", kind: "practice" },
+        { title: "Estate Auction", text: "Your time and habits, read out like an auction catalog.", modal: "estateAuction", icon: "icon-time.png", kind: "practice" },
+        { title: "Self Archaeology", text: "Dig up an old month of entries as a field report.", modal: "selfArchaeology", icon: "icon-time.png", kind: "practice" }
+      ]
+    })}
+  `;
+}
+
+function profileScreen() {
+  return `
+    <header class="screen-head compact-head">
+      <div>
+        <p class="eyebrow">Profile</p>
+        <h2 class="screen-title">Account, trust, data, and controls</h2>
+        <p class="screen-subtitle">Keep identity, AI memory, demo limits, backups, and admin permissions in one place.</p>
+      </div>
+      <div class="avatar">${userInitial()}</div>
+    </header>
+    <section class="profile-hero">
+      <div class="avatar">${userInitial()}</div>
+      <div>
+        <strong>${displayName()}</strong>
+        <p>${escapeHTML(userProfile.email)} - ${escapeHTML(userProfile.role)} role</p>
+        <span class="risk-pill warn demo-account-badge">Demo account - saved on this device only</span>
+      </div>
+    </section>
+    <div class="profile-actions">
+      <button class="secondary-action" type="button" data-open="username">Edit profile</button>
+      <button class="secondary-action" type="button" data-open="compassProfile">Compass AI Profile</button>
+      <button class="secondary-action" type="button" data-open="guide">Guide / Help</button>
+    </div>
+    <section class="profile-card trust-center-card">
+      <p class="eyebrow">AI Trust Center</p>
+      <h3>Know what Compass uses before you rely on it.</h3>
+      <p class="muted">AI uses this chat, your saved AI profile, selected saved data, and uploaded PDFs when you provide them. Empty fields are not assumed.</p>
+      <div class="profile-actions">
+        <button class="primary-action compact-action" type="button" data-open="aiTrustCenter">Open trust center</button>
+        <button class="secondary-action compact-action" type="button" data-open="aiTraceLog">AI Trace Log</button>
+      </div>
+    </section>
+    <section class="profile-card">
+      <p class="eyebrow">Compass AI voice</p>
+      <div class="voice-choice-grid">
+        ${["female", "male", "off"].map((voice) => `
+          <label class="check-option">
+            <input type="radio" name="voice-preference" value="${voice}" ${userProfile.voicePreference === voice ? "checked" : ""}>
+            <span>${voice === "off" ? "Text only" : `${voice} voice`}</span>
+          </label>
+        `).join("")}
+      </div>
+      <button class="secondary-action signout-action" type="button" data-save-voice>Save voice preference</button>
+    </section>
+    <section class="profile-card">
+      <div class="toggle-row"><span>Login method</span><strong>Local demo (not verified)</strong></div>
+      <div class="toggle-row"><span>Role permissions</span><strong>${isAdmin() ? "Admin" : "User"}</strong></div>
+      <div class="toggle-row"><span>Progress storage</span><strong>This browser only</strong></div>
+      <button class="secondary-action compact-action" type="button" data-open="demoMode">Demo mode details</button>
+    </section>
+    <div class="profile-actions">
+      <button class="secondary-action" type="button" data-open="supportCircle">Support Circle</button>
+      <button class="secondary-action" type="button" data-open="knowledgeVault">Knowledge Vault</button>
+      <button class="secondary-action" type="button" data-open="receiptPlan">Receipt Plan</button>
+    </div>
+    ${yourStoryCard()}
+    ${yourDataCard()}
+    ${adminStudio()}
+    <button class="secondary-action signout-action" type="button" data-sign-out>Sign out</button>
+  `;
+}
+
 const screens = {
   home: () => `
-    ${todaysDeskHero()}
+    ${adultPrepHero()}
+    ${homeStarterPathCard()}
+    ${adultingReadinessOverviewCard()}
     ${homeLedgerRows(todaysDeskFocus().kind)}
-    ${lifeVerseHomeSpotlight()}
     ${homeQuickAccessGrid()}
   `,
+
+  decide: () => decideScreen(),
 
   future: () => `
     <header class="screen-head compact-head mirror-head">
@@ -9952,6 +10716,10 @@ const screens = {
       </div>
     </section>
   `,
+
+  build: () => buildScreen(),
+
+  practice: () => practiceScreen(),
 
   growth: () => `
     <header class="screen-head compact-head growth-head">
@@ -10120,6 +10888,8 @@ const screens = {
     </section>
   `,
 
+  discover: () => communityMergedScreen(),
+
   community: () => communityMergedScreen(),
 
   stories: () => `
@@ -10145,6 +10915,8 @@ const screens = {
     <div class="content-rail-title"><strong>Recommended stories</strong><span>${filteredStories().length} items</span></div>
     <div class="inspire-feed">${storyCards(inspireCategory === "All" && !inspireSearch.trim() ? rankedStories(filteredStories()).map((item) => item.story) : filteredStories())}</div>
   `,
+
+  profile: () => profileScreen(),
 
   settings: () => `
     <header class="screen-head compact-head">
@@ -10267,6 +11039,50 @@ const modals = {
         <p class="tiny-note">Compass AI will not assume anything from empty fields.</p>
       </div>
       <button class="primary-action" type="button" data-save-ai-profile>Save AI profile</button>
+    </div>
+  `,
+
+  aiTrustCenter: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="ai-trust-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">AI Trust Center</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="ai-trust-title">What Compass AI can and cannot know</h3>
+      <p class="muted">This app should help you practice adult life, not make the AI feel mysterious. These controls point to the real data sources already in the app.</p>
+      <div class="advice-stack">
+        <div><strong>Used when relevant</strong><span>Compass AI Chat, your saved AI profile, uploaded PDF text, selected saved goals, reflections, and Build Mode context.</span></div>
+        <div><strong>Not assumed</strong><span>Empty profile fields, private thoughts you never saved, real Google identity, bank accounts, official school records, or hidden device data.</span></div>
+        <div><strong>Quality checks</strong><span>AI Trace Log grades replies for answering the question, giving a concrete next step, and possible fabrication.</span></div>
+        <div><strong>Limits</strong><span>Compass is coaching and practice. It is not legal, medical, financial, immigration, or emergency advice.</span></div>
+      </div>
+      <div class="profile-actions">
+        <button class="primary-action compact-action" type="button" data-open="compassProfile">Edit AI profile</button>
+        <button class="secondary-action compact-action" type="button" data-open="knowledgeVault">Open Knowledge Vault</button>
+        <button class="secondary-action compact-action" type="button" data-open="aiTraceLog">Open AI Trace Log</button>
+        <button class="secondary-action compact-action" type="button" data-clear-chat>Clear chat</button>
+      </div>
+    </div>
+  `,
+
+  demoMode: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="demo-mode-title">
+      <div class="modal-top">
+        <span class="risk-pill warn">Demo mode</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="demo-mode-title">What is real in this demo</h3>
+      <p class="muted">Compass currently stores most progress in this browser. Community sign-in can unlock community features and encrypted cloud backup, but the local demo account itself is not a verified Google login.</p>
+      <div class="advice-stack">
+        <div><strong>Real app behavior</strong><span>Starter path progress, goals, mood, receipts, Skill Guide progress, Future Scan records, Career Studio drafts, and Knowledge Vault data are saved locally.</span></div>
+        <div><strong>Demo limitation</strong><span>Changing browser, clearing site data, or using another device can lose local progress unless you export or use cloud backup where available.</span></div>
+        <div><strong>Best demo route</strong><span>Choose a starter path, run one Decide tool, complete one Practice step, then check Adulting Readiness on Home.</span></div>
+      </div>
+      <div class="profile-actions">
+        <button class="primary-action compact-action" type="button" data-tab-jump="home">Go to Home</button>
+        <button class="secondary-action compact-action" type="button" data-export-tracker-data>Export backup</button>
+        <button class="secondary-action compact-action" type="button" data-open="guide">Open guide</button>
+      </div>
     </div>
   `,
 
@@ -11126,16 +11942,15 @@ const modals = {
       <h3 id="guide-title">How to use Compass</h3>
       <div class="guide-list">
         ${[
-          ["icon-home.png", "Home", "A quick dashboard of the main features."],
-          ["icon-spark.png", "Future Mirror", "Compare possible impacts of today's choices. It is a simulator, not a prediction tool."],
-          ["icon-learn.png", "Growth", "Well-being, assessments, goals, vision board, journal, mood tracking, challenges, badges, and reports."],
-          ["icon-stories.png", "Inspire Hub", "Read successful people stories and use AI Reflection to apply lessons realistically."],
-          ["icon-support.png", "Community", "Join growth communities, goal groups, partner matching, and anonymous support."],
-          ["icon-work.png", "Opportunity Hub", "Explore scholarships, internships, competitions, volunteering, and learn-and-earn resources."],
+          ["icon-home.png", "Home", "Your starter path, Adulting Readiness, and today's next step."],
+          ["icon-decide.png", "Decide", "Future Scan, Build Mode, and decision labs for choices before they become real."],
+          ["icon-spark.png", "Build", "Blueprint, goals, roadmap, mood, reflection, progress, and inspiration."],
+          ["icon-work.png", "Practice", "Career, money, home, support, communication, and practical adulting skills."],
+          ["icon-support.png", "Discover", "Opportunities, people, groups, and community updates in separate views."],
           ["icon-balance.png", "Life Sim", "Play the realistic 3D adult-life simulator, choose daily activities, and fast-forward consequences."],
           ["icon-chat.png", "Compass AI", "Discuss decisions, story lessons, reality checks, and action plans."],
           ["icon-support.png", "Support Circle", "Save trusted people for moments when decisions feel heavy."],
-          ["icon-settings.png", "Profile", "Manage account, guide, permissions, and admin tools."],
+          ["icon-settings.png", "Profile", "Manage account, AI Trust Center, data, guide, permissions, and admin tools."],
           ["icon-admin.png", "Admin Studio", "Admins can add Inspire Hub content, edit content, and enable or disable features."]
         ].map(([icon, title, text]) => `
           <div class="guide-item"><img src="assets/${icon}" alt=""><div><strong>${title}</strong><p>${text}</p></div></div>
@@ -11652,7 +12467,19 @@ function hidePortrait() {
   currentPortraitId = null;
 }
 
+const TAB_ALIASES = {
+  future: "decide",
+  growth: "build",
+  community: "discover",
+  settings: "profile"
+};
+
+function canonicalTab(tab) {
+  return TAB_ALIASES[tab] || tab || "home";
+}
+
 function renderScreen(tab) {
+  tab = canonicalTab(tab);
   activeTab = tab;
   // community.js/community-supabase.js load before app.js as separate
   // <script> tags, so they can't see the `activeTab` lexical binding - they
@@ -11669,8 +12496,8 @@ function renderScreen(tab) {
   }
   screenRoot.innerHTML = getScreen(tab);
   bindRenderedNavigation(screenRoot);
-  if (tab === "community") mountFeedSwipeCard();
-  const navTab = tab === "assess" || tab === "compass" ? "home" : tab === "simulator" ? "growth" : tab;
+  if (tab === "discover") mountFeedSwipeCard();
+  const navTab = tab === "assess" || tab === "compass" ? "home" : tab === "simulator" ? "practice" : tab === "stories" ? "build" : tab;
   navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.tab === navTab));
   const activePortraitId = computeActivePortraitId(tab);
   if (activePortraitId) showPortrait(activePortraitId);
@@ -11803,6 +12630,7 @@ function openModal(name, payload) {
   if (name === "firstRunOnboarding" && !modalLayer.classList.contains("is-open")) {
     onboardingStep = 1;
     onboardingAnswerDraft = "";
+    onboardingStarterPathDraft = trackerState.starterPath && trackerState.starterPath.id ? trackerState.starterPath.id : "";
     // Stamped on open, not on finish/skip - every dismissal path (the x
     // button, backdrop click, Skip, or the real suggestion) should count as
     // "seen" so this sequence never opens a second time for the same user.
@@ -14077,6 +14905,9 @@ document.addEventListener("click", async (event) => {
   const onboardingBack = event.target.closest("[data-onboarding-back]");
   const skipOnboarding = event.target.closest("[data-skip-onboarding]");
   const finishOnboarding = event.target.closest("[data-onboarding-finish]");
+  const selectStarterPathButton = event.target.closest("[data-select-starter-path]");
+  const toggleStarterStepButton = event.target.closest("[data-toggle-starter-step]");
+  const discoverModeJumpButton = event.target.closest("[data-discover-mode-jump]");
   const prevBlueprintStepButton = event.target.closest("[data-prev-blueprint-step]");
   const swipeTapButton = event.target.closest("[data-swipe-tap]");
   const answerBlueprintScenarioButton = event.target.closest("[data-answer-blueprint-scenario]");
@@ -14242,7 +15073,7 @@ document.addEventListener("click", async (event) => {
     const itemId = toggleTaxItem.dataset.toggleTaxItem;
     trackerState.taxChecklist[itemId] = !trackerState.taxChecklist[itemId];
     saveTrackerState();
-    if (activeTab === "future") renderScreen("future");
+    if (activeTab === "future" || activeTab === "decide") renderScreen("decide");
     if (modalLayer.classList.contains("is-open")) openModal("taxObligations");
   }
   if (saveGuardianShareButton) {
@@ -14464,33 +15295,35 @@ document.addEventListener("click", async (event) => {
   if (toggleHubSectionButton) {
     const id = toggleHubSectionButton.dataset.toggleHubSection;
     expandedGrowthSections[id] = !expandedGrowthSections[id];
-    renderScreen("growth");
+    renderScreen(activeTab === "practice" ? "practice" : "build");
   }
   if (saveChainReflectionButton) {
     const input = screenRoot.querySelector("#chain-break-reflection-input");
     saveChainBreakReflection(saveChainReflectionButton.dataset.saveChainReflection, input ? input.value : "");
-    renderScreen("growth");
+    renderScreen("build");
   }
   if (skipChainReflectionButton) {
     skipChainBreakReflection(skipChainReflectionButton.dataset.skipChainReflection);
-    renderScreen("growth");
+    renderScreen("build");
   }
   if (feedPrevButton) {
     feedIndex = Math.max(0, feedIndex - 1);
-    renderScreen("community");
+    renderScreen("discover");
   }
   if (feedNextButton) {
     feedIndex = Math.min(feedItems.length - 1, feedIndex + 1);
-    renderScreen("community");
+    renderScreen("discover");
   }
   if (feedSaveButton) {
     const [type, id] = String(feedSaveButton.dataset.feedSave || "").split(":");
     toggleFeedSave(type, id);
-    renderScreen("community");
+    renderScreen("discover");
   }
   if (communityViewModeButton) {
-    communityViewMode = communityViewModeButton.dataset.communityViewMode === "browse" ? "browse" : "feed";
-    renderScreen("community");
+    const requestedMode = communityViewModeButton.dataset.communityViewMode;
+    const normalizedMode = requestedMode === "browse" ? "opportunities" : requestedMode === "feed" ? "for-you" : requestedMode;
+    communityViewMode = DISCOVER_VIEW_MODES.some((mode) => mode.id === normalizedMode) ? normalizedMode : "for-you";
+    renderScreen("discover");
   }
   if (sosGetHelpButton) {
     const textInput = modalLayer.querySelector("#sos-input-text");
@@ -14868,8 +15701,29 @@ document.addEventListener("click", async (event) => {
     openModal("assessment");
   }
 
+  if (selectStarterPathButton) {
+    captureOnboardingDraft();
+    selectStarterPath(selectStarterPathButton.dataset.selectStarterPath, onboardingAnswerDraft);
+    if (currentModalName === "firstRunOnboarding") openModal("firstRunOnboarding");
+    else renderScreen(activeTab);
+  }
+
+  if (toggleStarterStepButton) {
+    toggleStarterStep(toggleStarterStepButton.dataset.toggleStarterStep);
+    renderScreen(activeTab);
+  }
+
+  if (discoverModeJumpButton) {
+    const nextMode = discoverModeJumpButton.dataset.discoverModeJump;
+    communityViewMode = DISCOVER_VIEW_MODES.some((mode) => mode.id === nextMode) ? nextMode : "for-you";
+    renderScreen("discover");
+  }
+
   if (onboardingNext) {
     captureOnboardingDraft();
+    if (onboardingStep === 2 && !onboardingStarterPathDraft) {
+      onboardingStarterPathDraft = starterPathFromText(onboardingAnswerDraft).id;
+    }
     onboardingStep = Math.min(3, onboardingStep + 1);
     openModal("firstRunOnboarding");
   }
@@ -14885,11 +15739,19 @@ document.addEventListener("click", async (event) => {
   }
 
   if (finishOnboarding) {
+    const targetPath = finishOnboarding.dataset.onboardingPath;
     const targetTab = finishOnboarding.dataset.onboardingTab;
     const targetOpen = finishOnboarding.dataset.onboardingOpen;
     const targetPayload = finishOnboarding.dataset.onboardingPayload || "";
+    const targetDiscoverMode = finishOnboarding.dataset.onboardingDiscoverMode || "";
+    if (targetPath) selectStarterPath(targetPath, onboardingAnswerDraft);
     closeModal();
-    if (targetTab) renderScreen(targetTab);
+    if (targetDiscoverMode) {
+      communityViewMode = targetDiscoverMode;
+      renderScreen("discover");
+    } else if (targetTab) {
+      renderScreen(targetTab);
+    }
     if (targetOpen) openModal(targetOpen, targetPayload);
   }
 
