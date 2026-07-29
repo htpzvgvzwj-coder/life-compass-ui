@@ -7374,7 +7374,70 @@ function jurySpeakerLabel(speaker) {
   if (speaker === "judge") return "Judge";
   if (speaker === "prosecution") return "Prosecution";
   if (speaker === "defense") return "Defense";
+  if (speaker === "futureself") return "Your Future Self (witness)";
   return displayName();
+}
+
+// "Future self testimony" (self-critique finding): Future Self Hiring and
+// Jury Duty are two separate systems that never talk to each other, even
+// though both already exist. Calling the simulated future self (grounded
+// in the real saved Personal Blueprint, same conditional-only phrasing
+// rule as the rest of the Future Self module - never "you will be",
+// always "if this is the path I took") as a witness is a hybrid only
+// possible because both systems are already built - a genuine crossover,
+// not a new standalone feature. A one-time side action per trial: it adds
+// testimony to the transcript but does not consume a cross-examination
+// round the way testifyToJury() does.
+async function callFutureSelfToTestify() {
+  const session = activeJuryTrial();
+  if (!session || session.futureSelfTestified || session.verdict) return;
+  isJuryLoading = true;
+  juryError = "";
+  openModal("juryTrial");
+  try {
+    const blueprint = latestBlueprint();
+    const context = blueprint
+      ? `Values: ${(blueprint.values || []).join(", ") || "not set"}. Personality: ${(blueprint.personality && blueprint.personality.style) || "not set"}. Motivation style: ${blueprint.motivationStyle || "not set"}. Work style: ${blueprint.workStyle || "not set"}.`
+      : "No Personal Blueprint saved yet - speak generally and honestly about the limits of that, rather than inventing specific personal detail.";
+    const prompt = `Case: "${session.decision}"\n\nTrial transcript so far:\n${juryTranscriptText(session)}\n\nThe defendant's saved self-knowledge: ${context}\n\nYou are being called to testify as the defendant's own future self, further down whichever path they seem to be leaning toward in this transcript. Speak in first person, present-tense, vivid but strictly conditional framing ("if this is the path I took, I'd tell you...") - never deterministic ("you will be"). Give one grounded, specific piece of testimony relevant to the case, 2-4 sentences, based only on the real context above - be honest about low confidence rather than inventing detail to sound impressive.`;
+    const reply = await requestCompassDirect(FUTURE_SELF_SYSTEM_PROMPT, prompt);
+    session.transcript.push({ speaker: "futureself", text: cleanText(reply, 400), round: session.round });
+    session.futureSelfTestified = true;
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Jury Trial] future self testimony failed", error);
+    juryError = "Couldn't reach your future self right now. Please try again.";
+  } finally {
+    isJuryLoading = false;
+    if (isModalActive("juryTrial")) openModal("juryTrial");
+  }
+}
+
+// "Counterfactual replay" (self-critique finding): once a verdict exists,
+// nothing ever revisits it - there's no way to see whether the decision
+// actually mattered. Grounded only in the real transcript already
+// generated for this case, and framed the same conditional way as the
+// rest of Future Self content - this is not a second prediction, it's a
+// narrated "what if" used to calibrate how much weight the original
+// decision actually carried.
+async function generateJuryCounterfactual() {
+  const session = activeJuryTrial();
+  if (!session || !session.verdict || session.counterfactual) return;
+  isJuryLoading = true;
+  juryError = "";
+  openModal("juryTrial");
+  try {
+    const prompt = `Case: "${session.decision}"\n\nFull trial transcript:\n${juryTranscriptText(session)}\n\nVerdict: ${session.verdict.ruling} ${session.verdict.reasoning}\n\nWrite a short, honest "what if" narration: if the defendant had leaned the opposite way from what this transcript suggests they were leaning, what would plausibly have happened instead? This is not a prediction of what WILL happen - it's a grounded reflection on how much this specific choice actually mattered, based only on the real testimony and arguments above. If the transcript suggests either path would have been fine, say so plainly rather than inventing a dramatic difference. 2-4 sentences, conditional framing only ("if you had instead...").`;
+    const reply = await requestCompassDirect(FUTURE_SELF_SYSTEM_PROMPT, prompt);
+    session.counterfactual = cleanText(reply, 500);
+    saveTrackerState();
+  } catch (error) {
+    console.error("[Jury Trial] counterfactual generation failed", error);
+    juryError = "Couldn't generate that right now. Please try again.";
+  } finally {
+    isJuryLoading = false;
+    if (isModalActive("juryTrial")) openModal("juryTrial");
+  }
 }
 
 function juryTrialModal() {
@@ -7424,6 +7487,7 @@ function juryTrialModal() {
             <input id="jury-testimony-input" type="text" placeholder="Answer the Judge's question...">
             <button class="primary-action send-action" type="button" data-testify-jury ${isJuryLoading ? "disabled" : ""}>Testify</button>
           </div>
+          ${!session.futureSelfTestified ? `<button class="text-action" type="button" data-call-future-self-witness ${isJuryLoading ? "disabled" : ""}>Call your future self as a witness</button>` : ""}
         ` : ""}
       </section>
       ${juryError ? `<p class="form-error">${escapeHTML(juryError)}</p>` : ""}
@@ -7433,9 +7497,16 @@ function juryTrialModal() {
           <h3>${escapeHTML(session.verdict.ruling)}</h3>
           <p class="muted">${escapeHTML(session.verdict.reasoning)}</p>
         </section>
+        ${session.counterfactual ? `
+          <section class="mirror-empty-card">
+            <p class="verdict-stamp">What if you'd leaned the other way</p>
+            <p class="muted">${escapeHTML(session.counterfactual)}</p>
+          </section>
+        ` : ""}
         <div class="profile-actions">
           <button class="secondary-action compact-action" type="button" data-close>Accept</button>
           ${session.appealsUsed < 1 ? `<button class="primary-action compact-action" type="button" data-open="juryAppeal">Appeal</button>` : ""}
+          ${!session.counterfactual ? `<button class="secondary-action compact-action" type="button" data-jury-counterfactual ${isJuryLoading ? "disabled" : ""}>See what might have happened otherwise</button>` : ""}
         </div>
       ` : ""}
     </div>
@@ -8304,6 +8375,85 @@ function selfDebtIsDue(debt) {
 
 function dueSelfDebts() {
   return trackerState.selfDebts.filter(selfDebtIsDue);
+}
+
+// "Debt of inaction" - unlike Self-Debt above (a commitment the user writes
+// themselves), this is automatically detected from behavior the app already
+// tracks. Everywhere else in Compass surfaces what a user DID; this is the
+// only surface that shows the shape of what they keep NOT doing - often the
+// more honest signal. No new state, three real existing avoidance signals.
+function avoidancePatterns() {
+  const patterns = [];
+
+  // Reflections/decisions/check-backs snoozed into silence - ignoredCount
+  // reached the auto-dismiss threshold (3) rather than actually being
+  // rated resolved/relevant/somewhat. A real, distinct signal from a
+  // genuine resolution.
+  const avoided = allReflectionLikeEntries().filter((entry) => (entry.ignoredCount || 0) >= 3 && entry.dismissedAt && !entry.resurfacedAt);
+  if (avoided.length) {
+    patterns.push({
+      id: "snoozed-away",
+      label: `${avoided.length} reflection${avoided.length === 1 ? "" : "s"} snoozed until it stopped coming back`,
+      detail: "Not resolved - just pushed off enough times that it quietly stopped resurfacing.",
+      items: avoided.slice(0, 3).map((entry) => cleanText(entry.content, 90))
+    });
+  }
+
+  // Real Due Dates significantly overdue, not just technically due - these
+  // are the one category of "due" with a genuine external deadline the
+  // user set themselves, not an app-invented reminder.
+  const overdue = myRealLifeEvents().filter((event) => event.status !== "done" && new Date(event.dueDate).getTime() <= Date.now() - 14 * 86400000);
+  if (overdue.length) {
+    patterns.push({
+      id: "overdue-real-events",
+      label: `${overdue.length} real due date${overdue.length === 1 ? "" : "s"} more than 2 weeks overdue`,
+      detail: "A deadline you set yourself, not one Compass invented.",
+      items: overdue.slice(0, 3).map((event) => cleanText(event.title, 90))
+    });
+  }
+
+  // Jury Duty trials opened, then walked away from before a verdict.
+  const abandoned = trackerState.juryTrials.sessions.filter((session) => session.user_id === currentUserId() || !session.user_id).filter((session) => !session.verdict && new Date(session.createdAt).getTime() <= Date.now() - 3 * 86400000);
+  if (abandoned.length) {
+    patterns.push({
+      id: "abandoned-trials",
+      label: `${abandoned.length} decision${abandoned.length === 1 ? "" : "s"} put on trial, then never finished`,
+      detail: "Opening the trial and not finishing it is itself a kind of answer.",
+      items: abandoned.slice(0, 3).map((session) => cleanText(session.decision, 90))
+    });
+  }
+
+  return patterns;
+}
+
+function avoidancePatternsModal() {
+  const patterns = avoidancePatterns();
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="avoidance-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Debt of Inaction</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="avoidance-title">What you keep not doing</h3>
+      <p class="muted">Everywhere else in Compass tracks what you did. This is the only place that tracks the shape of what you keep avoiding - often the more honest signal. Automatically detected, not something you write yourself, like Self-Debt.</p>
+      ${patterns.length ? `
+        <div class="advice-stack">
+          ${patterns.map((pattern) => `
+            <div>
+              <strong>${escapeHTML(pattern.label)}</strong>
+              <span>${escapeHTML(pattern.detail)}</span>
+              ${pattern.items.length ? `<p class="tiny-note">${pattern.items.map((item) => escapeHTML(item)).join(" · ")}</p>` : ""}
+            </div>
+          `).join("")}
+        </div>
+      ` : `
+        <section class="empty-feature">
+          <img src="assets/icon-checkin.png" alt="">
+          <div><strong>Nothing avoided right now</strong><p>No repeated snoozes, no old overdue dates, no abandoned trials.</p></div>
+        </section>
+      `}
+    </div>
+  `;
 }
 
 function createSelfDebt({ title, message, triggerType, triggerThresholdDays }) {
@@ -9786,7 +9936,8 @@ const screens = {
         { title: "Receipt record", text: "Track what you paid today.", modal: "receipt", icon: "icon-receipt.png" },
         { title: "Knowledge Vault", text: "Everything Future Mirror knows about you, in one place.", modal: "knowledgeVault", icon: "icon-learn.png" },
         { title: "AI Trace Log", text: "Is the AI coach actually helping? Every reply gets graded.", modal: "aiTraceLog", icon: "icon-assessment.png" },
-        { title: "Judgment Calibration", text: "When you say you're sure, how often are you actually right?", modal: "calibration", icon: "icon-balance.png", kind: "real" }
+        { title: "Judgment Calibration", text: "When you say you're sure, how often are you actually right?", modal: "calibration", icon: "icon-balance.png", kind: "real" },
+        { title: "Debt of Inaction", text: "What you keep not doing, automatically detected - not something you write yourself.", modal: "avoidancePatterns", icon: "icon-warning.png", kind: "real" }
       ]
     })}
 
@@ -10279,6 +10430,7 @@ const modals = {
   selfDebtLedger: () => selfDebtLedgerModal(),
   selfDebtNew: () => selfDebtNewModal(),
   selfDebtNotice: () => selfDebtNoticeModal(),
+  avoidancePatterns: () => avoidancePatternsModal(),
 
   failureInoculation: () => failureInoculationModal(),
 
@@ -11254,6 +11406,8 @@ const modals = {
 
   communityMembersBlocked: () => communityMembersBlockedModal(),
 
+  communityEncouragement: () => communityEncouragementModal(),
+
   safety: (reason = "") => `
     <div class="modal-card dark-modal" role="dialog" aria-modal="true" aria-labelledby="safety-title">
       <div class="modal-top">
@@ -11530,6 +11684,10 @@ function openModal(name, payload) {
     // "seen" so this sequence never opens a second time for the same user.
     trackerState.onboarding.completedAt = new Date().toISOString();
     saveTrackerState();
+  }
+  if (name === "communityEncouragement" && !modalLayer.classList.contains("is-open")) {
+    communityEncouragementError = "";
+    communityEncouragementStatus = "";
   }
   modalLayer.innerHTML = getModal(name, payload) || "";
   modalLayer.classList.add("is-open");
@@ -13863,6 +14021,9 @@ document.addEventListener("click", async (event) => {
   const unblockCommunityUserButton = event.target.closest("[data-unblock-community-user]");
   const openCommunityReportButton = event.target.closest("[data-open-community-report]");
   const submitCommunityReportButton = event.target.closest("[data-submit-community-report]");
+  const toggleBeenThereButton = event.target.closest("[data-toggle-been-there]");
+  const sendCommunityEncouragementButton = event.target.closest("[data-send-community-encouragement]");
+  const markEncouragementReadButton = event.target.closest("[data-mark-encouragement-read]");
   const submitMentorApplicationButton = event.target.closest("[data-submit-mentor-application]");
   const saveSkillTagButton = event.target.closest("[data-save-skill-tag]");
   const deleteSkillTagButton = event.target.closest("[data-delete-skill-tag]");
@@ -13927,6 +14088,8 @@ document.addEventListener("click", async (event) => {
   const startJuryTrialButton = event.target.closest("[data-start-jury-trial]");
   const testifyJuryButton = event.target.closest("[data-testify-jury]");
   const submitJuryAppealButton = event.target.closest("[data-submit-jury-appeal]");
+  const callFutureSelfWitnessButton = event.target.closest("[data-call-future-self-witness]");
+  const juryCounterfactualButton = event.target.closest("[data-jury-counterfactual]");
   const excavateStratumButton = event.target.closest("[data-excavate-stratum]");
   const toggleStratumButton = event.target.closest("[data-toggle-stratum]");
   const runAdvancedModeButton = event.target.closest("[data-run-advanced-mode]");
@@ -14152,6 +14315,12 @@ document.addEventListener("click", async (event) => {
     const text = cleanText(input ? input.value : "", 500);
     if (!text) return;
     await appealJuryVerdict(text);
+  }
+  if (callFutureSelfWitnessButton) {
+    await callFutureSelfToTestify();
+  }
+  if (juryCounterfactualButton) {
+    await generateJuryCounterfactual();
   }
   if (excavateStratumButton) {
     await excavateStratum(excavateStratumButton.dataset.excavateStratum);
@@ -15412,6 +15581,29 @@ document.addEventListener("click", async (event) => {
     } else {
       openModal("communityReport");
     }
+  }
+
+  if (toggleBeenThereButton) {
+    await toggleBeenThereOptIn(toggleBeenThereButton.dataset.toggleBeenThere);
+    openModal("communityEncouragement");
+  }
+
+  if (sendCommunityEncouragementButton) {
+    const categorySelect = modalLayer.querySelector("#community-encouragement-category");
+    const messageInput = modalLayer.querySelector("#community-encouragement-message");
+    const category = categorySelect ? categorySelect.value : "";
+    if (!category) {
+      communityEncouragementError = "Pick a category first.";
+      openModal("communityEncouragement");
+    } else {
+      await sendCommunityEncouragement(category, messageInput ? messageInput.value : "");
+      openModal("communityEncouragement");
+    }
+  }
+
+  if (markEncouragementReadButton) {
+    await markEncouragementRead(markEncouragementReadButton.dataset.markEncouragementRead);
+    openModal("communityEncouragement");
   }
 
   if (submitMentorApplicationButton) {

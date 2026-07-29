@@ -53,6 +53,21 @@
   let communityReportBusy = false;
   let communityReportError = "";
 
+  // Anonymous "been-there" encouragement (new idea): a lower-commitment
+  // alternative to accountability_connections. community_been_there_optins
+  // is my own opt-in list, fetched normally (RLS: select_own). Received
+  // encouragements (communityEncouragementsCache) can NOT be fetched
+  // normally - community_encouragements has no select policy at all, by
+  // design, so sender_id can never reach the browser even for the
+  // recipient. See fetchMyEncouragements() and api/community-encouragement.js.
+  let communityBeenThereOptInsCache = [];
+  let communityEncouragementsCache = [];
+  let communityEncouragementsLoaded = false;
+  let communityEncouragementSendCategory = "";
+  let communityEncouragementBusy = false;
+  let communityEncouragementError = "";
+  let communityEncouragementStatus = "";
+
   function communityProfilesById() {
     const map = new Map();
     communityProfilesCache.forEach((profile) => map.set(profile.id, profile));
@@ -121,7 +136,7 @@
     if (!hasCommunitySession() || communityDataLoading) return;
     communityDataLoading = true;
     try {
-      const [squads, squadMembers, posts, opportunities, profiles, optIns, connections, mentorProfiles, mentorApplications, skillTags, blocks, myReports] = await Promise.all([
+      const [squads, squadMembers, posts, opportunities, profiles, optIns, connections, mentorProfiles, mentorApplications, skillTags, blocks, myReports, beenThereOptIns] = await Promise.all([
         fetchCommunityTable("squads", (q) => q.order("is_seeded", { ascending: false }).order("created_at", { ascending: true })),
         fetchCommunityTable("squad_members"),
         fetchCommunityTable("posts", (q) => q.order("created_at", { ascending: false }).limit(60)),
@@ -133,7 +148,8 @@
         fetchCommunityTable("mentor_applications"),
         fetchCommunityTable("skill_tags", (q) => q.order("created_at", { ascending: false }).limit(120)),
         fetchCommunityTable("community_blocks"),
-        fetchCommunityTable("community_reports")
+        fetchCommunityTable("community_reports"),
+        fetchCommunityTable("community_been_there_optins")
       ]);
       communitySquadsCache = squads;
       communitySquadMembersCache = squadMembers;
@@ -147,10 +163,19 @@
       communitySkillTagsCache = skillTags;
       communityBlocksCache = blocks;
       communityMyReportsCache = myReports;
+      communityBeenThereOptInsCache = beenThereOptIns;
       communityMyProfile = profiles.find((profile) => profile.id === communityUserId()) || null;
       communityDataLoaded = true;
       communityDataError = "";
       if (typeof checkCommunityAchievements === "function") checkCommunityAchievements();
+      // Fire-and-forget: hits the privileged endpoint, not the normal
+      // Supabase client, so it's kept out of the main Promise.all above -
+      // the rest of Community shouldn't wait on a second network round
+      // trip. Re-opens the modal only if the user is actually looking at
+      // it when the fetch resolves.
+      fetchMyEncouragements().then(() => {
+        if (typeof isModalActive === "function" && isModalActive("communityEncouragement")) openModal("communityEncouragement");
+      });
     } catch (error) {
       console.error("[Community] refreshCommunityData failed", error);
       communityDataError = "Couldn't load Community right now. Pull to refresh or try again shortly.";
@@ -750,6 +775,86 @@
   }
 
   // ---------------------------------------------------------------------
+  // Anonymous "been-there" encouragement (new idea)
+  // ---------------------------------------------------------------------
+
+  function isBeenThereOptedIn(category) {
+    const myId = communityUserId();
+    return communityBeenThereOptInsCache.some((row) => row.user_id === myId && row.category === category);
+  }
+
+  async function toggleBeenThereOptIn(category) {
+    const client = getCommunitySupabaseClient();
+    if (!client) return;
+    const myId = communityUserId();
+    if (isBeenThereOptedIn(category)) {
+      const { error } = await client.from("community_been_there_optins").delete().eq("user_id", myId).eq("category", category);
+      if (!error) communityBeenThereOptInsCache = communityBeenThereOptInsCache.filter((row) => !(row.user_id === myId && row.category === category));
+    } else {
+      const { error } = await client.from("community_been_there_optins").insert({ user_id: myId, category });
+      if (!error) communityBeenThereOptInsCache = [...communityBeenThereOptInsCache, { user_id: myId, category }];
+    }
+  }
+
+  // Read path only ever goes through the privileged endpoint - see the
+  // comment on community_encouragements in docs/community-schema.sql. The
+  // table has no client-reachable SELECT policy at all, so this is the
+  // only way to read a received message, even for its own recipient -
+  // sender_id is stripped server-side before the response is sent.
+  async function fetchMyEncouragements() {
+    try {
+      const response = await fetch(`${COMMUNITY_API_BASE}/api/community-encouragement`, {
+        headers: { Authorization: `Bearer ${communityAccessToken()}` }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Could not load your encouragements.");
+      communityEncouragementsCache = data.encouragements || [];
+      communityEncouragementsLoaded = true;
+    } catch (error) {
+      console.error("[Community] fetchMyEncouragements failed", error);
+    }
+  }
+
+  async function sendCommunityEncouragement(category, message) {
+    communityEncouragementBusy = true;
+    communityEncouragementError = "";
+    communityEncouragementStatus = "";
+    try {
+      const response = await fetch(`${COMMUNITY_API_BASE}/api/community-encouragement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${communityAccessToken()}` },
+        body: JSON.stringify({ category, message })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        communityEncouragementError = data.error || "Could not send that encouragement right now.";
+        return false;
+      }
+      communityEncouragementStatus = data.status === "published" ? "Sent - it's on its way to someone who's currently stuck on this." : "Delivered for review before it can go out.";
+      return true;
+    } catch (error) {
+      console.error("[Community] sendCommunityEncouragement failed", error);
+      communityEncouragementError = "Could not send that encouragement right now.";
+      return false;
+    } finally {
+      communityEncouragementBusy = false;
+    }
+  }
+
+  // Client-updatable directly (no privileged endpoint needed) - the update
+  // policy's own USING clause already scopes this to the caller's own
+  // received rows (recipient_id = auth.uid()), and marking your own
+  // received message read/unread cannot affect any other user's data.
+  async function markEncouragementRead(id) {
+    const client = getCommunitySupabaseClient();
+    if (!client) return;
+    const { error } = await client.from("community_encouragements").update({ read_at: new Date().toISOString() }).eq("id", id);
+    if (!error) {
+      communityEncouragementsCache = communityEncouragementsCache.map((row) => (row.id === id ? { ...row, read_at: new Date().toISOString() } : row));
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // Skill Exchange - "I can offer X" / "I need X" listings tagged with one
   // of the 6 BUILD_LIFE_MOMENT_CATEGORIES (app.js). Connecting reuses
   // accountability_connections as-is, same as Community Mentors below - a
@@ -1036,6 +1141,66 @@
   }
 
   // ---------------------------------------------------------------------
+  // Anonymous "been-there" encouragement modal (new idea)
+  // ---------------------------------------------------------------------
+
+  const BEEN_THERE_CATEGORIES = (typeof BUILD_LIFE_MOMENT_CATEGORIES !== "undefined" ? BUILD_LIFE_MOMENT_CATEGORIES : []);
+
+  function communityEncouragementModal() {
+    const unread = communityEncouragementsCache.filter((row) => !row.read_at);
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="community-encouragement-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Been There</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="community-encouragement-title">Anonymous, one-time encouragement</h3>
+        <p class="muted">Lighter than an accountability partner - no ongoing relationship, both sides stay anonymous. Send one honest message to a stranger currently stuck where you once were, or receive one from someone who's been there.</p>
+
+        <div class="content-rail-title"><strong>You've genuinely been through</strong><span></span></div>
+        <p class="tiny-note">Opt into a category only if you've actually resolved something real there - this isn't a self-claimed skill listing.</p>
+        <div class="option-grid">
+          ${BEEN_THERE_CATEGORIES.map((category) => `
+            <label class="check-option">
+              <input type="checkbox" data-toggle-been-there="${escapeHTML(category.id)}" ${isBeenThereOptedIn(category.id) ? "checked" : ""}>
+              <span>${escapeHTML(category.label)}</span>
+            </label>
+          `).join("")}
+        </div>
+
+        <div class="content-rail-title"><strong>Send one</strong><span></span></div>
+        <div class="admin-form">
+          <label>What are you currently stuck on?
+            <select id="community-encouragement-category">
+              <option value="">Pick a category</option>
+              ${BEEN_THERE_CATEGORIES.map((category) => `<option value="${escapeHTML(category.id)}">${escapeHTML(category.label)}</option>`).join("")}
+            </select>
+          </label>
+          <label>Your message<textarea id="community-encouragement-message" maxlength="500" placeholder="Something honest and encouraging - no names, no contact info, this stays anonymous on both sides."></textarea></label>
+          <p class="form-error" id="community-encouragement-error" aria-live="polite">${escapeHTML(communityEncouragementError)}</p>
+          ${communityEncouragementStatus ? `<p class="tiny-note desk-hero-connection">${escapeHTML(communityEncouragementStatus)}</p>` : ""}
+        </div>
+        <button class="primary-action compact-action" type="button" data-send-community-encouragement ${communityEncouragementBusy ? "disabled" : ""}>${communityEncouragementBusy ? "Sending..." : "Send anonymously"}</button>
+
+        <div class="content-rail-title"><strong>Received</strong><span>${unread.length ? `${unread.length} new` : ""}</span></div>
+        ${communityEncouragementsCache.length ? `
+          <div class="action-stack">
+            ${communityEncouragementsCache.map((row) => `
+              <div class="wide-action ${row.read_at ? "" : "is-active"}">
+                <span>
+                  <strong>${escapeHTML(skillCategoryLabel(row.category))}</strong>
+                  <small>${escapeHTML(row.message)}</small>
+                </span>
+                ${!row.read_at ? `<button class="text-action" type="button" data-mark-encouragement-read="${escapeHTML(row.id)}">Mark read</button>` : ""}
+              </div>
+            `).join("")}
+          </div>
+        ` : `<p class="muted">Nothing received yet.</p>`}
+      </div>
+    `;
+  }
+
+  // ---------------------------------------------------------------------
   // Crowdsourced opportunities (idea 10)
   // ---------------------------------------------------------------------
 
@@ -1183,6 +1348,13 @@
       <div class="community-grid">${communityCards()}</div>
 
       ${accountabilityMatchCard()}
+
+      <section class="accountability-match-card">
+        <p class="eyebrow">Been There</p>
+        <h3>Anonymous, one-time encouragement - no ongoing relationship.</h3>
+        <p class="muted">Lighter than an accountability partner. Send one honest message to a stranger stuck where you once were, or opt in to be that stranger for someone else.</p>
+        <button class="primary-action compact-action" type="button" data-open="communityEncouragement">Open Been There${communityEncouragementsCache.filter((row) => !row.read_at).length ? ` (${communityEncouragementsCache.filter((row) => !row.read_at).length} new)` : ""}</button>
+      </section>
 
       ${communitySkillExchangeSection()}
 

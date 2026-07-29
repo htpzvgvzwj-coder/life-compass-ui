@@ -373,6 +373,75 @@ create policy "community_reports_insert_own" on community_reports
   for insert to authenticated with check (reporter_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
+-- community_been_there_optins
+-- New idea: "anonymous been-there encouragement" - a lower-commitment
+-- alternative to accountability_connections (a long-term 1:1 relationship).
+-- A user opts in per category to say "I have genuinely resolved something
+-- here" (grounded in this app's Real/Practice distinction, not a
+-- self-claimed skill like skill_tags) and may be randomly picked as the
+-- sender of a one-time anonymous message to someone currently stuck in the
+-- same category. No free text here, so no moderation needed - this table
+-- is purely an internal matching pool, never browsed by other users
+-- directly (no select-all policy, unlike accountability_optins/profiles) -
+-- matching only ever happens server-side in api/community-encouragement.js.
+-- ---------------------------------------------------------------------------
+create table if not exists community_been_there_optins (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  category text not null check (category in ('independence', 'money', 'communication', 'career', 'wellness', 'relationships')),
+  created_at timestamptz not null default now(),
+  primary key (user_id, category)
+);
+
+alter table community_been_there_optins enable row level security;
+
+create policy "community_been_there_optins_select_own" on community_been_there_optins
+  for select to authenticated using (user_id = auth.uid());
+
+create policy "community_been_there_optins_insert_own" on community_been_there_optins
+  for insert to authenticated with check (user_id = auth.uid());
+
+create policy "community_been_there_optins_delete_own" on community_been_there_optins
+  for delete to authenticated using (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
+-- community_encouragements
+-- The actual anonymous one-time message. Real anonymity is enforced at the
+-- database/API layer, not just hidden in the UI: this table has NO select
+-- policy at all, for anyone, ever - the only way to read a message you
+-- received is api/community-encouragement.js (GET), which strips sender_id
+-- server-side before returning JSON, so it never reaches the recipient's
+-- browser even via devtools. Insert is the same non-bypassable
+-- verify -> AI-moderate -> service-role shape as posts/skill_tags, with the
+-- recipient chosen server-side at random from community_been_there_optins
+-- (excluding the sender) rather than the sender picking a specific person -
+-- this means a sender can never browse or target a specific vulnerable
+-- user, which matters more here than in any other Community feature.
+-- read_at is client-updatable directly (no privileged endpoint needed) -
+-- the update policy's own USING clause already scopes it to the caller's
+-- own received rows, and a recipient marking their own message read/unread
+-- cannot affect any other user's data.
+-- ---------------------------------------------------------------------------
+create table if not exists community_encouragements (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid not null references auth.users (id) on delete cascade,
+  recipient_id uuid not null references auth.users (id) on delete cascade,
+  category text not null check (category in ('independence', 'money', 'communication', 'career', 'wellness', 'relationships')),
+  message text not null check (char_length(message) between 4 and 500),
+  status text not null default 'pending' check (status in ('pending', 'published', 'blocked')),
+  moderation_reason text,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table community_encouragements enable row level security;
+-- Intentionally no select policy - see comment above.
+
+create policy "community_encouragements_update_own_received" on community_encouragements
+  for update to authenticated using (recipient_id = auth.uid()) with check (recipient_id = auth.uid());
+
+create index if not exists community_encouragements_recipient_status_idx on community_encouragements (recipient_id, status);
+
+-- ---------------------------------------------------------------------------
 -- guardian_shares
 -- Backs the Guardian read-only share feature on Life Roadmap. Life Roadmap
 -- goals/milestones live only in the browser's localStorage, and using them

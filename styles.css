@@ -1302,6 +1302,11 @@ h3 {
   height: 34px;
 }
 
+.wide-action.is-active {
+  border-color: var(--color-ink);
+  background: var(--color-surface-soft);
+}
+
 .wide-action span {
   display: grid;
   gap: 2px;
