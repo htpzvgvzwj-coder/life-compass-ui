@@ -27,7 +27,10 @@ assert.ok(juryModalSection.includes("session.counterfactual"), "the generated co
 // --- Feature 2: debt of inaction ---
 assert.ok(appSource.includes("function avoidancePatterns()"), "avoidance pattern detector exists");
 assert.ok(appSource.includes("function avoidancePatternsModal"), "avoidance patterns modal exists");
-assert.ok(appSource.includes('modal: "avoidancePatterns"'), "Debt of Inaction has a real Growth Hub entry point");
+// Second Brain Phase 2a moved the entry point from a Growth Hub chip
+// (`modal: "avoidancePatterns"`) to the chat-dispatch/Ctrl+K catalog
+// (`open: "avoidancePatterns"` in commandLauncherCommands).
+assert.ok(appSource.includes('open: "avoidancePatterns"'), "Debt of Inaction has a real entry point in the command/chat-dispatch catalog");
 const avoidanceFn = section(appSource, "function avoidancePatterns()", "function avoidancePatternsModal");
 assert.ok(avoidanceFn.includes("ignoredCount") && avoidanceFn.includes("dismissedAt"), "detects reflections snoozed into silence, not just any dismissal");
 assert.ok(avoidanceFn.includes("14 * 86400000"), "overdue Real Due Dates use a real 2-week threshold, not just technically-due");

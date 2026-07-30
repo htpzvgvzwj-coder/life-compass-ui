@@ -48,13 +48,17 @@ assert.ok(inboxActionsSection.includes("data-dismiss-mood-trend-nudge") && inbox
 // proportionate to the real scale of the problem, instead of being one of
 // 12 equal-weight Skill Guides (same visual weight as choosing a SIM plan).
 assert.ok(appSource.includes('buildSupportGuide: () => skillGuideDetailModal("build-support-before-crisis")'), "build-support-before-crisis has a dedicated modal wrapper for a direct entry point");
-const practicalSection = section(appSource, 'title: "Practical & Safety"', "Safety Net Preview");
-assert.ok(practicalSection.includes('modal: "buildSupportGuide"'), "Build support before crisis is a direct Growth Hub chip, not buried inside the generic Skill Guides list");
+// Second Brain Phase 2a moved these from Growth Hub chips inside a
+// "Practical & Safety" section to the chat-dispatch/Ctrl+K catalog
+// (commandLauncherCommands, `open:` instead of `modal:`) - same
+// guarantee (a direct, real entry point, not buried in a generic list).
+const practicalSection = section(appSource, 'id: "build-support-guide"', 'id: "ghost-roommate"');
+assert.ok(practicalSection.includes('open: "buildSupportGuide"'), "Build support before crisis is a direct command-catalog entry, not buried inside the generic Skill Guides list");
 // Been There opens its own modal directly. It used to be a bare
 // tab: "community" jump, which dumped the user on the Community screen
 // with no Been There in sight - a chip whose label promised a specific
 // feature but only delivered a tab switch.
-assert.ok(practicalSection.includes('modal: "communityEncouragement"') && practicalSection.includes("Been There"), "the Been There chip opens Been There itself, not just the Community tab");
+assert.ok(practicalSection.includes('open: "communityEncouragement"') && practicalSection.includes("Been There"), "the Been There entry opens Been There itself, not just the Community tab");
 assert.ok(communitySource.includes("if (!hasCommunitySession()) {"), "Been There states the sign-in requirement instead of rendering a silently broken empty form when reached without a session");
 
 // --- Behavioral: actually execute recentMoodTrend()/pendingMoodTrendNudge()

@@ -10906,3 +10906,57 @@ body {
   width: 18px;
   height: 18px;
 }
+
+/* Second Brain, Phase 2a: chat dispatch - a suggested tool attached to a
+   real chat reply, never a silent auto-navigation. */
+.chat-suggested-open {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 14px;
+  border: 1px solid rgba(200, 169, 107, 0.5);
+  border-radius: 999px;
+  background: rgba(200, 169, 107, 0.12);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Second Brain, Phase 2a: History Search entry point - quiet, not a menu
+   item competing with the room panels above it. */
+.room-history-search {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 8px 12px;
+  border: 1px dashed rgba(26, 26, 26, 0.18);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.room-history-search img {
+  width: 16px;
+  height: 16px;
+  opacity: 0.6;
+}
+
+/* Second Brain, Phase 2a: Ctrl+K stays as a minor, unadvertised power-user
+   escape hatch - no longer a full-width "browse our tools" search bar. */
+.desktop-command-bar.is-quiet {
+  justify-content: flex-end;
+}
+
+.desktop-command-bar.is-quiet .desktop-command-search {
+  flex: 0 0 auto;
+  min-width: 0;
+  opacity: 0.55;
+}
+
+.desktop-command-bar.is-quiet .desktop-command-search::before {
+  margin-right: 6px;
+}

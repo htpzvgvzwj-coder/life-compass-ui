@@ -22,8 +22,12 @@ const moodModalSection = section('mood: () => {', "receipt: () => `");
 assert.ok(moodModalSection.includes('data-open="moodGuidance"'), "Mood modal links to the moodGuidance suggestion it just computed");
 
 // --- Bug fix: growthCommunity ("Discuss your mirror safely") was a fully
-// built, working modal with zero entry points anywhere in the UI. ---
-assert.ok(appSource.includes('modal: "growthCommunity"'), "growthCommunity has a real Growth Hub entry point");
+// built, working modal with zero entry points anywhere in the UI.
+// Second Brain Phase 2a moved the entry point from a Growth Hub chip
+// (`modal: "growthCommunity"`) to the chat-dispatch/Ctrl+K catalog
+// (`open: "growthCommunity"` in commandLauncherCommands) - same
+// guarantee (a real, reachable entry point exists), different mechanism. ---
+assert.ok(appSource.includes('open: "growthCommunity"'), "growthCommunity has a real entry point in the command/chat-dispatch catalog");
 
 // --- Bug fix: a relationship breakdown wasn't archived into
 // roommateStintHistory until the next move-in/move-out click, so the

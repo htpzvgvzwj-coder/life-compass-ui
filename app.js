@@ -1258,6 +1258,7 @@ let discoverStageFilter = "all";
 let discoverNeedFilter = "all";
 let discoverTimeFilter = "all";
 let commandQuery = "";
+let historySearchQuery = "";
 let lifeSimInstance = null;
 const userProfile = loadJson("steadyUserProfile", defaultUserProfile);
 const trackerState = normalizeTrackerState(loadJson(scopedKey("steadyTrackerState"), defaultTrackerState));
@@ -3271,7 +3272,8 @@ function refreshDesktopRightRail(tab = activeTab) {
 function commandLauncherCommands() {
   return [
     { id: "home", title: "Today plan", detail: "Starter path, readiness, and next action.", lane: "Home", tab: "home", icon: "icon-home.png", keywords: ["home", "today", "starter", "readiness"] },
-    { id: "future-scan", title: "Run Future Scan", detail: "Check identity, values, hidden costs, and no-action future.", lane: "Decide", tab: "secondBrain", icon: "icon-decide.png", keywords: ["decision", "choose", "future scan", "risk"] },
+    { id: "future-scan", title: "Run Future Scan", detail: "Check identity, values, hidden costs, and no-action future.", lane: "Decide", tab: "secondBrain", open: "decisionLab", icon: "icon-decide.png", keywords: ["decision", "choose", "future scan", "risk"] },
+    { id: "build-mode-coach", title: "Build Mode", detail: "An AI coach trains you toward one specific goal - interview, money, confidence, and more.", lane: "Decide", tab: "secondBrain", open: "decisionLab", icon: "icon-decide.png", keywords: ["coach", "training", "practice plan", "build mode"] },
     { id: "cost-living", title: "Real Cost of Living", detail: "Estimate SG-style living costs before a decision.", lane: "Decide", tab: "secondBrain", open: "costOfLiving", icon: "icon-money.png", keywords: ["money", "cost", "budget", "rent"] },
     { id: "tax", title: "Basic Tax Obligations", detail: "Plain-English tax checklist.", lane: "Decide", tab: "secondBrain", open: "taxObligations", icon: "icon-receipt.png", keywords: ["tax", "cpf", "income"] },
     { id: "blueprint", title: "Discover Yourself", detail: "Build the profile that powers better recommendations.", lane: "My Profile", tab: "secondBrain", open: "discoverYourself", icon: "icon-profile.png", keywords: ["profile", "blueprint", "identity", "values"] },
@@ -3336,6 +3338,160 @@ function commandLauncherMatches(command, query) {
   if (!query) return true;
   const haystack = [command.title, command.detail, command.lane, ...(command.keywords || [])].join(" ").toLowerCase();
   return query.toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
+}
+
+// Second Brain, Phase 2a: the same command catalog now also dispatches
+// from a real chat message instead of only a search box the user has to
+// think to open. commandLauncherMatches() requires every word in the
+// query to appear in the haystack - fine for a short typed search, far
+// too strict for a full sentence ("I'm nervous about a job interview").
+// This scores keyword overlap instead and requires a minimum confidence
+// (2+ keyword-words matched) before suggesting anything, so a weak/
+// ambiguous message stays silent rather than misfiring a wrong tool.
+// "home" (Today plan) is excluded - it's redundant with the always-visible
+// room view, never worth a suggestion. "sos" is excluded on purpose too:
+// urgent support must never be guessed at from a weak keyword match
+// ("help" alone matched "can you help me think through something" during
+// testing) - SOS already has its own permanent, always-visible entry
+// (.sos-fab), which is the right way to reach it, not an algorithmic guess.
+const CHAT_DISPATCH_EXCLUDED_IDS = new Set(["home", "sos"]);
+
+function matchCommandForChatText(text) {
+  const words = new Set(String(text || "").toLowerCase().split(/[^a-z0-9']+/).filter((word) => word.length > 2));
+  if (!words.size) return null;
+  let best = null;
+  let bestScore = 0;
+  for (const command of commandLauncherCommands()) {
+    if (CHAT_DISPATCH_EXCLUDED_IDS.has(command.id)) continue;
+    let score = 0;
+    for (const keyword of command.keywords || []) {
+      const keywordWords = keyword.toLowerCase().split(/\s+/).filter(Boolean);
+      if (keywordWords.length && keywordWords.every((word) => words.has(word))) score += keywordWords.length;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = command;
+    }
+  }
+  return bestScore >= 1 ? best : null;
+}
+
+// Second Brain, Phase 2a: History Search. This is NOT the feature catalog
+// (that's chat-dispatched/Ctrl+K, see matchCommandForChatText above) -
+// this searches the user's own real accumulated history across every
+// place it currently lives, normalized into one shape. `sealed` lifeMemory
+// entries are still included here (unlike in AI chat) - this is the user
+// looking through their own data, not the AI volunteering it unprompted.
+function historySearchEntries() {
+  const myId = currentUserId();
+  const entries = [];
+
+  trackerState.journalEntries.filter((e) => e.user_id === myId).forEach((e) => entries.push({
+    id: `hs-journal-${e.id}`, type: "Journal", title: e.display_time || "Journal entry",
+    snippet: cleanText(e.text, 90), fullText: e.text, date: e.created_at
+  }));
+
+  (trackerState.mood.entries || []).filter((e) => e.user_id === myId).forEach((e) => entries.push({
+    id: `hs-mood-${e.id}`, type: "Mood", title: `Mood: ${e.label}`,
+    snippet: cleanText(e.note, 90), fullText: `${e.label} (${e.score}/100) - ${e.note || ""}`, date: e.created_at
+  }));
+
+  trackerState.lifeMemory.filter((e) => e.user_id === myId).forEach((e) => entries.push({
+    id: `hs-memory-${e.id}`, type: e.sealed ? "Remember this (sealed)" : "Remember this", title: e.situationTag,
+    snippet: cleanText(e.decision, 90),
+    fullText: `Decision: ${e.decision}\nReason: ${e.reason || "-"}${e.outcome ? `\nLater: ${e.outcome}` : ""}`,
+    date: e.created_at
+  }));
+
+  trackerState.roleplaySessions.filter((s) => s.user_id === myId).forEach((s) => entries.push({
+    id: `hs-roleplay-${s.id}`, type: "Roleplay Practice", title: `Roleplay: ${s.scenario_type}`,
+    snippet: cleanText(s.summary, 90) || "Practice conversation",
+    fullText: (s.messages || []).map((m) => `${m.sender}: ${m.message}`).join("\n"),
+    date: s.started_at
+  }));
+
+  trackerState.careerStudio.interviewSessions.filter((s) => s.user_id === myId).forEach((s) => entries.push({
+    id: `hs-interview-${s.id}`, type: "Interview Practice", title: `Interview: ${s.persona}`,
+    snippet: (s.transcript || [])[0] ? cleanText((s.transcript[0].text || ""), 90) : "Interview practice",
+    fullText: (s.transcript || []).map((t) => `${t.sender}: ${t.text}`).join("\n"),
+    date: s.startedAt
+  }));
+
+  trackerState.juryTrials.sessions.forEach((s) => entries.push({
+    id: `hs-jury-${s.id}`, type: "Jury Duty", title: cleanText(s.decision, 80),
+    snippet: s.verdict ? cleanText(s.verdict.ruling, 90) : "No verdict yet",
+    fullText: `Decision on trial: ${s.decision}\n${(s.transcript || []).map((t) => `${t.speaker}: ${t.text}`).join("\n")}${s.verdict ? `\nVerdict: ${s.verdict.ruling} - ${s.verdict.reasoning}` : ""}`,
+    date: s.createdAt
+  }));
+
+  (trackerState.roommateStintHistory || []).forEach((s, index) => entries.push({
+    id: `hs-roommate-${index}-${s.endedAt}`, type: "Ghost Roommate", title: `Living with ${s.personaName}`,
+    snippet: `${s.weeksLived} weeks, ended ${s.endedReason}`,
+    fullText: `Lived with ${s.personaName} for ${s.weeksLived} weeks. Final relationship: ${s.finalRelationship}. Ended: ${s.endedReason}.`,
+    date: s.endedAt
+  }));
+
+  trackerState.futureScans.filter((s) => s.user_id === myId).forEach((s) => entries.push({
+    id: `hs-scan-${s.id}`, type: "Future Scan", title: cleanText(s.scanContext && s.scanContext.rawInput, 80) || "Future Scan",
+    snippet: cleanText(s.scanContext && s.scanContext.clarifyingAnswer, 90),
+    fullText: `Situation: ${(s.scanContext && s.scanContext.rawInput) || "-"}\nClarifying question: ${(s.scanContext && s.scanContext.clarifyingQuestion) || "-"}\nAnswer: ${(s.scanContext && s.scanContext.clarifyingAnswer) || "-"}`,
+    date: s.createdAt
+  }));
+
+  trackerState.failureInoculation.history.forEach((e) => entries.push({
+    id: `hs-failure-${e.weekKey}`, type: "Failure Inoculation", title: `Week of ${e.weekKey}`,
+    snippet: cleanText(e.note, 90) || e.outcome || "",
+    fullText: `Outcome: ${e.outcome || "-"}\n${e.note || ""}`, date: e.completedAt
+  }));
+
+  trackerState.estateAuctions.history.forEach((r) => entries.push({
+    id: `hs-auction-${r.id}`, type: "Estate Auction", title: `Auction, ${(r.lots || []).length} lots`,
+    snippet: (r.lots || []).map((lot) => lot.title || lot.label || "").filter(Boolean).slice(0, 3).join(", "),
+    fullText: (r.lots || []).map((lot) => lot.title || lot.label || JSON.stringify(lot)).join("\n"),
+    date: r.heldAt
+  }));
+
+  trackerState.archaeologyDigs.forEach((d) => entries.push({
+    id: `hs-dig-${d.monthKey}`, type: "Self Archaeology", title: `Stratum: ${d.monthKey}`,
+    snippet: cleanText(d.report, 90), fullText: d.report, date: d.excavatedAt
+  }));
+
+  return entries
+    .filter((e) => e.title || e.fullText)
+    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+}
+
+function historySearchMatches(entry, query) {
+  if (!query) return true;
+  const haystack = [entry.type, entry.title, entry.snippet, entry.fullText].join(" ").toLowerCase();
+  return query.toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
+}
+
+function historySearchResults(query = historySearchQuery) {
+  return historySearchEntries().filter((entry) => historySearchMatches(entry, query)).slice(0, 40);
+}
+
+function historySearchResultsHtml(query = historySearchQuery) {
+  const results = historySearchResults(query);
+  const hasQuery = cleanText(query, 120);
+  if (!results.length) {
+    return `
+      <section class="empty-feature">
+        <img src="assets/icon-learn.png" alt="">
+        <div><strong>${hasQuery ? "Nothing matches yet" : "Nothing recorded yet"}</strong><p>${hasQuery ? "Try a different word." : "Keep using Compass - what you say and do here is what this searches."}</p></div>
+      </section>
+    `;
+  }
+  return results.map((entry) => `
+    <article class="ledger-entry">
+      <p class="ledger-entry-stamp">${escapeHTML(entry.type)}${entry.date ? ` · ${new Date(entry.date).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}` : ""}</p>
+      <p class="ledger-entry-text"><strong>${escapeHTML(entry.title || "")}</strong></p>
+      <details>
+        <summary>${escapeHTML(entry.snippet || "")}</summary>
+        <p class="ledger-entry-text muted history-search-fulltext">${escapeHTML(entry.fullText || "")}</p>
+      </details>
+    </article>
+  `).join("");
 }
 
 function commandLauncherResults(query = commandQuery) {
@@ -10227,6 +10383,7 @@ function chatMessages() {
     <div class="chat-bubble ${message.from === "user" ? "is-user" : "is-ai"}">
       <span>${message.from === "user" ? displayName() : "Compass AI"}</span>
       <p>${escapeHTML(message.text)}</p>
+      ${message.suggestedOpen ? `<button class="chat-suggested-open" type="button" data-run-suggested-command="${escapeHTML(message.suggestedOpen.id)}">Open ${escapeHTML(message.suggestedOpen.title)}</button>` : ""}
     </div>
   `).join("");
   const typing = isCompassResponding ? `
@@ -10726,6 +10883,10 @@ function secondBrainRoomView() {
           <span>It remembers what you've told it</span>
         </div>
       </button>
+      <button class="room-history-search" type="button" data-open="historySearch" aria-label="Search your history">
+        <img src="assets/icon-learn.png" alt="">
+        <span>Find something you already said or did</span>
+      </button>
     </section>
   `;
 }
@@ -10737,164 +10898,22 @@ function secondBrainRoomView() {
 // the redesign discussion. Inspire Hub/Story of the day moved out to
 // Discover (confirmed decision) - Discuss-your-mirror-safely stayed since
 // it's a memory/support feature, not stories content.
+// Second Brain, Phase 2a cut: the ~45 features named individually here in
+// Phase 1 are now dispatched through chat (see the keyword-match hook in
+// requestCompassAI) or found via History Search - none deleted, none
+// dropped, but none of them render as a page of section headers anymore.
+// Only real ambient status (room, ledger) plus the existing ambient cards
+// stay. homeStarterPathCard()/adultingReadinessOverviewCard() moved to
+// one-time first-run onboarding instead of a permanent card here.
 function secondBrainScreen() {
   return `
     ${adultPrepHero()}
     ${secondBrainRoomView()}
-    ${homeStarterPathCard()}
-    ${adultingReadinessOverviewCard()}
     ${homeLedgerRows(todaysDeskFocus().kind)}
     ${blueprintSummaryCard()}
     ${resurfacingCard()}
     ${growthSuggestionCard()}
-
-    <div class="content-rail-title"><strong>Remember</strong><span>What Compass keeps for you</span></div>
-    ${growthHubSection({
-      id: "remember-you",
-      title: "My Compass Profile",
-      subtitle: "The personal context that makes every recommendation less generic.",
-      icon: "icon-profile.png",
-      tone: "goals-tone",
-      items: [
-        { title: "Discover Yourself", text: "Build your Personal Blueprint - the foundation for Future Self, Decision Compass, Roadmap, and AI Coach.", modal: "discoverYourself", icon: "icon-profile.png", kind: "real" },
-        { title: "Future Readiness Assessment", text: "Check adulthood readiness across money, decisions, resilience, relationships, independence, and direction.", modal: "assessment", icon: "icon-assessment.png", kind: "real" },
-        { title: "Compass AI Profile", text: "Control the age, interests, goals, stress triggers, and support style Compass may use.", modal: "compassProfile", icon: "icon-chat.png", kind: "real" },
-        { title: "Knowledge Vault", text: "See what Compass knows from real saved data.", modal: "knowledgeVault", icon: "icon-learn.png", kind: "real" }
-      ]
-    })}
-    ${growthHubSection({
-      id: "remember-checkin",
-      title: "Check-In",
-      subtitle: "Daily and weekly signals that keep the plan honest.",
-      icon: "icon-checkin.png",
-      tone: "challenge-tone",
-      items: [
-        { title: "Daily reflection", text: "A 3-minute rotating prompt.", modal: "dailyReflection", icon: "icon-spark.png", kind: "real" },
-        { title: "Mood check-in", text: "Log today's mood and energy.", modal: "mood", icon: "icon-mood.png", kind: "real" },
-        { title: "Journal", text: "Write what happened and what you learned.", modal: "journal", icon: "icon-learn.png", kind: "real" },
-        { title: "Personal Weather Forecast", text: "A 7-day forecast built from your real mood pattern.", modal: "personalWeather", icon: "icon-warning.png", kind: "real" },
-        { title: "Support Circle", text: "Keep trusted people reachable before stress peaks.", modal: "supportCircle", icon: "icon-support.png", kind: "real" },
-        { title: "AI reflection insight", text: "Ask Compass to find one pattern from saved data.", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png" }
-      ]
-    })}
     ${habitChainGraph()}
-    ${growthHubSection({
-      id: "remember-decisions",
-      title: "Decisions & Memory",
-      subtitle: "A real decision, why you made it, and what happened after - so next time isn't a blank page.",
-      icon: "icon-time.png",
-      tone: "reflection-tone",
-      items: [
-        { title: "Remember this", text: "Save a real decision, the reason, and (later) what happened - Compass brings it back next time something similar comes up.", modal: "lifeMemory", icon: "icon-learn.png", kind: "real" },
-        { title: "Goals & Dreams", text: "Personal goals, dream university, career direction, lifestyle, and vision board.", modal: "growthGoals", icon: "icon-spark.png", kind: "real" },
-        { title: "Life Roadmap", text: "Turn one goal into monthly milestones and track progress.", modal: "roadmapView", icon: "icon-time.png", kind: "real" },
-        { title: "Future Self", text: "Generate a conditional scene from your current path.", modal: "futureSelfView", icon: "icon-stories.png", kind: "practice" },
-        { title: "Weekly letter", text: "Write to you, next week.", modal: "weeklyLetter", icon: "icon-chat.png" },
-        { title: "Milestone letter", text: "Write to a future self further out.", modal: "milestoneLetter", icon: "icon-stories.png" },
-        { title: "AI goal planning", text: "Turn dreams into one realistic next step.", prompt: growthPromptFromData("a simple goal plan with one next action"), icon: "icon-chat.png" },
-        { title: "Discuss your mirror safely", text: "Share a reflection prompt with a trusted peer, mentor, or Support Circle.", modal: "growthCommunity", icon: "icon-support.png" }
-      ]
-    })}
-    ${growthHubSection({
-      id: "remember-progress",
-      title: "Progress",
-      subtitle: "Review what is changing without hunting through the app.",
-      icon: "icon-balance.png",
-      tone: "progress-tone",
-      items: [
-        { title: "Progress Reports", text: "Mood, goals, challenges, Career Studio, and Community signals together.", modal: "growthProgress", icon: "icon-chat.png", kind: "real" },
-        { title: "Badges & Streaks", text: "Progress counts and what you have unlocked.", modal: "badges", icon: "icon-time.png", kind: "real" },
-        { title: "AI Trace Log", text: "Check whether AI help is grounded and useful.", modal: "aiTraceLog", icon: "icon-assessment.png", kind: "real" },
-        { title: "Judgment Calibration", text: "When you say you are sure, how often are you right?", modal: "calibration", icon: "icon-balance.png", kind: "real" },
-        { title: "Debt of Inaction", text: "What you keep not doing, detected from real saved patterns.", modal: "avoidancePatterns", icon: "icon-warning.png", kind: "real" }
-      ]
-    })}
-
-    <div class="content-rail-title"><strong>Help You Act</strong><span>Decide, learn, and rehearse</span></div>
-    <section class="mirror-form-card">
-      <div class="home-quick-grid mirror-mode-grid">
-        <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">
-          <img src="assets/icon-guide.png" alt="">
-          <strong>Future Scan</strong>
-        </button>
-        <button type="button" class="${futureMirrorMode === "build" ? "is-selected" : ""}" data-future-mirror-mode="build">
-          <img src="assets/icon-decide.png" alt="">
-          <strong>Build Mode</strong>
-        </button>
-        <button type="button" class="${futureMirrorMode === "advanced" ? "is-selected" : ""}" data-future-mirror-mode="advanced">
-          <img src="assets/icon-balance.png" alt="">
-          <strong>Advanced</strong>
-        </button>
-      </div>
-      ${futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorMode === "advanced" ? advancedModeEntrySection() : futureScanEntrySection()}
-    </section>
-    <div class="mirror-tools-row">
-      ${costOfLivingEntryCard()}
-      ${taxObligationsEntryCard()}
-      ${futureSelfEntryCard()}
-      ${microInsuranceEntryCard()}
-    </div>
-    ${savedFutureDecisions().length ? futureReflectionList() : ""}
-    ${growthHubSection({
-      id: "act-career",
-      title: "Career Studio",
-      subtitle: "First job readiness without pretending experience appears from nowhere.",
-      icon: "icon-work.png",
-      tone: "career-tone",
-      items: [
-        { title: "Career Studio", text: "Interview practice, resume builder, portfolio builder, job matching, and paycheck/ATS checks.", modal: "careerStudio", icon: "icon-profile.png", kind: "real" },
-        { title: "AI Roleplay Practice", text: "Practice interviews, help-seeking, conflict, and boundaries.", modal: "roleplayList", icon: "icon-chat.png", kind: "practice" },
-        { title: "Read a job offer", text: "Contract clauses that matter more than the salary number.", modal: "skillGuideDetail", payload: "read-job-offer", icon: "icon-work.png", kind: "real" },
-        { title: "Understand your payslip", text: "Gross pay, deductions, take-home pay, and error checks.", modal: "skillGuideDetail", payload: "read-payslip", icon: "icon-receipt.png", kind: "real" },
-        { title: "Future Self Hiring", text: "Four future-you candidates interview for who you become.", modal: "futureSelfHiring", icon: "icon-chat.png", kind: "practice" }
-      ]
-    })}
-    ${growthHubSection({
-      id: "act-practical",
-      title: "Practical & Safety",
-      subtitle: "The unglamorous stuff nobody warns you about.",
-      icon: "icon-safety.png",
-      tone: "progress-tone",
-      items: [
-        { title: "Real Due Dates", text: "Rent, bills, renewals - real deadlines, not app-invented reminders.", modal: "realLifeEvents", icon: "icon-checkin.png", kind: "real" },
-        { title: "Skill Guides", text: "Cooking, laundry, renting, payslips, SIM plans, credit, first aid, and more.", modal: "skillGuides", icon: "icon-home.png", kind: "real" },
-        { title: "Real Cost of Living", text: "Estimate SG-style living costs before choosing a path.", modal: "costOfLiving", icon: "icon-money.png", kind: "real" },
-        { title: "Basic Tax Obligations", text: "Know what you actually owe, in plain English.", modal: "taxObligations", icon: "icon-receipt.png", kind: "real" },
-        { title: "Receipt record", text: "Track what you paid today.", modal: "receipt", icon: "icon-receipt.png", kind: "real" },
-        { title: "Build support before crisis", text: "Singapore youth mental-health realities deserve a direct support plan, not a hidden guide.", modal: "buildSupportGuide", icon: "icon-support.png", kind: "real" },
-        { title: "Been There", text: "Anonymous, one-time encouragement to or from someone who has been where you are.", modal: "communityEncouragement", icon: "icon-support.png", kind: "real" },
-        { title: "SOS - get urgent help", text: "Urgent resources stay one tap away and separate from normal coaching.", modal: "sosTriage", icon: "icon-warning.png", kind: "real" },
-        { title: "Safety Net Preview", text: "What a safety net might cover - concept only, not real cover.", modal: "microInsurance", icon: "icon-health.png", kind: "practice" }
-      ]
-    })}
-    ${growthHubSection({
-      id: "act-people",
-      title: "People, Home, and Boundaries",
-      subtitle: "Practice the conversations that decide whether adult life stays manageable.",
-      icon: "icon-boundary.png",
-      tone: "reflection-tone",
-      items: [
-        { title: "Ghost Roommate", text: "Move in with someone - a relationship that remembers.", modal: "ghostRoommate", icon: "icon-home.png", kind: "practice" },
-        { title: "Ending a relationship well", text: "A clean ending without ghosting or blowing up.", modal: "skillGuideDetail", payload: "end-a-relationship-well", icon: "icon-boundary.png", kind: "real" },
-        { title: "Living with someone", text: "Check agreements, chores, quiet hours, and repair conversations.", modal: "skillGuideDetail", payload: "before-renting-room", icon: "icon-home.png", kind: "real" },
-        { title: "Skill Exchange", text: "Trade what you know for what you need.", tab: "discover", icon: "icon-chat.png", kind: "real" }
-      ]
-    })}
-    ${growthHubSection({
-      id: "act-advanced",
-      title: "Advanced Reality Labs",
-      subtitle: "Use these after basics when you want harder self-honesty.",
-      icon: "icon-balance.png",
-      tone: "challenge-tone",
-      items: [
-        { title: "Jury Duty on Yourself", text: "Put a real decision on trial.", modal: "juryTrial", icon: "icon-balance.png", kind: "practice" },
-        { title: "Failure Inoculation", text: "This week's task is designed to fail. That is the point.", modal: "failureInoculation", icon: "icon-warning.png", kind: "practice" },
-        { title: "Inherited Debugging", text: "Refactor habits you did not choose, issue by issue.", modal: "legacyDebugger", icon: "icon-settings.png", kind: "practice" },
-        { title: "Self-Debt", text: "Pay your future self a debt when it is actually due.", modal: "selfDebtLedger", icon: "icon-money.png", kind: "practice" },
-        { title: "Estate Auction", text: "Your time and habits, read out like an auction catalog.", modal: "estateAuction", icon: "icon-time.png", kind: "practice" },
-        { title: "Self Archaeology", text: "Dig up an old month of entries as a field report.", modal: "selfArchaeology", icon: "icon-time.png", kind: "practice" }
-      ]
-    })}
   `;
 }
 
@@ -12466,6 +12485,65 @@ const modals = {
       </div>
     `;
   },
+
+  // Second Brain, Phase 2a: History Search - the second thing that stays
+  // visible by default besides chat (see secondBrainRoomView's search
+  // icon). Not a feature catalog - searches the user's own real history
+  // across 11 sources (historySearchEntries()), results rendered inline
+  // with full content rather than deep-linking into each original tool.
+  // Second Brain, Phase 2a fix: this used to render inline on the old
+  // Decide tab, then got moved into secondBrainScreen() during the
+  // catalog-hiding pass - but that left it with literally no entry point
+  // (build-mode.test.js caught this: Build Mode's mode-switcher had zero
+  // path to reach it). Given its own modal so chat-dispatch/Ctrl+K can
+  // open it like every other tool - content is unchanged from what
+  // rendered on Decide/secondBrainScreen before.
+  decisionLab: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="decision-lab-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Decide</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="decision-lab-title">Practice choices before they become real consequences</h3>
+      <section class="mirror-form-card">
+        <div class="home-quick-grid mirror-mode-grid">
+          <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">
+            <img src="assets/icon-guide.png" alt="">
+            <strong>Future Scan</strong>
+          </button>
+          <button type="button" class="${futureMirrorMode === "build" ? "is-selected" : ""}" data-future-mirror-mode="build">
+            <img src="assets/icon-decide.png" alt="">
+            <strong>Build Mode</strong>
+          </button>
+          <button type="button" class="${futureMirrorMode === "advanced" ? "is-selected" : ""}" data-future-mirror-mode="advanced">
+            <img src="assets/icon-balance.png" alt="">
+            <strong>Advanced</strong>
+          </button>
+        </div>
+        ${futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorMode === "advanced" ? advancedModeEntrySection() : futureScanEntrySection()}
+      </section>
+      <div class="mirror-tools-row">
+        ${costOfLivingEntryCard()}
+        ${taxObligationsEntryCard()}
+        ${futureSelfEntryCard()}
+        ${microInsuranceEntryCard()}
+      </div>
+      ${savedFutureDecisions().length ? futureReflectionList() : ""}
+    </div>
+  `,
+
+  historySearch: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="history-search-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">History</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="history-search-title">Find something you already said or did</h3>
+      <p class="muted">Journal, mood, decisions you asked Compass to remember, interview/roleplay practice, Jury Duty, Ghost Roommate, Future Scan, and more - all in one search.</p>
+      <input id="history-search-input" type="search" value="${escapeHTML(historySearchQuery)}" data-history-search placeholder="Search your own history...">
+      <div class="ledger-sheet" data-history-results>${historySearchResultsHtml()}</div>
+    </div>
+  `,
 
   challengeHub: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="challenge-title">
@@ -14982,7 +15060,8 @@ async function sendChatMessage(text) {
   renderScreen("compass");
   try {
     const reply = await requestCompassAI(clean);
-    chatState.messages.push({ from: "assistant", text: reply });
+    const suggested = matchCommandForChatText(clean);
+    chatState.messages.push({ from: "assistant", text: reply, suggestedOpen: suggested ? { id: suggested.id, title: suggested.title } : null });
     saveChatState();
     speak(reply);
     void logAiTrace({
@@ -15090,10 +15169,18 @@ navItems.forEach((item) => {
 
 document.addEventListener("input", (event) => {
   const commandSearchInput = event.target.closest("[data-command-search]");
-  if (!commandSearchInput) return;
-  commandQuery = cleanText(commandSearchInput.value, 120);
-  const results = modalLayer.querySelector("[data-command-results]");
-  if (results) results.innerHTML = commandLauncherResultsHtml(commandQuery);
+  if (commandSearchInput) {
+    commandQuery = cleanText(commandSearchInput.value, 120);
+    const results = modalLayer.querySelector("[data-command-results]");
+    if (results) results.innerHTML = commandLauncherResultsHtml(commandQuery);
+    return;
+  }
+  const historySearchInput = event.target.closest("[data-history-search]");
+  if (historySearchInput) {
+    historySearchQuery = cleanText(historySearchInput.value, 120);
+    const results = modalLayer.querySelector("[data-history-results]");
+    if (results) results.innerHTML = historySearchResultsHtml(historySearchQuery);
+  }
 });
 
 document.addEventListener("keydown", (event) => {
@@ -15326,12 +15413,19 @@ document.addEventListener("click", async (event) => {
   const communityViewModeButton = event.target.closest("[data-community-view-mode]");
   const discoverFilterButton = event.target.closest("[data-discover-filter]");
   const commandRunButton = event.target.closest("[data-command-run]");
+  const suggestedCommandButton = event.target.closest("[data-run-suggested-command]");
   const tryAdvancedFindingButton = event.target.closest("[data-try-advanced-finding]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
 
   if (commandRunButton) {
     event.preventDefault();
     await runCommandLauncher(commandRunButton.dataset.commandRun);
+    return;
+  }
+
+  if (suggestedCommandButton) {
+    event.preventDefault();
+    await runCommandLauncher(suggestedCommandButton.dataset.runSuggestedCommand);
     return;
   }
 
@@ -16055,7 +16149,7 @@ document.addEventListener("click", async (event) => {
 
   if (futureMirrorModeButton) {
     futureMirrorMode = futureMirrorModeButton.dataset.futureMirrorMode;
-    renderScreen("future");
+    openModal("decisionLab");
   }
 
   if (scanFromEntry) {
