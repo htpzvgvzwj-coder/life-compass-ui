@@ -58,7 +58,7 @@ const ADMIN_PASSCODE = "STEADY-ADMIN";
 // practical version of the future-self-continuity mechanism this whole
 // product is built on. Tone adapts to personalBlueprint.personality/workStyle
 // in context, but never fabricates a reference that isn't in realSavedFacts.
-const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies.";
+const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies. You have a tool available, open_tool, that opens a real feature in the app. Only call it when a specific real tool would genuinely help right now, based on what the user actually said - do not call it on most messages, and never call it just to seem helpful or to fill a reply. When you do call it, always include message_to_user: a short, natural, in-character line saying what you're doing, written the way you'd actually say it to this person - never a system notification like 'Opening Career Studio.' Never call open_tool for anything about immediate danger, self-harm, abuse, or crisis - that stays a plain-text reply per the safety rule above, since urgent support has its own always-visible route in this app, not one you decide to surface.";
 // Future Self module (Future Mirror bible Ch.4) - grounded in Hershfield's
 // future self-continuity research: vividness matters more than certainty
 // framing. Never phrase as "you will be X" - always "if you continue on this
@@ -3340,45 +3340,30 @@ function commandLauncherMatches(command, query) {
   return query.toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
 }
 
-// Second Brain, Phase 2a: the same command catalog now also dispatches
-// from a real chat message instead of only a search box the user has to
-// think to open. commandLauncherMatches() requires every word in the
-// query to appear in the haystack - fine for a short typed search, far
-// too strict for a full sentence ("I'm nervous about a job interview").
-// This scores keyword overlap instead and requires a minimum confidence
-// (2+ keyword-words matched) before suggesting anything, so a weak/
-// ambiguous message stays silent rather than misfiring a wrong tool.
-// "home" (Today plan) is excluded - it's redundant with the always-visible
-// room view, never worth a suggestion. "sos" is excluded on purpose too:
-// urgent support must never be guessed at from a weak keyword match
-// ("help" alone matched "can you help me think through something" during
-// testing) - SOS already has its own permanent, always-visible entry
-// (.sos-fab), which is the right way to reach it, not an algorithmic guess.
-const CHAT_DISPATCH_EXCLUDED_IDS = new Set(["home", "sos"]);
+// Real function calling (requestCompassAI passes this to the AI as a
+// tool; api/compass-chat.js builds the actual per-provider schema from
+// it) replaced the old keyword-overlap dispatch entirely - the model
+// itself now decides whether/which tool applies, using its real
+// understanding of the conversation, not a client-side word-matching
+// score. Same exclusions as the old dispatch, same reasons: "home" is
+// redundant with the always-visible chat screen itself, "sos" must never
+// be an AI-decided tool call - it already has its own permanent,
+// always-visible entry (.sos-fab), crisis support shouldn't depend on the
+// model deciding to reach for it. Also excludes prompt-only entries
+// (ai-goal-planning, ai-reflection-insight) - those are themselves a
+// scripted AI prompt to send, not a real "open this screen" action.
+const CHAT_TOOL_EXCLUDED_IDS = new Set(["home", "sos"]);
 
-function matchCommandForChatText(text) {
-  const words = new Set(String(text || "").toLowerCase().split(/[^a-z0-9']+/).filter((word) => word.length > 2));
-  if (!words.size) return null;
-  let best = null;
-  let bestScore = 0;
-  for (const command of commandLauncherCommands()) {
-    if (CHAT_DISPATCH_EXCLUDED_IDS.has(command.id)) continue;
-    let score = 0;
-    for (const keyword of command.keywords || []) {
-      const keywordWords = keyword.toLowerCase().split(/\s+/).filter(Boolean);
-      if (keywordWords.length && keywordWords.every((word) => words.has(word))) score += keywordWords.length;
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      best = command;
-    }
-  }
-  return bestScore >= 1 ? best : null;
+function chatToolCatalog() {
+  return commandLauncherCommands()
+    .filter((command) => !CHAT_TOOL_EXCLUDED_IDS.has(command.id) && !command.prompt)
+    .map((command) => ({ id: command.id, description: `${command.title} - ${command.detail}` }));
 }
 
 // Second Brain, Phase 2a: History Search. This is NOT the feature catalog
-// (that's chat-dispatched/Ctrl+K, see matchCommandForChatText above) -
-// this searches the user's own real accumulated history across every
+// (that's chat-dispatched via real function calling, see chatToolCatalog/
+// requestCompassAI, or the Ctrl+K fallback) - this searches the user's
+// own real accumulated history across every
 // place it currently lives, normalized into one shape. `sealed` lifeMemory
 // entries are still included here (unlike in AI chat) - this is the user
 // looking through their own data, not the AI volunteering it unprompted.
@@ -13105,7 +13090,8 @@ async function requestCompassAI(question) {
     body: JSON.stringify({
       systemPrompt: COMPASS_SYSTEM_PROMPT,
       messages: history,
-      context
+      context,
+      tools: chatToolCatalog()
     })
   });
   if (!response.ok) {
@@ -13124,9 +13110,16 @@ async function requestCompassAI(question) {
     throw new Error(`Compass API failed with ${response.status}`);
   }
   const data = await response.json();
+  // Real function calling: the model may return a tool call instead of
+  // (or alongside) plain text - toolCall.message_to_user is a required
+  // argument on the model's own call, not text this app synthesizes, so
+  // it's safe to show directly as the reply even when `reply` is empty.
   const reply = String(data.reply || "").trim();
-  if (!reply) throw new Error("Empty Compass reply");
-  return reply;
+  const toolCall = data.toolCall && typeof data.toolCall.tool_id === "string" && typeof data.toolCall.message_to_user === "string"
+    ? data.toolCall
+    : null;
+  if (!reply && !toolCall) throw new Error("Empty Compass reply");
+  return { reply, toolCall };
 }
 
 async function requestCompassDirect(systemPrompt, userPrompt) {
@@ -15060,17 +15053,25 @@ async function sendChatMessage(text) {
   isCompassResponding = true;
   renderScreen("compass");
   try {
-    const reply = await requestCompassAI(clean);
-    const suggested = matchCommandForChatText(clean);
-    chatState.messages.push({ from: "assistant", text: reply, suggestedOpen: suggested ? { id: suggested.id, title: suggested.title } : null });
+    const { reply, toolCall } = await requestCompassAI(clean);
+    // Defensive: never trust a tool_id the model returns without checking
+    // it against the real catalog first - same validation
+    // runCommandLauncher already does before opening anything.
+    const matchedTool = toolCall ? commandLauncherCommands().find((command) => command.id === toolCall.tool_id) : null;
+    const displayText = matchedTool ? toolCall.message_to_user : reply;
+    chatState.messages.push({
+      from: "assistant",
+      text: displayText,
+      suggestedOpen: matchedTool ? { id: matchedTool.id, title: matchedTool.title } : null
+    });
     saveChatState();
-    speak(reply);
+    speak(displayText);
     void logAiTrace({
       feature: "Compass AI Chat",
       userGoal: clean,
       coachType: "",
       context: "Saved profile, Personal Blueprint, real saved facts, and recent chat history assembled by requestCompassAI",
-      reply
+      reply: displayText
     });
   } catch (error) {
     console.error("[Compass AI] Request failed", error);

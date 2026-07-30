@@ -71,6 +71,121 @@ function extractChatCompletionText(data) {
   return message && typeof message.content === "string" ? message.content.trim() : "";
 }
 
+// Real function-calling parsers (one per provider - each returns the same
+// shape, {tool_id, message_to_user}, or null) - not a shared helper,
+// because each provider's tool-call response shape genuinely differs.
+// `message_to_user` is a required argument on the model's own tool call,
+// not text we synthesize - see buildOpenToolSchema below for why.
+function parseToolArgs(rawArgs) {
+  if (!rawArgs || typeof rawArgs !== "object") return null;
+  if (typeof rawArgs.tool_id === "string" && typeof rawArgs.message_to_user === "string") return rawArgs;
+  return null;
+}
+
+function extractChatCompletionToolCall(data) {
+  const choices = Array.isArray(data.choices) ? data.choices : [];
+  const message = choices[0] && choices[0].message ? choices[0].message : null;
+  const toolCalls = message && Array.isArray(message.tool_calls) ? message.tool_calls : [];
+  const call = toolCalls.find((item) => item.type === "function" && item.function && item.function.name === "open_tool");
+  if (!call) return null;
+  try {
+    return parseToolArgs(JSON.parse(call.function.arguments || "{}"));
+  } catch (error) {
+    return null;
+  }
+}
+
+function extractResponseToolCall(data) {
+  const output = Array.isArray(data.output) ? data.output : [];
+  const call = output.find((item) => item.type === "function_call" && item.name === "open_tool");
+  if (!call) return null;
+  try {
+    return parseToolArgs(JSON.parse(call.arguments || "{}"));
+  } catch (error) {
+    return null;
+  }
+}
+
+function extractGeminiToolCall(data) {
+  const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+  const parts = candidates[0] && candidates[0].content && Array.isArray(candidates[0].content.parts)
+    ? candidates[0].content.parts
+    : [];
+  const part = parts.find((item) => item.functionCall && item.functionCall.name === "open_tool");
+  return part ? parseToolArgs(part.functionCall.args || {}) : null;
+}
+
+// Single source of truth for the open_tool function's shape - each
+// provider's own tools-array wrapper differs (see the three *ToolsParam
+// functions), but all three are built from this one schema so they can't
+// silently drift out of sync with each other.
+function buildOpenToolSchema(tools) {
+  if (!Array.isArray(tools) || !tools.length) return null;
+  const ids = tools.map((item) => String(item.id)).filter(Boolean);
+  if (!ids.length) return null;
+  const descriptionLines = tools.map((item) => `- ${item.id}: ${item.description}`).join("\n");
+  return {
+    name: "open_tool",
+    description: `Open a real feature in the Compass app when it would genuinely help the user right now - not on every message, only when a specific real tool clearly applies. Available tools:\n${descriptionLines}`,
+    ids,
+    messageDescription: "A short, natural, in-character message to show the user explaining what you're doing - write it the way you'd actually say it, not a system notification."
+  };
+}
+
+function groqToolsParam(schema) {
+  if (!schema) return undefined;
+  return [{
+    type: "function",
+    function: {
+      name: schema.name,
+      description: schema.description,
+      parameters: {
+        type: "object",
+        properties: {
+          tool_id: { type: "string", enum: schema.ids },
+          message_to_user: { type: "string", description: schema.messageDescription }
+        },
+        required: ["tool_id", "message_to_user"]
+      }
+    }
+  }];
+}
+
+function openaiToolsParam(schema) {
+  if (!schema) return undefined;
+  return [{
+    type: "function",
+    name: schema.name,
+    description: schema.description,
+    parameters: {
+      type: "object",
+      properties: {
+        tool_id: { type: "string", enum: schema.ids },
+        message_to_user: { type: "string", description: schema.messageDescription }
+      },
+      required: ["tool_id", "message_to_user"]
+    }
+  }];
+}
+
+function geminiToolsParam(schema) {
+  if (!schema) return undefined;
+  return [{
+    functionDeclarations: [{
+      name: schema.name,
+      description: schema.description,
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          tool_id: { type: "STRING", enum: schema.ids },
+          message_to_user: { type: "STRING", description: schema.messageDescription }
+        },
+        required: ["tool_id", "message_to_user"]
+      }
+    }]
+  }];
+}
+
 function buildChatMessages(systemPrompt, messages, context) {
   return [
     {
@@ -97,12 +212,13 @@ function buildGeminiContents(messages) {
   return cleaned.length ? cleaned : [{ role: "user", parts: [{ text: "Hello" }] }];
 }
 
-async function callGemini({ systemPrompt, messages, context }) {
+async function callGemini({ systemPrompt, messages, context, tools }) {
   if (!geminiApiKey) {
     console.error("[Compass AI] GEMINI_API_KEY is missing in Vercel environment variables.");
     return { status: 503, payload: { error: "GEMINI_API_KEY is not configured." } };
   }
 
+  const schema = buildOpenToolSchema(tools);
   const modelPath = normalizedGeminiModelPath(geminiModel);
   const apiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(geminiApiKey)}`, {
     method: "POST",
@@ -114,6 +230,7 @@ async function callGemini({ systemPrompt, messages, context }) {
         }],
       },
       contents: buildGeminiContents(messages),
+      ...(schema ? { tools: geminiToolsParam(schema) } : {}),
       generationConfig: {
         temperature: 0.75,
         topP: 0.9,
@@ -129,20 +246,22 @@ async function callGemini({ systemPrompt, messages, context }) {
   }
 
   const data = await apiResponse.json();
+  const toolCall = extractGeminiToolCall(data);
   const reply = extractGeminiText(data);
-  if (!reply) {
+  if (!reply && !toolCall) {
     console.error("[Compass AI] Gemini returned an empty response", JSON.stringify(data).slice(0, 1200));
     return { status: 502, payload: { error: "Gemini provider returned an empty response." } };
   }
-  return { status: 200, payload: { reply, provider: "gemini", model: geminiModel } };
+  return { status: 200, payload: { reply, toolCall, provider: "gemini", model: geminiModel } };
 }
 
-async function callGroq({ systemPrompt, messages, context }) {
+async function callGroq({ systemPrompt, messages, context, tools }) {
   if (!groqApiKey) {
     console.error("[Compass AI] GROQ_API_KEY is missing in Vercel environment variables.");
     return { status: 503, payload: { error: "GROQ_API_KEY is not configured." } };
   }
 
+  const schema = buildOpenToolSchema(tools);
   const apiResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -152,6 +271,7 @@ async function callGroq({ systemPrompt, messages, context }) {
     body: JSON.stringify({
       model: groqModel,
       messages: buildChatMessages(systemPrompt, messages, context),
+      ...(schema ? { tools: groqToolsParam(schema) } : {}),
       temperature: 0.75,
       top_p: 0.9,
       max_completion_tokens: 1100,
@@ -165,20 +285,22 @@ async function callGroq({ systemPrompt, messages, context }) {
   }
 
   const data = await apiResponse.json();
+  const toolCall = extractChatCompletionToolCall(data);
   const reply = extractChatCompletionText(data);
-  if (!reply) {
+  if (!reply && !toolCall) {
     console.error("[Compass AI] Groq returned an empty response", JSON.stringify(data).slice(0, 1200));
     return { status: 502, payload: { error: "Groq provider returned an empty response." } };
   }
-  return { status: 200, payload: { reply, provider: "groq", model: groqModel } };
+  return { status: 200, payload: { reply, toolCall, provider: "groq", model: groqModel } };
 }
 
-async function callOpenAI({ systemPrompt, messages, context }) {
+async function callOpenAI({ systemPrompt, messages, context, tools }) {
   if (!openaiApiKey) {
     console.error("[Compass AI] OPENAI_API_KEY is missing in Vercel environment variables.");
     return { status: 503, payload: { error: "OPENAI_API_KEY is not configured." } };
   }
 
+  const schema = buildOpenToolSchema(tools);
   const apiResponse = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -188,6 +310,7 @@ async function callOpenAI({ systemPrompt, messages, context }) {
     body: JSON.stringify({
       model: openaiModel,
       input: buildChatMessages(systemPrompt, messages, context),
+      ...(schema ? { tools: openaiToolsParam(schema) } : {}),
       max_output_tokens: 1100,
     }),
   });
@@ -199,12 +322,13 @@ async function callOpenAI({ systemPrompt, messages, context }) {
   }
 
   const data = await apiResponse.json();
+  const toolCall = extractResponseToolCall(data);
   const reply = extractResponseText(data);
-  if (!reply) {
+  if (!reply && !toolCall) {
     console.error("[Compass AI] OpenAI returned an empty response", JSON.stringify(data).slice(0, 1200));
     return { status: 502, payload: { error: "OpenAI provider returned an empty response." } };
   }
-  return { status: 200, payload: { reply, provider: "openai", model: openaiModel } };
+  return { status: 200, payload: { reply, toolCall, provider: "openai", model: openaiModel } };
 }
 
 function providerOrder() {
@@ -265,8 +389,11 @@ module.exports = async function handler(req, res) {
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const systemPrompt = String(body.systemPrompt || "").slice(0, 1600);
     const context = body.context ? JSON.stringify(body.context).slice(0, 8000) : "{}";
+    const tools = Array.isArray(body.tools)
+      ? body.tools.slice(0, 80).map((item) => ({ id: String(item.id || "").slice(0, 60), description: String(item.description || "").slice(0, 300) })).filter((item) => item.id)
+      : [];
 
-    const result = await callConfiguredProvider({ systemPrompt, messages, context });
+    const result = await callConfiguredProvider({ systemPrompt, messages, context, tools });
     sendJson(res, result.status, result.payload);
   } catch (error) {
     console.error("[Compass AI] Vercel route failed", error);
