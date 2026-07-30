@@ -3471,6 +3471,35 @@ function historySearchResults(query = historySearchQuery) {
   return historySearchEntries().filter((entry) => historySearchMatches(entry, query)).slice(0, 40);
 }
 
+// One of 4 icon/color families per entry.type, not 11 different colors -
+// keeps the card grid legible (sage = day-to-day reflection, coral =
+// personal/emotional decisions, gold = practice & decision prep, slate =
+// the bigger advanced-labs simulations) while still visually
+// distinguishing what kind of memory each card is at a glance.
+function historyTypeVisual(type) {
+  const icons = {
+    Journal: `<path d="M4 4h13a2 2 0 012 2v13a1 1 0 01-1.4.9L4 17V4z"/><path d="M8 9h8M8 13h5"/>`,
+    Mood: `<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>`,
+    "Remember this": `<path d="M12 21s-7-4.35-9.3-8.6C1.2 8.8 2.8 5 6.4 5c2 0 3.4 1.1 4.1 2.3C11.2 6.1 12.6 5 14.6 5c3.6 0 5.2 3.8 3.7 7.4C19 16.6 12 21 12 21z"/>`,
+    "Roleplay Practice": `<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/>`,
+    "Interview Practice": `<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/>`,
+    "Future Scan": `<circle cx="12" cy="12" r="9"/><path d="M15 9l-3 6-3-1.5L12 9z"/>`,
+    "Jury Duty": `<path d="M12 3v18M5 8l-3 6a4 4 0 008 0l-3-6M19 8l-3 6a4 4 0 008 0l-3-6M5 8h6M13 8h6"/>`,
+    "Ghost Roommate": `<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>`,
+    "Failure Inoculation": `<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.6 17a2 2 0 001.7 3h15.4a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>`,
+    "Estate Auction": `<path d="M12 3v18"/><path d="M5 8l-3 6a4 4 0 008 0l-3-6M19 8l-3 6a4 4 0 008 0l-3-6M5 8h6M13 8h6"/>`,
+    "Self Archaeology": `<path d="M3 20h18M6 20V10l6-6 6 6v10"/><path d="M10 20v-6h4v6"/>`
+  };
+  const families = {
+    Journal: "sage", Mood: "sage",
+    "Remember this": "coral", "Remember this (sealed)": "coral",
+    "Roleplay Practice": "gold", "Interview Practice": "gold", "Future Scan": "gold",
+    "Jury Duty": "slate", "Ghost Roommate": "slate", "Failure Inoculation": "slate", "Estate Auction": "slate", "Self Archaeology": "slate"
+  };
+  const baseType = type.replace(" (sealed)", "");
+  return { icon: icons[baseType] || icons.Journal, family: families[type] || families[baseType] || "sage" };
+}
+
 function historySearchResultsHtml(query = historySearchQuery) {
   const results = historySearchResults(query);
   const hasQuery = cleanText(query, 120);
@@ -3482,16 +3511,27 @@ function historySearchResultsHtml(query = historySearchQuery) {
       </section>
     `;
   }
-  return results.map((entry) => `
-    <article class="ledger-entry">
-      <p class="ledger-entry-stamp">${escapeHTML(entry.type)}${entry.date ? ` · ${new Date(entry.date).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}` : ""}</p>
-      <p class="ledger-entry-text"><strong>${escapeHTML(entry.title || "")}</strong></p>
-      <details>
-        <summary>${escapeHTML(entry.snippet || "")}</summary>
-        <p class="ledger-entry-text muted history-search-fulltext">${escapeHTML(entry.fullText || "")}</p>
-      </details>
+  return results.map((entry, index) => {
+    const visual = historyTypeVisual(entry.type);
+    const cardId = `history-card-${index}`;
+    return `
+    <article class="history-card">
+      <div class="history-icon type-${visual.family}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${visual.icon}</svg>
+      </div>
+      <div class="history-body">
+        <p class="history-eyebrow">${escapeHTML(entry.type)}</p>
+        <p class="history-title">${escapeHTML(entry.title || "")}</p>
+        <p class="history-snippet">${escapeHTML(entry.snippet || "")}</p>
+        <p class="history-fulltext" id="${cardId}-full" hidden>${escapeHTML(entry.fullText || "")}</p>
+      </div>
+      <div class="history-side">
+        <span class="history-date">${entry.date ? new Date(entry.date).toLocaleDateString([], { month: "short", day: "numeric" }) : ""}</span>
+        <button class="history-expand" type="button" data-toggle-history-card="${cardId}" aria-expanded="false">More</button>
+      </div>
     </article>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function commandLauncherResults(query = commandQuery) {
@@ -10839,83 +10879,15 @@ function futureScanSignalBanner() {
   return `<div class="future-scan-signal-banner mixed">The stations you've run so far are giving mixed signals - might be worth checking a couple more angles.</div>${calibrationNote}`;
 }
 
-// Second Brain room view - the ambient "home" for the buddy relationship,
-// built from real recorded data (mood/due-dates/streak counts), not
-// illustration assets. Deliberately visually distinct from Ghost
-// Roommate/Jury Duty/Estate Auction's modal staging - this room is Real
-// (it's actually yours, accumulated over time); those stay clearly-marked
-// Practice scenes. See docs discussion: never blur the two.
-function secondBrainRoomView() {
-  const moodEntry = trackerState.mood;
-  const dueSoon = dueRealLifeEvents().slice(0, 3);
-  const stats = {
-    goals: cleanText(userProfile.goals, 20) ? "Saved" : "Empty",
-    journal: trackerState.journalEntries.filter((entry) => entry.user_id === currentUserId()).length,
-    weekWins: weeklyMissionCount(),
-    challenges: trackerState.challengeProgress.filter((item) => item.user_id === currentUserId()).length
-  };
-  return `
-    <section class="second-brain-room">
-      <div class="room-panel room-window">
-        <p class="eyebrow">Right now</p>
-        <h3>${escapeHTML(moodEntry.label)}</h3>
-        <p class="muted">${escapeHTML(moodEntry.note)}</p>
-      </div>
-      <div class="room-panel room-corkboard">
-        <p class="eyebrow">Coming up</p>
-        ${dueSoon.length ? dueSoon.map((event) => `
-          <p class="room-corkboard-note">${escapeHTML(event.title)} - ${new Date(event.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}</p>
-        `).join("") : `<p class="muted">Nothing due right now.</p>`}
-      </div>
-      <div class="room-panel room-shelf">
-        <p class="eyebrow">On the shelf</p>
-        <div class="growth-stat-grid">
-          <span><strong>${stats.goals}</strong>Goals</span>
-          <span><strong>${stats.journal}</strong>Journal</span>
-          <span><strong>${stats.weekWins}</strong>Week wins</span>
-          <span><strong>${stats.challenges}</strong>Challenges</span>
-        </div>
-      </div>
-      <button class="room-desk" type="button" data-tab-jump="compass">
-        <img src="assets/icon-decide.png" alt="">
-        <div>
-          <strong>Talk to Compass</strong>
-          <span>It remembers what you've told it</span>
-        </div>
-      </button>
-      <button class="room-history-search" type="button" data-open="historySearch" aria-label="Search your history">
-        <img src="assets/icon-learn.png" alt="">
-        <span>Find something you already said or did</span>
-      </button>
-    </section>
-  `;
-}
-
-// Second Brain - replaces the old Decide/Build/Practice tabs entirely (not
-// aliased-and-hidden, actually replaced - see TAB_ALIASES/screens below).
-// Content is organized by job, not by the old tab names: Remember (ambient,
-// always-on memory) and Help You Act (decision support + teaching), per
-// the redesign discussion. Inspire Hub/Story of the day moved out to
-// Discover (confirmed decision) - Discuss-your-mirror-safely stayed since
-// it's a memory/support feature, not stories content.
-// Second Brain, Phase 2a cut: the ~45 features named individually here in
-// Phase 1 are now dispatched through chat (see the keyword-match hook in
-// requestCompassAI) or found via History Search - none deleted, none
-// dropped, but none of them render as a page of section headers anymore.
-// Only real ambient status (room, ledger) plus the existing ambient cards
-// stay. homeStarterPathCard()/adultingReadinessOverviewCard() moved to
-// one-time first-run onboarding instead of a permanent card here.
-function secondBrainScreen() {
-  return `
-    ${adultPrepHero()}
-    ${secondBrainRoomView()}
-    ${homeLedgerRows(todaysDeskFocus().kind)}
-    ${blueprintSummaryCard()}
-    ${resurfacingCard()}
-    ${growthSuggestionCard()}
-    ${habitChainGraph()}
-  `;
-}
+// Second Brain's room view (mood/due-dates/badges panels + a "Talk to
+// Compass" button leading to a separate chat screen) was replaced by
+// making the chat screen itself the entire Second Brain surface - the
+// visual redesign the user approved (mockup: full-screen chat, a one-
+// line ambient status sliver, two small icon-tabs) doesn't work as a
+// screen you navigate to from a room; see screens.compass and
+// TAB_ALIASES.secondBrain below. secondBrainRoomView()/secondBrainScreen()
+// removed rather than left as dead code - same precedent as the earlier
+// future/growth cleanup.
 
 function profileScreen() {
   return `
@@ -10947,6 +10919,7 @@ function profileScreen() {
       <div class="profile-actions">
         <button class="primary-action compact-action" type="button" data-open="aiTrustCenter">Open trust center</button>
         <button class="secondary-action compact-action" type="button" data-open="aiTraceLog">AI Trace Log</button>
+        <button class="secondary-action compact-action" type="button" data-clear-chat>Clear chat</button>
       </div>
     </section>
     <section class="profile-card">
@@ -10980,15 +10953,14 @@ function profileScreen() {
 }
 
 const screens = {
-  // "home" now resolves to secondBrain via TAB_ALIASES - its unique real
-  // content (adultPrepHero/homeStarterPathCard/adultingReadinessOverviewCard/
-  // homeLedgerRows) moved into secondBrainScreen(). homeQuickAccessGrid()
-  // (a grid of buttons to the old decide/build/practice/discover tabs) is
-  // deliberately not carried over - those destinations no longer exist.
-  // Second Brain replaces the old decide/build/practice/future/growth tabs
-  // entirely (see TAB_ALIASES below) - one screen, organized by job
-  // (Remember / Help You Act) instead of by these old tab names.
-  secondBrain: () => secondBrainScreen(),
+  // "home" and "secondBrain" both resolve to "compass" via TAB_ALIASES -
+  // Second Brain's entire surface is now the chat screen itself (see the
+  // visual-rebuild note above screens.compass). homeQuickAccessGrid() (a
+  // grid of buttons to the old decide/build/practice/discover tabs) and
+  // adultPrepHero()/homeStarterPathCard()/adultingReadinessOverviewCard()/
+  // homeLedgerRows() are deliberately not carried over into chat - those
+  // destinations/cards no longer have a default-visible home; still real,
+  // reachable through chat/History Search/Profile like everything else.
 
   assess: () => `
     <header class="screen-head compact-head">
@@ -11021,42 +10993,56 @@ const screens = {
     ${featureEnabled("receipts") ? receiptTrackerPanel() : ""}
   `,
 
-  compass: () => `
-    <header class="screen-head compact-head compass-head">
-      <div>
-        <p class="eyebrow">Compass AI</p>
-        <h2 class="screen-title">Chat like a real conversation.</h2>
-        <p class="screen-subtitle">Ask about study, planning, motivation, app help, emotions, or everyday decisions.</p>
+  // Second Brain, visual rebuild: this IS Second Brain now, full-screen,
+  // no separate room to leave first - matches the approved mockup
+  // (...\scratchpad\second-brain-mockup.html). Two icon-tabs (History
+  // Search, Profile) replace the old header/subtitle block; a one-line
+  // ambient status sliver replaces the room's mood/corkboard/shelf
+  // panels; suggested-prompts and the "Memory controls" card are dropped
+  // from default view (Clear chat moved to profileScreen(), AI profile
+  // editing already reachable via the Profile icon-tab) - nothing here
+  // is deleted, just no longer a default-visible block.
+  compass: () => {
+    const dueSoon = dueRealLifeEvents()[0] || null;
+    return `
+    <header class="chat-topbar">
+      <div class="chat-brand">
+        <span class="chat-brand-mark">C</span>
+        Compass
       </div>
-      <div class="ai-avatar"><img src="assets/icon-chat.png" alt=""></div>
+      <div class="chat-icon-tabs">
+        <button class="chat-icon-tab" type="button" data-open="historySearch" aria-label="Search your history" title="History Search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+        </button>
+        <button class="chat-icon-tab" type="button" data-tab-jump="profile" aria-label="Profile" title="Profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.8-4 5-6 8-6s6.2 2 8 6"></path></svg>
+        </button>
+      </div>
     </header>
-    <div class="suggested-prompts">
-      ${["Help me think through a decision", "Reflect on an Inspire story", "Reality-check my goal", "Turn a lesson into action"].map((prompt) => `
-        <button type="button" data-chat-prompt="${escapeHTML(prompt)}">${escapeHTML(prompt)}</button>
-      `).join("")}
+    <div class="chat-status-sliver">
+      <span class="chat-status-dot"></span>
+      ${escapeHTML(trackerState.mood.label)}${trackerState.mood.note ? ` - ${escapeHTML(trackerState.mood.note)}` : ""}
+      ${dueSoon ? `<span class="chat-status-sep">&middot;</span>${escapeHTML(dueSoon.title)} - ${new Date(dueSoon.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}
     </div>
     <section class="chat-room">
       <div class="chat-messages" id="chat-messages">${chatMessages()}</div>
       <div class="chat-input-row">
-        <button class="voice-button" type="button" data-voice-chat aria-label="Voice input">Mic</button>
-        <label class="voice-button file-chat-button" aria-label="Upload PDF">
-          PDF
+        <label class="chat-icon-button" aria-label="Upload PDF" title="Upload PDF">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V9z"></path><path d="M14 3v6h6"></path></svg>
           <input id="chat-pdf-input" type="file" accept="application/pdf" data-pdf-upload>
         </label>
-        <input id="chat-input" type="text" placeholder="Ask Compass AI...">
-        <button class="primary-action send-action" type="button" data-send-chat ${isCompassResponding ? "disabled" : ""}>Send</button>
+        <button class="chat-icon-button" type="button" data-voice-chat aria-label="Voice input" title="Voice input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10a7 7 0 0014 0M12 17v5"></path></svg>
+        </button>
+        <input id="chat-input" type="text" placeholder="Talk to Compass...">
+        <button class="chat-send-button" type="button" data-send-chat aria-label="Send" ${isCompassResponding ? "disabled" : ""}>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 3 12 20.5l-2.3-7.2L3 11.5z"></path></svg>
+        </button>
       </div>
-    </section>
-    <section class="quick-card">
-      <h3>Memory controls</h3>
-      <p class="muted">Compass only uses this chat, your saved AI profile, and uploaded PDFs. It does not invent hidden memory.</p>
       ${uploadedDocumentStatus()}
-      <div class="profile-actions">
-        <button class="secondary-action" type="button" data-open="compassProfile">Edit AI profile</button>
-        <button class="secondary-action" type="button" data-clear-chat>Clear chat</button>
-      </div>
     </section>
-  `,
+  `;
+  },
 
   simulator: () => `
     <section class="life-sim-game" data-life-sim-game>
@@ -12533,15 +12519,20 @@ const modals = {
   `,
 
   historySearch: () => `
-    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="history-search-title">
+    <div class="modal-card history-search-modal" role="dialog" aria-modal="true" aria-labelledby="history-search-title">
       <div class="modal-top">
         <span class="risk-pill calm">History</span>
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
-      <h3 id="history-search-title">Find something you already said or did</h3>
-      <p class="muted">Journal, mood, decisions you asked Compass to remember, interview/roleplay practice, Jury Duty, Ghost Roommate, Future Scan, and more - all in one search.</p>
-      <input id="history-search-input" type="search" value="${escapeHTML(historySearchQuery)}" data-history-search placeholder="Search your own history...">
-      <div class="ledger-sheet" data-history-results>${historySearchResultsHtml()}</div>
+      <div class="history-head">
+        <h3 id="history-search-title">Find something you already said or did</h3>
+        <p class="muted">Journal, mood, decisions you asked Compass to remember, interview/roleplay practice, Jury Duty, Ghost Roommate, Future Scan, and more - all in one search.</p>
+      </div>
+      <div class="history-search-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+        <input id="history-search-input" type="search" value="${escapeHTML(historySearchQuery)}" data-history-search placeholder="Search your own history...">
+      </div>
+      <div class="history-list" data-history-results>${historySearchResultsHtml()}</div>
     </div>
   `,
 
@@ -12792,12 +12783,22 @@ const TAB_ALIASES = {
   growth: "secondBrain",
   build: "secondBrain",
   practice: "secondBrain",
+  secondBrain: "compass",
   community: "discover",
   settings: "profile"
 };
 
+// Resolves the whole alias chain (e.g. decide -> secondBrain -> compass),
+// not just one hop - a single-lookup version silently breaks the moment
+// an alias's own target becomes an alias itself, which is exactly what
+// happened when secondBrain (already a target of six other names) was
+// pointed at compass during the visual rebuild. Capped at 5 hops as a
+// safety net against an accidental cycle, not because chains this deep
+// are expected.
 function canonicalTab(tab) {
-  return TAB_ALIASES[tab] || tab || "home";
+  let current = tab || "home";
+  for (let hops = 0; hops < 5 && TAB_ALIASES[current]; hops++) current = TAB_ALIASES[current];
+  return current;
 }
 
 function renderScreen(tab) {
@@ -15414,6 +15415,7 @@ document.addEventListener("click", async (event) => {
   const discoverFilterButton = event.target.closest("[data-discover-filter]");
   const commandRunButton = event.target.closest("[data-command-run]");
   const suggestedCommandButton = event.target.closest("[data-run-suggested-command]");
+  const historyExpandButton = event.target.closest("[data-toggle-history-card]");
   const tryAdvancedFindingButton = event.target.closest("[data-try-advanced-finding]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
 
@@ -15427,6 +15429,18 @@ document.addEventListener("click", async (event) => {
     event.preventDefault();
     await runCommandLauncher(suggestedCommandButton.dataset.runSuggestedCommand);
     return;
+  }
+
+  if (historyExpandButton) {
+    const cardId = historyExpandButton.dataset.toggleHistoryCard;
+    const fullTextEl = modalLayer.querySelector(`#${CSS.escape(cardId)}-full`);
+    if (fullTextEl) {
+      const nowExpanded = fullTextEl.hasAttribute("hidden");
+      if (nowExpanded) fullTextEl.removeAttribute("hidden");
+      else fullTextEl.setAttribute("hidden", "");
+      historyExpandButton.textContent = nowExpanded ? "Less" : "More";
+      historyExpandButton.setAttribute("aria-expanded", nowExpanded ? "true" : "false");
+    }
   }
 
   if (opener) {

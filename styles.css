@@ -10960,3 +10960,411 @@ body {
 .desktop-command-bar.is-quiet .desktop-command-search::before {
   margin-right: 6px;
 }
+
+/* ==========================================================================
+   Second Brain visual rebuild - chat is the entire surface now, matching
+   the approved mockup (scratchpad/second-brain-mockup.html): warm
+   asymmetric bubbles instead of ChatGPT's flat grey, two small Apple-style
+   icon-tabs, a one-line ambient status sliver instead of room panels.
+   ========================================================================== */
+:root {
+  --color-coral: #ff6b57;
+  --color-coral-deep: #e0503e;
+  --color-sage: #7c9473;
+  --color-sage-soft: #e7ede4;
+}
+
+.chat-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 10px;
+}
+
+.chat-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+
+.chat-brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, var(--color-primary), #a5824a);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: var(--shadow-tight);
+}
+
+.chat-icon-tabs {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.chat-icon-tab {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--color-faint);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-tight);
+  display: grid;
+  place-items: center;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: transform 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.chat-icon-tab:hover {
+  transform: translateY(-1px);
+  color: var(--color-ink);
+  border-color: var(--color-primary);
+}
+
+.chat-icon-tab svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chat-status-sliver {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 2px 10px;
+  padding: 8px 13px;
+  border-radius: 13px;
+  background: var(--color-sage-soft);
+  color: var(--color-ink);
+  opacity: 0.85;
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.chat-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-sage);
+  flex: 0 0 auto;
+}
+
+.chat-status-sep {
+  opacity: 0.4;
+  margin: 0 1px;
+}
+
+/* Bubbles: overrides the earlier .chat-bubble.is-ai/.is-user rules
+   (several scattered redefinitions across breakpoints in this file) -
+   appended last so it wins the cascade at equal specificity regardless
+   of which breakpoint block they live in. */
+.chat-room {
+  display: flex;
+  flex-direction: column;
+  height: 62vh;
+  min-height: 420px;
+  border: none;
+  border-radius: var(--radius-xl);
+  background: transparent;
+  overflow: visible;
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 2px 14px;
+  overflow-y: auto;
+  background: none;
+  flex: 1 1 auto;
+}
+
+.chat-bubble {
+  max-width: 80%;
+  padding: 11px 15px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-tight);
+}
+
+.chat-bubble span {
+  display: block;
+  margin: 0 2px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--color-primary);
+}
+
+.chat-bubble p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.42;
+}
+
+.chat-bubble.is-ai {
+  justify-self: start;
+  background: var(--color-surface);
+  border: 1px solid var(--color-faint);
+  color: var(--color-ink);
+  border-radius: 20px 20px 20px 6px;
+}
+
+.chat-bubble.is-user {
+  justify-self: end;
+  background: linear-gradient(155deg, var(--color-coral), var(--color-coral-deep));
+  border: none;
+  color: #fff;
+  border-radius: 20px 20px 6px 20px;
+}
+
+.chat-bubble.is-user span {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.chat-bubble.is-typing p {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.chat-bubble.is-typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-muted);
+  opacity: 0.5;
+  animation: chatTypingBob 1s ease-in-out infinite;
+}
+
+.chat-bubble.is-typing i:nth-child(2) { animation-delay: 0.15s; }
+.chat-bubble.is-typing i:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes chatTypingBob {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-3px); opacity: 0.9; }
+}
+
+.chat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-top: 10px;
+  border: 1px solid var(--color-faint);
+  border-radius: 999px;
+  background: var(--color-surface);
+  flex: 0 0 auto;
+}
+
+.chat-input-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--color-ink);
+  outline: none;
+}
+
+.chat-input-row input::placeholder {
+  color: var(--color-muted);
+}
+
+.chat-icon-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-surface-soft);
+  color: var(--color-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.chat-icon-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.chat-icon-button input[type="file"] {
+  display: none;
+}
+
+.chat-send-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-ink);
+  color: var(--color-bg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.chat-send-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.chat-send-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* History Search - icon-coded cards instead of a plain text list with
+   <details>/<summary>, per the approved mockup. */
+.history-search-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: 82vh;
+}
+
+.history-head h3 {
+  margin: 4px 0 4px;
+}
+
+.history-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 10px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-faint);
+  flex: 0 0 auto;
+}
+
+.history-search-bar svg {
+  width: 15px;
+  height: 15px;
+  color: var(--color-muted);
+  flex: 0 0 auto;
+}
+
+.history-search-bar input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--color-ink);
+  outline: none;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.history-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: 18px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-faint);
+  box-shadow: var(--shadow-tight);
+}
+
+.history-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+.history-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.history-icon.type-sage { background: linear-gradient(155deg, var(--color-sage), #5f7757); }
+.history-icon.type-gold { background: linear-gradient(155deg, var(--color-primary), #a5824a); }
+.history-icon.type-coral { background: linear-gradient(155deg, var(--color-coral), var(--color-coral-deep)); }
+.history-icon.type-slate { background: linear-gradient(155deg, #7c8ba1, #566277); }
+
+.history-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.history-eyebrow {
+  margin: 0 0 2px;
+  font-size: 10.5px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  color: var(--color-muted);
+}
+
+.history-title {
+  margin: 0 0 3px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.history-snippet {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-fulltext {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-faint);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-ink);
+  white-space: pre-wrap;
+}
+
+.history-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.history-date {
+  font-size: 10.5px;
+  color: var(--color-muted);
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.history-expand {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
