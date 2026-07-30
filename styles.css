@@ -10784,3 +10784,125 @@ body {
     border-radius: 28px 14px 30px 14px;
   }
 }
+
+/* Second Brain room view - the ambient home for the buddy relationship.
+   Deliberately warm/illustrated-flat, not photoreal and not cold-minimal -
+   and deliberately visually distinct from Ghost Roommate/Jury Duty/Estate
+   Auction's modal staging, so the Real (this room, genuinely yours) vs
+   Practice (those staged scenes) line never blurs. */
+.second-brain-room {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 26px;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.85), rgba(238, 251, 213, 0.55)),
+    linear-gradient(135deg, #fbfcf8 0%, #f3f1ea 60%, #ece6d8 100%);
+  box-shadow: var(--shadow-tight);
+}
+
+.room-panel {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 6px 18px rgba(26, 26, 26, 0.06);
+}
+
+.room-panel .eyebrow {
+  margin-bottom: 4px;
+}
+
+.room-panel h3 {
+  font-size: 17px;
+  line-height: 1.15;
+  margin-bottom: 2px;
+}
+
+.room-window {
+  background:
+    linear-gradient(180deg, rgba(200, 169, 107, 0.22), rgba(255, 255, 255, 0.7) 70%),
+    rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(200, 169, 107, 0.25);
+}
+
+.room-corkboard {
+  background: rgba(238, 233, 214, 0.75);
+  border: 1px dashed rgba(26, 26, 26, 0.18);
+}
+
+.room-corkboard-note {
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--color-ink);
+  border-top: 1px dotted rgba(26, 26, 26, 0.15);
+}
+
+.room-corkboard-note:first-of-type {
+  border-top: none;
+}
+
+.room-shelf .growth-stat-grid {
+  margin-top: 4px;
+}
+
+.room-desk {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: none;
+  background: linear-gradient(120deg, var(--color-primary), #2c3129);
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.room-desk img {
+  width: 34px;
+  height: 34px;
+}
+
+.room-desk strong {
+  display: block;
+  font-size: 15px;
+}
+
+.room-desk span {
+  display: block;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+@media (max-width: 560px) {
+  .second-brain-room {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Profile moved from a bottom-nav/sidebar-nav slot to a persistent header
+   icon - the 3 module slots (Second Brain / Discover / Life Sim) are the
+   only primary nav entries now. */
+.desktop-profile-icon,
+.phone-profile-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  border: none;
+  border-radius: 50%;
+  background: rgba(26, 26, 26, 0.06);
+  cursor: pointer;
+}
+
+.desktop-profile-icon .nav-icon,
+.phone-profile-icon .nav-icon {
+  width: 18px;
+  height: 18px;
+}

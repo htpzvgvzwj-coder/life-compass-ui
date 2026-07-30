@@ -58,7 +58,7 @@ const ADMIN_PASSCODE = "STEADY-ADMIN";
 // practical version of the future-self-continuity mechanism this whole
 // product is built on. Tone adapts to personalBlueprint.personality/workStyle
 // in context, but never fabricates a reference that isn't in realSavedFacts.
-const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question.";
+const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies.";
 // Future Self module (Future Mirror bible Ch.4) - grounded in Hershfield's
 // future self-continuity research: vividness matters more than certainty
 // framing. Never phrase as "you will be X" - always "if you continue on this
@@ -506,6 +506,14 @@ const defaultTrackerState = {
   roleplaySessions: [],
   supportContacts: [],
   journalEntries: [],
+  // Second Brain causal memory ("decision + reason + outcome") - the
+  // record that lets Compass AI do similar-situation recall instead of
+  // generic advice: a real past decision, why the user says they made it,
+  // and what actually happened afterward. `sealed` entries are still sent
+  // to the AI as context (so it doesn't contradict what it privately
+  // knows) but the system prompt instructs it never to surface a sealed
+  // entry unless the user brings that topic up first.
+  lifeMemory: [],
   challengeProgress: [],
   savedOpportunities: [],
   futureMirror: {
@@ -1329,6 +1337,7 @@ function normalizeTrackerState(state) {
     roleplaySessions: Array.isArray(state.roleplaySessions) ? state.roleplaySessions : fallback.roleplaySessions,
     supportContacts: Array.isArray(state.supportContacts) ? state.supportContacts : defaultSupportContacts,
     journalEntries: Array.isArray(state.journalEntries) ? state.journalEntries : fallback.journalEntries,
+    lifeMemory: Array.isArray(state.lifeMemory) ? state.lifeMemory : fallback.lifeMemory,
     challengeProgress: Array.isArray(state.challengeProgress) ? state.challengeProgress : fallback.challengeProgress,
     savedOpportunities: Array.isArray(state.savedOpportunities) ? state.savedOpportunities : fallback.savedOpportunities,
     futureMirror: {
@@ -3114,7 +3123,7 @@ function adultingReadinessDimensions() {
       score: Math.min(3, (latestBlueprint() ? 1 : 0) + (cleanText(userProfile.goals, 20) ? 1 : 0) + (openGoalCount ? 1 : 0)),
       detail: openGoalCount ? `${openGoalCount} roadmap goal${openGoalCount === 1 ? "" : "s"}` : "No roadmap goal yet",
       action: "Build map",
-      attr: `data-tab-jump="build"`
+      attr: `data-tab-jump="secondBrain"`
     },
     {
       id: "decisions",
@@ -3122,7 +3131,7 @@ function adultingReadinessDimensions() {
       score: Math.min(3, decisionCount),
       detail: decisionCount ? `${decisionCount} decision practice signal${decisionCount === 1 ? "" : "s"}` : "No decision run yet",
       action: "Run scan",
-      attr: `data-tab-jump="decide"`
+      attr: `data-tab-jump="secondBrain"`
     },
     {
       id: "skills",
@@ -3130,7 +3139,7 @@ function adultingReadinessDimensions() {
       score: Math.min(3, completedGuides + startedGuides + interviewCount),
       detail: completedGuides ? `${completedGuides} guide${completedGuides === 1 ? "" : "s"} completed` : `${startedGuides + interviewCount} practice signal${startedGuides + interviewCount === 1 ? "" : "s"}`,
       action: "Practice",
-      attr: `data-tab-jump="practice"`
+      attr: `data-tab-jump="secondBrain"`
     },
     {
       id: "support",
@@ -3262,21 +3271,64 @@ function refreshDesktopRightRail(tab = activeTab) {
 function commandLauncherCommands() {
   return [
     { id: "home", title: "Today plan", detail: "Starter path, readiness, and next action.", lane: "Home", tab: "home", icon: "icon-home.png", keywords: ["home", "today", "starter", "readiness"] },
-    { id: "future-scan", title: "Run Future Scan", detail: "Check identity, values, hidden costs, and no-action future.", lane: "Decide", tab: "decide", icon: "icon-decide.png", keywords: ["decision", "choose", "future scan", "risk"] },
-    { id: "cost-living", title: "Real Cost of Living", detail: "Estimate SG-style living costs before a decision.", lane: "Decide", tab: "decide", open: "costOfLiving", icon: "icon-money.png", keywords: ["money", "cost", "budget", "rent"] },
-    { id: "tax", title: "Basic Tax Obligations", detail: "Plain-English tax checklist.", lane: "Decide", tab: "decide", open: "taxObligations", icon: "icon-receipt.png", keywords: ["tax", "cpf", "income"] },
-    { id: "blueprint", title: "Discover Yourself", detail: "Build the profile that powers better recommendations.", lane: "Build", tab: "build", open: "discoverYourself", icon: "icon-profile.png", keywords: ["profile", "blueprint", "identity", "values"] },
-    { id: "roadmap", title: "Life Roadmap", detail: "Turn a goal into monthly milestones.", lane: "Build", tab: "build", open: "roadmapView", icon: "icon-time.png", keywords: ["roadmap", "goal", "plan", "milestone"] },
-    { id: "mood", title: "Mood Check-In", detail: "Log today's mood and energy.", lane: "Build", tab: "build", open: "mood", icon: "icon-mood.png", keywords: ["mood", "energy", "check in"] },
-    { id: "career-studio", title: "Career Studio", detail: "Resume, portfolio, interviews, job matching, paycheck checks.", lane: "Practice", tab: "practice", open: "careerStudio", icon: "icon-work.png", keywords: ["career", "resume", "interview", "job"] },
-    { id: "skill-guides", title: "Skill Guides", detail: "Payslips, renting, SIM plans, cooking, first aid, and more.", lane: "Practice", tab: "practice", open: "skillGuides", icon: "icon-guide.png", keywords: ["skills", "adulting", "guide", "home"] },
-    { id: "due-dates", title: "Real Due Dates", detail: "Track bills, renewals, rent, and real deadlines.", lane: "Practice", tab: "practice", open: "realLifeEvents", icon: "icon-checkin.png", keywords: ["deadline", "due", "bill", "reminder"] },
+    { id: "future-scan", title: "Run Future Scan", detail: "Check identity, values, hidden costs, and no-action future.", lane: "Decide", tab: "secondBrain", icon: "icon-decide.png", keywords: ["decision", "choose", "future scan", "risk"] },
+    { id: "cost-living", title: "Real Cost of Living", detail: "Estimate SG-style living costs before a decision.", lane: "Decide", tab: "secondBrain", open: "costOfLiving", icon: "icon-money.png", keywords: ["money", "cost", "budget", "rent"] },
+    { id: "tax", title: "Basic Tax Obligations", detail: "Plain-English tax checklist.", lane: "Decide", tab: "secondBrain", open: "taxObligations", icon: "icon-receipt.png", keywords: ["tax", "cpf", "income"] },
+    { id: "blueprint", title: "Discover Yourself", detail: "Build the profile that powers better recommendations.", lane: "My Profile", tab: "secondBrain", open: "discoverYourself", icon: "icon-profile.png", keywords: ["profile", "blueprint", "identity", "values"] },
+    { id: "roadmap", title: "Life Roadmap", detail: "Turn a goal into monthly milestones.", lane: "Decisions & Memory", tab: "secondBrain", open: "roadmapView", icon: "icon-time.png", keywords: ["roadmap", "goal", "plan", "milestone"] },
+    { id: "mood", title: "Mood Check-In", detail: "Log today's mood and energy.", lane: "Check-In", tab: "secondBrain", open: "mood", icon: "icon-mood.png", keywords: ["mood", "energy", "check in"] },
+    { id: "career-studio", title: "Career Studio", detail: "Resume, portfolio, interviews, job matching, paycheck checks.", lane: "Career Studio", tab: "secondBrain", open: "careerStudio", icon: "icon-work.png", keywords: ["career", "resume", "interview", "job"] },
+    { id: "skill-guides", title: "Skill Guides", detail: "Payslips, renting, SIM plans, cooking, first aid, and more.", lane: "Practical & Safety", tab: "secondBrain", open: "skillGuides", icon: "icon-guide.png", keywords: ["skills", "adulting", "guide", "home"] },
+    { id: "due-dates", title: "Real Due Dates", detail: "Track bills, renewals, rent, and real deadlines.", lane: "Practical & Safety", tab: "secondBrain", open: "realLifeEvents", icon: "icon-checkin.png", keywords: ["deadline", "due", "bill", "reminder"] },
     { id: "opportunities", title: "Discover Opportunities", detail: "Browse doors by stage, need, time, and category.", lane: "Discover", tab: "discover", discoverMode: "opportunities", icon: "icon-support.png", keywords: ["opportunity", "internship", "scholarship", "volunteer"] },
     { id: "people", title: "Find People", detail: "Mentors, skill exchange, accountability, Been There.", lane: "Discover", tab: "discover", discoverMode: "people", icon: "icon-chat.png", keywords: ["people", "mentor", "skill exchange", "support"] },
     { id: "groups", title: "Find Groups", detail: "Goal squads and community groups.", lane: "Discover", tab: "discover", discoverMode: "groups", icon: "icon-support.png", keywords: ["group", "squad", "community"] },
     { id: "ai-profile", title: "Compass AI Profile", detail: "Control what Compass may use.", lane: "Profile", tab: "profile", open: "compassProfile", icon: "icon-chat.png", keywords: ["ai", "profile", "memory"] },
     { id: "trust", title: "AI Trust Center", detail: "See what AI uses and inspect trace logs.", lane: "Profile", tab: "profile", open: "aiTrustCenter", icon: "icon-assessment.png", keywords: ["trust", "privacy", "data", "ai"] },
-    { id: "sos", title: "SOS Support", detail: "Urgent support and safety categories.", lane: "Safety", open: "sosTriage", icon: "icon-warning.png", keywords: ["sos", "help", "urgent", "safety"] }
+    { id: "sos", title: "SOS Support", detail: "Urgent support and safety categories.", lane: "Safety", open: "sosTriage", icon: "icon-warning.png", keywords: ["sos", "help", "urgent", "safety"] },
+
+    { id: "readiness-assessment", title: "Future Readiness Assessment", detail: "Check adulthood readiness across money, decisions, resilience, relationships, independence, direction.", lane: "My Profile", tab: "secondBrain", open: "assessment", icon: "icon-assessment.png", keywords: ["readiness", "assessment", "adulthood", "independence"] },
+    { id: "knowledge-vault", title: "Knowledge Vault", detail: "See what Compass knows from your real saved data.", lane: "My Profile", tab: "secondBrain", open: "knowledgeVault", icon: "icon-learn.png", keywords: ["knowledge", "vault", "data", "privacy"] },
+    { id: "goals-dreams", title: "Goals & Dreams", detail: "Personal goals, dream university, career direction, lifestyle, vision board.", lane: "Decisions & Memory", tab: "secondBrain", open: "growthGoals", icon: "icon-spark.png", keywords: ["goals", "dreams", "vision board", "university", "career"] },
+    { id: "future-self", title: "Future Self", detail: "Generate a conditional scene from your current path.", lane: "Decisions & Memory", tab: "secondBrain", open: "futureSelfView", icon: "icon-stories.png", keywords: ["future self", "scene", "path"] },
+    { id: "weekly-letter", title: "Weekly letter", detail: "Write to you, next week.", lane: "Decisions & Memory", tab: "secondBrain", open: "weeklyLetter", icon: "icon-chat.png", keywords: ["weekly", "letter", "future"] },
+    { id: "milestone-letter", title: "Milestone letter", detail: "Write to a future self further out.", lane: "Decisions & Memory", tab: "secondBrain", open: "milestoneLetter", icon: "icon-stories.png", keywords: ["milestone", "letter", "future self"] },
+    { id: "ai-goal-planning", title: "AI goal planning", detail: "Turn a dream into one realistic next step.", lane: "Decisions & Memory", prompt: growthPromptFromData("a simple goal plan with one next action"), icon: "icon-chat.png", keywords: ["ai", "goal", "planning", "next step"] },
+    { id: "daily-reflection", title: "Daily reflection", detail: "A 3-minute rotating prompt.", lane: "Check-In", tab: "secondBrain", open: "dailyReflection", icon: "icon-spark.png", keywords: ["reflection", "daily", "prompt"] },
+    { id: "journal", title: "Journal", detail: "Write what happened and what you learned.", lane: "Check-In", tab: "secondBrain", open: "journal", icon: "icon-learn.png", keywords: ["journal", "write", "learned"] },
+    { id: "personal-weather", title: "Personal Weather Forecast", detail: "A 7-day forecast built from your real mood pattern.", lane: "Check-In", tab: "secondBrain", open: "personalWeather", icon: "icon-warning.png", keywords: ["weather", "forecast", "mood", "pattern"] },
+    { id: "support-circle", title: "Support Circle", detail: "Keep trusted people reachable before stress peaks.", lane: "Check-In", tab: "secondBrain", open: "supportCircle", icon: "icon-support.png", keywords: ["support", "circle", "trusted people", "stress"] },
+    { id: "ai-reflection-insight", title: "AI reflection insight", detail: "Ask Compass to find one pattern from your saved data.", lane: "Check-In", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png", keywords: ["ai", "reflection", "insight", "pattern"] },
+    { id: "progress-reports", title: "Progress Reports", detail: "Mood, goals, challenges, Career Studio, and Community signals together.", lane: "Progress", tab: "secondBrain", open: "growthProgress", icon: "icon-chat.png", keywords: ["progress", "report", "mood", "goals"] },
+    { id: "badges", title: "Badges & Streaks", detail: "Progress counts and what you have unlocked.", lane: "Progress", tab: "secondBrain", open: "badges", icon: "icon-time.png", keywords: ["badges", "streaks", "unlock"] },
+    { id: "ai-trace-log", title: "AI Trace Log", detail: "Check whether AI help is grounded and useful.", lane: "Profile", tab: "profile", open: "aiTraceLog", icon: "icon-assessment.png", keywords: ["ai", "trace", "log", "grounded"] },
+    { id: "calibration", title: "Judgment Calibration", detail: "When you say you are sure, how often are you right?", lane: "Progress", tab: "secondBrain", open: "calibration", icon: "icon-balance.png", keywords: ["calibration", "judgment", "confidence"] },
+    { id: "avoidance-patterns", title: "Debt of Inaction", detail: "What you keep not doing, detected from real saved patterns.", lane: "Progress", tab: "secondBrain", open: "avoidancePatterns", icon: "icon-warning.png", keywords: ["avoidance", "procrastination", "inaction", "debt"] },
+    { id: "inspire-hub", title: "Inspire Hub", detail: "Creators, athletes, leaders, entrepreneurs, and pressure-to-growth stories.", lane: "Discover", tab: "stories", icon: "icon-stories.png", keywords: ["inspire", "stories", "creators", "leaders"] },
+    { id: "discuss-mirror", title: "Discuss your mirror safely", detail: "Share a reflection prompt with a trusted peer, mentor, or Support Circle.", lane: "Decisions & Memory", tab: "secondBrain", open: "growthCommunity", icon: "icon-support.png", keywords: ["discuss", "mirror", "peer", "mentor"] },
+
+    { id: "roleplay-practice", title: "AI Roleplay Practice", detail: "Practice interviews, help-seeking, conflict, and boundaries.", lane: "Career Studio", tab: "secondBrain", open: "roleplayList", icon: "icon-chat.png", keywords: ["roleplay", "practice", "interview", "conflict"] },
+    { id: "read-job-offer", title: "Read a job offer", detail: "Contract clauses that matter more than the salary number.", lane: "Career Studio", tab: "secondBrain", open: "skillGuideDetail", payload: "read-job-offer", icon: "icon-work.png", keywords: ["job offer", "contract", "salary"] },
+    { id: "read-payslip", title: "Understand your payslip", detail: "Gross pay, deductions, take-home pay, and error checks.", lane: "Career Studio", tab: "secondBrain", open: "skillGuideDetail", payload: "read-payslip", icon: "icon-receipt.png", keywords: ["payslip", "salary", "deductions", "cpf"] },
+    { id: "future-self-hiring", title: "Future Self Hiring", detail: "Four future-you candidates interview for who you become.", lane: "Career Studio", tab: "secondBrain", open: "futureSelfHiring", icon: "icon-chat.png", keywords: ["future self", "hiring", "interview", "candidates"] },
+    { id: "receipt", title: "Receipt record", detail: "Track what you paid today.", lane: "Practical & Safety", tab: "secondBrain", open: "receipt", icon: "icon-receipt.png", keywords: ["receipt", "spending", "track"] },
+    { id: "build-support-guide", title: "Build support before crisis", detail: "A direct support plan, not a hidden guide.", lane: "Practical & Safety", tab: "secondBrain", open: "buildSupportGuide", icon: "icon-support.png", keywords: ["support", "crisis", "mental health"] },
+    { id: "been-there", title: "Been There", detail: "Anonymous, one-time encouragement to or from someone who has been where you are.", lane: "Practical & Safety", tab: "secondBrain", open: "communityEncouragement", icon: "icon-support.png", keywords: ["been there", "encouragement", "anonymous"] },
+    { id: "micro-insurance", title: "Safety Net Preview", detail: "What a safety net might cover - concept only, not real cover.", lane: "Practical & Safety", tab: "secondBrain", open: "microInsurance", icon: "icon-health.png", keywords: ["insurance", "safety net", "cover"] },
+    { id: "ghost-roommate", title: "Ghost Roommate", detail: "Move in with someone - a relationship that remembers.", lane: "People & Boundaries", tab: "secondBrain", open: "ghostRoommate", icon: "icon-home.png", keywords: ["roommate", "relationship", "living together"] },
+    { id: "end-relationship-well", title: "Ending a relationship well", detail: "A clean ending without ghosting or blowing up.", lane: "People & Boundaries", tab: "secondBrain", open: "skillGuideDetail", payload: "end-a-relationship-well", icon: "icon-boundary.png", keywords: ["breakup", "relationship", "ending"] },
+    { id: "living-with-someone", title: "Living with someone", detail: "Check agreements, chores, quiet hours, repair conversations.", lane: "People & Boundaries", tab: "secondBrain", open: "skillGuideDetail", payload: "before-renting-room", icon: "icon-home.png", keywords: ["roommate", "living", "chores", "agreement"] },
+    { id: "jury-trial", title: "Jury Duty on Yourself", detail: "Put a real decision on trial.", lane: "Advanced Labs", tab: "secondBrain", open: "juryTrial", icon: "icon-balance.png", keywords: ["jury", "trial", "decision", "verdict"] },
+    { id: "failure-inoculation", title: "Failure Inoculation", detail: "This week's task is designed to fail. That is the point.", lane: "Advanced Labs", tab: "secondBrain", open: "failureInoculation", icon: "icon-warning.png", keywords: ["failure", "inoculation", "resilience"] },
+    { id: "legacy-debugger", title: "Inherited Debugging", detail: "Refactor habits you did not choose, issue by issue.", lane: "Advanced Labs", tab: "secondBrain", open: "legacyDebugger", icon: "icon-settings.png", keywords: ["inherited", "habits", "debug", "refactor"] },
+    { id: "self-debt-ledger", title: "Self-Debt", detail: "Pay your future self a debt when it is actually due.", lane: "Advanced Labs", tab: "secondBrain", open: "selfDebtLedger", icon: "icon-money.png", keywords: ["self debt", "future self", "ledger"] },
+    { id: "estate-auction", title: "Estate Auction", detail: "Your time and habits, read out like an auction catalog.", lane: "Advanced Labs", tab: "secondBrain", open: "estateAuction", icon: "icon-time.png", keywords: ["estate", "auction", "time", "habits"] },
+    { id: "self-archaeology", title: "Self Archaeology", detail: "Dig up an old month of entries as a field report.", lane: "Advanced Labs", tab: "secondBrain", open: "selfArchaeology", icon: "icon-time.png", keywords: ["archaeology", "old entries", "field report"] },
+
+    { id: "edit-profile", title: "Edit profile", detail: "Update your name and account details.", lane: "Profile", tab: "profile", open: "username", icon: "icon-profile.png", keywords: ["edit", "profile", "name", "account"] },
+    { id: "guide-help", title: "Guide / Help", detail: "How Compass works and where to start.", lane: "Profile", tab: "profile", open: "guide", icon: "icon-guide.png", keywords: ["guide", "help", "how it works"] },
+    { id: "receipt-plan", title: "Receipt Plan", detail: "Review your saved receipt plan.", lane: "Profile", tab: "profile", open: "receiptPlan", icon: "icon-receipt.png", keywords: ["receipt", "plan", "budget"] },
+    { id: "demo-mode", title: "Demo mode details", detail: "See login method, role, and storage details.", lane: "Profile", tab: "profile", open: "demoMode", icon: "icon-settings.png", keywords: ["demo", "mode", "account", "storage"] }
   ];
 }
 
@@ -3345,6 +3397,11 @@ async function runCommandLauncher(id) {
   }
   const command = commandLauncherCommands().find((item) => item.id === id);
   if (!command) return;
+  if (command.prompt) {
+    renderScreen("compass");
+    await sendChatMessage(command.prompt);
+    return;
+  }
   if (command.discoverMode) {
     communityViewMode = command.discoverMode;
     renderScreen("discover");
@@ -3352,7 +3409,7 @@ async function runCommandLauncher(id) {
     renderScreen(command.tab);
   }
   if (command.open) {
-    openModal(command.open);
+    openModal(command.open, command.payload);
   }
 }
 
@@ -5437,7 +5494,7 @@ const STARTER_PATHS = [
     title: "Protect your first real income",
     detail: "Estimate living costs, track one real expense, understand pay, and avoid tax or debt surprises.",
     icon: "icon-money.png",
-    tab: "practice",
+    tab: "secondBrain",
     steps: [
       { id: "money-cost", title: "Estimate a monthly baseline", detail: "Use SG-style housing, transport, food, and phone costs before you commit.", modal: "costOfLiving" },
       { id: "money-receipt", title: "Record one real payment", detail: "Make spending visible first; budgets work better after that.", modal: "receipt" },
@@ -5453,7 +5510,7 @@ const STARTER_PATHS = [
     title: "Get ready for your first serious opportunity",
     detail: "Build a resume, practice interview answers, read offers clearly, and prepare for real applications.",
     icon: "icon-work.png",
-    tab: "practice",
+    tab: "secondBrain",
     steps: [
       { id: "career-studio", title: "Open Career Studio", detail: "Resume, portfolio, interview practice, job matching, and paycheck checks live together.", modal: "careerStudio" },
       { id: "career-interview", title: "Practice a job interview", detail: "Answer out loud before an interview counts.", modal: "roleplayList" },
@@ -5469,7 +5526,7 @@ const STARTER_PATHS = [
     title: "Run the basics of daily life",
     detail: "Practice the unglamorous skills: renting, food, laundry, bills, and sharing space.",
     icon: "icon-home.png",
-    tab: "practice",
+    tab: "secondBrain",
     steps: [
       { id: "home-rent", title: "Check before renting a room", detail: "Ask the boring questions before a bad tenancy becomes your problem.", modal: "skillGuideDetail", payload: "before-renting-room" },
       { id: "home-laundry", title: "Do laundry without damage", detail: "Read labels, sort simply, and avoid expensive mistakes.", modal: "skillGuideDetail", payload: "do-laundry" },
@@ -5485,9 +5542,9 @@ const STARTER_PATHS = [
     title: "Make choices without drifting",
     detail: "Use Future Scan, evidence checks, and reflection to decide with less panic and more structure.",
     icon: "icon-decide.png",
-    tab: "decide",
+    tab: "secondBrain",
     steps: [
-      { id: "decide-scan", title: "Run a Future Scan", detail: "See hidden costs, pressure, drift, and no-action consequences.", tab: "decide" },
+      { id: "decide-scan", title: "Run a Future Scan", detail: "See hidden costs, pressure, drift, and no-action consequences.", tab: "secondBrain" },
       { id: "decide-trial", title: "Put one choice on trial", detail: "Use prosecution, defense, and verdict before you commit.", modal: "juryTrial" },
       { id: "decide-future-self", title: "Ask Future Self for a scene", detail: "Not a prediction; a vivid consequence check.", modal: "futureSelfView" },
       { id: "decide-calibration", title: "Review judgment calibration", detail: "Learn whether your confidence has matched outcomes over time.", modal: "calibration" }
@@ -5501,7 +5558,7 @@ const STARTER_PATHS = [
     title: "Build support before life gets heavy",
     detail: "Track your state, set up trusted people, learn safe support steps, and keep urgent help one tap away.",
     icon: "icon-support.png",
-    tab: "build",
+    tab: "secondBrain",
     steps: [
       { id: "wellbeing-mood", title: "Log mood and energy", detail: "A real trend beats trying to remember how you have been.", modal: "mood" },
       { id: "wellbeing-circle", title: "Set up Support Circle", detail: "Name people before you need them urgently.", modal: "supportCircle" },
@@ -5517,7 +5574,7 @@ const STARTER_PATHS = [
     title: "Handle people without avoiding everything",
     detail: "Practice clear conversations, boundaries, endings, and low-pressure encouragement.",
     icon: "icon-boundary.png",
-    tab: "practice",
+    tab: "secondBrain",
     steps: [
       { id: "people-roleplay", title: "Roleplay a hard conversation", detail: "Practice conflict, help-seeking, or boundaries safely.", modal: "roleplayList" },
       { id: "people-breakup", title: "End a relationship cleanly", detail: "Avoid ghosting, cruelty, and unclear endings.", modal: "skillGuideDetail", payload: "end-a-relationship-well" },
@@ -5533,7 +5590,7 @@ const STARTER_PATHS = [
     title: "Turn vague future anxiety into a map",
     detail: "Build your Personal Blueprint, goals, roadmap, and future self scenes from your own answers.",
     icon: "icon-spark.png",
-    tab: "build",
+    tab: "secondBrain",
     steps: [
       { id: "direction-blueprint", title: "Build Personal Blueprint", detail: "Compass works better when it knows your values, strengths, and decision style.", modal: "discoverYourself" },
       { id: "direction-goals", title: "Save goals and dreams", detail: "Put the future you keep thinking about somewhere concrete.", modal: "growthGoals" },
@@ -8819,8 +8876,10 @@ function discoverForYouSection() {
       <div class="profile-actions">
         ${nextStep ? `<button class="primary-action compact-action" type="button" ${starterPathStepActionAttributes(nextStep)}>Continue starter path</button>` : `<button class="primary-action compact-action" type="button" data-tab-jump="home">Pick starter path</button>`}
         <button class="secondary-action compact-action" type="button" data-community-view-mode="opportunities">Browse opportunities</button>
+        <button class="secondary-action compact-action" type="button" data-tab-jump="stories">Inspire Hub</button>
       </div>
     </section>
+    ${storyOfTheDayCard()}
     ${opportunityRecommendationCard()}
     <div class="content-rail-title"><strong>Relevant right now</strong><span>${recommendations.length} cards</span></div>
     <div class="discover-recommendation-list">
@@ -10623,16 +10682,135 @@ function futureScanSignalBanner() {
   return `<div class="future-scan-signal-banner mixed">The stations you've run so far are giving mixed signals - might be worth checking a couple more angles.</div>${calibrationNote}`;
 }
 
-function decideScreen() {
+// Second Brain room view - the ambient "home" for the buddy relationship,
+// built from real recorded data (mood/due-dates/streak counts), not
+// illustration assets. Deliberately visually distinct from Ghost
+// Roommate/Jury Duty/Estate Auction's modal staging - this room is Real
+// (it's actually yours, accumulated over time); those stay clearly-marked
+// Practice scenes. See docs discussion: never blur the two.
+function secondBrainRoomView() {
+  const moodEntry = trackerState.mood;
+  const dueSoon = dueRealLifeEvents().slice(0, 3);
+  const stats = {
+    goals: cleanText(userProfile.goals, 20) ? "Saved" : "Empty",
+    journal: trackerState.journalEntries.filter((entry) => entry.user_id === currentUserId()).length,
+    weekWins: weeklyMissionCount(),
+    challenges: trackerState.challengeProgress.filter((item) => item.user_id === currentUserId()).length
+  };
   return `
-    <header class="screen-head compact-head mirror-head">
-      <div>
-        <p class="eyebrow">Decide</p>
-        <h2 class="screen-title">Practice choices before they become real consequences.</h2>
-        <p class="screen-subtitle">Future Scan, Build Mode, and advanced decision labs stay together here.</p>
+    <section class="second-brain-room">
+      <div class="room-panel room-window">
+        <p class="eyebrow">Right now</p>
+        <h3>${escapeHTML(moodEntry.label)}</h3>
+        <p class="muted">${escapeHTML(moodEntry.note)}</p>
       </div>
-      <div class="avatar"><img src="assets/icon-decide.png" alt=""></div>
-    </header>
+      <div class="room-panel room-corkboard">
+        <p class="eyebrow">Coming up</p>
+        ${dueSoon.length ? dueSoon.map((event) => `
+          <p class="room-corkboard-note">${escapeHTML(event.title)} - ${new Date(event.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}</p>
+        `).join("") : `<p class="muted">Nothing due right now.</p>`}
+      </div>
+      <div class="room-panel room-shelf">
+        <p class="eyebrow">On the shelf</p>
+        <div class="growth-stat-grid">
+          <span><strong>${stats.goals}</strong>Goals</span>
+          <span><strong>${stats.journal}</strong>Journal</span>
+          <span><strong>${stats.weekWins}</strong>Week wins</span>
+          <span><strong>${stats.challenges}</strong>Challenges</span>
+        </div>
+      </div>
+      <button class="room-desk" type="button" data-tab-jump="compass">
+        <img src="assets/icon-decide.png" alt="">
+        <div>
+          <strong>Talk to Compass</strong>
+          <span>It remembers what you've told it</span>
+        </div>
+      </button>
+    </section>
+  `;
+}
+
+// Second Brain - replaces the old Decide/Build/Practice tabs entirely (not
+// aliased-and-hidden, actually replaced - see TAB_ALIASES/screens below).
+// Content is organized by job, not by the old tab names: Remember (ambient,
+// always-on memory) and Help You Act (decision support + teaching), per
+// the redesign discussion. Inspire Hub/Story of the day moved out to
+// Discover (confirmed decision) - Discuss-your-mirror-safely stayed since
+// it's a memory/support feature, not stories content.
+function secondBrainScreen() {
+  return `
+    ${adultPrepHero()}
+    ${secondBrainRoomView()}
+    ${homeStarterPathCard()}
+    ${adultingReadinessOverviewCard()}
+    ${homeLedgerRows(todaysDeskFocus().kind)}
+    ${blueprintSummaryCard()}
+    ${resurfacingCard()}
+    ${growthSuggestionCard()}
+
+    <div class="content-rail-title"><strong>Remember</strong><span>What Compass keeps for you</span></div>
+    ${growthHubSection({
+      id: "remember-you",
+      title: "My Compass Profile",
+      subtitle: "The personal context that makes every recommendation less generic.",
+      icon: "icon-profile.png",
+      tone: "goals-tone",
+      items: [
+        { title: "Discover Yourself", text: "Build your Personal Blueprint - the foundation for Future Self, Decision Compass, Roadmap, and AI Coach.", modal: "discoverYourself", icon: "icon-profile.png", kind: "real" },
+        { title: "Future Readiness Assessment", text: "Check adulthood readiness across money, decisions, resilience, relationships, independence, and direction.", modal: "assessment", icon: "icon-assessment.png", kind: "real" },
+        { title: "Compass AI Profile", text: "Control the age, interests, goals, stress triggers, and support style Compass may use.", modal: "compassProfile", icon: "icon-chat.png", kind: "real" },
+        { title: "Knowledge Vault", text: "See what Compass knows from real saved data.", modal: "knowledgeVault", icon: "icon-learn.png", kind: "real" }
+      ]
+    })}
+    ${growthHubSection({
+      id: "remember-checkin",
+      title: "Check-In",
+      subtitle: "Daily and weekly signals that keep the plan honest.",
+      icon: "icon-checkin.png",
+      tone: "challenge-tone",
+      items: [
+        { title: "Daily reflection", text: "A 3-minute rotating prompt.", modal: "dailyReflection", icon: "icon-spark.png", kind: "real" },
+        { title: "Mood check-in", text: "Log today's mood and energy.", modal: "mood", icon: "icon-mood.png", kind: "real" },
+        { title: "Journal", text: "Write what happened and what you learned.", modal: "journal", icon: "icon-learn.png", kind: "real" },
+        { title: "Personal Weather Forecast", text: "A 7-day forecast built from your real mood pattern.", modal: "personalWeather", icon: "icon-warning.png", kind: "real" },
+        { title: "Support Circle", text: "Keep trusted people reachable before stress peaks.", modal: "supportCircle", icon: "icon-support.png", kind: "real" },
+        { title: "AI reflection insight", text: "Ask Compass to find one pattern from saved data.", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png" }
+      ]
+    })}
+    ${habitChainGraph()}
+    ${growthHubSection({
+      id: "remember-decisions",
+      title: "Decisions & Memory",
+      subtitle: "A real decision, why you made it, and what happened after - so next time isn't a blank page.",
+      icon: "icon-time.png",
+      tone: "reflection-tone",
+      items: [
+        { title: "Remember this", text: "Save a real decision, the reason, and (later) what happened - Compass brings it back next time something similar comes up.", modal: "lifeMemory", icon: "icon-learn.png", kind: "real" },
+        { title: "Goals & Dreams", text: "Personal goals, dream university, career direction, lifestyle, and vision board.", modal: "growthGoals", icon: "icon-spark.png", kind: "real" },
+        { title: "Life Roadmap", text: "Turn one goal into monthly milestones and track progress.", modal: "roadmapView", icon: "icon-time.png", kind: "real" },
+        { title: "Future Self", text: "Generate a conditional scene from your current path.", modal: "futureSelfView", icon: "icon-stories.png", kind: "practice" },
+        { title: "Weekly letter", text: "Write to you, next week.", modal: "weeklyLetter", icon: "icon-chat.png" },
+        { title: "Milestone letter", text: "Write to a future self further out.", modal: "milestoneLetter", icon: "icon-stories.png" },
+        { title: "AI goal planning", text: "Turn dreams into one realistic next step.", prompt: growthPromptFromData("a simple goal plan with one next action"), icon: "icon-chat.png" },
+        { title: "Discuss your mirror safely", text: "Share a reflection prompt with a trusted peer, mentor, or Support Circle.", modal: "growthCommunity", icon: "icon-support.png" }
+      ]
+    })}
+    ${growthHubSection({
+      id: "remember-progress",
+      title: "Progress",
+      subtitle: "Review what is changing without hunting through the app.",
+      icon: "icon-balance.png",
+      tone: "progress-tone",
+      items: [
+        { title: "Progress Reports", text: "Mood, goals, challenges, Career Studio, and Community signals together.", modal: "growthProgress", icon: "icon-chat.png", kind: "real" },
+        { title: "Badges & Streaks", text: "Progress counts and what you have unlocked.", modal: "badges", icon: "icon-time.png", kind: "real" },
+        { title: "AI Trace Log", text: "Check whether AI help is grounded and useful.", modal: "aiTraceLog", icon: "icon-assessment.png", kind: "real" },
+        { title: "Judgment Calibration", text: "When you say you are sure, how often are you right?", modal: "calibration", icon: "icon-balance.png", kind: "real" },
+        { title: "Debt of Inaction", text: "What you keep not doing, detected from real saved patterns.", modal: "avoidancePatterns", icon: "icon-warning.png", kind: "real" }
+      ]
+    })}
+
+    <div class="content-rail-title"><strong>Help You Act</strong><span>Decide, learn, and rehearse</span></div>
     <section class="mirror-form-card">
       <div class="home-quick-grid mirror-mode-grid">
         <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">
@@ -10650,7 +10828,6 @@ function decideScreen() {
       </div>
       ${futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorMode === "advanced" ? advancedModeEntrySection() : futureScanEntrySection()}
     </section>
-    <div class="content-rail-title"><strong>Decision support</strong><span>Use when a choice feels expensive</span></div>
     <div class="mirror-tools-row">
       ${costOfLivingEntryCard()}
       ${taxObligationsEntryCard()}
@@ -10658,129 +10835,8 @@ function decideScreen() {
       ${microInsuranceEntryCard()}
     </div>
     ${savedFutureDecisions().length ? futureReflectionList() : ""}
-  `;
-}
-
-function buildScreen() {
-  return `
-    <header class="screen-head compact-head growth-head">
-      <div>
-        <p class="eyebrow">Build</p>
-        <h2 class="screen-title">Turn your future direction into a living plan.</h2>
-        <p class="screen-subtitle">Blueprint, goals, check-ins, progress, and inspiration stay here so growth feels connected.</p>
-      </div>
-      <div class="avatar"><img src="assets/icon-spark.png" alt=""></div>
-    </header>
-    <section class="growth-hero-card">
-      <div>
-        <p class="eyebrow">Your adult-life build map</p>
-        <h3>Know yourself, set a direction, then keep checking reality.</h3>
-        <p>Build is for identity, goals, mood, reflection, progress, and the story you are trying to write next.</p>
-      </div>
-      ${growthOverviewStats()}
-    </section>
-    ${blueprintSummaryCard()}
-    ${resurfacingCard()}
-    ${growthSuggestionCard()}
     ${growthHubSection({
-      id: "build-profile",
-      title: "My Compass Profile",
-      subtitle: "The personal context that makes every recommendation less generic.",
-      icon: "icon-profile.png",
-      tone: "goals-tone",
-      items: [
-        { title: "Discover Yourself", text: "Build your Personal Blueprint - the foundation for Future Self, Decision Compass, Roadmap, and AI Coach.", modal: "discoverYourself", icon: "icon-profile.png", kind: "real" },
-        { title: "Future Readiness Assessment", text: "Check adulthood readiness across money, decisions, resilience, relationships, independence, and direction.", modal: "assessment", icon: "icon-assessment.png", kind: "real" },
-        { title: "Compass AI Profile", text: "Control the age, interests, goals, stress triggers, and support style Compass may use.", modal: "compassProfile", icon: "icon-chat.png", kind: "real" },
-        { title: "Knowledge Vault", text: "See what Compass knows from real saved data.", modal: "knowledgeVault", icon: "icon-learn.png", kind: "real" }
-      ]
-    })}
-    ${growthHubSection({
-      id: "build-plan",
-      title: "Future Plan",
-      subtitle: "Turn a vague future into goals, milestones, and future-self scenes.",
-      icon: "icon-time.png",
-      tone: "reflection-tone",
-      items: [
-        { title: "Goals & Dreams", text: "Personal goals, dream university, career direction, lifestyle, and vision board.", modal: "growthGoals", icon: "icon-spark.png", kind: "real" },
-        { title: "Life Roadmap", text: "Turn one goal into monthly milestones and track progress.", modal: "roadmapView", icon: "icon-time.png", kind: "real" },
-        { title: "Future Self", text: "Generate a conditional scene from your current path.", modal: "futureSelfView", icon: "icon-stories.png", kind: "practice" },
-        { title: "Weekly letter", text: "Write to you, next week.", modal: "weeklyLetter", icon: "icon-chat.png" },
-        { title: "Milestone letter", text: "Write to a future self further out.", modal: "milestoneLetter", icon: "icon-stories.png" },
-        { title: "AI goal planning", text: "Turn dreams into one realistic next step.", prompt: growthPromptFromData("a simple goal plan with one next action"), icon: "icon-chat.png" }
-      ]
-    })}
-    ${growthHubSection({
-      id: "build-checkin",
-      title: "Check-In",
-      subtitle: "Daily and weekly signals that keep the plan honest.",
-      icon: "icon-checkin.png",
-      tone: "challenge-tone",
-      items: [
-        { title: "Daily reflection", text: "A 3-minute rotating prompt.", modal: "dailyReflection", icon: "icon-spark.png", kind: "real" },
-        { title: "Mood check-in", text: "Log today's mood and energy.", modal: "mood", icon: "icon-mood.png", kind: "real" },
-        { title: "Journal", text: "Write what happened and what you learned.", modal: "journal", icon: "icon-learn.png", kind: "real" },
-        { title: "Personal Weather Forecast", text: "A 7-day forecast built from your real mood pattern.", modal: "personalWeather", icon: "icon-warning.png", kind: "real" },
-        { title: "Support Circle", text: "Keep trusted people reachable before stress peaks.", modal: "supportCircle", icon: "icon-support.png", kind: "real" },
-        { title: "AI reflection insight", text: "Ask Compass to find one pattern from saved data.", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png" }
-      ]
-    })}
-    ${habitChainGraph()}
-    ${growthHubSection({
-      id: "build-progress",
-      title: "Progress",
-      subtitle: "Review what is changing without hunting through the app.",
-      icon: "icon-balance.png",
-      tone: "progress-tone",
-      items: [
-        { title: "Progress Reports", text: "Mood, goals, challenges, Career Studio, and Community signals together.", modal: "growthProgress", icon: "icon-chat.png", kind: "real" },
-        { title: "Badges & Streaks", text: "Progress counts and what you have unlocked.", modal: "badges", icon: "icon-time.png", kind: "real" },
-        { title: "AI Trace Log", text: "Check whether AI help is grounded and useful.", modal: "aiTraceLog", icon: "icon-assessment.png", kind: "real" },
-        { title: "Judgment Calibration", text: "When you say you are sure, how often are you right?", modal: "calibration", icon: "icon-balance.png", kind: "real" },
-        { title: "Debt of Inaction", text: "What you keep not doing, detected from real saved patterns.", modal: "avoidancePatterns", icon: "icon-warning.png", kind: "real" }
-      ]
-    })}
-    ${growthHubSection({
-      id: "build-inspiration",
-      title: "Inspiration",
-      subtitle: "Use stories as reflection fuel, not as a separate content island.",
-      icon: "icon-stories.png",
-      tone: "reflection-tone",
-      items: [
-        { title: "Inspire Hub", text: "Creators, athletes, leaders, entrepreneurs, and pressure-to-growth stories.", tab: "stories", icon: "icon-stories.png" },
-        { title: "Story of the day", text: "Read one story and turn one lesson into an action.", modal: "storyReader", payload: (contentState.stories[0] || {}).id || "", icon: "icon-spark.png" },
-        { title: "Discuss your mirror safely", text: "Share a reflection prompt with a trusted peer, mentor, or Support Circle.", modal: "growthCommunity", icon: "icon-support.png" }
-      ]
-    })}
-  `;
-}
-
-function practiceScreen() {
-  return `
-    <header class="screen-head compact-head">
-      <div>
-        <p class="eyebrow">Practice</p>
-        <h2 class="screen-title">Train the parts of adult life people expect you to know.</h2>
-        <p class="screen-subtitle">Career, money, home, support, communication, and reality labs live here instead of being scattered through Growth.</p>
-      </div>
-      <div class="avatar"><img src="assets/icon-work.png" alt=""></div>
-    </header>
-    <section class="growth-hero-card practice-hero-card">
-      <div>
-        <p class="eyebrow">Practical adulting toolkit</p>
-        <h3>Try the skill here before the real world tests it.</h3>
-        <p>Start with the normal basics first; advanced reality labs stay lower on the page.</p>
-      </div>
-      <div class="growth-stat-grid">
-        <span><strong>${SKILL_GUIDES.length}</strong>Guides</span>
-        <span><strong>${trackerState.careerStudio.interviewSessions.length}</strong>Interviews</span>
-        <span><strong>${trackerState.receipts.length}</strong>Receipts</span>
-        <span><strong>${trackerState.realLifeEvents.length}</strong>Due dates</span>
-      </div>
-    </section>
-    ${homeStarterPathCard()}
-    ${growthHubSection({
-      id: "practice-career",
+      id: "act-career",
       title: "Career Studio",
       subtitle: "First job readiness without pretending experience appears from nowhere.",
       icon: "icon-work.png",
@@ -10794,7 +10850,7 @@ function practiceScreen() {
       ]
     })}
     ${growthHubSection({
-      id: "practice-practical",
+      id: "act-practical",
       title: "Practical & Safety",
       subtitle: "The unglamorous stuff nobody warns you about.",
       icon: "icon-safety.png",
@@ -10812,7 +10868,7 @@ function practiceScreen() {
       ]
     })}
     ${growthHubSection({
-      id: "practice-people",
+      id: "act-people",
       title: "People, Home, and Boundaries",
       subtitle: "Practice the conversations that decide whether adult life stays manageable.",
       icon: "icon-boundary.png",
@@ -10825,7 +10881,7 @@ function practiceScreen() {
       ]
     })}
     ${growthHubSection({
-      id: "practice-advanced",
+      id: "act-advanced",
       title: "Advanced Reality Labs",
       subtitle: "Use these after basics when you want harder self-honesty.",
       icon: "icon-balance.png",
@@ -10905,54 +10961,15 @@ function profileScreen() {
 }
 
 const screens = {
-  home: () => `
-    ${adultPrepHero()}
-    ${homeStarterPathCard()}
-    ${adultingReadinessOverviewCard()}
-    ${homeLedgerRows(todaysDeskFocus().kind)}
-    ${homeQuickAccessGrid()}
-  `,
-
-  decide: () => decideScreen(),
-
-  future: () => `
-    <header class="screen-head compact-head mirror-head">
-      <div>
-        <p class="eyebrow">Future Mirror</p>
-        <h2 class="screen-title">Your future is built by today's choices.</h2>
-        <p class="screen-subtitle">Compare paths before you choose.</p>
-      </div>
-      <div class="avatar"><img src="assets/icon-spark.png" alt=""></div>
-    </header>
-
-    <section class="mirror-form-card">
-      <div class="home-quick-grid mirror-mode-grid">
-        <button type="button" class="${futureMirrorMode === "scan" ? "is-selected" : ""}" data-future-mirror-mode="scan">
-          <img src="assets/icon-guide.png" alt="">
-          <strong>Future Scan</strong>
-        </button>
-        <button type="button" class="${futureMirrorMode === "build" ? "is-selected" : ""}" data-future-mirror-mode="build">
-          <img src="assets/icon-decide.png" alt="">
-          <strong>Build Mode</strong>
-        </button>
-        <button type="button" class="${futureMirrorMode === "advanced" ? "is-selected" : ""}" data-future-mirror-mode="advanced">
-          <img src="assets/icon-balance.png" alt="">
-          <strong>Advanced</strong>
-        </button>
-      </div>
-      ${futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorMode === "advanced" ? advancedModeEntrySection() : futureScanEntrySection()}
-    </section>
-
-    <div class="content-rail-title"><strong>More tools</strong><span>Scroll sideways</span></div>
-    <div class="mirror-tools-row">
-      ${costOfLivingEntryCard()}
-      ${taxObligationsEntryCard()}
-      ${futureSelfEntryCard()}
-      ${microInsuranceEntryCard()}
-    </div>
-
-    ${savedFutureDecisions().length ? futureReflectionList() : ""}
-  `,
+  // "home" now resolves to secondBrain via TAB_ALIASES - its unique real
+  // content (adultPrepHero/homeStarterPathCard/adultingReadinessOverviewCard/
+  // homeLedgerRows) moved into secondBrainScreen(). homeQuickAccessGrid()
+  // (a grid of buttons to the old decide/build/practice/discover tabs) is
+  // deliberately not carried over - those destinations no longer exist.
+  // Second Brain replaces the old decide/build/practice/future/growth tabs
+  // entirely (see TAB_ALIASES below) - one screen, organized by job
+  // (Remember / Help You Act) instead of by these old tab names.
+  secondBrain: () => secondBrainScreen(),
 
   assess: () => `
     <header class="screen-head compact-head">
@@ -11020,138 +11037,6 @@ const screens = {
         <button class="secondary-action" type="button" data-clear-chat>Clear chat</button>
       </div>
     </section>
-  `,
-
-  build: () => buildScreen(),
-
-  practice: () => practiceScreen(),
-
-  growth: () => `
-    <header class="screen-head compact-head growth-head">
-      <div>
-        <p class="eyebrow">Growth Hub</p>
-        <h2 class="screen-title">Personal growth tools connected to your future.</h2>
-        <p class="screen-subtitle">Well-being, assessments, goals, vision board, journal, mood tracking, challenges, badges, receipts, and reports stay here.</p>
-      </div>
-      <div class="avatar"><img src="assets/icon-spark.png" alt=""></div>
-    </header>
-
-    <section class="growth-hero-card">
-      <div>
-        <p class="eyebrow">Your growth map</p>
-        <h3>Build independence one honest step at a time.</h3>
-        <p>Future Mirror connects to these tools so decisions become goals, reflections, habits, and progress.</p>
-      </div>
-      ${growthOverviewStats()}
-    </section>
-
-    ${blueprintSummaryCard()}
-
-    ${resurfacingCard()}
-
-    ${growthSuggestionCard()}
-
-    ${growthHubSection({
-      id: "goals",
-      title: "Goals & Dreams",
-      subtitle: "Save the future you are aiming toward.",
-      icon: "icon-learn.png",
-      tone: "goals-tone",
-      items: [
-        { title: "Discover Yourself", text: "Build your Personal Blueprint - the foundation for everything else here.", modal: "discoverYourself", icon: "icon-profile.png" },
-        { title: "Life Roadmap", text: "Turn a goal into concrete monthly milestones.", modal: "roadmapView", icon: "icon-time.png" },
-        { title: "Goals & Dreams", text: "Personal goals, vision board, dream university/career/lifestyle - one form.", modal: "growthGoals", icon: "icon-spark.png" },
-        { title: "AI goal planning", text: "Turn dreams into next steps.", prompt: growthPromptFromData("a simple goal plan with one next action"), icon: "icon-chat.png" }
-      ]
-    })}
-
-    ${growthHubSection({
-      id: "reflection",
-      title: "Reflection",
-      subtitle: "Understand mood, thoughts, and daily patterns.",
-      icon: "icon-checkin.png",
-      tone: "reflection-tone",
-      items: [
-        { title: "Daily reflection", text: "A 3-minute rotating prompt - mood, stress, growth, or procrastination.", modal: "dailyReflection", icon: "icon-spark.png" },
-        { title: "Weekly letter", text: "A short note to you, next week.", modal: "weeklyLetter", icon: "icon-chat.png" },
-        { title: "Milestone letter", text: "Write to your future self, further out.", modal: "milestoneLetter", icon: "icon-stories.png" },
-        { title: "Mood check-in", text: "Log today's mood and energy, and review how you've been feeling.", modal: "mood", icon: "icon-checkin.png" },
-        { title: "Personal Weather Forecast", text: "A predictive 7-day forecast, built from your real mood pattern.", modal: "personalWeather", icon: "icon-warning.png" },
-        { title: "Future Readiness Assessment", text: "Adulthood, decisions, money, resilience, well-being, and self-awareness.", modal: "assessment", icon: "icon-assessment.png" },
-        { title: "Journal", text: "Write what happened and what you learned.", modal: "journal", icon: "icon-learn.png" },
-        { title: "Self Archaeology", text: "Dig up an old month of entries as a field report, not nostalgia.", modal: "selfArchaeology", icon: "icon-time.png", kind: "practice" },
-        { title: "AI reflection insight", text: "Ask Compass to find one pattern.", prompt: growthPromptFromData("a reflection insight from my real saved data"), icon: "icon-balance.png" },
-        { title: "Discuss your mirror safely", text: "Share a reflection prompt with a trusted peer, mentor, or your Support Circle.", modal: "growthCommunity", icon: "icon-support.png" }
-      ]
-    })}
-
-    ${habitChainGraph()}
-
-    ${growthHubSection({
-      id: "challenges",
-      title: "Challenges & Badges",
-      subtitle: "Small 7-day challenges without childish pressure.",
-      icon: "icon-boundary.png",
-      tone: "challenge-tone",
-      items: [
-        { title: "7-Day Challenges", text: "Confidence, study focus, or gratitude - pick one.", modal: "challengeHub", icon: "icon-spark.png", kind: "practice" },
-        { title: "AI Roleplay Practice", text: "Practice real-life situations safely.", modal: "roleplayList", icon: "icon-chat.png", kind: "practice" },
-        { title: "Ghost Roommate", text: "Move in with someone - a relationship that remembers.", modal: "ghostRoommate", icon: "icon-home.png", kind: "practice" },
-        { title: "Failure Inoculation", text: "This week's task is designed to fail. That's the point.", modal: "failureInoculation", icon: "icon-warning.png", kind: "practice" },
-        { title: "Badges & Streaks", text: "Progress counts and what you've unlocked.", modal: "badges", icon: "icon-time.png" }
-      ]
-    })}
-
-    ${growthHubSection({
-      id: "career",
-      title: "Career Studio",
-      subtitle: "Practice for the real thing before it counts.",
-      icon: "icon-work.png",
-      tone: "career-tone",
-      items: [
-        { title: "Career Studio", text: "Interview practice, resume builder, portfolio builder, job matching, and a real paycheck/ATS check.", modal: "careerStudio", icon: "icon-profile.png", kind: "real" },
-        { title: "Future Self Hiring", text: "Four future-you candidates interview for the job of who you become.", modal: "futureSelfHiring", icon: "icon-chat.png", kind: "practice" },
-        { title: "Jury Duty on Yourself", text: "Put a real decision on trial - prosecution, defense, and a verdict.", modal: "juryTrial", icon: "icon-balance.png", kind: "practice" }
-      ]
-    })}
-
-    ${growthHubSection({
-      id: "progress",
-      title: "Progress",
-      subtitle: "Review your growth without clutter.",
-      icon: "icon-balance.png",
-      tone: "progress-tone",
-      items: [
-        { title: "Progress Reports", text: "Mood, goals, and challenge status, plus a weekly or monthly AI report - all from real saved data.", modal: "growthProgress", icon: "icon-chat.png" },
-        { title: "Receipt record", text: "Track what you paid today.", modal: "receipt", icon: "icon-receipt.png" },
-        { title: "Knowledge Vault", text: "Everything Future Mirror knows about you, in one place.", modal: "knowledgeVault", icon: "icon-learn.png" },
-        { title: "AI Trace Log", text: "Is the AI coach actually helping? Every reply gets graded.", modal: "aiTraceLog", icon: "icon-assessment.png" },
-        { title: "Judgment Calibration", text: "When you say you're sure, how often are you actually right?", modal: "calibration", icon: "icon-balance.png", kind: "real" },
-        { title: "Debt of Inaction", text: "What you keep not doing, automatically detected - not something you write yourself.", modal: "avoidancePatterns", icon: "icon-warning.png", kind: "real" }
-      ]
-    })}
-
-    ${growthHubSection({
-      id: "practical",
-      title: "Practical & Safety",
-      subtitle: "The unglamorous stuff nobody warns you about.",
-      icon: "icon-safety.png",
-      tone: "progress-tone",
-      items: [
-        { title: "Real Due Dates", text: "Rent, bills, renewals - real deadlines, not app-invented reminders.", modal: "realLifeEvents", icon: "icon-checkin.png", kind: "real" },
-        { title: "Skill Guides", text: "Cooking, laundry, renting, payslips - real step-by-step, not a chat.", modal: "skillGuides", icon: "icon-home.png", kind: "real" },
-        { title: "Basic Tax Obligations", text: "Know what you actually owe, in plain English.", modal: "taxObligations", icon: "icon-receipt.png", kind: "real" },
-        { title: "Share with a guardian", text: "A read-only Life Roadmap link - no login needed on their end.", modal: "guardianShareSetup", icon: "icon-profile.png", kind: "real" },
-        { title: "Skill Exchange", text: "Trade what you know for what you need.", tab: "community", icon: "icon-chat.png", kind: "real" },
-        { title: "SOS - get urgent help", text: "Real Singapore resources, always one tap away.", modal: "sosTriage", icon: "icon-warning.png", kind: "real" },
-        { title: "Build support before crisis", text: "Singapore's own youth mental health data says this matters as much as SOS - not just one guide among many.", modal: "buildSupportGuide", icon: "icon-support.png", kind: "real" },
-        { title: "Been There", text: "Anonymous, one-time encouragement to or from someone who's been where you are.", modal: "communityEncouragement", icon: "icon-support.png", kind: "real" },
-        { title: "Inherited Debugging", text: "Refactor habits you didn't choose, issue by issue.", modal: "legacyDebugger", icon: "icon-settings.png", kind: "practice" },
-        { title: "Self-Debt", text: "Pay your future self a debt, collected only when it's actually due.", modal: "selfDebtLedger", icon: "icon-money.png", kind: "practice" },
-        { title: "Estate Auction", text: "Your time and habits, read out like an auction catalog.", modal: "estateAuction", icon: "icon-time.png", kind: "practice" },
-        { title: "Safety Net Preview", text: "What a safety net might cover - concept only, not real cover.", modal: "microInsurance", icon: "icon-health.png", kind: "practice" }
-      ]
-    })}
   `,
 
   simulator: () => `
@@ -12534,6 +12419,54 @@ const modals = {
     `;
   },
 
+  // Second Brain causal memory ("decision + reason + outcome") - lets
+  // Compass AI do similar-situation recall instead of generic advice (see
+  // requestCompassAI's lifeMemory context field). Sealed entries stay
+  // listed here (the user needs to see/manage everything it remembers)
+  // but are never surfaced by the AI unprompted - see COMPASS_SYSTEM_PROMPT.
+  lifeMemory: () => {
+    const entries = trackerState.lifeMemory.filter((entry) => entry.user_id === currentUserId());
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="life-memory-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Remember this</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="life-memory-title">A decision, and why</h3>
+        <p class="muted">What did you decide (or not decide), and why? Next time something similar comes up, Compass can bring this back instead of giving you generic advice.</p>
+        <input id="life-memory-situation-input" type="text" maxlength="120" placeholder="Example: A talk I could have gone to">
+        <textarea id="life-memory-decision-input" maxlength="300" placeholder="What did you decide? Example: Skipped it, too tired that week."></textarea>
+        <textarea id="life-memory-reason-input" maxlength="300" placeholder="Why, really? Example: Wasn't the tiredness, I just didn't want to go alone."></textarea>
+        <label class="check-option">
+          <input type="checkbox" id="life-memory-sealed-input">
+          <span>Keep this just between us - don't bring it up unless I do</span>
+        </label>
+        <p class="form-error" id="life-memory-error" aria-live="polite"></p>
+        <button class="primary-action" type="button" data-save-life-memory>Save</button>
+        <div class="ledger-sheet">
+          ${entries.length ? entries.map((entry) => `
+            <article class="ledger-entry">
+              <p class="ledger-entry-stamp">${escapeHTML(entry.display_time)}${entry.sealed ? " · sealed" : ""}</p>
+              <p class="ledger-entry-text"><strong>${escapeHTML(entry.situationTag)}</strong> - ${escapeHTML(entry.decision)}</p>
+              <p class="ledger-entry-text muted">${escapeHTML(entry.reason)}</p>
+              ${entry.outcome ? `
+                <p class="ledger-entry-text">Later: ${escapeHTML(entry.outcome)}</p>
+              ` : `
+                <textarea class="life-memory-outcome-input" data-outcome-input-for="${escapeHTML(entry.id)}" maxlength="300" placeholder="What actually happened afterward? (optional, add anytime)"></textarea>
+                <button class="secondary-action compact-action" type="button" data-record-life-memory-outcome="${escapeHTML(entry.id)}">Save what happened</button>
+              `}
+            </article>
+          `).join("") : `
+            <section class="empty-feature">
+              <img src="assets/icon-learn.png" alt="">
+              <div><strong>Nothing saved yet</strong><p>Save one real decision to start building this.</p></div>
+            </section>
+          `}
+        </div>
+      </div>
+    `;
+  },
+
   challengeHub: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="challenge-title">
       <div class="modal-top">
@@ -12775,8 +12708,12 @@ function hidePortrait() {
 }
 
 const TAB_ALIASES = {
-  future: "decide",
-  growth: "build",
+  home: "secondBrain",
+  future: "secondBrain",
+  decide: "secondBrain",
+  growth: "secondBrain",
+  build: "secondBrain",
+  practice: "secondBrain",
   community: "discover",
   settings: "profile"
 };
@@ -12805,7 +12742,7 @@ function renderScreen(tab) {
   bindRenderedNavigation(screenRoot);
   refreshDesktopRightRail(tab);
   if (tab === "discover") mountFeedSwipeCard();
-  const navTab = tab === "assess" || tab === "compass" ? "home" : tab === "simulator" ? "practice" : tab === "stories" ? "build" : tab;
+  const navTab = tab === "assess" || tab === "compass" ? "secondBrain" : tab === "stories" ? "discover" : tab;
   navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.tab === navTab));
   const activePortraitId = computeActivePortraitId(tab);
   if (activePortraitId) showPortrait(activePortraitId);
@@ -13073,7 +13010,11 @@ async function requestCompassAI(question) {
     savedUserProfile: compassProfileForAI(),
     personalBlueprint: blueprint ? { values: blueprint.values, strengths: blueprint.strengths, personality: blueprint.personality, motivationStyle: blueprint.motivationStyle, workStyle: blueprint.workStyle, decisionStyle: blueprint.decisionStyle } : null,
     realSavedFacts: realGrowthFacts(),
-    uploadedDocumentChunks: documentChunks
+    uploadedDocumentChunks: documentChunks,
+    lifeMemory: trackerState.lifeMemory
+      .filter((entry) => entry.user_id === currentUserId())
+      .slice(0, 30)
+      .map((entry) => ({ situationTag: entry.situationTag, decision: entry.decision, reason: entry.reason, outcome: entry.outcome || null, sealed: Boolean(entry.sealed) }))
   };
   const history = chatState.messages.slice(-24).filter((message) => !message.local && message.text !== COMPASS_API_ERROR).slice(-20).map((message) => ({
     role: message.from === "assistant" ? "assistant" : "user",
@@ -15282,6 +15223,8 @@ document.addEventListener("click", async (event) => {
   const saveGrowthGoals = event.target.closest("[data-save-growth-goals]");
   const calcCostOfLiving = event.target.closest("[data-calc-cost-of-living]");
   const saveJournal = event.target.closest("[data-save-journal]");
+  const saveLifeMemory = event.target.closest("[data-save-life-memory]");
+  const recordLifeMemoryOutcomeButton = event.target.closest("[data-record-life-memory-outcome]");
   const startChallenge = event.target.closest("[data-start-challenge]");
   const saveCommunityPost = event.target.closest("[data-save-community-post]");
   const communityAuthModeButton = event.target.closest("[data-community-auth-mode]");
@@ -16624,6 +16567,47 @@ document.addEventListener("click", async (event) => {
     openModal("journal");
     renderScreen(activeTab);
     refreshStaticScreens();
+  }
+
+  if (saveLifeMemory) {
+    const situationInput = modalLayer.querySelector("#life-memory-situation-input");
+    const decisionInput = modalLayer.querySelector("#life-memory-decision-input");
+    const reasonInput = modalLayer.querySelector("#life-memory-reason-input");
+    const sealedInput = modalLayer.querySelector("#life-memory-sealed-input");
+    const error = modalLayer.querySelector("#life-memory-error");
+    const situationTag = cleanText(situationInput ? situationInput.value : "", 120);
+    const decision = cleanText(decisionInput ? decisionInput.value : "", 300);
+    const reason = cleanText(reasonInput ? reasonInput.value : "", 300);
+    if (!situationTag || !decision) {
+      if (error) error.textContent = "Add at least what it was and what you decided.";
+      return;
+    }
+    trackerState.lifeMemory.unshift({
+      id: `life-memory-${Date.now()}`,
+      user_id: currentUserId(),
+      situationTag,
+      decision,
+      reason,
+      outcome: "",
+      sealed: Boolean(sealedInput && sealedInput.checked),
+      created_at: new Date().toISOString(),
+      display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    });
+    trackerState.lifeMemory = trackerState.lifeMemory.slice(0, 200);
+    saveTrackerState();
+    openModal("lifeMemory");
+  }
+
+  if (recordLifeMemoryOutcomeButton) {
+    const id = recordLifeMemoryOutcomeButton.dataset.recordLifeMemoryOutcome;
+    const outcomeInput = modalLayer.querySelector(`[data-outcome-input-for="${CSS.escape(id)}"]`);
+    const outcome = cleanText(outcomeInput ? outcomeInput.value : "", 300);
+    const entry = trackerState.lifeMemory.find((item) => item.id === id);
+    if (entry && outcome) {
+      entry.outcome = outcome;
+      saveTrackerState();
+      openModal("lifeMemory");
+    }
   }
 
   if (startChallenge) {
