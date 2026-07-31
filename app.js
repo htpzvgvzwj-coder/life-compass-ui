@@ -3314,7 +3314,7 @@ function refreshDesktopRightRail(tab = activeTab) {
 
 function commandLauncherCommands() {
   return [
-    { id: "home", title: "Today plan", detail: "Starter path, readiness, and next action.", lane: "Home", tab: "home", icon: "icon-home.png", keywords: ["home", "today", "starter", "readiness"] },
+    { id: "home", title: "Home", detail: "What Compass remembers, and a way back into the conversation.", lane: "Home", tab: "home", icon: "icon-home.png", keywords: ["home", "dashboard", "memory", "shelf"] },
     { id: "future-scan", title: "Run Future Scan", detail: "Check identity, values, hidden costs, and no-action future.", lane: "Decide", tab: "secondBrain", open: "decisionLab", icon: "icon-decide.png", keywords: ["decision", "choose", "future scan", "risk"] },
     { id: "build-mode-coach", title: "Build Mode", detail: "An AI coach trains you toward one specific goal - interview, money, confidence, and more.", lane: "Decide", tab: "secondBrain", open: "decisionLab", icon: "icon-decide.png", keywords: ["coach", "training", "practice plan", "build mode"] },
     { id: "cost-living", title: "Real Cost of Living", detail: "Estimate SG-style living costs before a decision.", lane: "Decide", tab: "secondBrain", open: "costOfLiving", icon: "icon-money.png", keywords: ["money", "cost", "budget", "rent"] },
@@ -4659,7 +4659,7 @@ function lifeVersePausePanel(state, view) {
         <button type="button" data-lifeverse-tab="profile">Progress profile</button>
         <button type="button" data-lifeverse-tab="fastForward">Fast Forward</button>
         <button type="button" data-lifeverse-reset>Reset LifeVerse</button>
-        <button type="button" data-tab-jump="home">Exit to Compass</button>
+        <button type="button" data-tab-jump="secondBrain">Exit to Compass</button>
       </div>
       ${lifeVerseProfilePanel(state, view)}
     </section>
@@ -11611,15 +11611,59 @@ function profileScreen() {
   `;
 }
 
+// Relative-date label for the Home memory shelf - reuses daysSince() rather
+// than duplicating date math; homeQuickAccessGrid()/adultPrepHero()/
+// homeStarterPathCard()/adultingReadinessOverviewCard()/homeLedgerRows()
+// still exist below (unused by Home - kept dormant, not deleted) from the
+// pre-visual-rebuild home screen; Home's own content stays deliberately
+// minimal (hero + memory shelf only) per the "chatroom + a few things
+// beside it, not a sprawling screen" rule.
+function homeRelativeDateLabel(iso) {
+  const days = daysSince(iso);
+  if (!Number.isFinite(days)) return "";
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
 const screens = {
-  // "home" and "secondBrain" both resolve to "compass" via TAB_ALIASES -
-  // Second Brain's entire surface is now the chat screen itself (see the
-  // visual-rebuild note above screens.compass). homeQuickAccessGrid() (a
-  // grid of buttons to the old decide/build/practice/discover tabs) and
-  // adultPrepHero()/homeStarterPathCard()/adultingReadinessOverviewCard()/
-  // homeLedgerRows() are deliberately not carried over into chat - those
-  // destinations/cards no longer have a default-visible home; still real,
-  // reachable through chat/History Search/Profile like everything else.
+  // "home" used to resolve to "secondBrain"/"compass" via TAB_ALIASES (see
+  // the "Second Brain visual rebuild" note near screens.compass) - home is
+  // now a distinct dashboard again: a hero that opens the chat, and a real
+  // memory shelf below it. Second Brain's chat screen itself is unchanged.
+  home: () => {
+    const mood = trackerState.mood;
+    const shelfEntries = historySearchEntries().slice(0, 8);
+    return `
+      <section class="home-hero">
+        <p class="eyebrow">Second Brain</p>
+        <h2>Welcome back, ${displayName()}.</h2>
+        <p class="home-hero-status">
+          <span class="home-hero-status-dot"></span>
+          ${escapeHTML(mood.label)}${mood.note ? ` - ${escapeHTML(mood.note)}` : ""}
+        </p>
+        <button class="home-hero-cta" type="button" data-tab-jump="secondBrain">Continue the conversation</button>
+      </section>
+      <section class="home-shelf">
+        <p class="eyebrow home-shelf-eyebrow">What Compass remembers</p>
+        <div class="home-shelf-row">
+          ${shelfEntries.length ? shelfEntries.map((entry, i) => `
+            <button type="button" class="home-shelf-card home-shelf-card-${i % 6}" data-open="historySearch">
+              <span class="home-shelf-card-type">${escapeHTML(entry.type)}</span>
+              <strong>${escapeHTML(cleanText(entry.title, 60))}</strong>
+              <span class="home-shelf-card-date">${homeRelativeDateLabel(entry.date)}</span>
+            </button>
+          `).join("") : `
+            <div class="home-shelf-empty">
+              <p>Nothing remembered yet.</p>
+              <button type="button" data-tab-jump="secondBrain">Start talking to Compass</button>
+            </div>
+          `}
+        </div>
+      </section>
+    `;
+  },
 
   assess: () => `
     <header class="screen-head compact-head">
@@ -11675,9 +11719,6 @@ const screens = {
         </button>
         <button class="chat-icon-tab" type="button" data-open="historySearch" aria-label="Search your history" title="History Search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
-        </button>
-        <button class="chat-icon-tab" type="button" data-tab-jump="profile" aria-label="Profile" title="Profile">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.8-4 5-6 8-6s6.2 2 8 6"></path></svg>
         </button>
       </div>
     </header>
@@ -13490,7 +13531,6 @@ function hidePortrait() {
 }
 
 const TAB_ALIASES = {
-  home: "secondBrain",
   future: "secondBrain",
   decide: "secondBrain",
   growth: "secondBrain",
@@ -13529,6 +13569,10 @@ function renderScreen(tab) {
   // async refresh resolves. Without this mirror, window.activeTab is always
   // undefined and those re-render checks silently never fire.
   window.activeTab = tab;
+  // CSS hook only (no behavior depends on this) - lets the warm Home/
+  // Second Brain restyle target just those two screens' shared .app-screen
+  // container without touching Discover/Life Sim/Profile's styling.
+  document.body.dataset.activeScreen = tab;
   if (tab === "compass") {
     applyCoachProactiveOpener();
     if (isEnteringCompass) applyPendingProactiveMessage();

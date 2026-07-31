@@ -9930,6 +9930,7 @@ body {
    =========================================================================== */
 .desktop-sidebar,
 .desktop-right-rail,
+.warm-icon-rail,
 .desktop-command-bar {
   display: none;
 }
@@ -9953,11 +9954,15 @@ body {
 
   body.compass-public-app:not(.life-sim-active) .prototype-view.app-workspace.is-active {
     display: grid;
-    grid-template-columns: 238px minmax(0, 1fr) 300px;
+    grid-template-columns: 238px minmax(0, 1fr) 300px 72px;
     gap: 16px;
     align-items: stretch;
     height: calc(100dvh - 40px);
     min-height: 680px;
+  }
+
+  .warm-icon-rail {
+    display: flex;
   }
 
   .desktop-sidebar,
@@ -11503,4 +11508,296 @@ body {
 .open-loop-actions .secondary-action,
 .insight-actions .secondary-action {
   margin-top: 0;
+}
+
+/* ===========================================================================
+   Second Brain warm redesign - Home dashboard, Second Brain chat shell, and
+   the primary nav only. Discover/Life Sim/Profile keep the existing
+   --color-* palette untouched; these are dedicated --warm-* tokens so
+   nothing here can bleed into screens outside this scope. Background is a
+   layered CSS gradient + grain texture (no external image asset) tuned to
+   read as a warm, lived-in study rather than a flat color fill.
+   =========================================================================== */
+:root {
+  --warm-bg-deep: #140d08;
+  --warm-bg: #201509;
+  --warm-surface: #2b1d10;
+  --warm-surface-soft: #382818;
+  --warm-ink: #f5e9d8;
+  --warm-muted: #c3ab8a;
+  --warm-line: rgba(245, 233, 216, 0.12);
+  --warm-accent: #d99a52;
+  --warm-accent-strong: #eab568;
+  --warm-accent-ink: #2a1608;
+  --warm-glow: rgba(217, 154, 82, 0.32);
+  --warm-shadow: 0 24px 60px rgba(8, 5, 2, 0.5);
+}
+
+body.compass-public-app[data-active-screen="home"] .app-screen,
+body.compass-public-app[data-active-screen="compass"] .app-screen {
+  background:
+    radial-gradient(circle at 88% 4%, var(--warm-glow), transparent 42%),
+    radial-gradient(circle at 6% 92%, rgba(217, 154, 82, 0.10), transparent 50%),
+    var(--warm-bg-deep);
+}
+
+/* Home dashboard */
+.home-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 30px 26px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 84% 10%, var(--warm-glow), transparent 46%),
+    linear-gradient(160deg, var(--warm-bg) 0%, var(--warm-bg-deep) 100%);
+  box-shadow: var(--warm-shadow);
+  color: var(--warm-ink);
+}
+
+.home-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.home-hero .eyebrow {
+  position: relative;
+  color: var(--warm-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 750;
+  margin: 0 0 10px;
+}
+
+.home-hero h2 {
+  position: relative;
+  margin: 0 0 12px;
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.home-hero-status {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 22px;
+  color: var(--warm-muted);
+  font-size: 13px;
+}
+
+.home-hero-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--warm-accent);
+  box-shadow: 0 0 0 3px rgba(217, 154, 82, 0.18);
+}
+
+.home-hero-cta {
+  position: relative;
+  z-index: 1;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--warm-accent), var(--warm-accent-strong));
+  color: var(--warm-accent-ink);
+  font-weight: 800;
+  font-size: 14px;
+  box-shadow: 0 10px 26px rgba(217, 154, 82, 0.3);
+}
+
+.home-hero-cta:hover {
+  filter: brightness(1.05);
+}
+
+.home-shelf {
+  margin-top: 22px;
+}
+
+.home-shelf-eyebrow {
+  color: var(--warm-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 750;
+  margin: 0 0 12px;
+}
+
+.home-shelf-row {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+}
+
+.home-shelf-card {
+  position: relative;
+  flex: 0 0 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px 12px 12px;
+  border: 1px solid var(--warm-line);
+  border-radius: 14px;
+  background: linear-gradient(165deg, var(--warm-surface), var(--warm-bg));
+  color: var(--warm-ink);
+  text-align: left;
+  overflow: hidden;
+  box-shadow: 0 12px 28px rgba(8, 5, 2, 0.32);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.home-shelf-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 34px rgba(8, 5, 2, 0.42);
+}
+
+.home-shelf-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+}
+
+.home-shelf-card-0::before { background: #caa15a; }
+.home-shelf-card-1::before { background: #c1704a; }
+.home-shelf-card-2::before { background: #8a8148; }
+.home-shelf-card-3::before { background: #7a6a55; }
+.home-shelf-card-4::before { background: #8a4a4a; }
+.home-shelf-card-5::before { background: #b8a06e; }
+
+.home-shelf-card-type {
+  margin-top: 6px;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--warm-muted);
+}
+
+.home-shelf-card strong {
+  font-size: 13.5px;
+  line-height: 1.32;
+}
+
+.home-shelf-card-date {
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 11px;
+  color: var(--warm-muted);
+}
+
+.home-shelf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 18px;
+  border: 1px dashed var(--warm-line);
+  border-radius: 14px;
+  color: var(--warm-muted);
+}
+
+.home-shelf-empty button {
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--warm-accent);
+  color: var(--warm-accent-ink);
+  font-weight: 750;
+  font-size: 12.5px;
+}
+
+/* Second Brain chat shell - only the outer chrome (topbar/status sliver);
+   .chat-bubble.is-ai/.is-user keep their own opaque backgrounds untouched
+   above, so message readability is unaffected by this. */
+body.compass-public-app[data-active-screen="compass"] .chat-brand {
+  color: var(--warm-ink);
+}
+
+body.compass-public-app[data-active-screen="compass"] .chat-brand-mark {
+  background: linear-gradient(150deg, var(--warm-accent), var(--warm-accent-strong));
+  color: var(--warm-accent-ink);
+}
+
+body.compass-public-app[data-active-screen="compass"] .chat-status-sliver {
+  background: rgba(245, 233, 216, 0.08);
+  color: var(--warm-ink);
+}
+
+body.compass-public-app[data-active-screen="compass"] .chat-status-dot {
+  background: var(--warm-accent);
+}
+
+/* Primary nav - Home / Second Brain / Discover / Life Sim / Settings as
+   icon-only buttons. .warm-icon-rail is the new far-right desktop strip;
+   .warm-icon-nav is the existing bottom-nav on mobile, now carrying 5
+   icons instead of 3 icons + a separate header profile button. */
+.warm-icon-rail {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 72px;
+  padding: 18px 0;
+  border: 1px solid var(--warm-line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--warm-bg), var(--warm-bg-deep));
+  box-shadow: var(--warm-shadow);
+}
+
+.warm-icon-rail .nav-item {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--warm-muted);
+}
+
+.bottom-nav.warm-icon-nav {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  background: linear-gradient(180deg, var(--warm-bg), var(--warm-bg-deep));
+  border-top-color: var(--warm-line);
+}
+
+.bottom-nav.warm-icon-nav .nav-item {
+  background: transparent;
+  color: var(--warm-muted);
+}
+
+.warm-icon-rail .nav-icon,
+.bottom-nav.warm-icon-nav .nav-icon {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) invert(0.86);
+}
+
+.warm-icon-rail .nav-item.is-active .nav-icon,
+.warm-icon-rail .nav-item.signature-nav .nav-icon,
+.bottom-nav.warm-icon-nav .nav-item.is-active .nav-icon,
+.bottom-nav.warm-icon-nav .nav-item.signature-nav .nav-icon {
+  padding: 7px;
+  border-radius: 999px;
+  background: var(--warm-accent);
+  filter: brightness(0);
+  box-shadow: 0 6px 16px rgba(217, 154, 82, 0.35);
+}
+
+.warm-icon-rail .nav-item.is-active,
+.bottom-nav.warm-icon-nav .nav-item.is-active {
+  background: transparent;
 }
