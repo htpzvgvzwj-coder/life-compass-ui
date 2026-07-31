@@ -3713,25 +3713,38 @@ async function runCompassInsights({ force = false } = {}) {
   if (!force && !entries.length) return false;
   const episodesText = entries.slice(0, 40).map((e) => `- [${e.kind || "unclassified"}] ${e.situationTag}: ${e.decision}${e.reason ? ` (reason: ${e.reason})` : ""}${e.outcome ? ` -> later: ${e.outcome}` : ""}`).join("\n") || "No lifeMemory entries yet.";
   const priorInsights = (trackerState.aiInsights.items || []).map((item) => `- ${item.text}`).join("\n") || "None yet.";
-  const systemPrompt = "You are Compass's background memory-consolidation process. You are given a list of real remembered decisions/situations about one specific user, plus the short list of patterns you noticed about them last time. Update your understanding: keep patterns that still hold, drop ones the new data contradicts, and add genuinely new ones - don't just repeat the old list back unchanged. Never invent anything not supported by the entries given; if there isn't enough real signal for a pattern, say so plainly in the summary instead of manufacturing one. Respond as strict JSON only.";
-  const userPrompt = `Remembered decisions/situations (most recent first):\n${episodesText}\n\nOther real saved context: ${realGrowthFactsText()}\n\nPatterns you noticed last time:\n${priorInsights}\n\nRespond as strict JSON only: {"summary": "one or two sentences, warm but plain, describing what you've noticed about this person overall", "insights": ["short pattern statement", "short pattern statement"]} - 2 to 4 insights, each one sentence, specific to this person, not generic advice.`;
+  const systemPrompt = "You are Compass's background memory-consolidation process. You are given a list of real remembered decisions/situations about one specific user, plus the short list of patterns you noticed about them last time. Update your understanding: keep patterns that still hold, drop ones the new data contradicts, and add genuinely new ones - don't just repeat the old list back unchanged. Never invent anything not supported by the entries given; if there isn't enough real signal for a pattern, say so plainly in the summary instead of manufacturing one. Every insight must cite which specific remembered situations it's based on. Respond as strict JSON only.";
+  const userPrompt = `Remembered decisions/situations (most recent first):\n${episodesText}\n\nOther real saved context: ${realGrowthFactsText()}\n\nPatterns you noticed last time:\n${priorInsights}\n\nRespond as strict JSON only: {"summary": "one or two sentences, warm but plain, describing what you've noticed about this person overall", "insights": [{"text": "short pattern statement", "based_on": ["situation_tag exactly as listed above"]}]} - 2 to 4 insights, each one sentence, specific to this person, not generic advice. based_on must list at least one real situation_tag copied exactly from the remembered decisions/situations above - never invent one, and never cite one that isn't actually relevant to that specific insight.`;
   const reply = await requestCompassDirect(systemPrompt, userPrompt);
   const parsed = extractJsonObject(reply);
   if (!parsed || !parsed.summary || !Array.isArray(parsed.insights)) throw new Error("Compass insights reply was not valid JSON.");
-  const newTexts = parsed.insights.slice(0, 4).map((text) => cleanText(text, 160)).filter(Boolean);
+  // OpenHuman-inspired (Memory Tree): every summary links back to the real
+  // records it was built from, so a claim can always be checked instead of
+  // taken on faith - resolved here from the model's cited situation_tags
+  // to real lifeMemory entry ids, not left as free text.
+  const resolveSourceIds = (tags) => {
+    const list = Array.isArray(tags) ? tags : [];
+    return entries
+      .filter((e) => e.situationTag && list.some((tag) => typeof tag === "string" && tag.trim().toLowerCase() === e.situationTag.trim().toLowerCase()))
+      .map((e) => e.id);
+  };
+  const rawInsights = parsed.insights.slice(0, 4).map((item) => {
+    if (typeof item === "string") return { text: cleanText(item, 160), sourceEntryIds: [] };
+    return { text: cleanText(item && item.text, 160), sourceEntryIds: resolveSourceIds(item && item.based_on) };
+  }).filter((item) => item.text);
   const oldItems = trackerState.aiInsights.items || [];
   // Zep/Graphiti-inspired (bi-temporal facts, "superseded not deleted"):
   // when this round drops a prior insight, keep a visible trail of it
   // instead of silently losing what Compass used to think - this is what
   // makes the evolving-understanding claim demonstrable, not just asserted.
-  const dropped = oldItems.filter((item) => !newTexts.some((text) => text.toLowerCase() === item.text.toLowerCase()));
+  const dropped = oldItems.filter((item) => !rawInsights.some((next) => next.text.toLowerCase() === item.text.toLowerCase()));
   const supersededItems = [
     ...dropped.map((item) => ({ text: item.text, supersededAt: new Date().toISOString(), replacedBy: "revised" })),
     ...(trackerState.aiInsights.supersededItems || [])
   ].slice(0, 10);
   trackerState.aiInsights = {
     summary: cleanText(parsed.summary, 300),
-    items: newTexts.map((text, index) => ({ id: `insight-${Date.now()}-${index}`, text, createdAt: new Date().toISOString() })),
+    items: rawInsights.map((item, index) => ({ id: `insight-${Date.now()}-${index}`, text: item.text, sourceEntryIds: item.sourceEntryIds, createdAt: new Date().toISOString() })),
     supersededItems,
     lastRunAt: new Date().toISOString(),
     basedOnCount: entries.length
@@ -3783,12 +3796,22 @@ function compassInsightsSectionHtml() {
           <p class="history-snippet insight-summary">${escapeHTML(insights.summary)}</p>
           ${(insights.items || []).length ? `
             <ul class="insight-list">
-              ${insights.items.map((item) => `
-                <li>
-                  <span>${escapeHTML(item.text)}</span>
-                  <button class="insight-dismiss" type="button" data-dismiss-insight="${escapeHTML(item.id)}" aria-label="This isn't right">&times;</button>
-                </li>
-              `).join("")}
+              ${insights.items.map((item) => {
+                const linked = (item.sourceEntryIds || []).map((id) => trackerState.lifeMemory.find((e) => e.id === id)).filter(Boolean);
+                const whyId = `insight-why-${item.id}`;
+                return `
+                  <li>
+                    <div class="insight-row">
+                      <span>${escapeHTML(item.text)}</span>
+                      <button class="insight-dismiss" type="button" data-dismiss-insight="${escapeHTML(item.id)}" aria-label="This isn't right">&times;</button>
+                    </div>
+                    ${linked.length ? `
+                      <button class="insight-why-toggle" type="button" data-toggle-history-card="${whyId}" aria-expanded="false">Why?</button>
+                      <p class="insight-why-detail" id="${whyId}-full" hidden>Based on: ${escapeHTML(linked.map((e) => `"${e.situationTag}"`).join(", "))}</p>
+                    ` : ""}
+                  </li>
+                `;
+              }).join("")}
             </ul>
           ` : ""}
           <p class="history-section-intro">Based on ${insights.basedOnCount} remembered moment${insights.basedOnCount === 1 ? "" : "s"}${insights.lastRunAt ? `, updated ${new Date(insights.lastRunAt).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}.</p>
