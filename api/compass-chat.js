@@ -75,14 +75,17 @@ function extractChatCompletionText(data) {
 
 // Real function-calling parsers (one per provider) - not a shared helper,
 // because each provider's tool-call response shape genuinely differs.
-// Every provider can call one of two functions per turn (never both -
-// keeps parsing unambiguous): open_tool (opens a real app feature) or
-// remember_this (writes a real lifeMemory entry from the natural flow of
-// conversation, no manual form). Both parsers return a discriminated
-// {tool: "open_tool"|"remember_this", ...} shape, or null.
+// Every provider can call one of three functions per turn (never more than
+// one - keeps parsing unambiguous): open_tool (opens a real app feature),
+// remember_this (writes a new lifeMemory entry from the natural flow of
+// conversation), or update_memory (attaches an outcome to an EXISTING
+// lifeMemory entry instead of creating an unrelated new one - Mem0/
+// OpenWebUI's "update, don't just append" pattern). All three parsers
+// return a discriminated {tool: "...", ...} shape, or null.
 // `message_to_user` is a required argument on the model's own tool call,
 // not text we synthesize - see buildToolSchemas below for why.
 const REMEMBER_THIS_KINDS = ["missed_opportunity", "decision", "note"];
+const TOOL_NAMES = ["open_tool", "remember_this", "update_memory"];
 
 function parseOpenToolArgs(rawArgs) {
   if (!rawArgs || typeof rawArgs !== "object") return null;
@@ -94,7 +97,7 @@ function parseOpenToolArgs(rawArgs) {
 
 function parseRememberThisArgs(rawArgs) {
   if (!rawArgs || typeof rawArgs !== "object") return null;
-  const { situation_tag, decision, reason, kind, message_to_user } = rawArgs;
+  const { situation_tag, decision, reason, kind, related_goal, message_to_user } = rawArgs;
   if (typeof situation_tag !== "string" || !situation_tag.trim()) return null;
   if (typeof decision !== "string" || !decision.trim()) return null;
   if (typeof message_to_user !== "string" || !message_to_user.trim()) return null;
@@ -104,6 +107,21 @@ function parseRememberThisArgs(rawArgs) {
     decision: decision.trim().slice(0, 300),
     reason: typeof reason === "string" ? reason.trim().slice(0, 300) : "",
     kind: REMEMBER_THIS_KINDS.includes(kind) ? kind : "decision",
+    related_goal: typeof related_goal === "string" ? related_goal.trim().slice(0, 200) : "",
+    message_to_user: message_to_user.trim()
+  };
+}
+
+function parseUpdateMemoryArgs(rawArgs) {
+  if (!rawArgs || typeof rawArgs !== "object") return null;
+  const { situation_tag, outcome, message_to_user } = rawArgs;
+  if (typeof situation_tag !== "string" || !situation_tag.trim()) return null;
+  if (typeof outcome !== "string" || !outcome.trim()) return null;
+  if (typeof message_to_user !== "string" || !message_to_user.trim()) return null;
+  return {
+    tool: "update_memory",
+    situation_tag: situation_tag.trim().slice(0, 120),
+    outcome: outcome.trim().slice(0, 300),
     message_to_user: message_to_user.trim()
   };
 }
@@ -111,6 +129,7 @@ function parseRememberThisArgs(rawArgs) {
 function parseNamedToolArgs(name, rawArgs) {
   if (name === "open_tool") return parseOpenToolArgs(rawArgs);
   if (name === "remember_this") return parseRememberThisArgs(rawArgs);
+  if (name === "update_memory") return parseUpdateMemoryArgs(rawArgs);
   return null;
 }
 
@@ -118,7 +137,7 @@ function extractChatCompletionToolCall(data) {
   const choices = Array.isArray(data.choices) ? data.choices : [];
   const message = choices[0] && choices[0].message ? choices[0].message : null;
   const toolCalls = message && Array.isArray(message.tool_calls) ? message.tool_calls : [];
-  const call = toolCalls.find((item) => item.type === "function" && item.function && (item.function.name === "open_tool" || item.function.name === "remember_this"));
+  const call = toolCalls.find((item) => item.type === "function" && item.function && TOOL_NAMES.includes(item.function.name));
   if (!call) return null;
   try {
     return parseNamedToolArgs(call.function.name, JSON.parse(call.function.arguments || "{}"));
@@ -129,7 +148,7 @@ function extractChatCompletionToolCall(data) {
 
 function extractResponseToolCall(data) {
   const output = Array.isArray(data.output) ? data.output : [];
-  const call = output.find((item) => item.type === "function_call" && (item.name === "open_tool" || item.name === "remember_this"));
+  const call = output.find((item) => item.type === "function_call" && TOOL_NAMES.includes(item.name));
   if (!call) return null;
   try {
     return parseNamedToolArgs(call.name, JSON.parse(call.arguments || "{}"));
@@ -143,13 +162,13 @@ function extractGeminiToolCall(data) {
   const parts = candidates[0] && candidates[0].content && Array.isArray(candidates[0].content.parts)
     ? candidates[0].content.parts
     : [];
-  const part = parts.find((item) => item.functionCall && (item.functionCall.name === "open_tool" || item.functionCall.name === "remember_this"));
+  const part = parts.find((item) => item.functionCall && TOOL_NAMES.includes(item.functionCall.name));
   return part ? parseNamedToolArgs(part.functionCall.name, part.functionCall.args || {}) : null;
 }
 
 function extractAnthropicToolCall(data) {
   const content = Array.isArray(data.content) ? data.content : [];
-  const block = content.find((item) => item.type === "tool_use" && (item.name === "open_tool" || item.name === "remember_this"));
+  const block = content.find((item) => item.type === "tool_use" && TOOL_NAMES.includes(item.name));
   return block ? parseNamedToolArgs(block.name, block.input || {}) : null;
 }
 
@@ -188,18 +207,36 @@ function buildRememberThisSchema() {
       decision: { type: "string", description: "What they decided or did (or decided not to do), in their own terms." },
       reason: { type: "string", description: "Why, if they said why." },
       kind: { type: "string", enum: REMEMBER_THIS_KINDS, description: "missed_opportunity if they skipped/avoided/held back on something; decision if they made an active choice; note for anything else worth remembering." },
+      related_goal: { type: "string", description: "If this clearly relates to one of the user's real saved Life Roadmap goals (see the saved facts in context), the goal's title exactly as given there. Omit entirely if no specific goal clearly applies - do not guess." },
       message_to_user: { type: "string", description: "A short, natural line telling the user you're noting this down - write it the way you'd actually say it, not a system notification." }
     },
     required: ["situation_tag", "decision", "kind", "message_to_user"]
   };
 }
 
+function buildUpdateMemorySchema() {
+  return {
+    name: "update_memory",
+    description: "Attach a real outcome to something already remembered about the user (a lifeMemory entry from an earlier remember_this call or the manual form) - use this when the user tells you what actually happened afterward, instead of creating a disconnected new memory. Only call this when there's a genuinely matching earlier entry; if unsure, use remember_this instead.",
+    properties: {
+      situation_tag: { type: "string", description: "The situation_tag (or a close match) of the earlier entry this outcome belongs to." },
+      outcome: { type: "string", description: "What actually happened, in the user's own terms." },
+      message_to_user: { type: "string", description: "A short, natural line telling the user you're updating that memory - write it the way you'd actually say it, not a system notification." }
+    },
+    required: ["situation_tag", "outcome", "message_to_user"]
+  };
+}
+
 function buildToolSchemas(tools) {
-  return { openTool: buildOpenToolSchema(tools), rememberThis: buildRememberThisSchema() };
+  return { openTool: buildOpenToolSchema(tools), rememberThis: buildRememberThisSchema(), updateMemory: buildUpdateMemorySchema() };
+}
+
+function schemaList(schemas) {
+  return [schemas.openTool, schemas.rememberThis, schemas.updateMemory].filter(Boolean);
 }
 
 function groqToolsParam(schemas) {
-  const list = [schemas.openTool, schemas.rememberThis].filter(Boolean);
+  const list = schemaList(schemas);
   if (!list.length) return undefined;
   return list.map((schema) => ({
     type: "function",
@@ -212,7 +249,7 @@ function groqToolsParam(schemas) {
 }
 
 function openaiToolsParam(schemas) {
-  const list = [schemas.openTool, schemas.rememberThis].filter(Boolean);
+  const list = schemaList(schemas);
   if (!list.length) return undefined;
   return list.map((schema) => ({
     type: "function",
@@ -228,7 +265,7 @@ function geminiProperty(prop) {
 }
 
 function geminiToolsParam(schemas) {
-  const list = [schemas.openTool, schemas.rememberThis].filter(Boolean);
+  const list = schemaList(schemas);
   if (!list.length) return undefined;
   return [{
     functionDeclarations: list.map((schema) => ({
@@ -244,7 +281,7 @@ function geminiToolsParam(schemas) {
 }
 
 function anthropicToolsParam(schemas) {
-  const list = [schemas.openTool, schemas.rememberThis].filter(Boolean);
+  const list = schemaList(schemas);
   if (!list.length) return undefined;
   return list.map((schema) => ({
     name: schema.name,

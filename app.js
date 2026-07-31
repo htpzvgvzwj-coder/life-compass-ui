@@ -522,7 +522,7 @@ const defaultTrackerState = {
   // own rather than only growing by the user adding things. Named
   // aiInsights, not "reflection", to avoid colliding with the existing
   // unrelated Reflection Engine (trackerState.reflectionEntries).
-  aiInsights: { summary: "", items: [], lastRunAt: null, basedOnCount: 0 },
+  aiInsights: { summary: "", items: [], supersededItems: [], lastRunAt: null, basedOnCount: 0 },
   challengeProgress: [],
   savedOpportunities: [],
   futureMirror: {
@@ -1349,7 +1349,7 @@ function normalizeTrackerState(state) {
     supportContacts: Array.isArray(state.supportContacts) ? state.supportContacts : defaultSupportContacts,
     journalEntries: Array.isArray(state.journalEntries) ? state.journalEntries : fallback.journalEntries,
     lifeMemory: Array.isArray(state.lifeMemory) ? state.lifeMemory : fallback.lifeMemory,
-    aiInsights: state.aiInsights && typeof state.aiInsights === "object" ? { ...fallback.aiInsights, ...state.aiInsights, items: Array.isArray(state.aiInsights.items) ? state.aiInsights.items : [] } : fallback.aiInsights,
+    aiInsights: state.aiInsights && typeof state.aiInsights === "object" ? { ...fallback.aiInsights, ...state.aiInsights, items: Array.isArray(state.aiInsights.items) ? state.aiInsights.items : [], supersededItems: Array.isArray(state.aiInsights.supersededItems) ? state.aiInsights.supersededItems : [] } : fallback.aiInsights,
     challengeProgress: Array.isArray(state.challengeProgress) ? state.challengeProgress : fallback.challengeProgress,
     savedOpportunities: Array.isArray(state.savedOpportunities) ? state.savedOpportunities : fallback.savedOpportunities,
     futureMirror: {
@@ -3558,14 +3558,20 @@ function historyCurateCardHtml(cardId, { family, icon, eyebrow, title, snippet, 
 
 // View 1: goals + which training/practice helped them. There's no
 // explicit goal-id link on Build Mode/interview/roleplay/Skill Guide
-// records, so relatedness is a first-pass keyword match against the
-// goal's title, not a guaranteed link - honest about that in the empty
-// state rather than fabricating a connection.
+// records, so relatedness there is still a first-pass keyword match
+// against the goal's title. lifeMemory entries are the exception: when
+// remember_this named a real goal (see resolveRelatedGoalId), that exact
+// link is used first - only lifeMemory entries without one fall back to
+// keyword matching, same honest-degradation pattern as everything else.
 function goalRelatedTraining(goal) {
   const goalWords = new Set(cleanText(goal.title, 200).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4));
-  if (!goalWords.size) return [];
   const overlaps = (text) => cleanText(text, 200).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4).some((w) => goalWords.has(w));
   const related = [];
+  trackerState.lifeMemory.filter((e) => e.user_id === currentUserId()).forEach((e) => {
+    if (e.relatedGoalId === goal.id) related.push({ label: `Remembered: "${cleanText(e.situationTag, 80)}"`, date: e.created_at });
+    else if (!e.relatedGoalId && goalWords.size && overlaps(e.situationTag || "")) related.push({ label: `Remembered: "${cleanText(e.situationTag, 80)}"`, date: e.created_at });
+  });
+  if (!goalWords.size) return related.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).slice(0, 5);
   trackerState.buildMode.entries.filter((e) => e.user_id === currentUserId()).forEach((e) => {
     if (overlaps(e.goalSummary || e.goal || "")) related.push({ label: `Build Mode training: "${cleanText(e.goalSummary || e.goal, 80)}"`, date: e.updatedAt || e.createdAt });
   });
@@ -3712,9 +3718,21 @@ async function runCompassInsights({ force = false } = {}) {
   const reply = await requestCompassDirect(systemPrompt, userPrompt);
   const parsed = extractJsonObject(reply);
   if (!parsed || !parsed.summary || !Array.isArray(parsed.insights)) throw new Error("Compass insights reply was not valid JSON.");
+  const newTexts = parsed.insights.slice(0, 4).map((text) => cleanText(text, 160)).filter(Boolean);
+  const oldItems = trackerState.aiInsights.items || [];
+  // Zep/Graphiti-inspired (bi-temporal facts, "superseded not deleted"):
+  // when this round drops a prior insight, keep a visible trail of it
+  // instead of silently losing what Compass used to think - this is what
+  // makes the evolving-understanding claim demonstrable, not just asserted.
+  const dropped = oldItems.filter((item) => !newTexts.some((text) => text.toLowerCase() === item.text.toLowerCase()));
+  const supersededItems = [
+    ...dropped.map((item) => ({ text: item.text, supersededAt: new Date().toISOString(), replacedBy: "revised" })),
+    ...(trackerState.aiInsights.supersededItems || [])
+  ].slice(0, 10);
   trackerState.aiInsights = {
     summary: cleanText(parsed.summary, 300),
-    items: parsed.insights.slice(0, 4).map((text, index) => ({ id: `insight-${Date.now()}-${index}`, text: cleanText(text, 160), createdAt: new Date().toISOString() })),
+    items: newTexts.map((text, index) => ({ id: `insight-${Date.now()}-${index}`, text, createdAt: new Date().toISOString() })),
+    supersededItems,
     lastRunAt: new Date().toISOString(),
     basedOnCount: entries.length
   };
@@ -3734,9 +3752,26 @@ function maybeRunCompassInsights() {
   });
 }
 
+// OpenWebUI-inspired principle: the model can add insights, but the user
+// always has the final say - dismissing one moves it to the same
+// supersededItems trail a revised insight would go through, just with a
+// different reason, instead of just disappearing with no record.
+function dismissCompassInsight(insightId) {
+  const items = trackerState.aiInsights.items || [];
+  const target = items.find((item) => item.id === insightId);
+  if (!target) return;
+  trackerState.aiInsights.items = items.filter((item) => item.id !== insightId);
+  trackerState.aiInsights.supersededItems = [
+    { text: target.text, supersededAt: new Date().toISOString(), replacedBy: "user dismissed" },
+    ...(trackerState.aiInsights.supersededItems || [])
+  ].slice(0, 10);
+  saveTrackerState();
+}
+
 function compassInsightsSectionHtml() {
   const insights = trackerState.aiInsights;
   const hasData = Boolean(insights.summary || (insights.items || []).length);
+  const superseded = (insights.supersededItems || []).slice(0, 3);
   return `
     <p class="history-section-title">What Compass has noticed</p>
     <article class="history-card insight-card">
@@ -3746,8 +3781,23 @@ function compassInsightsSectionHtml() {
       <div class="history-body">
         ${hasData ? `
           <p class="history-snippet insight-summary">${escapeHTML(insights.summary)}</p>
-          ${(insights.items || []).length ? `<ul class="insight-list">${insights.items.map((item) => `<li>${escapeHTML(item.text)}</li>`).join("")}</ul>` : ""}
+          ${(insights.items || []).length ? `
+            <ul class="insight-list">
+              ${insights.items.map((item) => `
+                <li>
+                  <span>${escapeHTML(item.text)}</span>
+                  <button class="insight-dismiss" type="button" data-dismiss-insight="${escapeHTML(item.id)}" aria-label="This isn't right">&times;</button>
+                </li>
+              `).join("")}
+            </ul>
+          ` : ""}
           <p class="history-section-intro">Based on ${insights.basedOnCount} remembered moment${insights.basedOnCount === 1 ? "" : "s"}${insights.lastRunAt ? `, updated ${new Date(insights.lastRunAt).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}.</p>
+          ${superseded.length ? `
+            <div class="insight-superseded">
+              <p class="insight-superseded-title">What Compass used to think</p>
+              ${superseded.map((item) => `<p class="insight-superseded-line">"${escapeHTML(item.text)}" - ${item.replacedBy === "user dismissed" ? "you said this wasn't right" : "revised with new information"}</p>`).join("")}
+            </div>
+          ` : ""}
         ` : `<p class="history-section-intro">Nothing yet - once Compass has a few remembered moments to work with, it'll start noticing patterns here.</p>`}
         <button class="secondary-action compact-action" type="button" data-refresh-compass-insights ${isCompassInsightsRefreshing ? "disabled" : ""}>${isCompassInsightsRefreshing ? "Thinking..." : (hasData ? "Refresh" : "Notice patterns now")}</button>
       </div>
@@ -13390,6 +13440,21 @@ async function requestCompassAI(question) {
 // entries don't have - existing readers of lifeMemory ignore unknown
 // fields, and History (historyMissedOpportunitiesView) falls back to a
 // keyword heuristic for entries without `kind`.
+// MCP Memory Server-inspired (lightweight): remember_this can name a real
+// Roadmap goal it relates to; resolved here to a real goal id instead of
+// left as free text, so History's "Goals & training" view can use an
+// explicit link first and only fall back to keyword matching when the AI
+// didn't name one (see goalRelatedTraining).
+function resolveRelatedGoalId(relatedGoalText) {
+  const text = cleanText(relatedGoalText, 200);
+  if (!text) return null;
+  const goals = myRoadmapGoals();
+  const exact = goals.find((goal) => goal.title.trim().toLowerCase() === text.toLowerCase());
+  if (exact) return exact.id;
+  const fuzzy = goals.find((goal) => situationTagOverlap(goal.title, text));
+  return fuzzy ? fuzzy.id : null;
+}
+
 function saveLifeMemoryFromChat(toolCall) {
   trackerState.lifeMemory.unshift({
     id: `life-memory-${Date.now()}`,
@@ -13400,6 +13465,7 @@ function saveLifeMemoryFromChat(toolCall) {
     outcome: "",
     sealed: false,
     kind: toolCall.kind,
+    relatedGoalId: resolveRelatedGoalId(toolCall.related_goal),
     source: "ai",
     created_at: new Date().toISOString(),
     display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
@@ -13407,6 +13473,29 @@ function saveLifeMemoryFromChat(toolCall) {
   trackerState.lifeMemory = trackerState.lifeMemory.slice(0, 200);
   saveTrackerState();
   maybeRunCompassInsights();
+}
+
+// update_memory tool support (Mem0/OpenWebUI-inspired "update an existing
+// memory instead of always appending a new one"): finds the most recent
+// matching lifeMemory entry by situationTag and attaches the real outcome
+// to it - the same `outcome` field the manual "record outcome" button
+// writes, so both paths feed History's growth-synthesis view the same way.
+function updateLifeMemoryFromChat(toolCall) {
+  const myId = currentUserId();
+  const candidates = trackerState.lifeMemory.filter((entry) => entry.user_id === myId);
+  const exact = candidates.find((entry) => entry.situationTag && entry.situationTag.trim().toLowerCase() === toolCall.situation_tag.trim().toLowerCase());
+  const target = exact || candidates
+    .filter((entry) => situationTagOverlap(entry.situationTag, toolCall.situation_tag))
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
+  if (!target) {
+    console.error("[Compass AI] update_memory had no matching lifeMemory entry for", toolCall.situation_tag);
+    return false;
+  }
+  target.outcome = cleanText(toolCall.outcome, 300);
+  target.updatedAt = new Date().toISOString();
+  saveTrackerState();
+  maybeRunCompassInsights();
+  return true;
 }
 
 function validateToolCall(raw) {
@@ -13421,8 +13510,12 @@ function validateToolCall(raw) {
       decision: raw.decision,
       reason: typeof raw.reason === "string" ? raw.reason : "",
       kind: ["missed_opportunity", "decision", "note"].includes(raw.kind) ? raw.kind : "decision",
+      related_goal: typeof raw.related_goal === "string" ? raw.related_goal : "",
       message_to_user: raw.message_to_user
     };
+  }
+  if (raw.tool === "update_memory" && typeof raw.situation_tag === "string" && typeof raw.outcome === "string" && typeof raw.message_to_user === "string") {
+    return { tool: "update_memory", situation_tag: raw.situation_tag, outcome: raw.outcome, message_to_user: raw.message_to_user };
   }
   return null;
 }
@@ -15368,7 +15461,12 @@ async function sendChatMessage(text) {
     if (toolCall && toolCall.tool === "remember_this") {
       saveLifeMemoryFromChat(toolCall);
     }
-    const displayText = matchedTool ? toolCall.message_to_user : (toolCall && toolCall.tool === "remember_this" ? toolCall.message_to_user : reply);
+    if (toolCall && toolCall.tool === "update_memory") {
+      updateLifeMemoryFromChat(toolCall);
+    }
+    const displayText = toolCall && toolCall.tool !== "open_tool"
+      ? toolCall.message_to_user
+      : (matchedTool ? toolCall.message_to_user : reply);
     chatState.messages.push({
       from: "assistant",
       text: displayText,
@@ -15728,6 +15826,7 @@ document.addEventListener("click", async (event) => {
   const suggestedCommandButton = event.target.closest("[data-run-suggested-command]");
   const historyExpandButton = event.target.closest("[data-toggle-history-card]");
   const refreshInsightsButton = event.target.closest("[data-refresh-compass-insights]");
+  const dismissInsightButton = event.target.closest("[data-dismiss-insight]");
   const tryAdvancedFindingButton = event.target.closest("[data-try-advanced-finding]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
 
@@ -15769,6 +15868,11 @@ document.addEventListener("click", async (event) => {
       isCompassInsightsRefreshing = false;
       renderScreen(activeTab);
     }
+  }
+
+  if (dismissInsightButton) {
+    dismissCompassInsight(dismissInsightButton.dataset.dismissInsight);
+    renderScreen(activeTab);
   }
 
   if (opener) {
