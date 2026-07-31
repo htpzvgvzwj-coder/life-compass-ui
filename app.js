@@ -54,7 +54,7 @@ const ADMIN_PASSCODE = "STEADY-ADMIN";
 // practical version of the future-self-continuity mechanism this whole
 // product is built on. Tone adapts to personalBlueprint.personality/workStyle
 // in context, but never fabricates a reference that isn't in realSavedFacts.
-const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies. You have a tool available, open_tool, that opens a real feature in the app. Only call it when a specific real tool would genuinely help right now, based on what the user actually said - do not call it on most messages, and never call it just to seem helpful or to fill a reply. When you do call it, always include message_to_user: a short, natural, in-character line saying what you're doing, written the way you'd actually say it to this person - never a system notification like 'Opening Career Studio.' Never call open_tool for anything about immediate danger, self-harm, abuse, or crisis - that stays a plain-text reply per the safety rule above, since urgent support has its own always-visible route in this app, not one you decide to surface. You also have a second tool, remember_this, for saving something real the user just told you as a lifeMemory entry - the same kind of record the app's manual 'remember this' form creates, so the user does not have to fill out a form. Call it only when something concrete and worth recalling later was actually said (a real decision, something they are avoiding, a plan) - not on ordinary small talk, and never in the same turn as open_tool. Set kind to missed_opportunity when they skipped, avoided, or held back on something; decision when they made an active choice; note otherwise. Always include message_to_user, written the way you would actually tell a friend you are jotting something down, never a system notification. Illustrative examples of the tone and judgment described above (these are examples only, not real conversation history - never reuse their exact wording, they exist only to show the pattern): Example 1, reacting to a casual disclosure - user says 'ugh I bombed that interview today', you say something like 'damn, what happened - did it fall apart on a specific question or just the overall vibe?' not a generic 'I'm sorry to hear that, interviews can be stressful.' Example 2, using real goal data assertively - user asks 'am I making any progress', and if realSavedFacts shows a Key Result stuck at a low percent for a while, you name it directly, like 'honestly your internship-applications key result has been stuck around 20% for a few weeks now - that's the one actually dragging things down, what's been in the way?' not a vague 'you're doing great, keep it up.' Example 3, the open_tool boundary - user says 'I don't even know what career I want', a real career-exploration feature genuinely applies so you call open_tool with a natural message_to_user like 'let's actually map this out - opening Career Compass'; but if the user instead says 'ugh I'm just tired today', nothing specific applies, so you reply normally and call no tool at all. Example 4, disagreeing plainly - user says 'I think I should just drop the internship search and wait until next year', you say something like 'I'd push back on that - waiting doesn't fix what's making the search feel stuck right now, it just delays it, what's actually making it feel hard?' not silent agreement and not a lecture. If the context JSON includes a non-null pendingProactiveMessage, that is something Compass wants to get across (a newly noticed pattern, or a check-in on something the user mentioned a while back and never followed up on) - weave it into this reply naturally, once, in your own words, the way you would casually bring it up with a friend, never as a formal update or notification like 'Update: I noticed...'. Skip it entirely if the user's message is about something urgent, unrelated, or where bringing it up would feel forced - there will be other chances, it does not have to be this exact reply. The context JSON also includes trustTier, one of low, mid, or high, reflecting how much real trust has actually been earned so far through concrete events - never mention this tier, its name, or that such a thing exists, it is invisible by design. At low tier, stay fully reactive - answer what is asked, do not volunteer unprompted connections. At mid or high tier, you may proactively connect real patterns across different areas of the user's life within a reply when genuinely relevant, even unprompted, the way a close friend who has known someone a while would - for example noting that a topic keeps resurfacing across separate situations - but only when it is actually true and relevant, never manufactured to seem perceptive. If the context JSON includes relevantHistory (past journal entries, mood logs, practice sessions, or other saved activity that matches what the user is asking about), use it to answer directly instead of saying you cannot find that - reference it naturally in a sentence, never as a dumped list, and only speak to what it actually contains. If the context JSON includes a non-null personalityRead (openness/conscientiousness/extraversion/agreeableness/neuroticism, each low/medium/high, inferred from the user's own writing), use it alongside personalBlueprint.personality/workStyle to calibrate how direct, warm, or exploratory to be - never mention these trait names or that such an inference exists, it works the same way personalBlueprint already does, just quietly informing tone. If the context JSON includes domainBrief (an array of up to two short internal notes on how to handle this specific topic well - career/interview, money, relationships, or decision/avoidance help), let it shape what you prioritize, what you ask, and what a genuinely useful next step looks like for that specific area - but never mention the word 'brief', never say you are following guidance or switching modes, and never change your voice - you are still the same one person talking, just someone who happens to know this particular topic well.";
+const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies. You have a tool available, open_tool, that opens a real feature in the app. Only call it when a specific real tool would genuinely help right now, based on what the user actually said - do not call it on most messages, and never call it just to seem helpful or to fill a reply. When you do call it, always include message_to_user: a short, natural, in-character line saying what you're doing, written the way you'd actually say it to this person - never a system notification like 'Opening Career Studio.' Never call open_tool for anything about immediate danger, self-harm, abuse, or crisis - that stays a plain-text reply per the safety rule above, since urgent support has its own always-visible route in this app, not one you decide to surface. You also have a second tool, remember_this, for saving something real the user just told you as a lifeMemory entry - the same kind of record the app's manual 'remember this' form creates, so the user does not have to fill out a form. Call it only when something concrete and worth recalling later was actually said (a real decision, something they are avoiding, a plan) - not on ordinary small talk, and never in the same turn as open_tool. Set kind to missed_opportunity when they skipped, avoided, or held back on something; decision when they made an active choice; note otherwise. Always include message_to_user, written the way you would actually tell a friend you are jotting something down, never a system notification. Illustrative examples of the tone and judgment described above (these are examples only, not real conversation history - never reuse their exact wording, they exist only to show the pattern): Example 1, reacting to a casual disclosure - user says 'ugh I bombed that interview today', you say something like 'damn, what happened - did it fall apart on a specific question or just the overall vibe?' not a generic 'I'm sorry to hear that, interviews can be stressful.' Example 2, using real goal data assertively - user asks 'am I making any progress', and if realSavedFacts shows a Key Result stuck at a low percent for a while, you name it directly, like 'honestly your internship-applications key result has been stuck around 20% for a few weeks now - that's the one actually dragging things down, what's been in the way?' not a vague 'you're doing great, keep it up.' Example 3, the open_tool boundary - user says 'I don't even know what career I want', a real career-exploration feature genuinely applies so you call open_tool with a natural message_to_user like 'let's actually map this out - opening Career Compass'; but if the user instead says 'ugh I'm just tired today', nothing specific applies, so you reply normally and call no tool at all. Example 4, disagreeing plainly - user says 'I think I should just drop the internship search and wait until next year', you say something like 'I'd push back on that - waiting doesn't fix what's making the search feel stuck right now, it just delays it, what's actually making it feel hard?' not silent agreement and not a lecture. If the context JSON includes a non-null pendingProactiveMessage, that is something Compass wants to get across (a newly noticed pattern, or a check-in on something the user mentioned a while back and never followed up on) - weave it into this reply naturally, once, in your own words, the way you would casually bring it up with a friend, never as a formal update or notification like 'Update: I noticed...'. Skip it entirely if the user's message is about something urgent, unrelated, or where bringing it up would feel forced - there will be other chances, it does not have to be this exact reply. The context JSON also includes trustTier, one of low, mid, or high, reflecting how much real trust has actually been earned so far through concrete events - never mention this tier, its name, or that such a thing exists, it is invisible by design. At low tier, stay fully reactive - answer what is asked, do not volunteer unprompted connections. At mid or high tier, you may proactively connect real patterns across different areas of the user's life within a reply when genuinely relevant, even unprompted, the way a close friend who has known someone a while would - for example noting that a topic keeps resurfacing across separate situations - but only when it is actually true and relevant, never manufactured to seem perceptive. If the context JSON includes relevantHistory (past journal entries, mood logs, practice sessions, or other saved activity that matches what the user is asking about), use it to answer directly instead of saying you cannot find that - reference it naturally in a sentence, never as a dumped list, and only speak to what it actually contains. If the context JSON includes a non-null personalityRead (openness/conscientiousness/extraversion/agreeableness/neuroticism, each low/medium/high, inferred from the user's own writing), use it alongside personalBlueprint.personality/workStyle to calibrate how direct, warm, or exploratory to be - never mention these trait names or that such an inference exists, it works the same way personalBlueprint already does, just quietly informing tone. If the context JSON includes domainBrief (an array of up to two short internal notes on how to handle this specific topic well - career/interview, money, relationships, or decision/avoidance help), let it shape what you prioritize, what you ask, and what a genuinely useful next step looks like for that specific area - but never mention the word 'brief', never say you are following guidance or switching modes, and never change your voice - you are still the same one person talking, just someone who happens to know this particular topic well. If the context JSON includes a non-null budgetSnapshot (real Needs/Wants/Savings amounts from Money Plan, how much has actually been spent this month against that, and any savings goal), use these real numbers directly when money comes up instead of staying abstract - for example naming that their spending is already close to or over the Needs+Wants budget for the month, or how a savings goal is tracking - but only when it is actually relevant to what they said, never as an unprompted report, and never call it 'budgetSnapshot' or say where the numbers come from.";
 // Future Self module (Future Mirror bible Ch.4) - grounded in Hershfield's
 // future self-continuity research: vividness matters more than certainty
 // framing. Never phrase as "you will be X" - always "if you continue on this
@@ -612,6 +612,15 @@ const defaultTrackerState = {
   systemTutorialsSeen: {},
   moodSuggestion: null,
   taxChecklist: {},
+  // 55/25/20 (not the classic US 50/30/20) - Singapore's mandatory CPF
+  // deduction plus a typically larger housing share genuinely warrant a
+  // heavier Needs slice; takeHomeMonthly defaults to null and is meant to
+  // be pre-filled from careerStudio.paycheckCheck.result when available,
+  // not re-asked from scratch (see modals.moneyPlan). savingsGoal.saved
+  // is a manually-updated figure, same "no fake bank connection" honesty
+  // as microInsurance - this app has no real backend to sync a real
+  // account against.
+  moneyPlan: { takeHomeMonthly: null, needsPercent: 55, wantsPercent: 25, savingsPercent: 20, savingsGoal: { label: "", target: 0, saved: 0 }, updatedAt: null },
   guardianShare: { token: null, manageSecret: null, goalIds: [], includePersonalBlueprint: false, includeChatHistory: false, includeCostOfLiving: false, updatedAt: null },
   ghostRoommate: { active: false, personaId: null, startedAt: null, week: 0, relationship: 60, history: [], moveOutReason: "", currentWeek: null },
   legacyIssues: [],
@@ -1208,6 +1217,7 @@ let buildModeError = "";
 let buildMomentCategory = "independence";
 let costOfLivingDraft = { housing: "shared-room", district: "suburban", transport: "public", lifestyle: "moderate" };
 let costOfLivingResult = null;
+let moneyPlanEditing = false;
 let activeBuildEntryId = null;
 let activeBuildTrainingSessionId = null;
 let isBuildTrainingLoading = false;
@@ -1411,6 +1421,26 @@ function normalizeTrackerState(state) {
     systemTutorialsSeen: (state.systemTutorialsSeen && typeof state.systemTutorialsSeen === "object") ? state.systemTutorialsSeen : {},
     moodSuggestion: state.moodSuggestion || null,
     taxChecklist: (state.taxChecklist && typeof state.taxChecklist === "object") ? state.taxChecklist : {},
+    moneyPlan: (() => {
+      const plan = (state.moneyPlan && typeof state.moneyPlan === "object") ? state.moneyPlan : fallback.moneyPlan;
+      const needs = Number(plan.needsPercent);
+      const wants = Number(plan.wantsPercent);
+      const savings = Number(plan.savingsPercent);
+      const percentsValid = Number.isFinite(needs) && Number.isFinite(wants) && Number.isFinite(savings) && needs + wants + savings === 100;
+      const goal = (plan.savingsGoal && typeof plan.savingsGoal === "object") ? plan.savingsGoal : fallback.moneyPlan.savingsGoal;
+      return {
+        takeHomeMonthly: Number.isFinite(Number(plan.takeHomeMonthly)) && Number(plan.takeHomeMonthly) > 0 ? Number(plan.takeHomeMonthly) : null,
+        needsPercent: percentsValid ? needs : fallback.moneyPlan.needsPercent,
+        wantsPercent: percentsValid ? wants : fallback.moneyPlan.wantsPercent,
+        savingsPercent: percentsValid ? savings : fallback.moneyPlan.savingsPercent,
+        savingsGoal: {
+          label: typeof goal.label === "string" ? goal.label : "",
+          target: Number.isFinite(Number(goal.target)) ? Number(goal.target) : 0,
+          saved: Number.isFinite(Number(goal.saved)) ? Number(goal.saved) : 0
+        },
+        updatedAt: plan.updatedAt || null
+      };
+    })(),
     guardianShare: (state.guardianShare && typeof state.guardianShare === "object") ? { ...fallback.guardianShare, ...state.guardianShare, goalIds: Array.isArray(state.guardianShare.goalIds) ? state.guardianShare.goalIds : [] } : fallback.guardianShare,
     ghostRoommate: (state.ghostRoommate && typeof state.ghostRoommate === "object") ? { ...fallback.ghostRoommate, ...state.ghostRoommate, history: Array.isArray(state.ghostRoommate.history) ? state.ghostRoommate.history : [] } : fallback.ghostRoommate,
     legacyIssues: Array.isArray(state.legacyIssues) ? state.legacyIssues : fallback.legacyIssues,
@@ -2076,6 +2106,56 @@ function formatCurrency(value) {
 
 function todaySpendTotal() {
   return trackerState.receipts.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+}
+
+// Real per-month filter, unlike todaySpendTotal() above (which sums every
+// receipt ever recorded despite its name) - only counts receipts with a
+// real createdAt timestamp falling in the current calendar month. Older
+// receipts recorded before createdAt existed are excluded rather than
+// guessed at.
+function spentThisMonth() {
+  const now = new Date();
+  return trackerState.receipts
+    .filter((item) => {
+      if (!item.createdAt) return false;
+      const created = new Date(item.createdAt);
+      return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
+    })
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+}
+
+// spendingBudget deliberately does not try to split Food/Study/Transport/
+// Health/Other receipt categories into Needs vs. Wants - there is no
+// honest, universally-correct mapping (is "Study" a need or a want for a
+// given person?), so rather than invent one, this only compares one real
+// number (total spent) against one real number (Needs+Wants combined,
+// since Savings is money set aside, not money available to spend).
+function moneyPlanSummary() {
+  const plan = trackerState.moneyPlan;
+  if (!plan.takeHomeMonthly) return null;
+  const needsAmount = plan.takeHomeMonthly * (plan.needsPercent / 100);
+  const wantsAmount = plan.takeHomeMonthly * (plan.wantsPercent / 100);
+  const savingsAmount = plan.takeHomeMonthly * (plan.savingsPercent / 100);
+  const spendingBudget = needsAmount + wantsAmount;
+  const spent = spentThisMonth();
+  return {
+    takeHomeMonthly: plan.takeHomeMonthly,
+    needsAmount,
+    wantsAmount,
+    savingsAmount,
+    spendingBudget,
+    spentThisMonth: spent,
+    spendPercent: spendingBudget > 0 ? Math.round((spent / spendingBudget) * 100) : 0,
+    savingsGoal: plan.savingsGoal
+  };
+}
+
+// Fed into requestCompassAI's context (see context.budgetSnapshot) - the
+// same "recompute every turn, null when not applicable" pattern as
+// relevantHistory/personalityRead/domainBrief. Null until the user has
+// actually set a plan, so 2BB never references numbers that don't exist.
+function budgetSnapshotForAI() {
+  return moneyPlanSummary();
 }
 
 function dateKey(date = new Date()) {
@@ -3314,6 +3394,7 @@ function commandLauncherCommands() {
     { id: "future-scan", title: "Run Future Scan", detail: "Check identity, values, hidden costs, and no-action future.", lane: "Decide", tab: "secondBrain", open: "decisionLab", icon: "icon-decide.png", keywords: ["decision", "choose", "future scan", "risk"] },
     { id: "build-mode-coach", title: "Build Mode", detail: "An AI coach trains you toward one specific goal - interview, money, confidence, and more.", lane: "Decide", tab: "secondBrain", open: "decisionLab", icon: "icon-decide.png", keywords: ["coach", "training", "practice plan", "build mode"] },
     { id: "cost-living", title: "Real Cost of Living", detail: "Estimate SG-style living costs before a decision.", lane: "Decide", tab: "secondBrain", open: "costOfLiving", icon: "icon-money.png", keywords: ["money", "cost", "budget", "rent"] },
+    { id: "money-plan", title: "Money Plan", detail: "Real Needs/Wants/Savings numbers, and a savings goal.", lane: "Decide", tab: "secondBrain", open: "moneyPlan", icon: "icon-money.png", keywords: ["money", "budget", "savings", "needs", "wants"] },
     { id: "tax", title: "Basic Tax Obligations", detail: "Plain-English tax checklist.", lane: "Decide", tab: "secondBrain", open: "taxObligations", icon: "icon-receipt.png", keywords: ["tax", "cpf", "income"] },
     { id: "blueprint", title: "Discover Yourself", detail: "Build the profile that powers better recommendations.", lane: "My Profile", tab: "secondBrain", open: "discoverYourself", icon: "icon-profile.png", keywords: ["profile", "blueprint", "identity", "values"] },
     { id: "roadmap", title: "Life Roadmap", detail: "Turn a goal into monthly milestones.", lane: "Decisions & Memory", tab: "secondBrain", open: "roadmapView", icon: "icon-time.png", keywords: ["roadmap", "goal", "plan", "milestone"] },
@@ -13236,6 +13317,74 @@ const modals = {
     `;
   },
 
+  // Money Plan: real Needs/Wants/Savings amounts from a real take-home
+  // figure (defaults to the already-computed paycheckCheck result rather
+  // than asking again), a real spend-vs-budget comparison
+  // (moneyPlanSummary/spentThisMonth), and one manually-tracked savings
+  // goal - no fake bank connection, same honesty as microInsurance.
+  // moneyPlanEditing forces the setup form back open even when a plan
+  // already exists (see data-edit-money-plan).
+  moneyPlan: () => {
+    const plan = trackerState.moneyPlan;
+    const summary = moneyPlanSummary();
+    if (!summary || moneyPlanEditing) {
+      const suggestedTakeHome = trackerState.careerStudio.paycheckCheck ? trackerState.careerStudio.paycheckCheck.result.takeHomeMonthly : "";
+      return `
+        <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="money-plan-title">
+          <div class="modal-top">
+            <span class="risk-pill calm">Money Plan</span>
+            <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+          </div>
+          <h3 id="money-plan-title">Set up your real budget</h3>
+          <p class="muted">55/25/20, not the classic US 50/30/20 - adjusted for CPF and Singapore's bigger housing share. Change the numbers if they don't fit you; they just need to add up to 100.</p>
+          <div class="admin-form">
+            <label>Take-home pay per month
+              <input id="money-take-home" type="number" min="0" step="10" value="${plan.takeHomeMonthly || suggestedTakeHome || ""}" placeholder="e.g. 2400">
+            </label>
+            <label>Needs %<input id="money-needs-percent" type="number" min="0" max="100" value="${plan.needsPercent}"></label>
+            <label>Wants %<input id="money-wants-percent" type="number" min="0" max="100" value="${plan.wantsPercent}"></label>
+            <label>Savings %<input id="money-savings-percent" type="number" min="0" max="100" value="${plan.savingsPercent}"></label>
+            <label>Savings goal (optional)<input id="money-goal-label" type="text" maxlength="60" value="${escapeHTML(plan.savingsGoal.label)}" placeholder="e.g. Laptop fund"></label>
+            <label>Goal target<input id="money-goal-target" type="number" min="0" step="10" value="${plan.savingsGoal.target || ""}"></label>
+          </div>
+          <p class="tiny-note" id="money-plan-error"></p>
+          <button class="primary-action" type="button" data-save-money-plan>Save plan</button>
+        </div>
+      `;
+    }
+    const overBudget = summary.spendPercent >= 100;
+    const nearBudget = !overBudget && summary.spendPercent >= 80;
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="money-plan-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Money Plan</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="money-plan-title">This month, for real</h3>
+        <div class="resume-preview-card paycheck-result-card">
+          <div class="paycheck-result-row"><span>Needs (${plan.needsPercent}%)</span><strong>${formatCurrency(summary.needsAmount)}</strong></div>
+          <div class="paycheck-result-row"><span>Wants (${plan.wantsPercent}%)</span><strong>${formatCurrency(summary.wantsAmount)}</strong></div>
+          <div class="paycheck-result-row"><span>Savings (${plan.savingsPercent}%)</span><strong>${formatCurrency(summary.savingsAmount)}</strong></div>
+          <div class="paycheck-result-row paycheck-result-final"><span>Spent this month</span><strong>${formatCurrency(summary.spentThisMonth)} / ${formatCurrency(summary.spendingBudget)} (${summary.spendPercent}%)</strong></div>
+        </div>
+        ${overBudget ? `<p class="tiny-note risk-pill warn">Already past your Needs+Wants budget for this month.</p>` : nearBudget ? `<p class="tiny-note risk-pill warn">Getting close to your budget for this month.</p>` : ""}
+        ${plan.savingsGoal.label ? `
+          <div class="ledger-sheet">
+            <p class="eyebrow">${escapeHTML(plan.savingsGoal.label)}</p>
+            <div class="adulting-meter"><span style="width:${plan.savingsGoal.target > 0 ? Math.min(100, Math.round((plan.savingsGoal.saved / plan.savingsGoal.target) * 100)) : 0}%"></span></div>
+            <p class="ledger-entry-note">${formatCurrency(plan.savingsGoal.saved)} / ${formatCurrency(plan.savingsGoal.target)}</p>
+            <label>Update saved amount<input id="money-goal-saved-input" type="number" min="0" step="10" value="${plan.savingsGoal.saved}"></label>
+            <button class="secondary-action compact-action" type="button" data-update-savings-progress>Update</button>
+          </div>
+        ` : ""}
+        <div class="profile-actions">
+          <button class="secondary-action compact-action" type="button" data-open="receipt">Log a payment</button>
+          <button class="secondary-action compact-action" type="button" data-edit-money-plan>Edit plan</button>
+        </div>
+      </div>
+    `;
+  },
+
   growthGoals: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="growth-goals-title">
       <div class="modal-top">
@@ -13769,6 +13918,9 @@ function openModal(name, payload) {
   if (name === "costOfLiving" && !modalLayer.classList.contains("is-open")) {
     costOfLivingResult = null;
   }
+  if (name === "moneyPlan" && !modalLayer.classList.contains("is-open")) {
+    moneyPlanEditing = false;
+  }
   if (name === "microInsurance" && !modalLayer.classList.contains("is-open")) {
     microInsuranceScenarioId = null;
   }
@@ -13991,6 +14143,9 @@ async function requestCompassAI(question) {
     // avoidance), keyword-matched against this specific message - see
     // domainBriefForMessage and the DOMAIN_BRIEFS comment above it.
     domainBrief: domainBriefForMessage(question),
+    // Real Needs/Wants/Savings numbers from Money Plan (moneyPlanSummary),
+    // null until the user actually sets one up - see budgetSnapshotForAI.
+    budgetSnapshot: budgetSnapshotForAI(),
     // Big Five-inspired real tone read from the user's own writing,
     // distinct from the self-reported personalBlueprint - see
     // runPersonalityInference. Null until enough real text exists.
@@ -16390,6 +16545,9 @@ document.addEventListener("click", async (event) => {
   const messageContact = event.target.closest("[data-message-contact]");
   const saveGrowthGoals = event.target.closest("[data-save-growth-goals]");
   const calcCostOfLiving = event.target.closest("[data-calc-cost-of-living]");
+  const saveMoneyPlanButton = event.target.closest("[data-save-money-plan]");
+  const editMoneyPlanButton = event.target.closest("[data-edit-money-plan]");
+  const updateSavingsProgressButton = event.target.closest("[data-update-savings-progress]");
   const saveJournal = event.target.closest("[data-save-journal]");
   const saveLifeMemory = event.target.closest("[data-save-life-memory]");
   const recordLifeMemoryOutcomeButton = event.target.closest("[data-record-life-memory-outcome]");
@@ -17852,6 +18010,47 @@ document.addEventListener("click", async (event) => {
     openModal("costOfLiving");
   }
 
+  if (saveMoneyPlanButton) {
+    const takeHome = Number(modalLayer.querySelector("#money-take-home").value || 0);
+    const needs = Number(modalLayer.querySelector("#money-needs-percent").value || 0);
+    const wants = Number(modalLayer.querySelector("#money-wants-percent").value || 0);
+    const savings = Number(modalLayer.querySelector("#money-savings-percent").value || 0);
+    const errorEl = modalLayer.querySelector("#money-plan-error");
+    if (takeHome <= 0) {
+      if (errorEl) errorEl.textContent = "Enter a real take-home amount first.";
+    } else if (needs + wants + savings !== 100) {
+      if (errorEl) errorEl.textContent = `Needs + Wants + Savings has to add up to 100 - right now it's ${needs + wants + savings}.`;
+    } else {
+      trackerState.moneyPlan = {
+        takeHomeMonthly: takeHome,
+        needsPercent: needs,
+        wantsPercent: wants,
+        savingsPercent: savings,
+        savingsGoal: {
+          label: cleanText(modalLayer.querySelector("#money-goal-label").value, 60),
+          target: Number(modalLayer.querySelector("#money-goal-target").value || 0),
+          saved: trackerState.moneyPlan.savingsGoal.saved
+        },
+        updatedAt: new Date().toISOString()
+      };
+      moneyPlanEditing = false;
+      saveTrackerState();
+      openModal("moneyPlan");
+    }
+  }
+
+  if (editMoneyPlanButton) {
+    moneyPlanEditing = true;
+    openModal("moneyPlan");
+  }
+
+  if (updateSavingsProgressButton) {
+    const input = modalLayer.querySelector("#money-goal-saved-input");
+    trackerState.moneyPlan.savingsGoal.saved = Number(input ? input.value : 0) || 0;
+    saveTrackerState();
+    openModal("moneyPlan");
+  }
+
   if (saveJournal) {
     const input = modalLayer.querySelector("#journal-entry-input");
     const error = modalLayer.querySelector("#journal-error");
@@ -18379,7 +18578,13 @@ document.addEventListener("click", async (event) => {
         amount,
         category: modalLayer.querySelector("#receipt-category").value,
         method: modalLayer.querySelector("#receipt-method").value,
-        time: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+        time: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+        // Receipts previously had no real date field at all (only this
+        // display-only time-of-day string) - added so Money Plan can
+        // genuinely filter "this month" instead of summing every receipt
+        // ever recorded. Older receipts without this field are excluded
+        // from that filter rather than guessed at (see spentThisMonth()).
+        createdAt: new Date().toISOString()
       };
       trackerState.receipts.unshift(receipt);
       recordFinanceReceipt(receipt);

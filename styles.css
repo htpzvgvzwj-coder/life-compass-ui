@@ -11709,6 +11709,15 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .app
   display: none;
 }
 
+/* .money-plan-fab has no default appearance anywhere else (unlike
+   .sos-fab/.desktop-command-search, which are real features on every
+   screen just restyled here) - hidden by default everywhere, only
+   shown+positioned for Home/2BB below. */
+.money-plan-fab {
+  display: none;
+  position: absolute;
+}
+
 /* display:contents (not position:absolute) - giving .desktop-command-bar
    its own position:absolute made IT the positioning context for
    .desktop-command-search's left/top percentages instead of .phone-shell,
@@ -11762,7 +11771,9 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .des
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-search .bb-card-image,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search .bb-card-image,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab .bb-card-image,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab .bb-card-image {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab .bb-card-image,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .money-plan-fab .bb-card-image,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .money-plan-fab .bb-card-image {
   display: block;
   position: absolute;
   inset: 0;
@@ -11774,7 +11785,9 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-search::after,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search::after,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab::after,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab::after {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab::after,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .money-plan-fab::after,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .money-plan-fab::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -11813,7 +11826,9 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos
 }
 
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab .bb-sos-label,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab .bb-sos-label {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab .bb-sos-label,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .money-plan-fab .bb-sos-label,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .money-plan-fab .bb-sos-label {
   position: absolute;
   left: 5px;
   right: 5px;
@@ -11824,11 +11839,35 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos
   color: var(--warm-ink);
 }
 
+/* Third card in the same column, stacked below SOS - same fixed-px
+   width/height as the other two so this next `top` addition stays
+   entirely in one axis (px), the exact fix for the calc() bug two
+   cards up from here already explains in full. */
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .money-plan-fab,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .money-plan-fab {
+  left: 12%;
+  top: calc(6% + 117px + 10px + 117px + 10px);
+  right: auto;
+  bottom: auto;
+  width: 84px;
+  height: 117px;
+  display: block;
+  padding: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: transparent;
+  border: 1px solid var(--warm-line);
+  box-shadow: 0 10px 22px rgba(8, 5, 2, 0.3);
+  font-size: 0;
+}
+
 @media (max-width: 760px) {
   body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar.is-quiet .desktop-command-search,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-bar.is-quiet .desktop-command-search,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab,
-  body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab {
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab,
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .money-plan-fab,
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .money-plan-fab {
     position: static;
     width: auto;
     aspect-ratio: auto;
