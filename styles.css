@@ -11389,3 +11389,31 @@ body {
   font-size: 12.5px;
   color: var(--color-muted);
 }
+
+/* aiInsights card - the one History section that visibly changes on its
+   own as lifeMemory accumulates, not just when the user adds something.
+   Uses the default .history-card row layout (icon left, body right). */
+.insight-summary {
+  white-space: normal;
+  overflow: visible;
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.insight-list {
+  margin: 8px 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.insight-list li {
+  margin-bottom: 3px;
+}
+
+.insight-card .secondary-action {
+  align-self: flex-start;
+  margin-top: 4px;
+}

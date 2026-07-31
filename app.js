@@ -514,6 +514,15 @@ const defaultTrackerState = {
   // knows) but the system prompt instructs it never to surface a sealed
   // entry unless the user brings that topic up first.
   lifeMemory: [],
+  // EverOS-inspired "skills/profile" layer, distinct from lifeMemory
+  // (episodes - what happened) and personalBlueprint (user-declared, set
+  // once at onboarding). aiInsights is AI-INFERRED from accumulated
+  // episodes and re-generated periodically (see maybeRunCompassInsights),
+  // so it's the one part of Compass's memory that visibly evolves on its
+  // own rather than only growing by the user adding things. Named
+  // aiInsights, not "reflection", to avoid colliding with the existing
+  // unrelated Reflection Engine (trackerState.reflectionEntries).
+  aiInsights: { summary: "", items: [], lastRunAt: null, basedOnCount: 0 },
   challengeProgress: [],
   savedOpportunities: [],
   futureMirror: {
@@ -1136,6 +1145,7 @@ const assessmentItems = [
 
 let activeTab = "home";
 let isCompassResponding = false;
+let isCompassInsightsRefreshing = false;
 let futureMirrorMode = "scan";
 
 // Future Scan - third Future Mirror mode ("help the user see the truth before
@@ -1339,6 +1349,7 @@ function normalizeTrackerState(state) {
     supportContacts: Array.isArray(state.supportContacts) ? state.supportContacts : defaultSupportContacts,
     journalEntries: Array.isArray(state.journalEntries) ? state.journalEntries : fallback.journalEntries,
     lifeMemory: Array.isArray(state.lifeMemory) ? state.lifeMemory : fallback.lifeMemory,
+    aiInsights: state.aiInsights && typeof state.aiInsights === "object" ? { ...fallback.aiInsights, ...state.aiInsights, items: Array.isArray(state.aiInsights.items) ? state.aiInsights.items : [] } : fallback.aiInsights,
     challengeProgress: Array.isArray(state.challengeProgress) ? state.challengeProgress : fallback.challengeProgress,
     savedOpportunities: Array.isArray(state.savedOpportunities) ? state.savedOpportunities : fallback.savedOpportunities,
     futureMirror: {
@@ -3676,8 +3687,77 @@ function historyGrowthSynthesisHtml() {
   })).join("");
 }
 
+// EverOS-inspired "reflection" step: periodically distill accumulated
+// lifeMemory into a short evolving understanding of the user (aiInsights),
+// instead of only ever recomputing facts fresh per message. Prior insights
+// are fed back to the model so it can revise/merge them itself - closer to
+// EverOS's "refines profiles and skills" idea than a naive append-only list.
+function compassInsightsDueCount() {
+  const total = trackerState.lifeMemory.filter((e) => e.user_id === currentUserId()).length;
+  return total - (trackerState.aiInsights.basedOnCount || 0);
+}
+
+function shouldRunCompassInsights() {
+  const dueCount = compassInsightsDueCount();
+  return trackerState.aiInsights.lastRunAt ? dueCount >= 5 : dueCount >= 3;
+}
+
+async function runCompassInsights({ force = false } = {}) {
+  const entries = trackerState.lifeMemory.filter((e) => e.user_id === currentUserId());
+  if (!force && !entries.length) return false;
+  const episodesText = entries.slice(0, 40).map((e) => `- [${e.kind || "unclassified"}] ${e.situationTag}: ${e.decision}${e.reason ? ` (reason: ${e.reason})` : ""}${e.outcome ? ` -> later: ${e.outcome}` : ""}`).join("\n") || "No lifeMemory entries yet.";
+  const priorInsights = (trackerState.aiInsights.items || []).map((item) => `- ${item.text}`).join("\n") || "None yet.";
+  const systemPrompt = "You are Compass's background memory-consolidation process. You are given a list of real remembered decisions/situations about one specific user, plus the short list of patterns you noticed about them last time. Update your understanding: keep patterns that still hold, drop ones the new data contradicts, and add genuinely new ones - don't just repeat the old list back unchanged. Never invent anything not supported by the entries given; if there isn't enough real signal for a pattern, say so plainly in the summary instead of manufacturing one. Respond as strict JSON only.";
+  const userPrompt = `Remembered decisions/situations (most recent first):\n${episodesText}\n\nOther real saved context: ${realGrowthFactsText()}\n\nPatterns you noticed last time:\n${priorInsights}\n\nRespond as strict JSON only: {"summary": "one or two sentences, warm but plain, describing what you've noticed about this person overall", "insights": ["short pattern statement", "short pattern statement"]} - 2 to 4 insights, each one sentence, specific to this person, not generic advice.`;
+  const reply = await requestCompassDirect(systemPrompt, userPrompt);
+  const parsed = extractJsonObject(reply);
+  if (!parsed || !parsed.summary || !Array.isArray(parsed.insights)) throw new Error("Compass insights reply was not valid JSON.");
+  trackerState.aiInsights = {
+    summary: cleanText(parsed.summary, 300),
+    items: parsed.insights.slice(0, 4).map((text, index) => ({ id: `insight-${Date.now()}-${index}`, text: cleanText(text, 160), createdAt: new Date().toISOString() })),
+    lastRunAt: new Date().toISOString(),
+    basedOnCount: entries.length
+  };
+  saveTrackerState();
+  return true;
+}
+
+// Fire-and-forget background trigger, same pattern as
+// enhanceMoodSuggestionWithAI/enhanceBuildTrainingReply - only runs when
+// enough new signal has accumulated, never blocks the flow it's called from.
+function maybeRunCompassInsights() {
+  if (!shouldRunCompassInsights()) return;
+  runCompassInsights().then((ran) => {
+    if (ran) renderScreen(activeTab);
+  }).catch((error) => {
+    console.error("[Compass AI] Background insight generation failed.", error);
+  });
+}
+
+function compassInsightsSectionHtml() {
+  const insights = trackerState.aiInsights;
+  const hasData = Boolean(insights.summary || (insights.items || []).length);
+  return `
+    <p class="history-section-title">What Compass has noticed</p>
+    <article class="history-card insight-card">
+      <div class="history-icon type-sage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 00-7 7c0 2.4 1.2 4.2 3 5.5V17a1 1 0 001 1h6a1 1 0 001-1v-2.5c1.8-1.3 3-3.1 3-5.5a7 7 0 00-7-7z"/><path d="M9 21h6"/></svg>
+      </div>
+      <div class="history-body">
+        ${hasData ? `
+          <p class="history-snippet insight-summary">${escapeHTML(insights.summary)}</p>
+          ${(insights.items || []).length ? `<ul class="insight-list">${insights.items.map((item) => `<li>${escapeHTML(item.text)}</li>`).join("")}</ul>` : ""}
+          <p class="history-section-intro">Based on ${insights.basedOnCount} remembered moment${insights.basedOnCount === 1 ? "" : "s"}${insights.lastRunAt ? `, updated ${new Date(insights.lastRunAt).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}.</p>
+        ` : `<p class="history-section-intro">Nothing yet - once Compass has a few remembered moments to work with, it'll start noticing patterns here.</p>`}
+        <button class="secondary-action compact-action" type="button" data-refresh-compass-insights ${isCompassInsightsRefreshing ? "disabled" : ""}>${isCompassInsightsRefreshing ? "Thinking..." : (hasData ? "Refresh" : "Notice patterns now")}</button>
+      </div>
+    </article>
+  `;
+}
+
 function historyCuratedSectionsHtml() {
   return `
+    ${compassInsightsSectionHtml()}
     <p class="history-section-title">Goals & training</p>
     ${historyGoalsTrainingHtml()}
     <p class="history-section-title">Missed opportunities</p>
@@ -13326,6 +13406,7 @@ function saveLifeMemoryFromChat(toolCall) {
   });
   trackerState.lifeMemory = trackerState.lifeMemory.slice(0, 200);
   saveTrackerState();
+  maybeRunCompassInsights();
 }
 
 function validateToolCall(raw) {
@@ -15646,6 +15727,7 @@ document.addEventListener("click", async (event) => {
   const commandRunButton = event.target.closest("[data-command-run]");
   const suggestedCommandButton = event.target.closest("[data-run-suggested-command]");
   const historyExpandButton = event.target.closest("[data-toggle-history-card]");
+  const refreshInsightsButton = event.target.closest("[data-refresh-compass-insights]");
   const tryAdvancedFindingButton = event.target.closest("[data-try-advanced-finding]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
 
@@ -15670,6 +15752,22 @@ document.addEventListener("click", async (event) => {
       else fullTextEl.setAttribute("hidden", "");
       historyExpandButton.textContent = nowExpanded ? "Less" : "More";
       historyExpandButton.setAttribute("aria-expanded", nowExpanded ? "true" : "false");
+    }
+  }
+
+  // Manual trigger for aiInsights - lets the user (or a live demo) see
+  // Compass's understanding update on demand instead of only waiting for
+  // the background threshold in maybeRunCompassInsights to be met.
+  if (refreshInsightsButton) {
+    isCompassInsightsRefreshing = true;
+    renderScreen(activeTab);
+    try {
+      await runCompassInsights({ force: true });
+    } catch (error) {
+      console.error("[Compass AI] Manual insight refresh failed.", error);
+    } finally {
+      isCompassInsightsRefreshing = false;
+      renderScreen(activeTab);
     }
   }
 
@@ -16935,6 +17033,7 @@ document.addEventListener("click", async (event) => {
     });
     trackerState.lifeMemory = trackerState.lifeMemory.slice(0, 200);
     saveTrackerState();
+    maybeRunCompassInsights();
     openModal("lifeMemory");
   }
 
