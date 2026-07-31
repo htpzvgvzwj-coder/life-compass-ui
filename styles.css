@@ -11733,9 +11733,16 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .des
   position: absolute;
   left: 12%;
   top: 6%;
-  width: 7%;
-  aspect-ratio: 0.72 / 1;
-  height: auto;
+  /* Fixed px, not width:%+aspect-ratio - .sos-fab's top below needs to
+     add "this card's height" to its own top offset, and a height derived
+     from aspect-ratio is relative to this element's WIDTH (a horizontal
+     measurement) while `top` resolves percentages against the
+     container's HEIGHT - mixing those two axes in one calc() doesn't
+     convert between them, it just silently produces the wrong number
+     (that's what put these two cards flush against each other with no
+     visible gap). Fixed px sidesteps the axis mismatch entirely. */
+  width: 84px;
+  height: 117px;
   display: block;
   padding: 0;
   opacity: 1;
@@ -11790,12 +11797,11 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .des
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab {
   left: 12%;
-  top: calc(6% + 7% / 0.72 + 8px);
+  top: calc(6% + 117px + 10px);
   right: auto;
   bottom: auto;
-  width: 7%;
-  aspect-ratio: 0.72 / 1;
-  height: auto;
+  width: 84px;
+  height: 117px;
   display: block;
   padding: 0;
   border-radius: 10px;
