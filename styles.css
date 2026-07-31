@@ -11592,23 +11592,25 @@ body.compass-public-app[data-active-screen="compass"] .desktop-right-rail {
 }
 
 /* The single glass card - screens.home()/screens.compass() render into
-   .app-screen; centering it here means the photo shows all around it,
-   exactly like the reference. */
+   .app-screen. Positioned at the exact same slot as "The Starless Archive"
+   hero card in the reference (left:31%/top:16.5%/width:58.5%/height:40.5%),
+   not centered - the vacated space below/left of it is where the Ctrl K
+   and SOS image-cards now sit (see below). */
 body.compass-public-app[data-active-screen="home"] .app-screen,
 body.compass-public-app[data-active-screen="compass"] .app-screen {
   position: relative;
   z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: transparent;
-  padding: 24px;
+  padding: 0;
 }
 
 .bb-card {
-  position: relative;
-  width: min(640px, 100%);
-  max-height: 100%;
+  position: absolute;
+  left: 31%;
+  top: 16.5%;
+  width: 58.5%;
+  height: 40.5%;
+  min-height: 214px;
   overflow: hidden;
   display: flex;
   border: 1px solid var(--warm-line);
@@ -11623,6 +11625,123 @@ body.compass-public-app[data-active-screen="compass"] .app-screen {
     inset 0 -28px 62px rgba(8, 5, 3, 0.38),
     0 26px 60px rgba(20, 11, 5, 0.28);
   backdrop-filter: blur(16px) saturate(1.1);
+}
+
+@media (max-width: 760px) {
+  body.compass-public-app[data-active-screen="home"] .bb-card,
+  body.compass-public-app[data-active-screen="compass"] .bb-card {
+    left: 20%;
+    top: 13.5%;
+    width: 74%;
+    height: 43%;
+    min-height: 260px;
+  }
+}
+
+/* Ctrl K and SOS as small image-cards, sitting in the space the hero card
+   vacated (below/left of it) - matching the reference's thumbnail-card
+   language instead of a plain text search bar and a bare floating dot.
+   Scoped to Home/2BB only; Discover/Life Sim/Profile keep the original
+   Ctrl K bar and floating SOS button exactly as before. */
+body.compass-public-app[data-active-screen="home"] .desktop-command-bar,
+body.compass-public-app[data-active-screen="compass"] .desktop-command-bar {
+  position: absolute;
+  inset: auto;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  z-index: 2;
+}
+
+body.compass-public-app[data-active-screen="home"] .desktop-command-search,
+body.compass-public-app[data-active-screen="compass"] .desktop-command-search {
+  position: absolute;
+  left: 8%;
+  top: 60%;
+  width: 108px;
+  height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0;
+  border: 1px solid var(--warm-line);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(240, 199, 115, 0.28), transparent 60%),
+    linear-gradient(160deg, rgba(45, 32, 24, 0.7), rgba(20, 15, 13, 0.82));
+  backdrop-filter: blur(10px);
+  box-shadow: 0 16px 32px rgba(8, 5, 2, 0.34);
+  color: var(--warm-ink);
+}
+
+body.compass-public-app[data-active-screen="home"] .desktop-command-search kbd,
+body.compass-public-app[data-active-screen="compass"] .desktop-command-search kbd {
+  display: none;
+}
+
+body.compass-public-app[data-active-screen="home"] .desktop-command-search::before,
+body.compass-public-app[data-active-screen="compass"] .desktop-command-search::before {
+  content: "";
+  width: 30px;
+  height: 30px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff4df' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+body.compass-public-app[data-active-screen="home"] .desktop-command-search::after,
+body.compass-public-app[data-active-screen="compass"] .desktop-command-search::after {
+  content: "Quick jump";
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 244, 223, 0.7);
+}
+
+body.compass-public-app[data-active-screen="home"] .sos-fab,
+body.compass-public-app[data-active-screen="compass"] .sos-fab {
+  left: calc(8% + 122px);
+  top: 60%;
+  right: auto;
+  bottom: auto;
+  width: 108px;
+  height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(216, 110, 102, 0.32), transparent 60%),
+    linear-gradient(160deg, rgba(45, 32, 24, 0.7), rgba(20, 15, 13, 0.82));
+  border: 1px solid rgba(216, 110, 102, 0.3);
+  box-shadow: 0 16px 32px rgba(8, 5, 2, 0.34);
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 244, 223, 0.7);
+}
+
+body.compass-public-app[data-active-screen="home"] .sos-fab::before,
+body.compass-public-app[data-active-screen="compass"] .sos-fab::before {
+  content: "";
+  width: 30px;
+  height: 30px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff8f7a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 9v4M12 17h.01'/%3E%3Cpath d='M10.3 3.9 2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+@media (max-width: 760px) {
+  body.compass-public-app[data-active-screen="home"] .desktop-command-search,
+  body.compass-public-app[data-active-screen="compass"] .desktop-command-search {
+    left: 6%;
+    top: 58%;
+  }
+
+  body.compass-public-app[data-active-screen="home"] .sos-fab,
+  body.compass-public-app[data-active-screen="compass"] .sos-fab {
+    left: calc(6% + 118px);
+    top: 58%;
+  }
 }
 
 .bb-card-inner {
