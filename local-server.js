@@ -591,9 +591,10 @@ async function handleCompassChat(req, res) {
   try {
     const body = await readJsonBody(req);
     const messages = Array.isArray(body.messages) ? body.messages : [];
-    // Was 1600 - see the matching comment in api/compass-chat.js.
-    const systemPrompt = String(body.systemPrompt || '').slice(0, 8000);
-    const context = body.context ? JSON.stringify(body.context).slice(0, 8000) : '{}';
+    // Was 1600, then 8000 - raised again as the prompt/context keep
+    // growing (Trust Moments/relevantHistory/personalityRead).
+    const systemPrompt = String(body.systemPrompt || '').slice(0, 14000);
+    const context = body.context ? JSON.stringify(body.context).slice(0, 14000) : '{}';
     const tools = Array.isArray(body.tools)
       ? body.tools.slice(0, 80).map((item) => ({ id: String(item.id || '').slice(0, 60), description: String(item.description || '').slice(0, 300) })).filter((item) => item.id)
       : [];

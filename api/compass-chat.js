@@ -564,8 +564,11 @@ module.exports = async function handler(req, res) {
     // grows with every few-shot example added to it; 1600 silently cut off
     // roughly the back half of the prompt (tone rules, lifeMemory recall,
     // open_tool/remember_this guidance) before it ever reached the model.
-    const systemPrompt = String(body.systemPrompt || "").slice(0, 8000);
-    const context = body.context ? JSON.stringify(body.context).slice(0, 8000) : "{}";
+    // Raised again as COMPASS_SYSTEM_PROMPT and the context payload both
+    // keep growing (Trust Moments/relevantHistory/personalityRead) - see
+    // the 1600->8000 fix earlier for why this limit matters at all.
+    const systemPrompt = String(body.systemPrompt || "").slice(0, 14000);
+    const context = body.context ? JSON.stringify(body.context).slice(0, 14000) : "{}";
     const tools = Array.isArray(body.tools)
       ? body.tools.slice(0, 80).map((item) => ({ id: String(item.id || "").slice(0, 60), description: String(item.description || "").slice(0, 300) })).filter((item) => item.id)
       : [];

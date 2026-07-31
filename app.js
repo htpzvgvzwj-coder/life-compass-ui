@@ -58,7 +58,7 @@ const ADMIN_PASSCODE = "STEADY-ADMIN";
 // practical version of the future-self-continuity mechanism this whole
 // product is built on. Tone adapts to personalBlueprint.personality/workStyle
 // in context, but never fabricates a reference that isn't in realSavedFacts.
-const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies. You have a tool available, open_tool, that opens a real feature in the app. Only call it when a specific real tool would genuinely help right now, based on what the user actually said - do not call it on most messages, and never call it just to seem helpful or to fill a reply. When you do call it, always include message_to_user: a short, natural, in-character line saying what you're doing, written the way you'd actually say it to this person - never a system notification like 'Opening Career Studio.' Never call open_tool for anything about immediate danger, self-harm, abuse, or crisis - that stays a plain-text reply per the safety rule above, since urgent support has its own always-visible route in this app, not one you decide to surface. You also have a second tool, remember_this, for saving something real the user just told you as a lifeMemory entry - the same kind of record the app's manual 'remember this' form creates, so the user does not have to fill out a form. Call it only when something concrete and worth recalling later was actually said (a real decision, something they are avoiding, a plan) - not on ordinary small talk, and never in the same turn as open_tool. Set kind to missed_opportunity when they skipped, avoided, or held back on something; decision when they made an active choice; note otherwise. Always include message_to_user, written the way you would actually tell a friend you are jotting something down, never a system notification. Illustrative examples of the tone and judgment described above (these are examples only, not real conversation history - never reuse their exact wording, they exist only to show the pattern): Example 1, reacting to a casual disclosure - user says 'ugh I bombed that interview today', you say something like 'damn, what happened - did it fall apart on a specific question or just the overall vibe?' not a generic 'I'm sorry to hear that, interviews can be stressful.' Example 2, using real goal data assertively - user asks 'am I making any progress', and if realSavedFacts shows a Key Result stuck at a low percent for a while, you name it directly, like 'honestly your internship-applications key result has been stuck around 20% for a few weeks now - that's the one actually dragging things down, what's been in the way?' not a vague 'you're doing great, keep it up.' Example 3, the open_tool boundary - user says 'I don't even know what career I want', a real career-exploration feature genuinely applies so you call open_tool with a natural message_to_user like 'let's actually map this out - opening Career Compass'; but if the user instead says 'ugh I'm just tired today', nothing specific applies, so you reply normally and call no tool at all. Example 4, disagreeing plainly - user says 'I think I should just drop the internship search and wait until next year', you say something like 'I'd push back on that - waiting doesn't fix what's making the search feel stuck right now, it just delays it, what's actually making it feel hard?' not silent agreement and not a lecture. If the context JSON includes a non-null freshInsight, that is something Compass just newly noticed about the user that has not been shared yet - weave it into this reply naturally, once, in your own words, the way you would casually bring it up with a friend, never as a formal update or notification like 'Update: I noticed...'. Skip it entirely if the user's message is about something urgent, unrelated, or where bringing it up would feel forced - there will be other chances, it does not have to be this exact reply.";
+const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies. You have a tool available, open_tool, that opens a real feature in the app. Only call it when a specific real tool would genuinely help right now, based on what the user actually said - do not call it on most messages, and never call it just to seem helpful or to fill a reply. When you do call it, always include message_to_user: a short, natural, in-character line saying what you're doing, written the way you'd actually say it to this person - never a system notification like 'Opening Career Studio.' Never call open_tool for anything about immediate danger, self-harm, abuse, or crisis - that stays a plain-text reply per the safety rule above, since urgent support has its own always-visible route in this app, not one you decide to surface. You also have a second tool, remember_this, for saving something real the user just told you as a lifeMemory entry - the same kind of record the app's manual 'remember this' form creates, so the user does not have to fill out a form. Call it only when something concrete and worth recalling later was actually said (a real decision, something they are avoiding, a plan) - not on ordinary small talk, and never in the same turn as open_tool. Set kind to missed_opportunity when they skipped, avoided, or held back on something; decision when they made an active choice; note otherwise. Always include message_to_user, written the way you would actually tell a friend you are jotting something down, never a system notification. Illustrative examples of the tone and judgment described above (these are examples only, not real conversation history - never reuse their exact wording, they exist only to show the pattern): Example 1, reacting to a casual disclosure - user says 'ugh I bombed that interview today', you say something like 'damn, what happened - did it fall apart on a specific question or just the overall vibe?' not a generic 'I'm sorry to hear that, interviews can be stressful.' Example 2, using real goal data assertively - user asks 'am I making any progress', and if realSavedFacts shows a Key Result stuck at a low percent for a while, you name it directly, like 'honestly your internship-applications key result has been stuck around 20% for a few weeks now - that's the one actually dragging things down, what's been in the way?' not a vague 'you're doing great, keep it up.' Example 3, the open_tool boundary - user says 'I don't even know what career I want', a real career-exploration feature genuinely applies so you call open_tool with a natural message_to_user like 'let's actually map this out - opening Career Compass'; but if the user instead says 'ugh I'm just tired today', nothing specific applies, so you reply normally and call no tool at all. Example 4, disagreeing plainly - user says 'I think I should just drop the internship search and wait until next year', you say something like 'I'd push back on that - waiting doesn't fix what's making the search feel stuck right now, it just delays it, what's actually making it feel hard?' not silent agreement and not a lecture. If the context JSON includes a non-null pendingProactiveMessage, that is something Compass wants to get across (a newly noticed pattern, or a check-in on something the user mentioned a while back and never followed up on) - weave it into this reply naturally, once, in your own words, the way you would casually bring it up with a friend, never as a formal update or notification like 'Update: I noticed...'. Skip it entirely if the user's message is about something urgent, unrelated, or where bringing it up would feel forced - there will be other chances, it does not have to be this exact reply. The context JSON also includes trustTier, one of low, mid, or high, reflecting how much real trust has actually been earned so far through concrete events - never mention this tier, its name, or that such a thing exists, it is invisible by design. At low tier, stay fully reactive - answer what is asked, do not volunteer unprompted connections. At mid or high tier, you may proactively connect real patterns across different areas of the user's life within a reply when genuinely relevant, even unprompted, the way a close friend who has known someone a while would - for example noting that a topic keeps resurfacing across separate situations - but only when it is actually true and relevant, never manufactured to seem perceptive. If the context JSON includes relevantHistory (past journal entries, mood logs, practice sessions, or other saved activity that matches what the user is asking about), use it to answer directly instead of saying you cannot find that - reference it naturally in a sentence, never as a dumped list, and only speak to what it actually contains. If the context JSON includes a non-null personalityRead (openness/conscientiousness/extraversion/agreeableness/neuroticism, each low/medium/high, inferred from the user's own writing), use it alongside personalBlueprint.personality/workStyle to calibrate how direct, warm, or exploratory to be - never mention these trait names or that such an inference exists, it works the same way personalBlueprint already does, just quietly informing tone.";
 // Future Self module (Future Mirror bible Ch.4) - grounded in Hershfield's
 // future self-continuity research: vividness matters more than certainty
 // framing. Never phrase as "you will be X" - always "if you continue on this
@@ -522,10 +522,23 @@ const defaultTrackerState = {
   // own rather than only growing by the user adding things. Named
   // aiInsights, not "reflection", to avoid colliding with the existing
   // unrelated Reflection Engine (trackerState.reflectionEntries).
-  // pendingNudge/nudgeText (Hermes-inspired "periodic nudge" - no push
-  // notifications exist, so this is pull-based: consumed once, on the
-  // user's next chat message, then cleared - see maybeQueueInsightNudge.
-  aiInsights: { summary: "", items: [], supersededItems: [], lastRunAt: null, basedOnCount: 0, pendingNudge: false, nudgeText: "" },
+  aiInsights: { summary: "", items: [], supersededItems: [], lastRunAt: null, basedOnCount: 0 },
+  // Trust Moments (event-anchored, never a visible score/tier number to
+  // the user) - firedIds accumulates permanently (trust only moves up, no
+  // decay, kept simple); watchedAvoidanceIds tracks specific real-life-
+  // event/jury-trial ids currently showing as avoided, so a later
+  // resolution can be detected as a transition, not a snapshot.
+  trustMoments: { firedIds: [], watchedAvoidanceIds: [] },
+  // Unified proactive-message queue (Hermes-inspired "periodic nudge",
+  // generalized): fresh aiInsights and stale missed_opportunity check-ins
+  // both land here as {id, type, text, createdAt}. Delivery depends on
+  // trustTier() - low/mid folds it into the AI's next reply via context;
+  // high shows it as Compass speaking first when the chat screen opens.
+  proactiveQueue: [],
+  // Big Five-inspired real tone read, distinct from personalBlueprint
+  // (which is self-reported once at onboarding) - inferred from the
+  // user's own journal/chat text, never a formal assessment.
+  personalityRead: { traits: {}, confidence: "", lastRunAt: null, basedOnCount: 0 },
   challengeProgress: [],
   savedOpportunities: [],
   futureMirror: {
@@ -1149,6 +1162,7 @@ const assessmentItems = [
 let activeTab = "home";
 let isCompassResponding = false;
 let isCompassInsightsRefreshing = false;
+let isPersonalityReadRefreshing = false;
 let futureMirrorMode = "scan";
 
 // Future Scan - third Future Mirror mode ("help the user see the truth before
@@ -1353,6 +1367,9 @@ function normalizeTrackerState(state) {
     journalEntries: Array.isArray(state.journalEntries) ? state.journalEntries : fallback.journalEntries,
     lifeMemory: Array.isArray(state.lifeMemory) ? state.lifeMemory : fallback.lifeMemory,
     aiInsights: state.aiInsights && typeof state.aiInsights === "object" ? { ...fallback.aiInsights, ...state.aiInsights, items: Array.isArray(state.aiInsights.items) ? state.aiInsights.items : [], supersededItems: Array.isArray(state.aiInsights.supersededItems) ? state.aiInsights.supersededItems : [] } : fallback.aiInsights,
+    trustMoments: state.trustMoments && typeof state.trustMoments === "object" ? { firedIds: Array.isArray(state.trustMoments.firedIds) ? state.trustMoments.firedIds : [], watchedAvoidanceIds: Array.isArray(state.trustMoments.watchedAvoidanceIds) ? state.trustMoments.watchedAvoidanceIds : [] } : fallback.trustMoments,
+    proactiveQueue: Array.isArray(state.proactiveQueue) ? state.proactiveQueue : fallback.proactiveQueue,
+    personalityRead: state.personalityRead && typeof state.personalityRead === "object" ? { ...fallback.personalityRead, ...state.personalityRead, traits: state.personalityRead.traits && typeof state.personalityRead.traits === "object" ? state.personalityRead.traits : {} } : fallback.personalityRead,
     challengeProgress: Array.isArray(state.challengeProgress) ? state.challengeProgress : fallback.challengeProgress,
     savedOpportunities: Array.isArray(state.savedOpportunities) ? state.savedOpportunities : fallback.savedOpportunities,
     futureMirror: {
@@ -3470,6 +3487,26 @@ function historySearchResults(query = historySearchQuery) {
   return historySearchEntries().filter((entry) => historySearchMatches(entry, query)).slice(0, 40);
 }
 
+// Chat-dispatchable History: requestCompassAI's context previously only
+// carried lifeMemory, so a question like "how did my interview practice
+// go" had zero real data behind it even though historySearchEntries()
+// already covers all 11 source types. historySearchMatches() requires
+// every query word to match, built for a short typed search box - a real
+// chat message is a full sentence, so this uses a looser "any meaningful
+// keyword overlaps" match instead, good enough to surface a plausibly
+// relevant record for the model to actually cite.
+function relevantHistoryForChat(question) {
+  const words = cleanText(question, 300).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+  if (!words.length) return [];
+  return historySearchEntries()
+    .filter((entry) => {
+      const haystack = `${entry.type} ${entry.title} ${entry.snippet} ${entry.fullText}`.toLowerCase();
+      return words.some((w) => haystack.includes(w));
+    })
+    .slice(0, 5)
+    .map((entry) => ({ type: entry.type, title: entry.title, detail: cleanText(entry.fullText || entry.snippet, 240), date: entry.date }));
+}
+
 // One of 4 icon/color families per entry.type, not 11 different colors -
 // keeps the card grid legible (sage = day-to-day reflection, coral =
 // personal/emotional decisions, gold = practice & decision prep, slate =
@@ -3756,12 +3793,95 @@ async function runCompassInsights({ force = false } = {}) {
     items: rawInsights.map((item, index) => ({ id: `insight-${Date.now()}-${index}`, text: item.text, sourceEntryIds: item.sourceEntryIds, createdAt: new Date().toISOString() })),
     supersededItems,
     lastRunAt: new Date().toISOString(),
-    basedOnCount: entries.length,
-    pendingNudge: added.length > 0,
-    nudgeText: added.length ? added[0].text : ""
+    basedOnCount: entries.length
+  };
+  if (added.length) {
+    const insightText = added[0].text;
+    queueProactiveMessage("fresh_insight", `Hey, I've been noticing something - ${insightText.charAt(0).toLowerCase()}${insightText.slice(1)}`);
+  }
+  saveTrackerState();
+  return true;
+}
+
+// Shared by every proactive-message source (fresh aiInsights, stale
+// check-ins) so delivery is one code path - see requestCompassAI (low/mid
+// tier: folded into the AI's next reply) and applyPendingProactiveMessage
+// (high tier: Compass speaks first when the chat screen opens). Capped so
+// a quiet user can't accumulate an unbounded backlog.
+function queueProactiveMessage(type, text) {
+  trackerState.proactiveQueue.push({ id: `proactive-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, text: cleanText(text, 220), createdAt: new Date().toISOString() });
+  trackerState.proactiveQueue = trackerState.proactiveQueue.slice(-5);
+}
+
+// A real friend checks back on something you mentioned and never heard
+// the end of. Looks for exactly one stale missed_opportunity per call (not
+// force-feeding every stale item at once) so it doesn't feel like a
+// clipboard of unresolved items being read out.
+function maybeQueueStaleCheckIn() {
+  const myId = currentUserId();
+  const stale = trackerState.lifeMemory.find((entry) => entry.user_id === myId && entry.kind === "missed_opportunity" && !entry.outcome && !entry.checkedInAt && daysSince(entry.created_at) >= 5);
+  if (!stale) return;
+  stale.checkedInAt = new Date().toISOString();
+  queueProactiveMessage("check_in", `Random thought - you mentioned "${stale.situationTag}" a while back. How did that end up going?`);
+  saveTrackerState();
+}
+
+// Big Five-inspired real tone read, distinct from personalBlueprint (self-
+// reported once at onboarding) - inferred from the user's own journal/chat
+// text instead. Never a formal psychological assessment - same "never
+// diagnose" discipline the mood/wellbeing features already follow, and
+// surfaced transparently in the AI Trust Center, not hidden.
+function personalityInferenceDueCount() {
+  const myId = currentUserId();
+  const written = trackerState.journalEntries.filter((e) => e.user_id === myId).length + chatState.messages.filter((m) => m.from === "user").length;
+  return written - (trackerState.personalityRead.basedOnCount || 0);
+}
+
+function shouldRunPersonalityInference() {
+  return personalityInferenceDueCount() >= (trackerState.personalityRead.lastRunAt ? 8 : 5);
+}
+
+const PERSONALITY_TRAIT_KEYS = ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"];
+const PERSONALITY_LEVELS = ["low", "medium", "high"];
+
+async function runPersonalityInference({ force = false } = {}) {
+  const myId = currentUserId();
+  const journalText = trackerState.journalEntries.filter((e) => e.user_id === myId).slice(0, 20).map((e) => `- ${e.text}`).join("\n");
+  const chatText = chatState.messages.filter((m) => m.from === "user").slice(-30).map((m) => `- ${m.text}`).join("\n");
+  if (!force && !journalText.trim() && !chatText.trim()) return false;
+  const systemPrompt = "You infer a soft, non-clinical read of someone's Big Five (OCEAN) personality traits strictly from their own written text - never from what they claim about themselves in a form, never invented. This is not a real psychological assessment - if there is not enough real text to support a read, say so honestly in confidence rather than guessing. Respond as strict JSON only.";
+  const userPrompt = `Their own journal entries:\n${journalText || "None yet."}\n\nTheir own chat messages, most recent last:\n${chatText || "None yet."}\n\nRespond as strict JSON only: {"traits": {"openness": "low|medium|high", "conscientiousness": "low|medium|high", "extraversion": "low|medium|high", "agreeableness": "low|medium|high", "neuroticism": "low|medium|high"}, "confidence": "one short sentence on how much real text this is based on and how confident this read is"} - base every trait strictly on the text given, never on generic assumptions about people in general.`;
+  const reply = await requestCompassDirect(systemPrompt, userPrompt);
+  const parsed = extractJsonObject(reply);
+  if (!parsed || !parsed.traits || typeof parsed.traits !== "object") throw new Error("Personality inference reply was not valid JSON.");
+  const traits = {};
+  PERSONALITY_TRAIT_KEYS.forEach((key) => {
+    if (PERSONALITY_LEVELS.includes(parsed.traits[key])) traits[key] = parsed.traits[key];
+  });
+  trackerState.personalityRead = {
+    traits,
+    confidence: cleanText(parsed.confidence, 200),
+    lastRunAt: new Date().toISOString(),
+    basedOnCount: trackerState.journalEntries.filter((e) => e.user_id === myId).length + chatState.messages.filter((m) => m.from === "user").length
   };
   saveTrackerState();
   return true;
+}
+
+function maybeRunPersonalityInference() {
+  if (!shouldRunPersonalityInference()) return;
+  runPersonalityInference().catch((error) => {
+    console.error("[Compass AI] Background personality inference failed.", error);
+  });
+}
+
+function personalityReadSummaryText() {
+  const traits = trackerState.personalityRead.traits || {};
+  const keys = Object.keys(traits);
+  if (!keys.length) return "Not enough of your own writing yet to form a read - keep journaling or chatting and this fills in on its own.";
+  const labels = { openness: "Openness", conscientiousness: "Conscientiousness", extraversion: "Extraversion", agreeableness: "Agreeableness", neuroticism: "Neuroticism" };
+  const line = PERSONALITY_TRAIT_KEYS.filter((key) => traits[key]).map((key) => `${labels[key]}: ${traits[key]}`).join(" · ");
+  return `${line}${trackerState.personalityRead.confidence ? ` - ${trackerState.personalityRead.confidence}` : ""}`;
 }
 
 // Fire-and-forget background trigger, same pattern as
@@ -9910,6 +10030,73 @@ function avoidancePatterns() {
   return patterns;
 }
 
+// Trust Moments: event-anchored relationship depth, never a visible
+// score/tier shown to the user ("信任等级不要做的这么代码，像人类一样").
+// Four moments, each fires once and stays fired (trust only accumulates,
+// no decay - kept simple for a first version). All four reuse real
+// signals Compass already computes elsewhere; nothing new is measured
+// just for this.
+const TRUST_MOMENT_IDS = ["calibrated-judgment", "week-streak", "faced-avoidance", "sealed-secret"];
+
+// Trust Moment 3 support: avoidancePatterns() only returns display text
+// for its top 3 items, not stable ids, so this mirrors its two cleanly-
+// resolvable filters (real due dates overdue 14+ days; Jury Duty trials
+// abandoned 3+ days without a verdict) with real record ids kept, so a
+// later resolution (event marked done / trial gets a verdict) can be
+// detected as a transition instead of a snapshot. Snoozed reflections are
+// deliberately excluded here - "stopped resurfacing" has no clean,
+// detectable resolution moment the way a checkbox or a verdict does.
+function updateAvoidanceWatchList() {
+  const myId = currentUserId();
+  const currentlyAvoided = [];
+  myRealLifeEvents().filter((event) => event.status !== "done" && new Date(event.dueDate).getTime() <= Date.now() - 14 * 86400000).forEach((event) => currentlyAvoided.push(event.id));
+  trackerState.juryTrials.sessions.filter((session) => (session.user_id === myId || !session.user_id) && !session.verdict && new Date(session.createdAt).getTime() <= Date.now() - 3 * 86400000).forEach((session) => currentlyAvoided.push(session.id));
+  const watched = trackerState.trustMoments.watchedAvoidanceIds || [];
+  const resolved = watched.filter((id) => !currentlyAvoided.includes(id));
+  trackerState.trustMoments.watchedAvoidanceIds = Array.from(new Set(currentlyAvoided));
+  return resolved.length > 0;
+}
+
+function checkTrustMoments() {
+  const fired = new Set(trackerState.trustMoments.firedIds || []);
+  const before = fired.size;
+
+  if (!fired.has("calibrated-judgment")) {
+    const stats = calibrationStats();
+    if (stats && stats.read === "calibrated" && stats.count >= 3) fired.add("calibrated-judgment");
+  }
+
+  if (!fired.has("week-streak")) {
+    if (habitChainStats(habitChainDays(84)).current >= 7) fired.add("week-streak");
+  }
+
+  // Keep the avoidance watch list current regardless of whether this
+  // moment already fired - it's cheap and keeps future checks accurate.
+  const justResolvedAvoidance = updateAvoidanceWatchList();
+  if (!fired.has("faced-avoidance") && justResolvedAvoidance) fired.add("faced-avoidance");
+
+  if (!fired.has("sealed-secret")) {
+    const myId = currentUserId();
+    if (trackerState.lifeMemory.some((entry) => entry.user_id === myId && entry.sealed)) fired.add("sealed-secret");
+  }
+
+  trackerState.trustMoments.firedIds = Array.from(fired);
+  if (fired.size !== before) saveTrackerState();
+  return fired.size;
+}
+
+// low = AI stays fully reactive, exactly like today. mid = AI may
+// proactively connect patterns across different areas of the user's life
+// within a reply, unprompted, when genuinely relevant (see
+// COMPASS_SYSTEM_PROMPT). high = AI additionally earns the right to speak
+// first - see applyPendingProactiveMessage.
+function trustTier() {
+  const count = checkTrustMoments();
+  if (count >= 3) return "high";
+  if (count >= 1) return "mid";
+  return "low";
+}
+
 function avoidancePatternsModal() {
   const patterns = avoidancePatterns();
   return `
@@ -10743,6 +10930,22 @@ function applyCoachProactiveOpener() {
       saveChatState();
     }
   }
+}
+
+// Trust Moments payoff: only at high trust tier does Compass actually
+// speak first - queued fresh-insight/check-in messages otherwise just sit
+// in trackerState.proactiveQueue and get folded into the AI's next reply
+// instead (see requestCompassAI). Runs every time the chat screen opens,
+// same hook point as applyCoachProactiveOpener above; delivering dequeues
+// immediately so the same message can't fire twice.
+function applyPendingProactiveMessage() {
+  maybeQueueStaleCheckIn();
+  if (trustTier() !== "high") return;
+  if (!trackerState.proactiveQueue.length) return;
+  const item = trackerState.proactiveQueue.shift();
+  chatState.messages.push({ from: "assistant", text: item.text });
+  saveTrackerState();
+  saveChatState();
 }
 
 function chatMessages() {
@@ -11579,11 +11782,13 @@ const modals = {
         <div><strong>Not assumed</strong><span>Empty profile fields, private thoughts you never saved, real Google identity, bank accounts, official school records, or hidden device data.</span></div>
         <div><strong>Quality checks</strong><span>AI Trace Log grades replies for answering the question, giving a concrete next step, and possible fabrication.</span></div>
         <div><strong>Limits</strong><span>Compass is coaching and practice. It is not legal, medical, financial, immigration, or emergency advice.</span></div>
+        <div><strong>Tone read (inferred, not a real assessment)</strong><span>${escapeHTML(personalityReadSummaryText())}</span></div>
       </div>
       <div class="profile-actions">
         <button class="primary-action compact-action" type="button" data-open="compassProfile">Edit AI profile</button>
         <button class="secondary-action compact-action" type="button" data-open="knowledgeVault">Open Knowledge Vault</button>
         <button class="secondary-action compact-action" type="button" data-open="aiTraceLog">Open AI Trace Log</button>
+        <button class="secondary-action compact-action" type="button" data-refresh-personality-read ${isPersonalityReadRefreshing ? "disabled" : ""}>${isPersonalityReadRefreshing ? "Reading..." : "Refresh tone read"}</button>
         <button class="secondary-action compact-action" type="button" data-clear-chat>Clear chat</button>
       </div>
     </div>
@@ -13130,6 +13335,12 @@ function canonicalTab(tab) {
 
 function renderScreen(tab) {
   tab = canonicalTab(tab);
+  // Compass re-renders constantly while chatting (on send, on reply, in
+  // the finally block) - applyPendingProactiveMessage must only fire on
+  // the transition INTO the tab (opening the chat), not on every one of
+  // those, or a proactive message would interleave into an active
+  // exchange instead of greeting the user when they arrive.
+  const isEnteringCompass = tab === "compass" && activeTab !== "compass";
   activeTab = tab;
   // community.js/community-supabase.js load before app.js as separate
   // <script> tags, so they can't see the `activeTab` lexical binding - they
@@ -13137,7 +13348,10 @@ function renderScreen(tab) {
   // async refresh resolves. Without this mirror, window.activeTab is always
   // undefined and those re-render checks silently never fire.
   window.activeTab = tab;
-  if (tab === "compass") applyCoachProactiveOpener();
+  if (tab === "compass") {
+    applyCoachProactiveOpener();
+    if (isEnteringCompass) applyPendingProactiveMessage();
+  }
   if (tab === "simulator") {
     enterLifeSimMode();
   } else {
@@ -13421,10 +13635,24 @@ async function requestCompassAI(question) {
       .filter((entry) => entry.user_id === currentUserId())
       .slice(0, 30)
       .map((entry) => ({ situationTag: entry.situationTag, decision: entry.decision, reason: entry.reason, outcome: entry.outcome || null, sealed: Boolean(entry.sealed) })),
-    // Hermes-inspired "periodic nudge" - a genuinely new aiInsights pattern
-    // Compass hasn't mentioned yet, consumed once (see sendChatMessage)
-    // then cleared, since there's no real push notification to carry it.
-    freshInsight: trackerState.aiInsights.pendingNudge ? trackerState.aiInsights.nudgeText : null
+    // Trust Moments: low = stay fully reactive; mid = may proactively
+    // connect cross-domain patterns within a reply; high = may also speak
+    // first (see applyPendingProactiveMessage) - never shown to the user
+    // as a number, just changes how forward the AI is allowed to be.
+    trustTier: trustTier(),
+    // Fallback delivery for a queued proactive message (fresh aiInsights,
+    // stale check-in) that hasn't been shown standalone yet - consumed
+    // once (see sendChatMessage) then dequeued, since there's no real push
+    // notification to carry it otherwise.
+    pendingProactiveMessage: trackerState.proactiveQueue.length ? trackerState.proactiveQueue[0].text : null,
+    // Lets History-type questions ("how did my interview practice go")
+    // get answered inline in chat instead of only through the separate
+    // History Search modal - see relevantHistoryForChat.
+    relevantHistory: relevantHistoryForChat(question),
+    // Big Five-inspired real tone read from the user's own writing,
+    // distinct from the self-reported personalBlueprint - see
+    // runPersonalityInference. Null until enough real text exists.
+    personalityRead: Object.keys(trackerState.personalityRead.traits || {}).length ? trackerState.personalityRead.traits : null
   };
   const history = chatState.messages.slice(-24).filter((message) => !message.local && message.text !== COMPASS_API_ERROR).slice(-20).map((message) => ({
     role: message.from === "assistant" ? "assistant" : "user",
@@ -15490,11 +15718,12 @@ async function sendChatMessage(text) {
   renderScreen("compass");
   try {
     const { reply, toolCall } = await requestCompassAI(clean);
-    // The nudge (if any) was already sent in this request's context - clear
-    // it now so it's used exactly once, not repeated on every later message.
-    if (trackerState.aiInsights.pendingNudge) {
-      trackerState.aiInsights.pendingNudge = false;
-      trackerState.aiInsights.nudgeText = "";
+    // The queued proactive message (if any) was already sent in this
+    // request's context as a fallback - dequeue it now so it's used
+    // exactly once, not repeated on every later message. A no-op if
+    // applyPendingProactiveMessage already delivered it standalone.
+    if (trackerState.proactiveQueue.length) {
+      trackerState.proactiveQueue.shift();
       saveTrackerState();
     }
     // Defensive: never trust a tool_id the model returns without checking
@@ -15526,6 +15755,7 @@ async function sendChatMessage(text) {
       context: "Saved profile, Personal Blueprint, real saved facts, and recent chat history assembled by requestCompassAI",
       reply: displayText
     });
+    maybeRunPersonalityInference();
   } catch (error) {
     console.error("[Compass AI] Request failed", error);
     chatState.messages.push({ from: "assistant", text: COMPASS_API_ERROR, local: true });
@@ -15871,6 +16101,7 @@ document.addEventListener("click", async (event) => {
   const suggestedCommandButton = event.target.closest("[data-run-suggested-command]");
   const historyExpandButton = event.target.closest("[data-toggle-history-card]");
   const refreshInsightsButton = event.target.closest("[data-refresh-compass-insights]");
+  const refreshPersonalityButton = event.target.closest("[data-refresh-personality-read]");
   const dismissInsightButton = event.target.closest("[data-dismiss-insight]");
   const tryAdvancedFindingButton = event.target.closest("[data-try-advanced-finding]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
@@ -15911,6 +16142,19 @@ document.addEventListener("click", async (event) => {
       console.error("[Compass AI] Manual insight refresh failed.", error);
     } finally {
       isCompassInsightsRefreshing = false;
+      renderScreen(activeTab);
+    }
+  }
+
+  if (refreshPersonalityButton) {
+    isPersonalityReadRefreshing = true;
+    renderScreen(activeTab);
+    try {
+      await runPersonalityInference({ force: true });
+    } catch (error) {
+      console.error("[Compass AI] Manual personality read refresh failed.", error);
+    } finally {
+      isPersonalityReadRefreshing = false;
       renderScreen(activeTab);
     }
   }
@@ -17149,6 +17393,7 @@ document.addEventListener("click", async (event) => {
     });
     trackerState.journalEntries = trackerState.journalEntries.slice(0, 80);
     saveTrackerState();
+    maybeRunPersonalityInference();
     openModal("journal");
     renderScreen(activeTab);
     refreshStaticScreens();
