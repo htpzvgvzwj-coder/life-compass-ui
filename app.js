@@ -58,7 +58,7 @@ const ADMIN_PASSCODE = "STEADY-ADMIN";
 // practical version of the future-self-continuity mechanism this whole
 // product is built on. Tone adapts to personalBlueprint.personality/workStyle
 // in context, but never fabricates a reference that isn't in realSavedFacts.
-const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies. You have a tool available, open_tool, that opens a real feature in the app. Only call it when a specific real tool would genuinely help right now, based on what the user actually said - do not call it on most messages, and never call it just to seem helpful or to fill a reply. When you do call it, always include message_to_user: a short, natural, in-character line saying what you're doing, written the way you'd actually say it to this person - never a system notification like 'Opening Career Studio.' Never call open_tool for anything about immediate danger, self-harm, abuse, or crisis - that stays a plain-text reply per the safety rule above, since urgent support has its own always-visible route in this app, not one you decide to surface.";
+const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies. You have a tool available, open_tool, that opens a real feature in the app. Only call it when a specific real tool would genuinely help right now, based on what the user actually said - do not call it on most messages, and never call it just to seem helpful or to fill a reply. When you do call it, always include message_to_user: a short, natural, in-character line saying what you're doing, written the way you'd actually say it to this person - never a system notification like 'Opening Career Studio.' Never call open_tool for anything about immediate danger, self-harm, abuse, or crisis - that stays a plain-text reply per the safety rule above, since urgent support has its own always-visible route in this app, not one you decide to surface. You also have a second tool, remember_this, for saving something real the user just told you as a lifeMemory entry - the same kind of record the app's manual 'remember this' form creates, so the user does not have to fill out a form. Call it only when something concrete and worth recalling later was actually said (a real decision, something they are avoiding, a plan) - not on ordinary small talk, and never in the same turn as open_tool. Set kind to missed_opportunity when they skipped, avoided, or held back on something; decision when they made an active choice; note otherwise. Always include message_to_user, written the way you would actually tell a friend you are jotting something down, never a system notification. Illustrative examples of the tone and judgment described above (these are examples only, not real conversation history - never reuse their exact wording, they exist only to show the pattern): Example 1, reacting to a casual disclosure - user says 'ugh I bombed that interview today', you say something like 'damn, what happened - did it fall apart on a specific question or just the overall vibe?' not a generic 'I'm sorry to hear that, interviews can be stressful.' Example 2, using real goal data assertively - user asks 'am I making any progress', and if realSavedFacts shows a Key Result stuck at a low percent for a while, you name it directly, like 'honestly your internship-applications key result has been stuck around 20% for a few weeks now - that's the one actually dragging things down, what's been in the way?' not a vague 'you're doing great, keep it up.' Example 3, the open_tool boundary - user says 'I don't even know what career I want', a real career-exploration feature genuinely applies so you call open_tool with a natural message_to_user like 'let's actually map this out - opening Career Compass'; but if the user instead says 'ugh I'm just tired today', nothing specific applies, so you reply normally and call no tool at all. Example 4, disagreeing plainly - user says 'I think I should just drop the internship search and wait until next year', you say something like 'I'd push back on that - waiting doesn't fix what's making the search feel stuck right now, it just delays it, what's actually making it feel hard?' not silent agreement and not a lecture.";
 // Future Self module (Future Mirror bible Ch.4) - grounded in Hershfield's
 // future self-continuity research: vividness matters more than certainty
 // framing. Never phrase as "you will be X" - always "if you continue on this
@@ -3330,7 +3330,7 @@ function commandLauncherCommands() {
     { id: "edit-profile", title: "Edit profile", detail: "Update your name and account details.", lane: "Profile", tab: "profile", open: "username", icon: "icon-profile.png", keywords: ["edit", "profile", "name", "account"] },
     { id: "guide-help", title: "Guide / Help", detail: "How Compass works and where to start.", lane: "Profile", tab: "profile", open: "guide", icon: "icon-guide.png", keywords: ["guide", "help", "how it works"] },
     { id: "receipt-plan", title: "Receipt Plan", detail: "Review your saved receipt plan.", lane: "Profile", tab: "profile", open: "receiptPlan", icon: "icon-receipt.png", keywords: ["receipt", "plan", "budget"] },
-    { id: "demo-mode", title: "Demo mode details", detail: "See login method, role, and storage details.", lane: "Profile", tab: "profile", open: "demoMode", icon: "icon-settings.png", keywords: ["demo", "mode", "account", "storage"] }
+    { id: "demo-mode", title: "Account & storage details", detail: "See login method, role, and storage details.", lane: "Profile", tab: "profile", open: "demoMode", icon: "icon-settings.png", keywords: ["account", "storage", "login", "device"] }
   ];
 }
 
@@ -3517,6 +3517,184 @@ function historySearchResultsHtml(query = historySearchQuery) {
     </article>
   `;
   }).join("");
+}
+
+// Second Brain, History rebuild: the modal defaults to 3 curated views
+// instead of a flat list (historySearchResultsHtml/historySearchEntries
+// above are kept as-is and still power actual text search, so nothing a
+// user could already find is lost - see historySearchModalBodyHtml).
+// Shared card renderer so the 3 views and the flat list stay visually
+// identical without duplicating the markup three times.
+function historyCurateCardHtml(cardId, { family, icon, eyebrow, title, snippet, fullText, sideLabel }) {
+  return `
+    <article class="history-card">
+      <div class="history-icon type-${family}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>
+      </div>
+      <div class="history-body">
+        <p class="history-eyebrow">${escapeHTML(eyebrow)}</p>
+        <p class="history-title">${escapeHTML(title || "")}</p>
+        <p class="history-snippet">${escapeHTML(snippet || "")}</p>
+        <p class="history-fulltext" id="${cardId}-full" hidden>${escapeHTML(fullText || "")}</p>
+      </div>
+      <div class="history-side">
+        <span class="history-date">${escapeHTML(sideLabel || "")}</span>
+        <button class="history-expand" type="button" data-toggle-history-card="${cardId}" aria-expanded="false">More</button>
+      </div>
+    </article>
+  `;
+}
+
+// View 1: goals + which training/practice helped them. There's no
+// explicit goal-id link on Build Mode/interview/roleplay/Skill Guide
+// records, so relatedness is a first-pass keyword match against the
+// goal's title, not a guaranteed link - honest about that in the empty
+// state rather than fabricating a connection.
+function goalRelatedTraining(goal) {
+  const goalWords = new Set(cleanText(goal.title, 200).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4));
+  if (!goalWords.size) return [];
+  const overlaps = (text) => cleanText(text, 200).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4).some((w) => goalWords.has(w));
+  const related = [];
+  trackerState.buildMode.entries.filter((e) => e.user_id === currentUserId()).forEach((e) => {
+    if (overlaps(e.goalSummary || e.goal || "")) related.push({ label: `Build Mode training: "${cleanText(e.goalSummary || e.goal, 80)}"`, date: e.updatedAt || e.createdAt });
+  });
+  trackerState.careerStudio.interviewSessions.filter((s) => s.user_id === currentUserId()).forEach((s) => {
+    if (overlaps(s.persona || "")) related.push({ label: `Interview practice: ${cleanText(s.persona, 60)}`, date: s.startedAt });
+  });
+  trackerState.roleplaySessions.filter((s) => s.user_id === currentUserId()).forEach((s) => {
+    if (overlaps(s.scenario_type || "")) related.push({ label: `Roleplay practice: ${cleanText(s.scenario_type, 60)}`, date: s.started_at });
+  });
+  SKILL_GUIDES.filter((guide) => skillGuideProgress(guide.id).completedAt).forEach((guide) => {
+    if (overlaps(guide.title || "")) related.push({ label: `Skill Guide completed: ${guide.title}`, date: skillGuideProgress(guide.id).completedAt });
+  });
+  return related.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).slice(0, 5);
+}
+
+function historyGoalsTrainingHtml() {
+  const goals = myRoadmapGoals();
+  if (!goals.length) {
+    return `<p class="history-section-intro">Set a goal in Life Roadmap and this section will show how your practice connects to it.</p>`;
+  }
+  return goals.map((goal, index) => {
+    const krs = goal.keyResults || [];
+    const snippet = krs.length ? krs.map((kr) => `${kr.label} ${keyResultPercent(kr)}%`).join(" · ") : "No Key Results tracked yet";
+    const nextMilestone = (goal.milestones || []).filter((m) => m.status !== "done").sort((a, b) => a.month - b.month)[0];
+    const related = goalRelatedTraining(goal);
+    const fullText = [
+      nextMilestone ? `Next open milestone: "${nextMilestone.title}" (month ${nextMilestone.month})` : "",
+      related.length ? `Related practice:\n${related.map((r) => `- ${r.label}`).join("\n")}` : "No linked practice yet - a related Build Mode session, Skill Guide, or practice session will show up here once you do one."
+    ].filter(Boolean).join("\n");
+    return historyCurateCardHtml(`history-goal-${index}`, {
+      family: "gold",
+      icon: `<path d="M5 3v18"/><path d="M5 4h11l-2 4 2 4H5"/>`,
+      eyebrow: "Goal & training",
+      title: goal.title,
+      snippet,
+      fullText,
+      sideLabel: related.length ? `${related.length} linked` : ""
+    });
+  }).join("");
+}
+
+// View 2: opportunities missed, and why. AI-created lifeMemory entries
+// (remember_this) carry an explicit `kind`; older/manual entries don't,
+// so those fall back to a keyword heuristic on the decision/reason text -
+// imperfect, but reasonable for entries the app can't otherwise classify.
+const MISSED_OPPORTUNITY_HINTS = ["didn't", "did not", "skip", "avoid", "declin", "chose not", "decided not", "put off", "postpon", "missed", "held back", "backed out", "too scared", "too nervous", "never applied", "never asked", "gave up"];
+
+function isMissedOpportunityEntry(entry) {
+  if (entry.kind === "missed_opportunity") return true;
+  if (entry.kind) return false;
+  const haystack = `${entry.decision || ""} ${entry.reason || ""}`.toLowerCase();
+  return MISSED_OPPORTUNITY_HINTS.some((hint) => haystack.includes(hint));
+}
+
+function historyMissedOpportunitiesEntries() {
+  return trackerState.lifeMemory
+    .filter((e) => e.user_id === currentUserId() && isMissedOpportunityEntry(e))
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+}
+
+function historyMissedOpportunitiesHtml() {
+  const entries = historyMissedOpportunitiesEntries();
+  if (!entries.length) {
+    return `<p class="history-section-intro">Nothing here yet - when you tell Compass about something you skipped, avoided, or held back on, it shows up here.</p>`;
+  }
+  return entries.map((entry, index) => historyCurateCardHtml(`history-missed-${index}`, {
+    family: "coral",
+    icon: `<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.6 17a2 2 0 001.7 3h15.4a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>`,
+    eyebrow: entry.sealed ? "Missed opportunity (sealed)" : "Missed opportunity",
+    title: entry.situationTag,
+    snippet: cleanText(entry.decision, 90),
+    fullText: `Decision: ${entry.decision}\nReason: ${entry.reason || "-"}${entry.outcome ? `\nLater: ${entry.outcome}` : ""}`,
+    sideLabel: entry.created_at ? new Date(entry.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : ""
+  })).join("");
+}
+
+// View 3: synthesis - what got learned from a missed opportunity and
+// where it was applied. Primary signal is the entry's own `outcome`
+// field (already a real mechanic via the lifeMemory modal's "record
+// outcome" button); when that's empty, first-pass fallback is matching
+// against a later entry sharing keywords in its situationTag. Pairs with
+// neither signal are left out rather than fabricated.
+function situationTagOverlap(a, b) {
+  const wordsA = new Set(cleanText(a, 120).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4));
+  const wordsB = cleanText(b, 120).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+  return wordsA.size > 0 && wordsB.some((w) => wordsA.has(w));
+}
+
+function historyGrowthSynthesisEntries() {
+  const missed = historyMissedOpportunitiesEntries();
+  const allMine = trackerState.lifeMemory.filter((e) => e.user_id === currentUserId());
+  const pairs = [];
+  missed.forEach((entry) => {
+    if (entry.outcome) {
+      pairs.push({ missed: entry, appliedText: entry.outcome, appliedDate: entry.created_at });
+      return;
+    }
+    const later = allMine
+      .filter((other) => other.id !== entry.id && new Date(other.created_at || 0) > new Date(entry.created_at || 0) && situationTagOverlap(entry.situationTag, other.situationTag))
+      .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))[0];
+    if (later) pairs.push({ missed: entry, appliedText: `${later.decision}${later.reason ? ` (${later.reason})` : ""}`, appliedDate: later.created_at });
+  });
+  return pairs;
+}
+
+function historyGrowthSynthesisHtml() {
+  const pairs = historyGrowthSynthesisEntries();
+  if (!pairs.length) {
+    return `<p class="history-section-intro">Nothing to connect yet - once a missed opportunity gets an outcome, or you act on something similar later, the lesson shows up here.</p>`;
+  }
+  return pairs.map((pair, index) => historyCurateCardHtml(`history-synth-${index}`, {
+    family: "slate",
+    icon: `<path d="M3 20h18M6 20V10l6-6 6 6v10"/><path d="M10 20v-6h4v6"/>`,
+    eyebrow: "Growth synthesis",
+    title: pair.missed.situationTag,
+    snippet: cleanText(pair.appliedText, 90),
+    fullText: `Missed: ${pair.missed.decision}${pair.missed.reason ? ` (${pair.missed.reason})` : ""}\nLater: ${pair.appliedText}`,
+    sideLabel: pair.appliedDate ? new Date(pair.appliedDate).toLocaleDateString([], { month: "short", day: "numeric" }) : ""
+  })).join("");
+}
+
+function historyCuratedSectionsHtml() {
+  return `
+    <p class="history-section-title">Goals & training</p>
+    ${historyGoalsTrainingHtml()}
+    <p class="history-section-title">Missed opportunities</p>
+    ${historyMissedOpportunitiesHtml()}
+    <p class="history-section-title">Growth synthesis</p>
+    ${historyGrowthSynthesisHtml()}
+  `;
+}
+
+// Default (no search query): the 3 curated views above. Once the user
+// types a search, fall back to the flat historySearchResultsHtml search
+// across all 11 raw source types - so nothing findable before is lost,
+// it's just not the first thing shown. Keeps History's resting footprint
+// as a small icon entry point (unchanged) while its opened content can be
+// as rich as it needs to be.
+function historySearchModalBodyHtml(query = historySearchQuery) {
+  return cleanText(query, 120) ? historySearchResultsHtml(query) : historyCuratedSectionsHtml();
 }
 
 function commandLauncherResults(query = commandQuery) {
@@ -10880,7 +11058,7 @@ function profileScreen() {
       <div>
         <p class="eyebrow">Profile</p>
         <h2 class="screen-title">Account, trust, data, and controls</h2>
-        <p class="screen-subtitle">Keep identity, AI memory, demo limits, backups, and admin permissions in one place.</p>
+        <p class="screen-subtitle">Keep identity, AI memory, storage, backups, and admin permissions in one place.</p>
       </div>
       <div class="avatar">${userInitial()}</div>
     </header>
@@ -10889,7 +11067,7 @@ function profileScreen() {
       <div>
         <strong>${displayName()}</strong>
         <p>${escapeHTML(userProfile.email)} - ${escapeHTML(userProfile.role)} role</p>
-        <span class="risk-pill warn demo-account-badge">Demo account - saved on this device only</span>
+        <span class="risk-pill warn demo-account-badge">Local account - saved on this device only</span>
       </div>
     </section>
     <div class="profile-actions">
@@ -10920,10 +11098,10 @@ function profileScreen() {
       <button class="secondary-action signout-action" type="button" data-save-voice>Save voice preference</button>
     </section>
     <section class="profile-card">
-      <div class="toggle-row"><span>Login method</span><strong>Local demo (not verified)</strong></div>
+      <div class="toggle-row"><span>Login method</span><strong>Local device login (not verified)</strong></div>
       <div class="toggle-row"><span>Role permissions</span><strong>${isAdmin() ? "Admin" : "User"}</strong></div>
       <div class="toggle-row"><span>Progress storage</span><strong>This browser only</strong></div>
-      <button class="secondary-action compact-action" type="button" data-open="demoMode">Demo mode details</button>
+      <button class="secondary-action compact-action" type="button" data-open="demoMode">Account & storage details</button>
     </section>
     <div class="profile-actions">
       <button class="secondary-action" type="button" data-open="supportCircle">Support Circle</button>
@@ -11112,7 +11290,7 @@ const screens = {
       <div>
         <strong>${displayName()}</strong>
         <p>${escapeHTML(userProfile.email)} - ${escapeHTML(userProfile.role)} role</p>
-        <span class="risk-pill warn demo-account-badge">Demo account - saved on this device only</span>
+        <span class="risk-pill warn demo-account-badge">Local account - saved on this device only</span>
       </div>
     </section>
     <div class="profile-actions">
@@ -11120,7 +11298,7 @@ const screens = {
       <button class="secondary-action" type="button" data-open="guide">Guide / Help</button>
     </div>
     <section class="profile-card">
-      <div class="toggle-row"><span>Login method</span><strong>Local demo (not verified)</strong></div>
+      <div class="toggle-row"><span>Login method</span><strong>Local device login (not verified)</strong></div>
       <div class="toggle-row"><span>Role permissions</span><strong>${isAdmin() ? "Admin" : "User"}</strong></div>
       <div class="toggle-row"><span>Progress storage</span><strong>This browser only</strong></div>
     </section>
@@ -11250,15 +11428,15 @@ const modals = {
   demoMode: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="demo-mode-title">
       <div class="modal-top">
-        <span class="risk-pill warn">Demo mode</span>
+        <span class="risk-pill warn">Local storage</span>
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
-      <h3 id="demo-mode-title">What is real in this demo</h3>
-      <p class="muted">Compass currently stores most progress in this browser. Community sign-in can unlock community features and encrypted cloud backup, but the local demo account itself is not a verified Google login.</p>
+      <h3 id="demo-mode-title">What's real, and what's stored locally</h3>
+      <p class="muted">Compass currently stores most progress in this browser. Community sign-in can unlock community features and encrypted cloud backup, but the local account itself is not a verified Google login.</p>
       <div class="advice-stack">
         <div><strong>Real app behavior</strong><span>Starter path progress, goals, mood, receipts, Skill Guide progress, Future Scan records, Career Studio drafts, and Knowledge Vault data are saved locally.</span></div>
-        <div><strong>Demo limitation</strong><span>Changing browser, clearing site data, or using another device can lose local progress unless you export or use cloud backup where available.</span></div>
-        <div><strong>Best demo route</strong><span>Choose a starter path, run one Decide tool, complete one Practice step, then check Adulting Readiness on Home.</span></div>
+        <div><strong>Storage limitation</strong><span>Changing browser, clearing site data, or using another device can lose local progress unless you export or use cloud backup where available.</span></div>
+        <div><strong>Quick start</strong><span>Choose a starter path, run one Decide tool, complete one Practice step, then check Adulting Readiness on Home.</span></div>
       </div>
       <div class="profile-actions">
         <button class="primary-action compact-action" type="button" data-tab-jump="home">Go to Home</button>
@@ -11955,7 +12133,7 @@ const modals = {
         <span>Receipt image</span>
         <input id="receipt-file" type="file" accept="image/*">
       </label>
-      <button class="secondary-action" type="button" data-demo-receipt>Auto read demo receipt</button>
+      <button class="secondary-action" type="button" data-demo-receipt>Auto read sample receipt</button>
       <div class="receipt-form">
         <label>Merchant<input id="receipt-merchant" type="text" value="Campus bookstore"></label>
         <label>Amount paid<input id="receipt-amount" type="number" min="0" step="0.01" value="18.90"></label>
@@ -12510,14 +12688,14 @@ const modals = {
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <div class="history-head">
-        <h3 id="history-search-title">Find something you already said or did</h3>
-        <p class="muted">Journal, mood, decisions you asked Compass to remember, interview/roleplay practice, Jury Duty, Ghost Roommate, Future Scan, and more - all in one search.</p>
+        <h3 id="history-search-title">What Compass remembers about you</h3>
+        <p class="muted">Your goals and the practice behind them, what you've missed, and what you've learned from it. Search below to find anything specific - journal, mood, interview/roleplay practice, Jury Duty, Ghost Roommate, Future Scan, and more.</p>
       </div>
       <div class="history-search-bar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
         <input id="history-search-input" type="search" value="${escapeHTML(historySearchQuery)}" data-history-search placeholder="Search your own history...">
       </div>
-      <div class="history-list" data-history-results>${historySearchResultsHtml()}</div>
+      <div class="history-list" data-history-results>${historySearchModalBodyHtml()}</div>
     </div>
   `,
 
@@ -13114,12 +13292,58 @@ async function requestCompassAI(question) {
   // (or alongside) plain text - toolCall.message_to_user is a required
   // argument on the model's own call, not text this app synthesizes, so
   // it's safe to show directly as the reply even when `reply` is empty.
+  // Two real functions, never both in one turn: open_tool (opens a real
+  // app feature) or remember_this (writes a real lifeMemory entry from
+  // natural conversation, see validateToolCall/sendChatMessage).
   const reply = String(data.reply || "").trim();
-  const toolCall = data.toolCall && typeof data.toolCall.tool_id === "string" && typeof data.toolCall.message_to_user === "string"
-    ? data.toolCall
-    : null;
+  const toolCall = validateToolCall(data.toolCall);
   if (!reply && !toolCall) throw new Error("Empty Compass reply");
   return { reply, toolCall };
+}
+
+// Conversational counterpart to the manual "remember this" modal
+// (saveLifeMemory handler) - same entry shape, but written directly from
+// a real remember_this tool call instead of a form the user has to
+// remember to open. `sealed` always defaults false here: sealing is a
+// deliberate user privacy action, never something the AI decides on the
+// user's behalf. `kind`/`source` are additive fields the manual-form
+// entries don't have - existing readers of lifeMemory ignore unknown
+// fields, and History (historyMissedOpportunitiesView) falls back to a
+// keyword heuristic for entries without `kind`.
+function saveLifeMemoryFromChat(toolCall) {
+  trackerState.lifeMemory.unshift({
+    id: `life-memory-${Date.now()}`,
+    user_id: currentUserId(),
+    situationTag: cleanText(toolCall.situation_tag, 120),
+    decision: cleanText(toolCall.decision, 300),
+    reason: cleanText(toolCall.reason, 300),
+    outcome: "",
+    sealed: false,
+    kind: toolCall.kind,
+    source: "ai",
+    created_at: new Date().toISOString(),
+    display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+  });
+  trackerState.lifeMemory = trackerState.lifeMemory.slice(0, 200);
+  saveTrackerState();
+}
+
+function validateToolCall(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  if (raw.tool === "open_tool" && typeof raw.tool_id === "string" && typeof raw.message_to_user === "string") {
+    return { tool: "open_tool", tool_id: raw.tool_id, message_to_user: raw.message_to_user };
+  }
+  if (raw.tool === "remember_this" && typeof raw.situation_tag === "string" && typeof raw.decision === "string" && typeof raw.message_to_user === "string") {
+    return {
+      tool: "remember_this",
+      situation_tag: raw.situation_tag,
+      decision: raw.decision,
+      reason: typeof raw.reason === "string" ? raw.reason : "",
+      kind: ["missed_opportunity", "decision", "note"].includes(raw.kind) ? raw.kind : "decision",
+      message_to_user: raw.message_to_user
+    };
+  }
+  return null;
 }
 
 async function requestCompassDirect(systemPrompt, userPrompt) {
@@ -15057,8 +15281,13 @@ async function sendChatMessage(text) {
     // Defensive: never trust a tool_id the model returns without checking
     // it against the real catalog first - same validation
     // runCommandLauncher already does before opening anything.
-    const matchedTool = toolCall ? commandLauncherCommands().find((command) => command.id === toolCall.tool_id) : null;
-    const displayText = matchedTool ? toolCall.message_to_user : reply;
+    const matchedTool = toolCall && toolCall.tool === "open_tool"
+      ? commandLauncherCommands().find((command) => command.id === toolCall.tool_id)
+      : null;
+    if (toolCall && toolCall.tool === "remember_this") {
+      saveLifeMemoryFromChat(toolCall);
+    }
+    const displayText = matchedTool ? toolCall.message_to_user : (toolCall && toolCall.tool === "remember_this" ? toolCall.message_to_user : reply);
     chatState.messages.push({
       from: "assistant",
       text: displayText,
@@ -15181,7 +15410,7 @@ document.addEventListener("input", (event) => {
   if (historySearchInput) {
     historySearchQuery = cleanText(historySearchInput.value, 120);
     const results = modalLayer.querySelector("[data-history-results]");
-    if (results) results.innerHTML = historySearchResultsHtml(historySearchQuery);
+    if (results) results.innerHTML = historySearchModalBodyHtml(historySearchQuery);
   }
 });
 
@@ -16699,6 +16928,8 @@ document.addEventListener("click", async (event) => {
       reason,
       outcome: "",
       sealed: Boolean(sealedInput && sealedInput.checked),
+      kind: "",
+      source: "manual",
       created_at: new Date().toISOString(),
       display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
     });
