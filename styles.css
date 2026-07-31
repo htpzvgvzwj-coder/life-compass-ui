@@ -2291,53 +2291,6 @@ h3 {
   background: var(--color-mint);
 }
 
-.portrait-layer {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 3;
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(-8px);
-  transition: opacity 0.22s ease, transform 0.22s ease;
-}
-
-.portrait-layer.is-visible {
-  opacity: 1;
-  transform: none;
-}
-
-.portrait-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 84px;
-  padding: 6px;
-  border-radius: 16px;
-  background: rgba(20, 20, 22, 0.28);
-  backdrop-filter: blur(4px);
-  box-shadow: 0 8px 20px rgba(20, 20, 22, 0.18);
-}
-
-.portrait-image {
-  width: 100%;
-  aspect-ratio: 220 / 300;
-  object-fit: cover;
-  object-position: top;
-  border-radius: 12px;
-  display: block;
-}
-
-.portrait-name {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-  text-align: center;
-}
-
 .modal-layer {
   position: fixed;
   inset: 0;
@@ -11543,15 +11496,6 @@ body.compass-public-app[data-active-screen="compass"] .phone-shell {
   background: transparent;
   border: none;
   box-shadow: none;
-}
-
-/* The character-portrait popup (built for the roleplay/report views) gets
-   clipped by this container's new overflow:hidden and renders half-cut-off
-   in the corner - genuinely broken here, not just a style mismatch. Hidden
-   for Home/2BB only; still shows normally on the Life Sim report view. */
-body.compass-public-app[data-active-screen="home"] .portrait-layer,
-body.compass-public-app[data-active-screen="compass"] .portrait-layer {
-  display: none;
 }
 
 /* The rich Today/Readiness/Adult-Life Map/Trust dashboard rail is hidden

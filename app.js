@@ -46,10 +46,6 @@ const viewButtons = [...document.querySelectorAll(".view-button")];
 const staticScreens = [...document.querySelectorAll("[data-static-screen]")];
 const desktopRightRail = document.querySelector("#desktop-right-rail");
 
-const portraitLayer = document.querySelector("#portrait-layer");
-const portraitImageEl = document.querySelector("#portrait-image");
-const portraitNameEl = document.querySelector("#portrait-name");
-
 const ADMIN_PASSCODE = "STEADY-ADMIN";
 // AI Coach (Future Mirror bible Ch.8) - built after Blueprint/Reflection/
 // Roadmap exist on purpose, so it has real context to reference instead of
@@ -13449,17 +13445,12 @@ function setLifeVerseDefaultWorldView() {
   if (trackerState.lifeSim) trackerState.lifeSim.reportPromptReady = false;
 }
 
-// Volume 5 Anime World Remaster, step 3: a 2D character-portrait overlay for
-// dialogue, special events, and Life Report. Lives outside #screen-root and
-// #modal-layer on purpose - those get their innerHTML replaced wholesale on
-// every re-render (chat send, roleplay reply, tab switch), which would tear
-// down and rebuild an <img> living inside them and cause a visible flicker
-// every single time.
-// The roleplay modal renders its "event" portrait inline in its own template
-// instead (see modals.roleplayChat/roleplayReflection) - a modal is a fresh
-// render every time it opens, so there's no persistent-overlay flicker risk
-// there, and the VN-style layout (portrait next to the dialogue) reads better
-// than a small badge floating in the corner behind the modal backdrop.
+// The persistent corner-popup version of this (Compass/Life Report portraits
+// floating over #screen-root) was removed - broken by the 2BB photo redesign
+// and not wanted back. The roleplay modal's own inline "event" portrait
+// (see modals.roleplayChat/roleplayReflection) is unrelated and unaffected -
+// a modal is a fresh render every time it opens, so it just renders the
+// image directly in its own template, no overlay/flicker concerns there.
 // Art: Breezy's "Visual Novel Sprites!" (CC0) - see assets/portraits/CREDITS.md
 // for the license and the role-to-character pairing rationale.
 const PORTRAITS = {
@@ -13467,54 +13458,6 @@ const PORTRAITS = {
   event: { label: "Practice Partner", src: "assets/portraits/event-lyn.png" },
   report: { label: "Life Report", src: "assets/portraits/report-oak.png" }
 };
-
-// "report" is not a top-level tab - Life Report is a sub-view inside the
-// "simulator" tab (trackerState.lifeVerse.activeView === "report"), reached via
-// data-lifeverse-tab="report" buttons that call renderScreen("simulator").
-function computeActivePortraitId(tab) {
-  if (tab === "compass") return "compass";
-  if (tab === "simulator" && trackerState.lifeVerse && trackerState.lifeVerse.activeView === "report") return "report";
-  return null;
-}
-const PORTRAIT_SWAP_MS = 220;
-let currentPortraitId = null;
-let portraitSwapTimer = null;
-
-function setPortraitContent(id) {
-  const portrait = PORTRAITS[id];
-  if (!portrait || !portraitImageEl) return;
-  portraitImageEl.src = portrait.src;
-  portraitImageEl.alt = portrait.label;
-  if (portraitNameEl) portraitNameEl.textContent = portrait.label;
-  currentPortraitId = id;
-}
-
-function showPortrait(id) {
-  if (!portraitLayer || !PORTRAITS[id]) return;
-  window.clearTimeout(portraitSwapTimer);
-  if (currentPortraitId === id) {
-    portraitLayer.classList.add("is-visible");
-    return;
-  }
-  const wasVisible = portraitLayer.classList.contains("is-visible");
-  if (wasVisible) {
-    portraitLayer.classList.remove("is-visible");
-    portraitSwapTimer = window.setTimeout(() => {
-      setPortraitContent(id);
-      portraitLayer.classList.add("is-visible");
-    }, PORTRAIT_SWAP_MS);
-  } else {
-    setPortraitContent(id);
-    portraitLayer.classList.add("is-visible");
-  }
-}
-
-function hidePortrait() {
-  if (!portraitLayer) return;
-  window.clearTimeout(portraitSwapTimer);
-  portraitLayer.classList.remove("is-visible");
-  currentPortraitId = null;
-}
 
 const TAB_ALIASES = {
   future: "secondBrain",
@@ -13575,9 +13518,6 @@ function renderScreen(tab) {
   if (tab === "discover") mountFeedSwipeCard();
   const navTab = tab === "assess" || tab === "compass" ? "secondBrain" : tab === "stories" ? "discover" : tab;
   navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.tab === navTab));
-  const activePortraitId = computeActivePortraitId(tab);
-  if (activePortraitId) showPortrait(activePortraitId);
-  else hidePortrait();
   if (tab === "compass") {
     const chatMessagesEl = document.querySelector("#chat-messages");
     if (chatMessagesEl) chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
