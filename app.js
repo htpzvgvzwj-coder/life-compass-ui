@@ -11623,6 +11623,49 @@ function homeRelativeDateLabel(iso) {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+// Icon + short tag per openLoopsEntries() kind, for the mini-cards
+// surrounding the 2BB card - reuses existing asset icons, no new art.
+function openLoopKindMeta(kind) {
+  const meta = {
+    missed_opportunity: { icon: "icon-decide.png", tag: "Missed" },
+    overdue_event: { icon: "icon-warning.png", tag: "Overdue" },
+    self_debt: { icon: "icon-checkin.png", tag: "Reminder" },
+    stalled_practice: { icon: "icon-work.png", tag: "Paused" },
+    unresolved_prediction: { icon: "icon-assessment.png", tag: "Unresolved" }
+  };
+  return meta[kind] || { icon: "icon-guide.png", tag: "Open" };
+}
+
+// Icon per historySearchEntries() type, for the memory-shelf mini-cards.
+function historyEntryIcon(type) {
+  const icons = {
+    "Journal": "icon-chat.png",
+    "Mood": "icon-mood.png",
+    "Remember this": "icon-decide.png",
+    "Remember this (sealed)": "icon-decide.png",
+    "Roleplay Practice": "icon-work.png",
+    "Interview Practice": "icon-work.png",
+    "Jury Duty": "icon-balance.png",
+    "Ghost Roommate": "icon-home.png",
+    "Future Scan": "icon-assessment.png",
+    "Failure Inoculation": "icon-warning.png",
+    "Estate Auction": "icon-money.png",
+    "Self Archaeology": "icon-learn.png"
+  };
+  return icons[type] || "icon-chat.png";
+}
+
+function bbMiniCardRowHtml({ sectionClass, label, items, emptyText }) {
+  return `
+    <div class="bb-section ${sectionClass}">
+      <p class="bb-section-label">${escapeHTML(label)}</p>
+      <div class="bb-row">
+        ${items.length ? items.join("") : `<p class="bb-row-empty">${escapeHTML(emptyText)}</p>`}
+      </div>
+    </div>
+  `;
+}
+
 const screens = {
   // Home is a distinct destination again, not an alias for the chat - a
   // single small glass card (no shelf/dashboard bolted on) floating on the
@@ -11684,6 +11727,8 @@ const screens = {
   // surrounding markup/classes changed to fit the new card shell.
   compass: () => {
     const dueSoon = dueRealLifeEvents()[0] || null;
+    const loops = openLoopsEntries().slice(0, 3);
+    const shelfEntries = historySearchEntries().slice(0, 3);
     return `
     <div class="bb-card">
       <div class="bb-card-inner">
@@ -11726,6 +11771,33 @@ const screens = {
         ${uploadedDocumentStatus()}
       </div>
     </div>
+    ${bbMiniCardRowHtml({
+      sectionClass: "bb-open-loops",
+      label: "Open Loops - what hasn't closed yet",
+      emptyText: "Nothing open right now.",
+      items: loops.map((loop) => {
+        const meta = openLoopKindMeta(loop.kind);
+        return `
+          <button type="button" class="bb-mini-card" data-open="openLoops">
+            <img src="assets/${meta.icon}" alt="">
+            <span class="bb-mini-tag">${escapeHTML(meta.tag)}</span>
+            <strong>${escapeHTML(cleanText(loop.title, 40))}</strong>
+          </button>
+        `;
+      })
+    })}
+    ${bbMiniCardRowHtml({
+      sectionClass: "bb-shelf",
+      label: "What Compass remembers",
+      emptyText: "Nothing remembered yet.",
+      items: shelfEntries.map((entry) => `
+        <button type="button" class="bb-mini-card" data-open="historySearch">
+          <img src="assets/${historyEntryIcon(entry.type)}" alt="">
+          <strong>${escapeHTML(cleanText(entry.title, 40))}</strong>
+          <span class="bb-mini-date">${homeRelativeDateLabel(entry.date)}</span>
+        </button>
+      `)
+    })}
   `;
   },
 
