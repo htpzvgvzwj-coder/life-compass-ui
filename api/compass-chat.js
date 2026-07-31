@@ -97,10 +97,11 @@ function parseOpenToolArgs(rawArgs) {
 
 function parseRememberThisArgs(rawArgs) {
   if (!rawArgs || typeof rawArgs !== "object") return null;
-  const { situation_tag, decision, reason, kind, related_goal, message_to_user } = rawArgs;
+  const { situation_tag, decision, reason, kind, related_goal, confidence, message_to_user } = rawArgs;
   if (typeof situation_tag !== "string" || !situation_tag.trim()) return null;
   if (typeof decision !== "string" || !decision.trim()) return null;
   if (typeof message_to_user !== "string" || !message_to_user.trim()) return null;
+  const confidenceNum = Number(confidence);
   return {
     tool: "remember_this",
     situation_tag: situation_tag.trim().slice(0, 120),
@@ -108,6 +109,7 @@ function parseRememberThisArgs(rawArgs) {
     reason: typeof reason === "string" ? reason.trim().slice(0, 300) : "",
     kind: REMEMBER_THIS_KINDS.includes(kind) ? kind : "decision",
     related_goal: typeof related_goal === "string" ? related_goal.trim().slice(0, 200) : "",
+    confidence: Number.isFinite(confidenceNum) ? Math.max(0, Math.min(100, Math.round(confidenceNum))) : null,
     message_to_user: message_to_user.trim()
   };
 }
@@ -208,6 +210,7 @@ function buildRememberThisSchema() {
       reason: { type: "string", description: "Why, if they said why." },
       kind: { type: "string", enum: REMEMBER_THIS_KINDS, description: "missed_opportunity if they skipped/avoided/held back on something; decision if they made an active choice; note for anything else worth remembering." },
       related_goal: { type: "string", description: "If this clearly relates to one of the user's real saved Life Roadmap goals (see the saved facts in context), the goal's title exactly as given there. Omit entirely if no specific goal clearly applies - do not guess." },
+      confidence: { type: "number", description: "Only if the user themselves stated how confident they are or what they expect (e.g. 'I'm like 70% sure this works out') - their own stated number 0-100. Omit entirely otherwise; never estimate a confidence they did not state." },
       message_to_user: { type: "string", description: "A short, natural line telling the user you're noting this down - write it the way you'd actually say it, not a system notification." }
     },
     required: ["situation_tag", "decision", "kind", "message_to_user"]
@@ -261,6 +264,7 @@ function openaiToolsParam(schemas) {
 
 function geminiProperty(prop) {
   if (prop.type === "string" && prop.enum) return { type: "STRING", enum: prop.enum, description: prop.description };
+  if (prop.type === "number") return { type: "NUMBER", description: prop.description };
   return { type: "STRING", description: prop.description };
 }
 

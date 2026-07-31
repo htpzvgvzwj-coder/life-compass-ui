@@ -539,6 +539,11 @@ const defaultTrackerState = {
   // (which is self-reported once at onboarding) - inferred from the
   // user's own journal/chat text, never a formal assessment.
   personalityRead: { traits: {}, confidence: "", lastRunAt: null, basedOnCount: 0 },
+  // Open Loops "not ready to face this yet" button - snoozes one specific
+  // derived loop for a week without pretending it's resolved (unlike the
+  // other two buttons, this doesn't create any new record, just delays
+  // when this particular loop resurfaces).
+  openLoopsSnoozed: [],
   challengeProgress: [],
   savedOpportunities: [],
   futureMirror: {
@@ -1163,6 +1168,12 @@ let activeTab = "home";
 let isCompassResponding = false;
 let isCompassInsightsRefreshing = false;
 let isPersonalityReadRefreshing = false;
+// Quick capture Inbox (text-only v1): draft text -> AI classifies into one
+// of 7 categories -> user confirms before anything is actually saved.
+let quickCaptureText = "";
+let quickCaptureClassification = null;
+let quickCaptureLoading = false;
+let quickCaptureError = "";
 let futureMirrorMode = "scan";
 
 // Future Scan - third Future Mirror mode ("help the user see the truth before
@@ -1370,6 +1381,7 @@ function normalizeTrackerState(state) {
     trustMoments: state.trustMoments && typeof state.trustMoments === "object" ? { firedIds: Array.isArray(state.trustMoments.firedIds) ? state.trustMoments.firedIds : [], watchedAvoidanceIds: Array.isArray(state.trustMoments.watchedAvoidanceIds) ? state.trustMoments.watchedAvoidanceIds : [] } : fallback.trustMoments,
     proactiveQueue: Array.isArray(state.proactiveQueue) ? state.proactiveQueue : fallback.proactiveQueue,
     personalityRead: state.personalityRead && typeof state.personalityRead === "object" ? { ...fallback.personalityRead, ...state.personalityRead, traits: state.personalityRead.traits && typeof state.personalityRead.traits === "object" ? state.personalityRead.traits : {} } : fallback.personalityRead,
+    openLoopsSnoozed: Array.isArray(state.openLoopsSnoozed) ? state.openLoopsSnoozed : fallback.openLoopsSnoozed,
     challengeProgress: Array.isArray(state.challengeProgress) ? state.challengeProgress : fallback.challengeProgress,
     savedOpportunities: Array.isArray(state.savedOpportunities) ? state.savedOpportunities : fallback.savedOpportunities,
     futureMirror: {
@@ -3337,6 +3349,7 @@ function commandLauncherCommands() {
     { id: "ai-trace-log", title: "AI Trace Log", detail: "Check whether AI help is grounded and useful.", lane: "Profile", tab: "profile", open: "aiTraceLog", icon: "icon-assessment.png", keywords: ["ai", "trace", "log", "grounded"] },
     { id: "calibration", title: "Judgment Calibration", detail: "When you say you are sure, how often are you right?", lane: "Progress", tab: "secondBrain", open: "calibration", icon: "icon-balance.png", keywords: ["calibration", "judgment", "confidence"] },
     { id: "avoidance-patterns", title: "Debt of Inaction", detail: "What you keep not doing, detected from real saved patterns.", lane: "Progress", tab: "secondBrain", open: "avoidancePatterns", icon: "icon-warning.png", keywords: ["avoidance", "procrastination", "inaction", "debt"] },
+    { id: "open-loops", title: "Open Loops", detail: "What hasn't closed yet - unresolved decisions, overdue dates, paused practice.", lane: "Progress", tab: "secondBrain", open: "openLoops", icon: "icon-warning.png", keywords: ["open loops", "unresolved", "unfinished", "pending"] },
     { id: "inspire-hub", title: "Inspire Hub", detail: "Creators, athletes, leaders, entrepreneurs, and pressure-to-growth stories.", lane: "Discover", tab: "stories", icon: "icon-stories.png", keywords: ["inspire", "stories", "creators", "leaders"] },
     { id: "discuss-mirror", title: "Discuss your mirror safely", detail: "Share a reflection prompt with a trusted peer, mentor, or Support Circle.", lane: "Decisions & Memory", tab: "secondBrain", open: "growthCommunity", icon: "icon-support.png", keywords: ["discuss", "mirror", "peer", "mentor"] },
 
@@ -3487,6 +3500,41 @@ function historySearchResults(query = historySearchQuery) {
   return historySearchEntries().filter((entry) => historySearchMatches(entry, query)).slice(0, 40);
 }
 
+// Memory Atom (lightweight, read-only): a unified shape any consumer
+// (History Search, Open Loops, insight actions, a future Knowledge Vault/
+// Inbox) can read - {why, relatedGoalId, outcome, aiUsable, sourceEvidence}
+// - without migrating any of the 7+ underlying storage shapes. Only
+// lifeMemory actually has real why/outcome/relatedGoalId/sealed fields to
+// draw from; every other source honestly reports empty rather than
+// inventing a "why" or "outcome" that source was never structured to have.
+function memoryAtomView(entry) {
+  const atom = {
+    id: entry.id,
+    type: entry.type,
+    title: entry.title,
+    date: entry.date,
+    sourceEvidence: entry.fullText || entry.snippet || "",
+    aiUsable: !entry.type.includes("(sealed)"),
+    why: "",
+    outcome: "",
+    relatedGoalId: null
+  };
+  if (entry.id && entry.id.startsWith("hs-memory-")) {
+    const record = trackerState.lifeMemory.find((item) => item.id === entry.id.slice("hs-memory-".length));
+    if (record) {
+      atom.why = record.reason || "";
+      atom.outcome = record.outcome || "";
+      atom.relatedGoalId = record.relatedGoalId || null;
+      atom.aiUsable = !record.sealed;
+    }
+  }
+  return atom;
+}
+
+function memoryAtomEntries(query = historySearchQuery) {
+  return historySearchResults(query).map(memoryAtomView);
+}
+
 // Chat-dispatchable History: requestCompassAI's context previously only
 // carried lifeMemory, so a question like "how did my interview practice
 // go" had zero real data behind it even though historySearchEntries()
@@ -3498,13 +3546,19 @@ function historySearchResults(query = historySearchQuery) {
 function relevantHistoryForChat(question) {
   const words = cleanText(question, 300).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
   if (!words.length) return [];
+  // Reads the shared Memory Atom view (memoryAtomView) rather than the raw
+  // per-source shape, and respects aiUsable the same way the separate
+  // lifeMemory context field already does - a sealed entry never reaches
+  // the AI through this path either.
   return historySearchEntries()
     .filter((entry) => {
       const haystack = `${entry.type} ${entry.title} ${entry.snippet} ${entry.fullText}`.toLowerCase();
       return words.some((w) => haystack.includes(w));
     })
+    .map(memoryAtomView)
+    .filter((atom) => atom.aiUsable)
     .slice(0, 5)
-    .map((entry) => ({ type: entry.type, title: entry.title, detail: cleanText(entry.fullText || entry.snippet, 240), date: entry.date }));
+    .map((atom) => ({ type: atom.type, title: atom.title, detail: cleanText(atom.sourceEvidence, 240), date: atom.date }));
 }
 
 // One of 4 icon/color families per entry.type, not 11 different colors -
@@ -3686,6 +3740,76 @@ function historyMissedOpportunitiesHtml() {
     fullText: `Decision: ${entry.decision}\nReason: ${entry.reason || "-"}${entry.outcome ? `\nLater: ${entry.outcome}` : ""}`,
     sideLabel: entry.created_at ? new Date(entry.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : ""
   })).join("");
+}
+
+// Open Loops: "what hasn't closed yet", aggregated from 5 signals that
+// already exist scattered across the app - no new tracked data. The most
+// useful thing Second Brain can do isn't remembering everything, it's
+// naming what's still open.
+function openLoopsEntries() {
+  const myId = currentUserId();
+  const snoozedIds = new Set((trackerState.openLoopsSnoozed || []).filter((item) => daysSince(item.snoozedAt) < 7).map((item) => item.id));
+  const loops = [];
+
+  historyMissedOpportunitiesEntries().forEach((entry) => {
+    loops.push({ id: `loop-memory-${entry.id}`, kind: "missed_opportunity", title: entry.situationTag, detail: `You said: "${cleanText(entry.decision, 90)}"`, sourceId: entry.id, date: entry.created_at });
+  });
+
+  myRealLifeEvents().filter((event) => event.status !== "done" && daysSince(event.dueDate) >= 14).forEach((event) => {
+    loops.push({ id: `loop-event-${event.id}`, kind: "overdue_event", title: cleanText(event.title, 90), detail: `Due ${new Date(event.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })} - still open.`, sourceId: event.id, date: event.dueDate });
+  });
+
+  dueSelfDebts().forEach((debt) => {
+    loops.push({ id: `loop-debt-${debt.id}`, kind: "self_debt", title: debt.title, detail: cleanText(debt.message, 140), sourceId: debt.id, date: debt.createdAt });
+  });
+
+  trackerState.buildMode.entries.filter((entry) => entry.user_id === myId && entry.status === "active" && daysSince(entry.updatedAt || entry.createdAt) >= 14).forEach((entry) => {
+    loops.push({ id: `loop-build-${entry.id}`, kind: "stalled_practice", title: cleanText(entry.goalSummary || entry.goal, 90), detail: "Practice you started, then paused.", sourceId: entry.id, date: entry.updatedAt || entry.createdAt });
+  });
+
+  dueForResurfacing().filter((entry) => entry._source === "futureScan").forEach((entry) => {
+    loops.push({ id: `loop-checkback-${entry.id}`, kind: "unresolved_prediction", title: "A prediction you made", detail: entry.content, sourceId: entry._scanId, date: entry.resurfaceAt });
+  });
+
+  return loops.filter((loop) => !snoozedIds.has(loop.id)).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+}
+
+function openLoopBuddyLine(loop) {
+  const lines = {
+    missed_opportunity: `"${loop.title}" is still open. Want to look at it again?`,
+    overdue_event: `"${loop.title}" has been sitting past its date for a while now.`,
+    self_debt: `You asked to be reminded about this: "${loop.title}".`,
+    stalled_practice: `You started practicing "${loop.title}" and then paused - still here whenever you're ready.`,
+    unresolved_prediction: `${loop.detail} - worth checking how that actually turned out?`
+  };
+  return lines[loop.kind] || loop.detail;
+}
+
+function openLoopsModalHtml() {
+  const loops = openLoopsEntries();
+  if (!loops.length) {
+    return `
+      <section class="empty-feature">
+        <img src="assets/icon-checkin.png" alt="">
+        <div><strong>Nothing open right now</strong><p>No unresolved decisions, overdue dates, paused practice, or unchecked predictions.</p></div>
+      </section>
+    `;
+  }
+  return loops.map((loop) => `
+    <article class="history-card open-loop-card">
+      <div class="history-icon type-coral">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      </div>
+      <div class="history-body">
+        <p class="history-snippet">${escapeHTML(openLoopBuddyLine(loop))}</p>
+        <div class="open-loop-actions">
+          <button class="secondary-action compact-action" type="button" data-open-loop-practice="${escapeHTML(loop.id)}">Practice this</button>
+          <button class="secondary-action compact-action" type="button" data-open-loop-action="${escapeHTML(loop.id)}">Set a small action</button>
+          <button class="secondary-action compact-action" type="button" data-open-loop-snooze="${escapeHTML(loop.id)}">Not ready yet</button>
+        </div>
+      </div>
+    </article>
+  `).join("");
 }
 
 // View 3: synthesis - what got learned from a missed opportunity and
@@ -3940,6 +4064,11 @@ function compassInsightsSectionHtml() {
                       <button class="insight-why-toggle" type="button" data-toggle-history-card="${whyId}" aria-expanded="false">Why?</button>
                       <p class="insight-why-detail" id="${whyId}-full" hidden>Based on: ${escapeHTML(linked.map((e) => `"${e.situationTag}"`).join(", "))}</p>
                     ` : ""}
+                    <div class="insight-actions">
+                      <button class="secondary-action compact-action" type="button" data-insight-practice="${escapeHTML(item.id)}">Practice this</button>
+                      <button class="secondary-action compact-action" type="button" data-insight-action="${escapeHTML(item.id)}">Set a small action</button>
+                      <button class="secondary-action compact-action" type="button" data-insight-encouragement="${escapeHTML(item.id)}">Find encouragement</button>
+                    </div>
                   </li>
                 `;
               }).join("")}
@@ -10242,7 +10371,7 @@ function selfDebtNewModal() {
       </div>
       <h3 id="self-debt-new-title">What are you promising your future self?</h3>
       <div class="admin-form">
-        <label>Title<input id="self-debt-title-input" type="text" maxlength="120" placeholder="Example: Don't go quiet when things get hard"></label>
+        <label>Title<input id="self-debt-title-input" type="text" maxlength="120" value="${escapeHTML(selfDebtPrefillTitle)}" placeholder="Example: Don't go quiet when things get hard"></label>
         <label>Message to your future self<textarea id="self-debt-message-input" maxlength="500" placeholder="Write it like you're the one who'll read it later, not a to-do note."></textarea></label>
         <label>Deliver this when
           <select id="self-debt-trigger-input">
@@ -11541,6 +11670,9 @@ const screens = {
         Compass
       </div>
       <div class="chat-icon-tabs">
+        <button class="chat-icon-tab" type="button" data-open="quickCapture" aria-label="Quick capture" title="Quick capture">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+        </button>
         <button class="chat-icon-tab" type="button" data-open="historySearch" aria-label="Search your history" title="History Search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
         </button>
@@ -12974,6 +13106,7 @@ const modals = {
         <input id="life-memory-situation-input" type="text" maxlength="120" placeholder="Example: A talk I could have gone to">
         <textarea id="life-memory-decision-input" maxlength="300" placeholder="What did you decide? Example: Skipped it, too tired that week."></textarea>
         <textarea id="life-memory-reason-input" maxlength="300" placeholder="Why, really? Example: Wasn't the tiredness, I just didn't want to go alone."></textarea>
+        <input id="life-memory-confidence-input" type="number" min="0" max="100" placeholder="Optional: how confident are you this goes well? (0-100)">
         <label class="check-option">
           <input type="checkbox" id="life-memory-sealed-input">
           <span>Keep this just between us - don't bring it up unless I do</span>
@@ -12983,13 +13116,21 @@ const modals = {
         <div class="ledger-sheet">
           ${entries.length ? entries.map((entry) => `
             <article class="ledger-entry">
-              <p class="ledger-entry-stamp">${escapeHTML(entry.display_time)}${entry.sealed ? " · sealed" : ""}</p>
+              <p class="ledger-entry-stamp">${escapeHTML(entry.display_time)}${entry.sealed ? " · sealed" : ""}${Number.isFinite(entry.predictedConfidence) ? ` · ${entry.predictedConfidence}% confident` : ""}</p>
               <p class="ledger-entry-text"><strong>${escapeHTML(entry.situationTag)}</strong> - ${escapeHTML(entry.decision)}</p>
               <p class="ledger-entry-text muted">${escapeHTML(entry.reason)}</p>
               ${entry.outcome ? `
                 <p class="ledger-entry-text">Later: ${escapeHTML(entry.outcome)}</p>
               ` : `
                 <textarea class="life-memory-outcome-input" data-outcome-input-for="${escapeHTML(entry.id)}" maxlength="300" placeholder="What actually happened afterward? (optional, add anytime)"></textarea>
+                ${Number.isFinite(entry.predictedConfidence) ? `
+                  <select data-match-input-for="${escapeHTML(entry.id)}">
+                    <option value="">Did this match what you expected?</option>
+                    <option value="matched">Matched what I expected</option>
+                    <option value="partial">Partially matched</option>
+                    <option value="missed">Didn't match</option>
+                  </select>
+                ` : ""}
                 <button class="secondary-action compact-action" type="button" data-record-life-memory-outcome="${escapeHTML(entry.id)}">Save what happened</button>
               `}
             </article>
@@ -13059,12 +13200,52 @@ const modals = {
       <div class="history-head">
         <h3 id="history-search-title">What Compass remembers about you</h3>
         <p class="muted">Your goals and the practice behind them, what you've missed, and what you've learned from it. Search below to find anything specific - journal, mood, interview/roleplay practice, Jury Duty, Ghost Roommate, Future Scan, and more.</p>
+        <button class="secondary-action compact-action" type="button" data-open="openLoops">What hasn't closed yet</button>
       </div>
       <div class="history-search-bar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
         <input id="history-search-input" type="search" value="${escapeHTML(historySearchQuery)}" data-history-search placeholder="Search your own history...">
       </div>
       <div class="history-list" data-history-results>${historySearchModalBodyHtml()}</div>
+    </div>
+  `,
+
+  openLoops: () => `
+    <div class="modal-card history-search-modal" role="dialog" aria-modal="true" aria-labelledby="open-loops-title">
+      <div class="modal-top">
+        <span class="risk-pill warn">Open Loops</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <div class="history-head">
+        <h3 id="open-loops-title">What hasn't closed yet</h3>
+        <p class="muted">Not a to-do list - just what's still open, so nothing quietly gets buried.</p>
+      </div>
+      <div class="history-list">${openLoopsModalHtml()}</div>
+    </div>
+  `,
+
+  quickCapture: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="quick-capture-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Quick capture</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="quick-capture-title">Drop anything here</h3>
+      <p class="muted">A thought, a plan, something that happened - Compass sorts out where it goes, you just confirm.</p>
+      ${quickCaptureClassification ? `
+        <div class="advice-stack">
+          <div><strong>${escapeHTML(quickCaptureClassification.category)}</strong><span>${escapeHTML(quickCaptureClassification.summary)}</span></div>
+        </div>
+        <p class="form-error" id="quick-capture-error" aria-live="polite">${escapeHTML(quickCaptureError)}</p>
+        <div class="profile-actions">
+          <button class="primary-action compact-action" type="button" data-confirm-quick-capture>Save it</button>
+          <button class="secondary-action compact-action" type="button" data-redo-quick-capture>Let me rewrite it</button>
+        </div>
+      ` : `
+        <textarea id="quick-capture-input" maxlength="500" placeholder="Anything - Compass will figure out where it fits.">${escapeHTML(quickCaptureText)}</textarea>
+        <p class="form-error" id="quick-capture-error" aria-live="polite">${escapeHTML(quickCaptureError)}</p>
+        <button class="primary-action" type="button" data-classify-quick-capture ${quickCaptureLoading ? "disabled" : ""}>${quickCaptureLoading ? "Thinking..." : "Continue"}</button>
+      `}
     </div>
   `,
 
@@ -13390,6 +13571,10 @@ function openSelfDebtNotice() {
 }
 
 let currentModalName = "";
+// Set when an Open Loop / insight action button opens selfDebtNew with a
+// suggested title already in mind, so the user isn't stuck retyping what
+// they just read - same pattern as the other per-modal state below.
+let selfDebtPrefillTitle = "";
 
 // Lets a pending async callback (an AI reply arriving late, etc.) check
 // whether the modal it was about to re-render is still the one on screen,
@@ -13416,6 +13601,15 @@ function openModal(name, payload) {
   }
   if (name === "portfolioBuilder" && !modalLayer.classList.contains("is-open")) {
     portfolioError = "";
+  }
+  if (name === "selfDebtNew") {
+    selfDebtPrefillTitle = typeof payload === "string" ? payload : "";
+  }
+  if (name === "quickCapture" && !modalLayer.classList.contains("is-open")) {
+    quickCaptureText = "";
+    quickCaptureClassification = null;
+    quickCaptureLoading = false;
+    quickCaptureError = "";
   }
   if (name === "addKeyResult" && !modalLayer.classList.contains("is-open")) {
     roadmapError = "";
@@ -13732,6 +13926,7 @@ function saveLifeMemoryFromChat(toolCall) {
     sealed: false,
     kind: toolCall.kind,
     relatedGoalId: resolveRelatedGoalId(toolCall.related_goal),
+    predictedConfidence: Number.isFinite(toolCall.confidence) ? toolCall.confidence : null,
     source: "ai",
     created_at: new Date().toISOString(),
     display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
@@ -13777,6 +13972,7 @@ function validateToolCall(raw) {
       reason: typeof raw.reason === "string" ? raw.reason : "",
       kind: ["missed_opportunity", "decision", "note"].includes(raw.kind) ? raw.kind : "decision",
       related_goal: typeof raw.related_goal === "string" ? raw.related_goal : "",
+      confidence: Number.isFinite(raw.confidence) ? Math.max(0, Math.min(100, Math.round(raw.confidence))) : null,
       message_to_user: raw.message_to_user
     };
   }
@@ -13820,6 +14016,58 @@ async function requestCompassDirect(systemPrompt, userPrompt) {
   return reply;
 }
 
+// Quick capture Inbox (Trilium-inspired, text-only v1): single-category
+// classification, same pattern as SOS_TRIAGE_SYSTEM_PROMPT - one clean
+// category out, shown to the user before anything is saved, never silent.
+const QUICK_CAPTURE_CATEGORIES = ["goal", "decision", "emotion", "opportunity", "task", "contact", "learning"];
+const QUICK_CAPTURE_CLASSIFY_PROMPT = "You classify a short, unstructured note someone just jotted down into exactly one category, so it can be filed correctly without them picking a form first. Categories: goal (something they want to work toward), decision (a choice they made or are making), emotion (how they are feeling, not a decision), opportunity (something they could pursue - an event, an opening, a person to talk to), task (something concrete to do), contact (a person worth remembering), learning (something they want to look into or just learned). Respond with strict JSON only, no markdown, no extra text: {\"category\":\"one of the ids above\",\"summary\":\"a short one-sentence rephrasing of what they wrote, in their own words, not embellished\"}.";
+
+async function classifyQuickCapture(text) {
+  const reply = await requestCompassDirect(QUICK_CAPTURE_CLASSIFY_PROMPT, `Their note: "${cleanText(text, 500)}"`);
+  const parsed = extractJsonObject(reply);
+  if (!parsed || !QUICK_CAPTURE_CATEGORIES.includes(parsed.category)) throw new Error("Quick capture classification was not valid JSON.");
+  return { category: parsed.category, summary: cleanText(parsed.summary, 200) };
+}
+
+// v1 routing is deliberately simple: decision/opportunity/task become a
+// real lifeMemory entry (the same "remember this" shape everywhere else
+// uses); goal/emotion/contact/learning become a journal entry. Building 7
+// separate first-class creation flows (a real goal, a real contact card,
+// etc.) is a bigger project than "text-only quick capture" - this gets
+// the note filed and searchable now, without pretending it's more
+// structured than it is.
+function commitQuickCapture(text, category) {
+  const memoryKinds = ["decision", "opportunity", "task"];
+  if (memoryKinds.includes(category)) {
+    trackerState.lifeMemory.unshift({
+      id: `life-memory-${Date.now()}`,
+      user_id: currentUserId(),
+      situationTag: cleanText(quickCaptureClassification ? quickCaptureClassification.summary : text, 120),
+      decision: cleanText(text, 300),
+      reason: "",
+      outcome: "",
+      sealed: false,
+      kind: "note",
+      relatedGoalId: null,
+      predictedConfidence: null,
+      source: "quick-capture",
+      created_at: new Date().toISOString(),
+      display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    });
+    trackerState.lifeMemory = trackerState.lifeMemory.slice(0, 200);
+  } else {
+    trackerState.journalEntries.unshift({
+      id: `journal-${Date.now()}`,
+      user_id: currentUserId(),
+      text: cleanText(text, 1200),
+      created_at: new Date().toISOString(),
+      display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    });
+    trackerState.journalEntries = trackerState.journalEntries.slice(0, 80);
+  }
+  saveTrackerState();
+  maybeRunCompassInsights();
+}
 
 // ---- Future Scan ---------------------------------------------------------
 
@@ -16102,6 +16350,15 @@ document.addEventListener("click", async (event) => {
   const historyExpandButton = event.target.closest("[data-toggle-history-card]");
   const refreshInsightsButton = event.target.closest("[data-refresh-compass-insights]");
   const refreshPersonalityButton = event.target.closest("[data-refresh-personality-read]");
+  const openLoopPracticeButton = event.target.closest("[data-open-loop-practice]");
+  const openLoopActionButton = event.target.closest("[data-open-loop-action]");
+  const openLoopSnoozeButton = event.target.closest("[data-open-loop-snooze]");
+  const insightPracticeButton = event.target.closest("[data-insight-practice]");
+  const insightActionButton = event.target.closest("[data-insight-action]");
+  const insightEncouragementButton = event.target.closest("[data-insight-encouragement]");
+  const classifyQuickCaptureButton = event.target.closest("[data-classify-quick-capture]");
+  const confirmQuickCaptureButton = event.target.closest("[data-confirm-quick-capture]");
+  const redoQuickCaptureButton = event.target.closest("[data-redo-quick-capture]");
   const dismissInsightButton = event.target.closest("[data-dismiss-insight]");
   const tryAdvancedFindingButton = event.target.closest("[data-try-advanced-finding]");
   const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
@@ -16162,6 +16419,77 @@ document.addEventListener("click", async (event) => {
   if (dismissInsightButton) {
     dismissCompassInsight(dismissInsightButton.dataset.dismissInsight);
     renderScreen(activeTab);
+  }
+
+  // Open Loops action buttons - "practice" reuses the existing decisionLab
+  // entry point (no new practice engine needed), "small action" opens the
+  // existing Self-Debt form pre-filled with the loop's own title, "not
+  // ready yet" just snoozes this one derived loop for a week without
+  // pretending it's resolved.
+  if (openLoopPracticeButton) {
+    openModal("decisionLab");
+  }
+  if (openLoopActionButton) {
+    const loop = openLoopsEntries().find((item) => item.id === openLoopActionButton.dataset.openLoopAction);
+    openModal("selfDebtNew", loop ? loop.title : "");
+  }
+  if (openLoopSnoozeButton) {
+    const id = openLoopSnoozeButton.dataset.openLoopSnooze;
+    trackerState.openLoopsSnoozed = [{ id, snoozedAt: new Date().toISOString() }, ...(trackerState.openLoopsSnoozed || []).filter((item) => item.id !== id)].slice(0, 50);
+    saveTrackerState();
+    openModal("openLoops");
+  }
+
+  // Insight action buttons - turn an observation into something you can
+  // actually do about it, same 3-action pattern as Open Loops above (this
+  // is the "Help you act" half of Second Brain's two jobs, not just
+  // "Remember").
+  if (insightPracticeButton) {
+    openModal("decisionLab");
+  }
+  if (insightActionButton) {
+    const item = (trackerState.aiInsights.items || []).find((entry) => entry.id === insightActionButton.dataset.insightAction);
+    openModal("selfDebtNew", item ? item.text : "");
+  }
+  if (insightEncouragementButton) {
+    openModal("communityEncouragement");
+  }
+
+  if (classifyQuickCaptureButton) {
+    const input = modalLayer.querySelector("#quick-capture-input");
+    const text = cleanText(input ? input.value : "", 500);
+    quickCaptureText = text;
+    if (!text) {
+      quickCaptureError = "Write something first.";
+      renderScreen(activeTab);
+      return;
+    }
+    quickCaptureLoading = true;
+    quickCaptureError = "";
+    renderScreen(activeTab);
+    try {
+      quickCaptureClassification = await classifyQuickCapture(text);
+    } catch (error) {
+      console.error("[Compass AI] Quick capture classification failed", error);
+      quickCaptureError = "Couldn't sort that just now - try again?";
+    } finally {
+      quickCaptureLoading = false;
+      openModal("quickCapture");
+    }
+  }
+
+  if (confirmQuickCaptureButton && quickCaptureClassification) {
+    commitQuickCapture(quickCaptureText, quickCaptureClassification.category);
+    quickCaptureText = "";
+    quickCaptureClassification = null;
+    closeModal();
+    renderScreen(activeTab);
+  }
+
+  if (redoQuickCaptureButton) {
+    quickCaptureClassification = null;
+    quickCaptureError = "";
+    openModal("quickCapture");
   }
 
   if (opener) {
@@ -17403,11 +17731,13 @@ document.addEventListener("click", async (event) => {
     const situationInput = modalLayer.querySelector("#life-memory-situation-input");
     const decisionInput = modalLayer.querySelector("#life-memory-decision-input");
     const reasonInput = modalLayer.querySelector("#life-memory-reason-input");
+    const confidenceInput = modalLayer.querySelector("#life-memory-confidence-input");
     const sealedInput = modalLayer.querySelector("#life-memory-sealed-input");
     const error = modalLayer.querySelector("#life-memory-error");
     const situationTag = cleanText(situationInput ? situationInput.value : "", 120);
     const decision = cleanText(decisionInput ? decisionInput.value : "", 300);
     const reason = cleanText(reasonInput ? reasonInput.value : "", 300);
+    const confidenceRaw = confidenceInput && confidenceInput.value !== "" ? Number(confidenceInput.value) : null;
     if (!situationTag || !decision) {
       if (error) error.textContent = "Add at least what it was and what you decided.";
       return;
@@ -17421,6 +17751,7 @@ document.addEventListener("click", async (event) => {
       outcome: "",
       sealed: Boolean(sealedInput && sealedInput.checked),
       kind: "",
+      predictedConfidence: Number.isFinite(confidenceRaw) ? Math.max(0, Math.min(100, Math.round(confidenceRaw))) : null,
       source: "manual",
       created_at: new Date().toISOString(),
       display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
@@ -17434,10 +17765,20 @@ document.addEventListener("click", async (event) => {
   if (recordLifeMemoryOutcomeButton) {
     const id = recordLifeMemoryOutcomeButton.dataset.recordLifeMemoryOutcome;
     const outcomeInput = modalLayer.querySelector(`[data-outcome-input-for="${CSS.escape(id)}"]`);
+    const matchInput = modalLayer.querySelector(`[data-match-input-for="${CSS.escape(id)}"]`);
     const outcome = cleanText(outcomeInput ? outcomeInput.value : "", 300);
     const entry = trackerState.lifeMemory.find((item) => item.id === id);
     if (entry && outcome) {
       entry.outcome = outcome;
+      // Prediction ledger: only when this entry had a stated confidence AND
+      // the user themselves rated whether it matched (never the AI
+      // guessing this) - writes into the same calibrationRecords array
+      // Future Scan Check-Backs already use, so calibrationStats() picks
+      // it up automatically with no changes of its own.
+      const matchValue = matchInput ? matchInput.value : "";
+      if (Number.isFinite(entry.predictedConfidence) && ["matched", "partial", "missed"].includes(matchValue)) {
+        resolveCalibrationRecord({ scanId: null, confidence: entry.predictedConfidence, outcomeMatch: matchValue, situationSummary: entry.situationTag });
+      }
       saveTrackerState();
       openModal("lifeMemory");
     }

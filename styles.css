@@ -11489,3 +11489,18 @@ body {
   align-self: flex-start;
   margin-top: 4px;
 }
+
+/* Shared by Open Loops cards and aiInsights action buttons - a row of
+   small action buttons under the card's own text. */
+.open-loop-actions,
+.insight-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.open-loop-actions .secondary-action,
+.insight-actions .secondary-action {
+  margin-top: 0;
+}
