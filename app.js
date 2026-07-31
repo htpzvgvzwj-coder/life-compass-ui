@@ -11771,33 +11771,35 @@ const screens = {
         ${uploadedDocumentStatus()}
       </div>
     </div>
-    ${bbMiniCardRowHtml({
-      sectionClass: "bb-open-loops",
-      label: "Open Loops - what hasn't closed yet",
-      emptyText: "Nothing open right now.",
-      items: loops.map((loop) => {
-        const meta = openLoopKindMeta(loop.kind);
-        return `
-          <button type="button" class="bb-mini-card" data-open="openLoops">
-            <img src="assets/${meta.icon}" alt="">
-            <span class="bb-mini-tag">${escapeHTML(meta.tag)}</span>
-            <strong>${escapeHTML(cleanText(loop.title, 40))}</strong>
+    <div class="bb-below-card">
+      ${bbMiniCardRowHtml({
+        sectionClass: "bb-open-loops",
+        label: "Open Loops - what hasn't closed yet",
+        emptyText: "Nothing open right now.",
+        items: loops.map((loop) => {
+          const meta = openLoopKindMeta(loop.kind);
+          return `
+            <button type="button" class="bb-mini-card" data-open="openLoops">
+              <img src="assets/${meta.icon}" alt="">
+              <span class="bb-mini-tag">${escapeHTML(meta.tag)}</span>
+              <strong>${escapeHTML(cleanText(loop.title, 40))}</strong>
+            </button>
+          `;
+        })
+      })}
+      ${bbMiniCardRowHtml({
+        sectionClass: "bb-shelf",
+        label: "What Compass remembers",
+        emptyText: "Nothing remembered yet.",
+        items: shelfEntries.map((entry) => `
+          <button type="button" class="bb-mini-card" data-open="historySearch">
+            <img src="assets/${historyEntryIcon(entry.type)}" alt="">
+            <strong>${escapeHTML(cleanText(entry.title, 40))}</strong>
+            <span class="bb-mini-date">${homeRelativeDateLabel(entry.date)}</span>
           </button>
-        `;
-      })
-    })}
-    ${bbMiniCardRowHtml({
-      sectionClass: "bb-shelf",
-      label: "What Compass remembers",
-      emptyText: "Nothing remembered yet.",
-      items: shelfEntries.map((entry) => `
-        <button type="button" class="bb-mini-card" data-open="historySearch">
-          <img src="assets/${historyEntryIcon(entry.type)}" alt="">
-          <strong>${escapeHTML(cleanText(entry.title, 40))}</strong>
-          <span class="bb-mini-date">${homeRelativeDateLabel(entry.date)}</span>
-        </button>
-      `)
-    })}
+        `)
+      })}
+    </div>
   `;
   },
 

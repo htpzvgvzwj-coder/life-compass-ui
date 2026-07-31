@@ -11474,6 +11474,16 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .pro
   overflow: hidden;
   border-radius: 26px;
   background: url("assets/2bb-room-background.jpg") center / cover no-repeat;
+  /* The 3rd grid column (previously the dashboard rail, still 300px/314px
+     wide in the base rules even though .desktop-right-rail itself is
+     display:none here) was leaving a dead reserved strip of empty photo
+     on the right - the 2BB card's left:52% was correct relative to the
+     content column, but that column no longer reached the true right
+     edge of the scene, so the card read as "too far toward the middle"
+     instead of top-right of the whole photo. Collapsing to 2 columns
+     lets the content column (and the card inside it) reach the actual
+     right edge. */
+  grid-template-columns: 76px minmax(0, 1fr);
 }
 
 body.compass-public-app[data-active-screen="home"] .prototype-view.app-workspace.is-active::before,
@@ -11653,8 +11663,8 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .app
 
   body.compass-public-app[data-active-screen="home"] .bb-card,
   body.compass-public-app[data-active-screen="compass"] .bb-card,
-  body.compass-public-app[data-active-screen="home"] .bb-section,
-  body.compass-public-app[data-active-screen="compass"] .bb-section {
+  body.compass-public-app[data-active-screen="home"] .bb-below-card,
+  body.compass-public-app[data-active-screen="compass"] .bb-below-card {
     position: static;
     width: 100%;
     left: auto;
@@ -11699,15 +11709,19 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .app
   display: none;
 }
 
+/* display:contents (not position:absolute) - giving .desktop-command-bar
+   its own position:absolute made IT the positioning context for
+   .desktop-command-search's left/top percentages instead of .phone-shell,
+   and since the bar itself collapses to near-zero size once taken out of
+   the flex flow (min-height:0, no reserved space), the child's percentage
+   math resolved against a degenerate box and the whole thing effectively
+   vanished - not hidden, just laid out somewhere with no visible size.
+   display:contents removes the wrapper from the box model entirely so
+   .desktop-command-search resolves its position against .phone-shell
+   directly, same as .sos-fab already does correctly. */
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-bar {
-  position: absolute;
-  inset: auto;
-  min-height: 0;
-  padding: 0;
-  background: transparent;
-  border: none;
-  z-index: 2;
+  display: contents;
 }
 
 /* .is-quiet included here to beat .desktop-command-bar.is-quiet
@@ -12057,18 +12071,19 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos
    matching the approved mockup: real data (openLoopsEntries()/
    historySearchEntries()), image-forward cards (icon + short title,
    no long description lines). */
-.bb-section {
+/* .bb-below-card wraps both rows in one flex column instead of each row
+   having its own fixed top:% - when Open Loops is empty (just one line
+   of "nothing open" text) the shelf row now sits right below it instead
+   of leaving a large dead gap where a fixed top:75% assumed the Open
+   Loops row would be much taller. */
+.bb-below-card {
   position: absolute;
   left: 52%;
-  width: 45%;
-}
-
-.bb-open-loops {
   top: 52%;
-}
-
-.bb-shelf {
-  top: 75%;
+  width: 45%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
 .bb-section-label {
