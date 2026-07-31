@@ -11628,40 +11628,25 @@ function homeRelativeDateLabel(iso) {
 }
 
 const screens = {
-  // "home" used to resolve to "secondBrain"/"compass" via TAB_ALIASES (see
-  // the "Second Brain visual rebuild" note near screens.compass) - home is
-  // now a distinct dashboard again: a hero that opens the chat, and a real
-  // memory shelf below it. Second Brain's chat screen itself is unchanged.
+  // Home is a distinct destination again, not an alias for the chat - a
+  // single small glass card (no shelf/dashboard bolted on) floating on the
+  // same photo background as 2BB, matching the approved reference mockup
+  // exactly. See the "2BB photo redesign" CSS block for the shared
+  // .bb-card/.bb-icon-pill treatment this and screens.compass() both use.
   home: () => {
     const mood = trackerState.mood;
-    const shelfEntries = historySearchEntries().slice(0, 8);
     return `
-      <section class="home-hero">
-        <p class="eyebrow">Second Brain</p>
-        <h2>Welcome back, ${displayName()}.</h2>
-        <p class="home-hero-status">
-          <span class="home-hero-status-dot"></span>
-          ${escapeHTML(mood.label)}${mood.note ? ` - ${escapeHTML(mood.note)}` : ""}
-        </p>
-        <button class="home-hero-cta" type="button" data-tab-jump="secondBrain">Continue the conversation</button>
-      </section>
-      <section class="home-shelf">
-        <p class="eyebrow home-shelf-eyebrow">What Compass remembers</p>
-        <div class="home-shelf-row">
-          ${shelfEntries.length ? shelfEntries.map((entry, i) => `
-            <button type="button" class="home-shelf-card home-shelf-card-${i % 6}" data-open="historySearch">
-              <span class="home-shelf-card-type">${escapeHTML(entry.type)}</span>
-              <strong>${escapeHTML(cleanText(entry.title, 60))}</strong>
-              <span class="home-shelf-card-date">${homeRelativeDateLabel(entry.date)}</span>
-            </button>
-          `).join("") : `
-            <div class="home-shelf-empty">
-              <p>Nothing remembered yet.</p>
-              <button type="button" data-tab-jump="secondBrain">Start talking to Compass</button>
-            </div>
-          `}
+      <div class="bb-card">
+        <div class="bb-card-inner bb-home-inner">
+          <p class="bb-kicker">2BB</p>
+          <h2 class="bb-home-title">Welcome back, ${displayName()}.</h2>
+          <p class="bb-home-status">
+            <span class="bb-status-dot"></span>
+            ${escapeHTML(mood.label)}${mood.note ? ` - ${escapeHTML(mood.note)}` : ""}
+          </p>
+          <button class="bb-home-cta" type="button" data-tab-jump="secondBrain">Continue the conversation</button>
         </div>
-      </section>
+      </div>
     `;
   },
 
@@ -11696,54 +11681,55 @@ const screens = {
     ${featureEnabled("receipts") ? receiptTrackerPanel() : ""}
   `,
 
-  // Second Brain, visual rebuild: this IS Second Brain now, full-screen,
-  // no separate room to leave first - matches the approved mockup
-  // (...\scratchpad\second-brain-mockup.html). Two icon-tabs (History
-  // Search, Profile) replace the old header/subtitle block; a one-line
-  // ambient status sliver replaces the room's mood/corkboard/shelf
-  // panels; suggested-prompts and the "Memory controls" card are dropped
-  // from default view (Clear chat moved to profileScreen(), AI profile
-  // editing already reachable via the Profile icon-tab) - nothing here
-  // is deleted, just no longer a default-visible block.
+  // 2BB (Second Brain chat), photo redesign: floating glass card on the
+  // shared photo background - see screens.home() and the "2BB photo
+  // redesign" CSS block. All real functionality unchanged (real messages,
+  // PDF upload, voice input, Quick Capture, History Search) - only the
+  // surrounding markup/classes changed to fit the new card shell.
   compass: () => {
     const dueSoon = dueRealLifeEvents()[0] || null;
     return `
-    <header class="chat-topbar">
-      <div class="chat-brand">
-        <span class="chat-brand-mark">C</span>
-        Compass
+    <div class="bb-card">
+      <div class="bb-card-inner">
+        <header class="bb-card-head">
+          <div class="bb-person">
+            <span class="bb-avatar" aria-hidden="true"></span>
+            <div>
+              <div class="bb-kicker">2BB private room</div>
+              <div class="bb-title">2BB</div>
+            </div>
+          </div>
+          <div class="bb-head-actions">
+            <button class="bb-icon-btn" type="button" data-open="quickCapture" aria-label="Quick capture" title="Quick capture">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            </button>
+            <button class="bb-icon-btn" type="button" data-open="historySearch" aria-label="Search your history" title="History Search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+            </button>
+          </div>
+        </header>
+        <div class="bb-status">
+          <span class="bb-status-dot"></span>
+          ${escapeHTML(trackerState.mood.label)}${trackerState.mood.note ? ` - ${escapeHTML(trackerState.mood.note)}` : ""}
+          ${dueSoon ? `<span class="chat-status-sep">&middot;</span>${escapeHTML(dueSoon.title)} - ${new Date(dueSoon.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}
+        </div>
+        <div class="bb-messages" id="chat-messages">${chatMessages()}</div>
+        <div class="bb-input-row">
+          <label class="bb-icon-btn" aria-label="Upload PDF" title="Upload PDF">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V9z"></path><path d="M14 3v6h6"></path></svg>
+            <input id="chat-pdf-input" type="file" accept="application/pdf" data-pdf-upload>
+          </label>
+          <button class="bb-icon-btn" type="button" data-voice-chat aria-label="Voice input" title="Voice input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10a7 7 0 0014 0M12 17v5"></path></svg>
+          </button>
+          <input id="chat-input" type="text" placeholder="Talk to Compass...">
+          <button class="bb-send" type="button" data-send-chat aria-label="Send" ${isCompassResponding ? "disabled" : ""}>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 3 12 20.5l-2.3-7.2L3 11.5z"></path></svg>
+          </button>
+        </div>
+        ${uploadedDocumentStatus()}
       </div>
-      <div class="chat-icon-tabs">
-        <button class="chat-icon-tab" type="button" data-open="quickCapture" aria-label="Quick capture" title="Quick capture">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
-        </button>
-        <button class="chat-icon-tab" type="button" data-open="historySearch" aria-label="Search your history" title="History Search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
-        </button>
-      </div>
-    </header>
-    <div class="chat-status-sliver">
-      <span class="chat-status-dot"></span>
-      ${escapeHTML(trackerState.mood.label)}${trackerState.mood.note ? ` - ${escapeHTML(trackerState.mood.note)}` : ""}
-      ${dueSoon ? `<span class="chat-status-sep">&middot;</span>${escapeHTML(dueSoon.title)} - ${new Date(dueSoon.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}
     </div>
-    <section class="chat-room">
-      <div class="chat-messages" id="chat-messages">${chatMessages()}</div>
-      <div class="chat-input-row">
-        <label class="chat-icon-button" aria-label="Upload PDF" title="Upload PDF">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V9z"></path><path d="M14 3v6h6"></path></svg>
-          <input id="chat-pdf-input" type="file" accept="application/pdf" data-pdf-upload>
-        </label>
-        <button class="chat-icon-button" type="button" data-voice-chat aria-label="Voice input" title="Voice input">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10a7 7 0 0014 0M12 17v5"></path></svg>
-        </button>
-        <input id="chat-input" type="text" placeholder="Talk to Compass...">
-        <button class="chat-send-button" type="button" data-send-chat aria-label="Send" ${isCompassResponding ? "disabled" : ""}>
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 3 12 20.5l-2.3-7.2L3 11.5z"></path></svg>
-        </button>
-      </div>
-      ${uploadedDocumentStatus()}
-    </section>
   `;
   },
 

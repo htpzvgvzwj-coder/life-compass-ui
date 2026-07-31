@@ -14,21 +14,23 @@
   <body class="compass-public-app">
     <main class="page-shell">
       <section class="prototype-view app-workspace is-active" id="app-view">
-        <aside class="desktop-sidebar" aria-label="Primary navigation">
-          <div class="desktop-brand">
-            <span class="desktop-brand-mark">C</span>
-            <div>
-              <strong>Compass</strong>
-              <span>Adult-Life Prep</span>
-            </div>
-          </div>
-          <div class="desktop-sidebar-footer">
-            <button class="desktop-sos-action" type="button" data-open="sosTriage">
-              <span>SOS</span>
-              <strong>Need support?</strong>
-            </button>
-          </div>
-        </aside>
+        <nav class="desktop-sidebar bb-icon-pill" aria-label="Primary navigation">
+          <button class="nav-item is-active" type="button" data-tab="home" aria-label="Home" title="Home">
+            <img class="nav-icon" src="assets/icon-home.png" alt="">
+          </button>
+          <button class="nav-item signature-nav" type="button" data-tab="secondBrain" aria-label="2BB" title="2BB">
+            <img class="nav-icon" src="assets/icon-spark.png" alt="">
+          </button>
+          <button class="nav-item" type="button" data-tab="simulator" aria-label="Life Sim" title="Life Sim">
+            <img class="nav-icon" src="assets/icon-time.png" alt="">
+          </button>
+          <button class="nav-item" type="button" data-tab="discover" aria-label="Discover" title="Discover">
+            <img class="nav-icon" src="assets/icon-support.png" alt="">
+          </button>
+          <button class="nav-item" type="button" data-tab="profile" aria-label="Settings" title="Settings">
+            <img class="nav-icon" src="assets/icon-settings.png" alt="">
+          </button>
+        </nav>
 
         <div class="phone-shell app-surface" aria-label="Compass adult-life prep workspace">
           <div class="phone-status">
@@ -52,14 +54,14 @@
             <button class="nav-item is-active" type="button" data-tab="home" aria-label="Home" title="Home">
               <img class="nav-icon" src="assets/icon-home.png" alt="">
             </button>
-            <button class="nav-item signature-nav" type="button" data-tab="secondBrain" aria-label="Second Brain" title="Second Brain">
+            <button class="nav-item signature-nav" type="button" data-tab="secondBrain" aria-label="2BB" title="2BB">
               <img class="nav-icon" src="assets/icon-spark.png" alt="">
-            </button>
-            <button class="nav-item" type="button" data-tab="discover" aria-label="Discover" title="Discover">
-              <img class="nav-icon" src="assets/icon-support.png" alt="">
             </button>
             <button class="nav-item" type="button" data-tab="simulator" aria-label="Life Sim" title="Life Sim">
               <img class="nav-icon" src="assets/icon-time.png" alt="">
+            </button>
+            <button class="nav-item" type="button" data-tab="discover" aria-label="Discover" title="Discover">
+              <img class="nav-icon" src="assets/icon-support.png" alt="">
             </button>
             <button class="nav-item" type="button" data-tab="profile" aria-label="Settings" title="Settings">
               <img class="nav-icon" src="assets/icon-settings.png" alt="">
@@ -88,24 +90,6 @@
             <button class="secondary-action compact-action" type="button" data-open="aiTrustCenter">Open trust center</button>
           </section>
         </aside>
-
-        <nav class="warm-icon-rail" aria-label="Primary desktop">
-          <button class="nav-item is-active" type="button" data-tab="home" aria-label="Home" title="Home">
-            <img class="nav-icon" src="assets/icon-home.png" alt="">
-          </button>
-          <button class="nav-item signature-nav" type="button" data-tab="secondBrain" aria-label="Second Brain" title="Second Brain">
-            <img class="nav-icon" src="assets/icon-spark.png" alt="">
-          </button>
-          <button class="nav-item" type="button" data-tab="discover" aria-label="Discover" title="Discover">
-            <img class="nav-icon" src="assets/icon-support.png" alt="">
-          </button>
-          <button class="nav-item" type="button" data-tab="simulator" aria-label="Life Sim" title="Life Sim">
-            <img class="nav-icon" src="assets/icon-time.png" alt="">
-          </button>
-          <button class="nav-item" type="button" data-tab="profile" aria-label="Settings" title="Settings">
-            <img class="nav-icon" src="assets/icon-settings.png" alt="">
-          </button>
-        </nav>
       </section>
     </main>
 

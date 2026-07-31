@@ -9930,7 +9930,6 @@ body {
    =========================================================================== */
 .desktop-sidebar,
 .desktop-right-rail,
-.warm-icon-rail,
 .desktop-command-bar {
   display: none;
 }
@@ -9954,18 +9953,13 @@ body {
 
   body.compass-public-app:not(.life-sim-active) .prototype-view.app-workspace.is-active {
     display: grid;
-    grid-template-columns: 238px minmax(0, 1fr) 300px 72px;
+    grid-template-columns: 76px minmax(0, 1fr) 300px;
     gap: 16px;
     align-items: stretch;
     height: calc(100dvh - 40px);
     min-height: 680px;
   }
 
-  .warm-icon-rail {
-    display: flex;
-  }
-
-  .desktop-sidebar,
   .desktop-right-rail {
     display: flex;
     min-height: 0;
@@ -9977,8 +9971,8 @@ body {
   }
 
   .desktop-sidebar {
-    flex-direction: column;
-    padding: 18px;
+    display: flex;
+    min-height: 0;
   }
 
   .desktop-brand {
@@ -10176,8 +10170,7 @@ body {
       #e9ece3;
   }
 
-  body.compass-public-app:not(.life-sim-active) .bottom-nav,
-  body.compass-public-app:not(.life-sim-active) .sos-fab {
+  body.compass-public-app:not(.life-sim-active) .bottom-nav {
     display: none;
   }
 
@@ -10357,7 +10350,7 @@ body {
 
 @media (min-width: 921px) and (max-width: 1180px) {
   body.compass-public-app:not(.life-sim-active) .prototype-view.app-workspace.is-active {
-    grid-template-columns: 84px minmax(0, 1fr) 280px;
+    grid-template-columns: 76px minmax(0, 1fr) 280px;
   }
 
   .desktop-brand div,
@@ -10562,17 +10555,15 @@ body {
 
 @media (min-width: 921px) {
   body.compass-public-app:not(.life-sim-active) .prototype-view.app-workspace.is-active {
-    grid-template-columns: 246px minmax(0, 1fr) 314px;
+    grid-template-columns: 76px minmax(0, 1fr) 314px;
     gap: 18px;
   }
 
-  .desktop-sidebar,
   .desktop-right-rail,
   body.compass-public-app:not(.life-sim-active) .phone-shell:not(.board-phone) {
     border-radius: 30px 18px 34px 18px;
   }
 
-  .desktop-sidebar,
   .desktop-right-rail {
     background:
       linear-gradient(180deg, rgba(253, 253, 250, 0.9), rgba(232, 234, 226, 0.86)),
@@ -10744,7 +10735,7 @@ body {
 
 @media (min-width: 921px) and (max-width: 1180px) {
   body.compass-public-app:not(.life-sim-active) .prototype-view.app-workspace.is-active {
-    grid-template-columns: 88px minmax(0, 1fr) 286px;
+    grid-template-columns: 76px minmax(0, 1fr) 286px;
   }
 
   .desktop-brand div,
@@ -11511,293 +11502,370 @@ body {
 }
 
 /* ===========================================================================
-   Second Brain warm redesign - Home dashboard, Second Brain chat shell, and
-   the primary nav only. Discover/Life Sim/Profile keep the existing
-   --color-* palette untouched; these are dedicated --warm-* tokens so
-   nothing here can bleed into screens outside this scope. Background is a
-   layered CSS gradient + grain texture (no external image asset) tuned to
-   read as a warm, lived-in study rather than a flat color fill.
+   2BB photo redesign - direct copy of the user's approved reference mockup:
+   ONE full-bleed photo background + a floating translucent icon-pill nav +
+   ONE glass card holding the real chat/home content. Nothing else. Scoped
+   to home/compass via [data-active-screen] - Discover/Life Sim/Profile keep
+   their existing layout, dashboard rail, and palette completely untouched.
    =========================================================================== */
 :root {
-  --warm-bg-deep: #140d08;
-  --warm-bg: #201509;
-  --warm-surface: #2b1d10;
-  --warm-surface-soft: #382818;
-  --warm-ink: #f5e9d8;
-  --warm-muted: #c3ab8a;
-  --warm-line: rgba(245, 233, 216, 0.12);
-  --warm-accent: #d99a52;
-  --warm-accent-strong: #eab568;
-  --warm-accent-ink: #2a1608;
-  --warm-glow: rgba(217, 154, 82, 0.32);
-  --warm-shadow: 0 24px 60px rgba(8, 5, 2, 0.5);
+  --warm-ink: #fff4df;
+  --warm-line: rgba(255, 244, 223, 0.16);
+  --warm-active: #f0c773;
+  --warm-active-ink: #21150e;
 }
 
-body.compass-public-app[data-active-screen="home"] .app-screen,
-body.compass-public-app[data-active-screen="compass"] .app-screen {
-  background:
-    radial-gradient(circle at 88% 4%, var(--warm-glow), transparent 42%),
-    radial-gradient(circle at 6% 92%, rgba(217, 154, 82, 0.10), transparent 50%),
-    var(--warm-bg-deep);
-}
-
-/* Home dashboard */
-.home-hero {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .prototype-view.app-workspace.is-active,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .prototype-view.app-workspace.is-active {
   position: relative;
   overflow: hidden;
-  padding: 30px 26px;
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at 84% 10%, var(--warm-glow), transparent 46%),
-    linear-gradient(160deg, var(--warm-bg) 0%, var(--warm-bg-deep) 100%);
-  box-shadow: var(--warm-shadow);
-  color: var(--warm-ink);
+  border-radius: 26px;
+  background: url("assets/2bb-room-background.jpg") center / cover no-repeat;
 }
 
-.home-hero::after {
+body.compass-public-app[data-active-screen="home"] .prototype-view.app-workspace.is-active::before,
+body.compass-public-app[data-active-screen="compass"] .prototype-view.app-workspace.is-active::before {
   content: "";
   position: absolute;
   inset: 0;
-  opacity: 0.05;
-  mix-blend-mode: overlay;
+  z-index: 0;
+  background: linear-gradient(90deg, rgba(20, 12, 7, 0.26), transparent 22%, transparent 76%, rgba(20, 12, 7, 0.14));
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-.home-hero .eyebrow {
-  position: relative;
-  color: var(--warm-accent);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 11px;
-  font-weight: 750;
-  margin: 0 0 10px;
+/* The rich Today/Readiness/Adult-Life Map/Trust dashboard rail is hidden
+   only on Home/2BB - it still renders exactly as before on every other
+   tab (Discover/Life Sim/Profile), nothing about it changed or was removed. */
+body.compass-public-app[data-active-screen="home"] .desktop-right-rail,
+body.compass-public-app[data-active-screen="compass"] .desktop-right-rail {
+  display: none;
 }
 
-.home-hero h2 {
+/* Floating icon-pill nav - desktop. Same 5 real nav-item buttons as
+   before (Home/2BB/Life Sim/Discover/Settings), just restyled to float
+   translucently on the photo instead of sitting in a boxed card. */
+.desktop-sidebar.bb-icon-pill {
   position: relative;
-  margin: 0 0 12px;
-  font-size: 25px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  line-height: 1.25;
-}
-
-.home-hero-status {
-  position: relative;
-  display: flex;
+  z-index: 2;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  margin: 0 0 22px;
-  color: var(--warm-muted);
-  font-size: 13px;
-}
-
-.home-hero-status-dot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 auto;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 8px;
+  border: 1px solid var(--warm-line);
   border-radius: 999px;
-  background: var(--warm-accent);
-  box-shadow: 0 0 0 3px rgba(217, 154, 82, 0.18);
+  background: rgba(255, 244, 223, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 12px 28px rgba(28, 16, 8, 0.16);
+  backdrop-filter: blur(12px) saturate(1.05);
 }
 
-.home-hero-cta {
-  position: relative;
-  z-index: 1;
-  padding: 12px 22px;
-  border: 0;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--warm-accent), var(--warm-accent-strong));
-  color: var(--warm-accent-ink);
-  font-weight: 800;
-  font-size: 14px;
-  box-shadow: 0 10px 26px rgba(217, 154, 82, 0.3);
-}
-
-.home-hero-cta:hover {
-  filter: brightness(1.05);
-}
-
-.home-shelf {
-  margin-top: 22px;
-}
-
-.home-shelf-eyebrow {
-  color: var(--warm-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 11px;
-  font-weight: 750;
-  margin: 0 0 12px;
-}
-
-.home-shelf-row {
-  display: flex;
-  gap: 14px;
-  overflow-x: auto;
-  padding: 2px 2px 8px;
-}
-
-.home-shelf-card {
-  position: relative;
-  flex: 0 0 150px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 16px 12px 12px;
-  border: 1px solid var(--warm-line);
-  border-radius: 14px;
-  background: linear-gradient(165deg, var(--warm-surface), var(--warm-bg));
-  color: var(--warm-ink);
-  text-align: left;
-  overflow: hidden;
-  box-shadow: 0 12px 28px rgba(8, 5, 2, 0.32);
-  transition: transform 160ms ease, box-shadow 160ms ease;
-}
-
-.home-shelf-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 16px 34px rgba(8, 5, 2, 0.42);
-}
-
-.home-shelf-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-}
-
-.home-shelf-card-0::before { background: #caa15a; }
-.home-shelf-card-1::before { background: #c1704a; }
-.home-shelf-card-2::before { background: #8a8148; }
-.home-shelf-card-3::before { background: #7a6a55; }
-.home-shelf-card-4::before { background: #8a4a4a; }
-.home-shelf-card-5::before { background: #b8a06e; }
-
-.home-shelf-card-type {
-  margin-top: 6px;
-  font-size: 9.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--warm-muted);
-}
-
-.home-shelf-card strong {
-  font-size: 13.5px;
-  line-height: 1.32;
-}
-
-.home-shelf-card-date {
-  margin-top: auto;
-  padding-top: 8px;
-  font-size: 11px;
-  color: var(--warm-muted);
-}
-
-.home-shelf-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 18px;
-  border: 1px dashed var(--warm-line);
-  border-radius: 14px;
-  color: var(--warm-muted);
-}
-
-.home-shelf-empty button {
-  padding: 8px 14px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--warm-accent);
-  color: var(--warm-accent-ink);
-  font-weight: 750;
-  font-size: 12.5px;
-}
-
-/* Second Brain chat shell - only the outer chrome (topbar/status sliver);
-   .chat-bubble.is-ai/.is-user keep their own opaque backgrounds untouched
-   above, so message readability is unaffected by this. */
-body.compass-public-app[data-active-screen="compass"] .chat-brand {
-  color: var(--warm-ink);
-}
-
-body.compass-public-app[data-active-screen="compass"] .chat-brand-mark {
-  background: linear-gradient(150deg, var(--warm-accent), var(--warm-accent-strong));
-  color: var(--warm-accent-ink);
-}
-
-body.compass-public-app[data-active-screen="compass"] .chat-status-sliver {
-  background: rgba(245, 233, 216, 0.08);
-  color: var(--warm-ink);
-}
-
-body.compass-public-app[data-active-screen="compass"] .chat-status-dot {
-  background: var(--warm-accent);
-}
-
-/* Primary nav - Home / Second Brain / Discover / Life Sim / Settings as
-   icon-only buttons. .warm-icon-rail is the new far-right desktop strip;
-   .warm-icon-nav is the existing bottom-nav on mobile, now carrying 5
-   icons instead of 3 icons + a separate header profile button. */
-.warm-icon-rail {
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  width: 72px;
-  padding: 18px 0;
-  border: 1px solid var(--warm-line);
-  border-radius: 14px;
-  background: linear-gradient(180deg, var(--warm-bg), var(--warm-bg-deep));
-  box-shadow: var(--warm-shadow);
-}
-
-.warm-icon-rail .nav-item {
+.bb-icon-pill .nav-item {
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border-radius: 999px;
+  border: 1px solid transparent;
+  border-radius: 50%;
   background: transparent;
-  color: var(--warm-muted);
+  color: rgba(255, 244, 223, 0.78);
 }
 
+.bb-icon-pill .nav-item.is-active,
+.bb-icon-pill .nav-item.signature-nav {
+  color: var(--warm-ink);
+  border-color: rgba(255, 244, 223, 0.2);
+  background: rgba(255, 244, 223, 0.14);
+}
+
+.bb-icon-pill .nav-icon {
+  width: 18px;
+  height: 18px;
+  filter: brightness(0) invert(1);
+  opacity: 0.82;
+}
+
+.bb-icon-pill .nav-item.is-active .nav-icon,
+.bb-icon-pill .nav-item.signature-nav .nav-icon {
+  opacity: 1;
+}
+
+/* Mobile bottom nav - same 5 buttons, same translucent-pill language,
+   still docked at the bottom for thumb reach. */
 .bottom-nav.warm-icon-nav {
+  z-index: 2;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  background: linear-gradient(180deg, var(--warm-bg), var(--warm-bg-deep));
-  border-top-color: var(--warm-line);
+  margin: 0 auto 10px;
+  width: calc(100% - 20px);
+  border: 1px solid var(--warm-line);
+  border-radius: 999px;
+  background: rgba(23, 17, 12, 0.55);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 28px rgba(8, 5, 2, 0.3);
 }
 
 .bottom-nav.warm-icon-nav .nav-item {
   background: transparent;
-  color: var(--warm-muted);
+  color: rgba(255, 244, 223, 0.78);
 }
 
-.warm-icon-rail .nav-icon,
+.bottom-nav.warm-icon-nav .nav-item.is-active,
+.bottom-nav.warm-icon-nav .nav-item.signature-nav {
+  background: rgba(255, 244, 223, 0.14);
+  border-radius: 999px;
+}
+
 .bottom-nav.warm-icon-nav .nav-icon {
-  width: 20px;
-  height: 20px;
-  filter: brightness(0) invert(0.86);
+  filter: brightness(0) invert(1);
+  opacity: 0.82;
 }
 
-.warm-icon-rail .nav-item.is-active .nav-icon,
-.warm-icon-rail .nav-item.signature-nav .nav-icon,
 .bottom-nav.warm-icon-nav .nav-item.is-active .nav-icon,
 .bottom-nav.warm-icon-nav .nav-item.signature-nav .nav-icon {
-  padding: 7px;
-  border-radius: 999px;
-  background: var(--warm-accent);
-  filter: brightness(0);
-  box-shadow: 0 6px 16px rgba(217, 154, 82, 0.35);
+  opacity: 1;
 }
 
-.warm-icon-rail .nav-item.is-active,
-.bottom-nav.warm-icon-nav .nav-item.is-active {
+/* The single glass card - screens.home()/screens.compass() render into
+   .app-screen; centering it here means the photo shows all around it,
+   exactly like the reference. */
+body.compass-public-app[data-active-screen="home"] .app-screen,
+body.compass-public-app[data-active-screen="compass"] .app-screen {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
+  padding: 24px;
+}
+
+.bb-card {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  display: flex;
+  border: 1px solid var(--warm-line);
+  border-radius: 26px;
+  color: var(--warm-ink);
+  background:
+    radial-gradient(circle at 17% 12%, rgba(240, 199, 115, 0.26), transparent 30%),
+    radial-gradient(circle at 92% 22%, rgba(125, 82, 50, 0.24), transparent 32%),
+    linear-gradient(135deg, rgba(26, 19, 15, 0.86), rgba(45, 32, 24, 0.6) 50%, rgba(20, 15, 13, 0.82));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -28px 62px rgba(8, 5, 3, 0.38),
+    0 26px 60px rgba(20, 11, 5, 0.28);
+  backdrop-filter: blur(16px) saturate(1.1);
+}
+
+.bb-card-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  padding: 20px;
+  gap: 12px;
+}
+
+.bb-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.bb-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.bb-avatar {
+  position: relative;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 244, 223, 0.34);
+  background: linear-gradient(145deg, rgba(255, 244, 223, 0.88), rgba(240, 199, 115, 0.5) 48%, rgba(87, 54, 33, 0.72));
+  box-shadow: 0 10px 24px rgba(12, 7, 4, 0.28);
+}
+
+.bb-avatar::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid rgba(31, 20, 14, 0.92);
+  border-radius: 50%;
+  background: #aee4a6;
+}
+
+.bb-kicker {
+  color: rgba(255, 244, 223, 0.58);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bb-title {
+  margin-top: 2px;
+  color: rgba(255, 244, 223, 0.97);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.bb-head-actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.bb-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 244, 223, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 244, 223, 0.08);
+  color: rgba(255, 244, 223, 0.78);
+  cursor: pointer;
+}
+
+.bb-icon-btn:hover {
+  color: var(--warm-ink);
+  border-color: rgba(255, 244, 223, 0.28);
+}
+
+.bb-icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.bb-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  color: rgba(255, 244, 223, 0.58);
+  font-size: 11.5px;
+}
+
+.bb-status-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--warm-active);
+}
+
+.bb-messages {
+  flex: 1 1 auto;
+  min-height: 160px;
+  max-height: 46vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.bb-input-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 5px 5px 5px 8px;
+  border: 1px solid rgba(255, 244, 223, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 244, 223, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.bb-input-row input {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--warm-ink);
+  font-size: 13.5px;
+}
+
+.bb-input-row input::placeholder {
+  color: rgba(255, 244, 223, 0.5);
+}
+
+.bb-input-row .bb-icon-btn {
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 244, 223, 0.06);
+}
+
+.bb-send {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--warm-active);
+  color: var(--warm-active-ink);
+  box-shadow: 0 10px 20px rgba(240, 199, 115, 0.28);
+  cursor: pointer;
+}
+
+.bb-send svg {
+  width: 16px;
+  height: 16px;
+}
+
+.bb-send:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Home's card is simpler still - just a greeting and the way into 2BB,
+   no shelf/dashboard content bolted on (that was the earlier version's
+   clutter problem - kept out until asked for). */
+.bb-home-inner {
+  align-items: flex-start;
+  justify-content: center;
+  gap: 14px;
+  text-align: left;
+}
+
+.bb-home-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.bb-home-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(255, 244, 223, 0.6);
+  font-size: 12.5px;
+}
+
+.bb-home-cta {
+  padding: 11px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--warm-active);
+  color: var(--warm-active-ink);
+  font-weight: 750;
+  font-size: 13.5px;
+  box-shadow: 0 10px 24px rgba(240, 199, 115, 0.28);
 }
