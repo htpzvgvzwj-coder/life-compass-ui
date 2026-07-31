@@ -11486,13 +11486,15 @@ body.compass-public-app[data-active-screen="compass"] .prototype-view.app-worksp
   pointer-events: none;
 }
 
-/* .phone-shell keeps an opaque cream box-background from the older
-   "Responsive command center shell" pass (meant for a phone-mockup look on
-   a light page) - on top of the new full-bleed photo it painted a large
-   solid white rectangle over the middle of the scene. Transparent here so
-   the photo actually shows through where the chat/home card floats. */
-body.compass-public-app[data-active-screen="home"] .phone-shell,
-body.compass-public-app[data-active-screen="compass"] .phone-shell {
+/* .phone-shell keeps an opaque cream box-background from 3 separate older
+   "Responsive command center shell" passes (body.compass-public-app:not
+   (.life-sim-active) .phone-shell:not(.board-phone) at specificity 0,4,0) -
+   my first attempt at this override used a shorter selector (0,3,0) and
+   lost the specificity fight outright, which is why the photo never
+   actually showed through - this repeats the exact qualifiers those rules
+   use, plus the scoping attribute, so it wins unambiguously (0,5,0). */
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .phone-shell:not(.board-phone),
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .phone-shell:not(.board-phone) {
   background: transparent;
   border: none;
   box-shadow: none;
@@ -11596,8 +11598,8 @@ body.compass-public-app[data-active-screen="compass"] .desktop-right-rail {
    hero card in the reference (left:31%/top:16.5%/width:58.5%/height:40.5%),
    not centered - the vacated space below/left of it is where the Ctrl K
    and SOS image-cards now sit (see below). */
-body.compass-public-app[data-active-screen="home"] .app-screen,
-body.compass-public-app[data-active-screen="compass"] .app-screen {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .app-screen,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .app-screen {
   position: relative;
   z-index: 1;
   background: transparent;
@@ -11609,8 +11611,14 @@ body.compass-public-app[data-active-screen="compass"] .app-screen {
   left: 31%;
   top: 16.5%;
   width: 58.5%;
-  height: 40.5%;
-  min-height: 214px;
+  /* height:40.5% (the reference's exact proportion) was sized for a short
+     book blurb, not a live chat thread + input row - at that height the
+     input row was genuinely being clipped off, not just visually
+     mismatched. bottom pins it lower instead so there's always room for
+     the input regardless of message count; left/top/width still match
+     the reference exactly. */
+  bottom: 6%;
+  min-height: 320px;
   overflow: hidden;
   display: flex;
   border: 1px solid var(--warm-line);
@@ -11633,7 +11641,7 @@ body.compass-public-app[data-active-screen="compass"] .app-screen {
     left: 20%;
     top: 13.5%;
     width: 74%;
-    height: 43%;
+    bottom: 4%;
     min-height: 260px;
   }
 }
@@ -11643,8 +11651,16 @@ body.compass-public-app[data-active-screen="compass"] .app-screen {
    language instead of a plain text search bar and a bare floating dot.
    Scoped to Home/2BB only; Discover/Life Sim/Profile keep the original
    Ctrl K bar and floating SOS button exactly as before. */
-body.compass-public-app[data-active-screen="home"] .desktop-command-bar,
-body.compass-public-app[data-active-screen="compass"] .desktop-command-bar {
+/* .bb-card-image (the real icon-guide.png/icon-warning.png images added to
+   these two buttons) stays hidden everywhere by default - only Home/2BB
+   turn it on, so Discover/Life Sim/Profile's existing Ctrl K bar and SOS
+   button are completely unaffected by this. */
+.bb-card-image {
+  display: none;
+}
+
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-bar {
   position: absolute;
   inset: auto;
   min-height: 0;
@@ -11654,8 +11670,12 @@ body.compass-public-app[data-active-screen="compass"] .desktop-command-bar {
   z-index: 2;
 }
 
-body.compass-public-app[data-active-screen="home"] .desktop-command-search,
-body.compass-public-app[data-active-screen="compass"] .desktop-command-search {
+/* .is-quiet included here to beat .desktop-command-bar.is-quiet
+   .desktop-command-search's pre-existing opacity:0.55 rule (same
+   specificity otherwise - the exact mistake already made once on
+   .phone-shell in this same file, not repeating it here). */
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar.is-quiet .desktop-command-search,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-bar.is-quiet .desktop-command-search {
   position: absolute;
   left: 8%;
   top: 60%;
@@ -11665,8 +11685,9 @@ body.compass-public-app[data-active-screen="compass"] .desktop-command-search {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 0;
+  gap: 6px;
+  padding: 10px;
+  opacity: 1;
   border: 1px solid var(--warm-line);
   border-radius: 20px;
   background:
@@ -11677,29 +11698,29 @@ body.compass-public-app[data-active-screen="compass"] .desktop-command-search {
   color: var(--warm-ink);
 }
 
-body.compass-public-app[data-active-screen="home"] .desktop-command-search kbd,
-body.compass-public-app[data-active-screen="compass"] .desktop-command-search kbd {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-search kbd,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search kbd {
   display: none;
 }
 
-body.compass-public-app[data-active-screen="home"] .desktop-command-search::before,
-body.compass-public-app[data-active-screen="compass"] .desktop-command-search::before {
-  content: "";
-  width: 30px;
-  height: 30px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff4df' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") center / contain no-repeat;
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-search .bb-card-image,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search .bb-card-image {
+  display: block;
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
 }
 
-body.compass-public-app[data-active-screen="home"] .desktop-command-search::after,
-body.compass-public-app[data-active-screen="compass"] .desktop-command-search::after {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-search::after,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search::after {
   content: "Quick jump";
   font-size: 11px;
   font-weight: 700;
   color: rgba(255, 244, 223, 0.7);
 }
 
-body.compass-public-app[data-active-screen="home"] .sos-fab,
-body.compass-public-app[data-active-screen="compass"] .sos-fab {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab {
   left: calc(8% + 122px);
   top: 60%;
   right: auto;
@@ -11710,7 +11731,8 @@ body.compass-public-app[data-active-screen="compass"] .sos-fab {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
+  padding: 10px;
   border-radius: 20px;
   background:
     radial-gradient(circle at 30% 20%, rgba(216, 110, 102, 0.32), transparent 60%),
@@ -11722,23 +11744,23 @@ body.compass-public-app[data-active-screen="compass"] .sos-fab {
   color: rgba(255, 244, 223, 0.7);
 }
 
-body.compass-public-app[data-active-screen="home"] .sos-fab::before,
-body.compass-public-app[data-active-screen="compass"] .sos-fab::before {
-  content: "";
-  width: 30px;
-  height: 30px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff8f7a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 9v4M12 17h.01'/%3E%3Cpath d='M10.3 3.9 2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab .bb-card-image,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab .bb-card-image {
+  display: block;
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
 }
 
 @media (max-width: 760px) {
-  body.compass-public-app[data-active-screen="home"] .desktop-command-search,
-  body.compass-public-app[data-active-screen="compass"] .desktop-command-search {
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar.is-quiet .desktop-command-search,
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-bar.is-quiet .desktop-command-search {
     left: 6%;
     top: 58%;
   }
 
-  body.compass-public-app[data-active-screen="home"] .sos-fab,
-  body.compass-public-app[data-active-screen="compass"] .sos-fab {
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab,
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab {
     left: calc(6% + 118px);
     top: 58%;
   }
@@ -11855,8 +11877,14 @@ body.compass-public-app[data-active-screen="compass"] .sos-fab::before {
 
 .bb-messages {
   flex: 1 1 auto;
-  min-height: 160px;
-  max-height: 46vh;
+  /* min-height:0 (not a fixed px floor) is the actual fix for the input
+     row getting clipped - a flex child's min-height defaults to its
+     content size, so a long message thread was forcing this taller than
+     the card and .bb-card's overflow:hidden was cutting the input row
+     off below the visible edge. This lets it shrink and scroll
+     internally instead, so the input row and everything above it always
+     stays visible. */
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
