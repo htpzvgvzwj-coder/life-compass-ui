@@ -11533,6 +11533,27 @@ body.compass-public-app[data-active-screen="compass"] .prototype-view.app-worksp
   pointer-events: none;
 }
 
+/* .phone-shell keeps an opaque cream box-background from the older
+   "Responsive command center shell" pass (meant for a phone-mockup look on
+   a light page) - on top of the new full-bleed photo it painted a large
+   solid white rectangle over the middle of the scene. Transparent here so
+   the photo actually shows through where the chat/home card floats. */
+body.compass-public-app[data-active-screen="home"] .phone-shell,
+body.compass-public-app[data-active-screen="compass"] .phone-shell {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* The character-portrait popup (built for the roleplay/report views) gets
+   clipped by this container's new overflow:hidden and renders half-cut-off
+   in the corner - genuinely broken here, not just a style mismatch. Hidden
+   for Home/2BB only; still shows normally on the Life Sim report view. */
+body.compass-public-app[data-active-screen="home"] .portrait-layer,
+body.compass-public-app[data-active-screen="compass"] .portrait-layer {
+  display: none;
+}
+
 /* The rich Today/Readiness/Adult-Life Map/Trust dashboard rail is hidden
    only on Home/2BB - it still renders exactly as before on every other
    tab (Discover/Life Sim/Profile), nothing about it changed or was removed. */
@@ -11778,6 +11799,27 @@ body.compass-public-app[data-active-screen="compass"] .app-screen {
   flex-direction: column;
   gap: 10px;
   padding-right: 4px;
+}
+
+/* Bubbles inherit .chat-bubble.is-ai/.is-user's solid white/coral colors
+   from the roleplay-room styling elsewhere - those read fine on a light
+   page but look like a jarring opaque sticker on this dark glass card, so
+   this card gets its own translucent warm treatment. Scoped to .bb-messages
+   only - roleplay bubbles elsewhere are completely untouched. */
+.bb-messages .chat-bubble.is-ai {
+  background: rgba(255, 244, 223, 0.1);
+  border: 1px solid rgba(255, 244, 223, 0.14);
+  color: var(--warm-ink);
+}
+
+.bb-messages .chat-bubble.is-user {
+  background: rgba(240, 199, 115, 0.2);
+  border: 1px solid rgba(240, 199, 115, 0.24);
+  color: var(--warm-ink);
+}
+
+.bb-messages .chat-bubble.is-user span {
+  color: rgba(255, 244, 223, 0.85);
 }
 
 .bb-input-row {
