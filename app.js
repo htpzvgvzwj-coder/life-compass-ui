@@ -11676,9 +11676,6 @@ const screens = {
         <button class="chat-icon-tab" type="button" data-open="historySearch" aria-label="Search your history" title="History Search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
         </button>
-        <button class="chat-icon-tab" type="button" data-tab-jump="profile" aria-label="Profile" title="Profile">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.8-4 5-6 8-6s6.2 2 8 6"></path></svg>
-        </button>
       </div>
     </header>
     <div class="chat-status-sliver">
