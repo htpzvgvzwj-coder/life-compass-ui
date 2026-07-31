@@ -3326,6 +3326,7 @@ function commandLauncherCommands() {
     { id: "groups", title: "Find Groups", detail: "Goal squads and community groups.", lane: "Discover", tab: "discover", discoverMode: "groups", icon: "icon-support.png", keywords: ["group", "squad", "community"] },
     { id: "ai-profile", title: "Compass AI Profile", detail: "Control what Compass may use.", lane: "Profile", tab: "profile", open: "compassProfile", icon: "icon-chat.png", keywords: ["ai", "profile", "memory"] },
     { id: "trust", title: "AI Trust Center", detail: "See what AI uses and inspect trace logs.", lane: "Profile", tab: "profile", open: "aiTrustCenter", icon: "icon-assessment.png", keywords: ["trust", "privacy", "data", "ai"] },
+    { id: "growth-trajectory", title: "Growth Trajectory", detail: "Real trust moments that happened, and a tone read on how you sound.", lane: "Profile", tab: "profile", open: "growthTrajectory", icon: "icon-decide.png", keywords: ["growth", "trust", "moments", "tone", "personality"] },
     { id: "sos", title: "SOS Support", detail: "Urgent support and safety categories.", lane: "Safety", open: "sosTriage", icon: "icon-warning.png", keywords: ["sos", "help", "urgent", "safety"] },
 
     { id: "readiness-assessment", title: "Future Readiness Assessment", detail: "Check adulthood readiness across money, decisions, resilience, relationships, independence, direction.", lane: "My Profile", tab: "secondBrain", open: "assessment", icon: "icon-assessment.png", keywords: ["readiness", "assessment", "adulthood", "independence"] },
@@ -10163,6 +10164,22 @@ function avoidancePatterns() {
 // just for this.
 const TRUST_MOMENT_IDS = ["calibrated-judgment", "week-streak", "faced-avoidance", "sealed-secret"];
 
+// Narrative copy for the Growth Trajectory view - only shown for moments
+// that have actually fired (trackerState.trustMoments.firedIds). Never
+// lists the other IDs or how many are left to reach, on purpose - a
+// "3/4 unlocked" framing turns a set of real, unscheduled life moments
+// into a checklist to grind, which is exactly the game-ification this
+// mechanism was built to avoid.
+function trustMomentCopy(id) {
+  const copy = {
+    "calibrated-judgment": "You've made at least 3 calls where your gut matched what actually happened. That's calibrated judgment, not luck.",
+    "week-streak": "You kept showing up for 7 days straight. That's a real streak, not a one-off.",
+    "faced-avoidance": "Something you'd been putting off actually got resolved. You didn't just let it fade - you dealt with it.",
+    "sealed-secret": "You trusted this space with something you sealed away. That's real trust, not just information."
+  };
+  return copy[id] || "";
+}
+
 // Trust Moment 3 support: avoidancePatterns() only returns display text
 // for its top 3 items, not stable ids, so this mirrors its two cleanly-
 // resolvable filters (real due dates overdue 14+ days; Jury Duty trials
@@ -11578,6 +11595,14 @@ function profileScreen() {
       </div>
     </section>
     <section class="profile-card">
+      <p class="eyebrow">Growth Trajectory</p>
+      <h3>Real signal, not a score.</h3>
+      <p class="muted">Trust moments that actually happened, and a tone read on how you tend to sound.</p>
+      <div class="profile-actions">
+        <button class="primary-action compact-action" type="button" data-open="growthTrajectory">Open growth trajectory</button>
+      </div>
+    </section>
+    <section class="profile-card">
       <p class="eyebrow">Compass AI voice</p>
       <div class="voice-choice-grid">
         ${["female", "male", "off"].map((voice) => `
@@ -12011,17 +12036,49 @@ const modals = {
         <div><strong>Not assumed</strong><span>Empty profile fields, private thoughts you never saved, real Google identity, bank accounts, official school records, or hidden device data.</span></div>
         <div><strong>Quality checks</strong><span>AI Trace Log grades replies for answering the question, giving a concrete next step, and possible fabrication.</span></div>
         <div><strong>Limits</strong><span>Compass is coaching and practice. It is not legal, medical, financial, immigration, or emergency advice.</span></div>
-        <div><strong>Tone read (inferred, not a real assessment)</strong><span>${escapeHTML(personalityReadSummaryText())}</span></div>
       </div>
       <div class="profile-actions">
         <button class="primary-action compact-action" type="button" data-open="compassProfile">Edit AI profile</button>
         <button class="secondary-action compact-action" type="button" data-open="knowledgeVault">Open Knowledge Vault</button>
         <button class="secondary-action compact-action" type="button" data-open="aiTraceLog">Open AI Trace Log</button>
-        <button class="secondary-action compact-action" type="button" data-refresh-personality-read ${isPersonalityReadRefreshing ? "disabled" : ""}>${isPersonalityReadRefreshing ? "Reading..." : "Refresh tone read"}</button>
         <button class="secondary-action compact-action" type="button" data-clear-chat>Clear chat</button>
       </div>
     </div>
   `,
+
+  // Growth Trajectory: the quiet, unified home for two systems that were
+  // fully built earlier this session but never had a default entry point
+  // - Trust Moments (checkTrustMoments()/TRUST_MOMENT_IDS) and Tone Read
+  // (personalityReadSummaryText(), moved here from aiTrustCenter - that
+  // modal is data-transparency, this is "who you are becoming", different
+  // enough purposes not to share one line). Trust Moments render as
+  // narrative sentences, never a count/progress bar/list of what's left -
+  // see trustMomentCopy()'s comment for why.
+  growthTrajectory: () => {
+    const firedIds = trackerState.trustMoments.firedIds || [];
+    return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="growth-trajectory-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Growth Trajectory</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="growth-trajectory-title">Real moments, not a score</h3>
+      <p class="muted">Nothing here is a number to chase. These are things that actually happened, and a read on how you tend to sound.</p>
+      <div class="advice-stack">
+        <div>
+          <strong>Trust moments</strong>
+          ${firedIds.length
+            ? `<span>${firedIds.map((id) => escapeHTML(trustMomentCopy(id))).filter(Boolean).join(" ")}</span>`
+            : `<span>Nothing yet - these happen on their own as you keep using Compass, not as tasks to complete.</span>`}
+        </div>
+        <div><strong>Tone read (inferred, not a real assessment)</strong><span>${escapeHTML(personalityReadSummaryText())}</span></div>
+      </div>
+      <div class="profile-actions">
+        <button class="secondary-action compact-action" type="button" data-refresh-personality-read ${isPersonalityReadRefreshing ? "disabled" : ""}>${isPersonalityReadRefreshing ? "Reading..." : "Refresh tone read"}</button>
+      </div>
+    </div>
+  `;
+  },
 
   demoMode: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="demo-mode-title">
