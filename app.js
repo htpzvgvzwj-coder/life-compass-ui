@@ -2558,6 +2558,90 @@ function knowledgeVaultBlueprintSection() {
       <strong>Blueprint v${blueprint.version}</strong>
       <span>Values: ${escapeHTML(blueprint.values.join(", ") || "not set")} - Strengths: ${escapeHTML(blueprint.strengths.join(", ") || "not set")}</span>
       <button class="text-action" type="button" data-open="discoverYourself">View / update</button>
+      ${trackerState.blueprint.history.length >= 2 ? `<button class="text-action" type="button" data-open="blueprintEvolution">See how you've changed</button>` : ""}
+    </div>
+  `;
+}
+
+// Identity formation (8th and final domain in the gap-audit series): the
+// Blueprint has been versioned/append-only the whole time
+// (trackerState.blueprint.history, see the comment near its definition), but
+// nothing ever compared versions - only ever the latest one via
+// latestBlueprint(). Seeing your own values/strengths/style change over time
+// is itself a core piece of identity formation, and the data to show it
+// already existed; it just never got surfaced. Deliberately a first-vs-latest
+// comparison, not a full timeline - simple, and the raw history is still
+// there if a future round wants more.
+function blueprintEvolutionSummary() {
+  const history = trackerState.blueprint.history;
+  if (history.length < 2) return null;
+  const first = history[0];
+  const latest = history[history.length - 1];
+  const valuesKept = latest.values.filter((value) => first.values.includes(value));
+  const valuesAdded = latest.values.filter((value) => !first.values.includes(value));
+  const valuesDropped = first.values.filter((value) => !latest.values.includes(value));
+  const strengthsKept = latest.strengths.filter((strength) => first.strengths.includes(strength));
+  const strengthsAdded = latest.strengths.filter((strength) => !first.strengths.includes(strength));
+  const strengthsDropped = first.strengths.filter((strength) => !latest.strengths.includes(strength));
+  const styleFields = [
+    { label: "Personality", key: "personalityChoice" },
+    { label: "Motivation", key: "motivationChoice" },
+    { label: "Learning", key: "learningChoice" },
+    { label: "Work style", key: "workChoice" },
+    { label: "Decision style", key: "decisionChoice" }
+  ].map((field) => ({ label: field.label, changed: first[field.key] !== latest[field.key], then: first[field.key], now: latest[field.key] }));
+  return {
+    firstVersion: first.version, firstAt: first.versionedAt,
+    latestVersion: latest.version, latestAt: latest.versionedAt,
+    versionCount: history.length,
+    valuesKept, valuesAdded, valuesDropped,
+    strengthsKept, strengthsAdded, strengthsDropped,
+    styleFields
+  };
+}
+
+function blueprintEvolutionModal() {
+  const summary = blueprintEvolutionSummary();
+  if (!summary) {
+    return `
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="blueprint-evolution-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">How you've changed</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="blueprint-evolution-title">Not enough versions yet</h3>
+        <p class="muted">Complete your Personal Blueprint again later to see how you've changed - right now there's only one version saved.</p>
+      </div>
+    `;
+  }
+  const listRow = (label, items) => items.length ? `<div><strong>${escapeHTML(label)}</strong><span>${escapeHTML(items.join(", "))}</span></div>` : "";
+  return `
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="blueprint-evolution-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">How you've changed</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="blueprint-evolution-title">From v${summary.firstVersion} to v${summary.latestVersion}</h3>
+      <p class="muted">${escapeHTML(summary.firstAt)} to ${escapeHTML(summary.latestAt)}, ${summary.versionCount} version${summary.versionCount === 1 ? "" : "s"} in between.</p>
+      <div class="content-rail-title"><strong>Values</strong><span></span></div>
+      <div class="advice-stack">
+        ${listRow("Kept", summary.valuesKept)}
+        ${listRow("New", summary.valuesAdded)}
+        ${listRow("Let go of", summary.valuesDropped)}
+      </div>
+      <div class="content-rail-title"><strong>Strengths</strong><span></span></div>
+      <div class="advice-stack">
+        ${listRow("Kept", summary.strengthsKept)}
+        ${listRow("New", summary.strengthsAdded)}
+        ${listRow("Let go of", summary.strengthsDropped)}
+      </div>
+      <div class="content-rail-title"><strong>Style</strong><span></span></div>
+      <div class="advice-stack">
+        ${summary.styleFields.map((field) => field.changed
+          ? `<div><strong>${escapeHTML(field.label)}</strong><span>Then: ${escapeHTML(field.then || "not set")} &rarr; Now: ${escapeHTML(field.now || "not set")}</span></div>`
+          : `<div><strong>${escapeHTML(field.label)}</strong><span>Stayed the same: ${escapeHTML(field.then || "not set")} - that's stability, not stagnation.</span></div>`
+        ).join("")}
+      </div>
     </div>
   `;
 }
@@ -5727,7 +5811,8 @@ const DAILY_REFLECTION_PROMPTS = [
   { id: "mood", label: "How would you describe your mood today, and why?", emoji: "🎭", starters: ["Honestly, today felt...", "My mood shifted when...", "I'm feeling this way because..."] },
   { id: "stress", label: "What's taking up the most mental space right now?", emoji: "🧠", starters: ["The thing I can't stop thinking about is...", "I keep worrying that...", "It would help if..."] },
   { id: "growth", label: "What's one thing you did today that your future self would thank you for?", emoji: "🌱", starters: ["I'm proud that I...", "Future me will thank me for...", "A small win today was..."] },
-  { id: "procrastination", label: "What did you put off today, and what made it easy to avoid?", emoji: "⏳", starters: ["I kept avoiding...", "It was easy to put off because...", "Next time I'll..."] }
+  { id: "procrastination", label: "What did you put off today, and what made it easy to avoid?", emoji: "⏳", starters: ["I kept avoiding...", "It was easy to put off because...", "Next time I'll..."] },
+  { id: "identity", label: "If you couldn't mention school, work, or grades, how would you describe yourself?", emoji: "🪞", starters: ["I'd say I'm someone who...", "People who know me well would say...", "Even without any of that, I..."] }
 ];
 
 // Consecutive-day streak shared by Mood check-in and Daily Reflection - both
@@ -12733,6 +12818,8 @@ const modals = {
   guardianShareSetup: () => guardianShareSetupModal(),
 
   sosTriage: () => sosTriageModal(),
+
+  blueprintEvolution: () => blueprintEvolutionModal(),
 
   calmReset: () => calmResetModal(),
 
