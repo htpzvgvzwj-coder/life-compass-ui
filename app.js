@@ -6244,6 +6244,34 @@ const SKILL_GUIDES = [
     ]
   },
   {
+    id: "raising-a-local-issue",
+    title: "Actually raising a local issue",
+    category: "Civic",
+    summary: "Which channel handles which problem, so a complaint reaches someone who can fix it instead of just a group chat.",
+    steps: [
+      "Municipal problems - litter, a broken lift, pest sightings, illegal parking, cleanliness - go through the OneService app or website, not your Town Council directly; it routes the report to whichever agency actually owns that issue.",
+      "Estate-level matters your Town Council does handle directly - upgrading works, facilities booking, community events, grants for residents' committees - are worth emailing or calling your own Town Council about by name.",
+      "For something only your own MP can help with - an appeal, a personal case, a policy concern specific to your estate - attend a Meet-the-People session in person; bring any relevant documents, since most cases need paperwork to be looked into properly.",
+      "For a national-level policy opinion rather than a local fix, REACH (REACH.gov.sg) is the actual channel for public feedback - a Town Council or MP's office isn't the right place for that.",
+      "Whichever channel you use, a report with a specific location, date, and photo gets handled faster than a general complaint - vague reports are the ones that stall.",
+      "Posting publicly might get sympathy, but it doesn't route to anyone with the authority to fix it - use it alongside a real report, not instead of one."
+    ]
+  },
+  {
+    id: "spot-misinformation-before-sharing",
+    title: "Spotting misinformation before you share it",
+    category: "Civic",
+    summary: "A quick check before forwarding something, not a lecture about media literacy.",
+    steps: [
+      "Check who actually said it before you check what it says - an anonymous screenshot or an account with no history is a reason to slow down, not a reason to trust it more because it 'confirms' something.",
+      "Check the date - old news and old photos get recirculated during unrelated events constantly, and a real event from years ago can look urgent again out of context.",
+      "Notice when something is written to make you angry or scared fast - that's often the point, not a side effect; strong emotion is a signal to verify, not a signal it's true.",
+      "Search the claim itself in a couple of other places before forwarding it - if it were real and significant, more than one source would be reporting it.",
+      "If you see an official correction or a POFMA direction attached to a post, read what specific claim it's correcting - it usually targets one false statement, not everything else in the post, so don't assume the whole source is either totally fake or totally cleared.",
+      "Being the one who forwards something false to a group chat has a real, if small, social cost - a 10-second check before sending is cheaper than walking it back after."
+    ]
+  },
+  {
     id: "first-credit-line",
     title: "Getting your first credit card or line of credit right",
     category: "Money",
