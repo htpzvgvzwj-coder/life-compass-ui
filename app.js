@@ -6214,6 +6214,50 @@ const SKILL_GUIDES = [
       "Write down shared agreements on rent, bills, and chores somewhere both of you can see, so \"I thought we agreed\" arguments have an actual reference.",
       "If the same issue keeps coming back after you've raised it clearly, treat that as your answer about whether the living situation actually works long-term."
     ]
+  },
+  {
+    id: "getting-around-sg",
+    title: "Getting around Singapore without wasting money or getting lost",
+    category: "Transport",
+    summary: "The card, the app, and the timing habits that actually matter day to day.",
+    steps: [
+      "Get a SimplyGo-enabled bank card or link one in the SimplyGo app - a physical EZ-Link card still works, but you don't need a separate top-up habit if a bank card already does it.",
+      "If you're a student, apply for a Student Concession Pass or Concession Card early - it takes real processing time and isn't backdated.",
+      "Use an app that shows real-time bus/train arrival (Google Maps, Citymapper, or SimplyGo) instead of guessing from a printed timetable - actual arrival times shift a lot.",
+      "Know that a transfer between bus and MRT within about 45 minutes counts as one combined trip for fare purposes - splitting a trip badly can cost more than it needs to.",
+      "Check the last train/bus time on your usual route before you rely on it for a late night - services taper off well before midnight on most lines.",
+      "Know your fallback for after that: a ride-hailing app with a saved payment method, so you're not sorting that out for the first time at 1am.",
+      "If you leave something on a bus or train, note the exact time, direction, and bus/train number if you can - that's what lost-and-found actually needs to find it."
+    ]
+  },
+  {
+    id: "move-in-week",
+    title: "Your first week in a new place",
+    category: "Housing",
+    summary: "The things worth doing on day one, before you're too settled in to notice what's wrong.",
+    steps: [
+      "Photograph every room, including existing damage or marks, before you move furniture in - this is your evidence if a deposit dispute happens later, not paranoia.",
+      "Test every switch, tap, and the aircon on day one, not week three - a landlord is far more likely to fix something reported immediately than something you mention after living with it a month.",
+      "Find the water shut-off valve and the electrical breaker box before you need them in an emergency, not during one.",
+      "Save your landlord's or agent's actual contact - phone number, not just a chat thread that could disappear - somewhere you'd still have it if your phone died.",
+      "Locate the nearest supermarket, pharmacy, and clinic within your first few days, not the first time you actually need one.",
+      "Update your registered address anywhere it's actually required (school, work, bank, government services where applicable) - a lot of official mail assumes this is current.",
+      "If you have neighbours you'll realistically run into, a brief introduction now makes it a normal conversation later if you ever need to knock on their door."
+    ]
+  },
+  {
+    id: "navigating-healthcare",
+    title: "Actually understanding the healthcare system before you need it",
+    category: "Health",
+    summary: "Which kind of clinic is for what, and how booking actually works - not a repeat of when to see a doctor, this is what happens once you decide to go.",
+    steps: [
+      "Know the difference: a GP/family clinic is for everyday illness and can refer you onward; a polyclinic is generally cheaper for citizens/PRs but has longer waits; A&E is for genuine emergencies and costs the most for non-emergencies.",
+      "Check if you're eligible for a CHAS card (subsidies at participating GP and dental clinics) - eligibility and subsidy level depend on your situation, so check the actual current criteria rather than assuming either way.",
+      "Most polyclinics and many private clinics let you book through the HealthHub app instead of walking in and waiting - worth setting up before you're already unwell and want it to just work.",
+      "Bring your NRIC (or equivalent ID) and any insurance/CHAS card to every visit - registration usually needs it even for a first-time simple visit.",
+      "Ask for an itemised bill if a cost surprises you - line items are easier to question than a single total, and this app's SOS routing can help if a bill genuinely looks wrong.",
+      "MediSave and MediShield are real government schemes with real rules about what they cover - this app does not give financial or insurance advice, so treat this as a prompt to check the current official terms yourself, not a summary to rely on."
+    ]
   }
 ];
 
