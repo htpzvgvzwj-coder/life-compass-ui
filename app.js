@@ -547,6 +547,10 @@ const defaultTrackerState = {
   // real LinkedIn/contacts sync (no real backend to sync against, same
   // honesty as moneyPlan.savingsGoal/microInsurance).
   networkContacts: [],
+  // "What You've Let Go Of" - the deliberate mirror of roadmapGoals: a
+  // record of what was declined/let go of, not another goal list. Pure
+  // manual entry, same honesty as networkContacts above.
+  rejectionList: [],
   journalEntries: [],
   // Second Brain causal memory ("decision + reason + outcome") - the
   // record that lets Compass AI do similar-situation recall instead of
@@ -1231,6 +1235,11 @@ let beforeYouTextContext = "";
 let beforeYouTextResult = "";
 let beforeYouTextLoading = false;
 let beforeYouTextError = "";
+let freshEyesDescription = "";
+let freshEyesDuration = "";
+let freshEyesResult = "";
+let freshEyesLoading = false;
+let freshEyesError = "";
 let futureMirrorMode = "scan";
 // Quick Call - fourth Future Mirror mode, for decisions too small to deserve
 // Future Scan's full station machinery. Deliberately no AI call: the whole
@@ -1441,6 +1450,7 @@ function normalizeTrackerState(state) {
     roleplaySessions: Array.isArray(state.roleplaySessions) ? state.roleplaySessions : fallback.roleplaySessions,
     supportContacts: Array.isArray(state.supportContacts) ? state.supportContacts : defaultSupportContacts,
     networkContacts: Array.isArray(state.networkContacts) ? state.networkContacts : fallback.networkContacts,
+    rejectionList: Array.isArray(state.rejectionList) ? state.rejectionList : fallback.rejectionList,
     journalEntries: Array.isArray(state.journalEntries) ? state.journalEntries : fallback.journalEntries,
     lifeMemory: Array.isArray(state.lifeMemory) ? state.lifeMemory : fallback.lifeMemory,
     aiInsights: state.aiInsights && typeof state.aiInsights === "object" ? { ...fallback.aiInsights, ...state.aiInsights, items: Array.isArray(state.aiInsights.items) ? state.aiInsights.items : [], supersededItems: Array.isArray(state.aiInsights.supersededItems) ? state.aiInsights.supersededItems : [] } : fallback.aiInsights,
@@ -3538,6 +3548,7 @@ function commandLauncherCommands() {
     { id: "future-scan", title: "Run Future Scan", detail: "Check identity, values, hidden costs, and no-action future.", lane: "Decide", tab: "secondBrain", open: "decisionLab", icon: "icon-decide.png", keywords: ["decision", "choose", "future scan", "risk"] },
     { id: "build-mode-coach", title: "Build Mode", detail: "An AI coach trains you toward one specific goal - interview, money, confidence, and more.", lane: "Decide", tab: "secondBrain", open: "decisionLab", icon: "icon-decide.png", keywords: ["coach", "training", "practice plan", "build mode"] },
     { id: "quick-call", title: "Quick Call", detail: "A fast nudge for decisions too small for a full scan.", lane: "Decide", tab: "secondBrain", open: "decisionLab", payload: "quick", icon: "icon-time.png", keywords: ["quick", "decide", "pick", "choice"] },
+    { id: "fresh-eyes-reframe", title: "Would You Choose This Today?", detail: "Reframe something you're holding onto, without any advice.", lane: "Decide", tab: "secondBrain", open: "freshEyesReframe", icon: "icon-decide.png", keywords: ["sunk cost", "quit", "stuck", "reconsider", "holding on"] },
     { id: "cost-living", title: "Real Cost of Living", detail: "Estimate SG-style living costs before a decision.", lane: "Decide", tab: "secondBrain", open: "costOfLiving", icon: "icon-money.png", keywords: ["money", "cost", "budget", "rent"] },
     { id: "money-plan", title: "Money Plan", detail: "Real Needs/Wants/Savings numbers, and a savings goal.", lane: "Decide", tab: "secondBrain", open: "moneyPlan", icon: "icon-money.png", keywords: ["money", "budget", "savings", "needs", "wants"] },
     { id: "tax", title: "Basic Tax Obligations", detail: "Plain-English tax checklist.", lane: "Decide", tab: "secondBrain", open: "taxObligations", icon: "icon-receipt.png", keywords: ["tax", "cpf", "income"] },
@@ -3575,6 +3586,7 @@ function commandLauncherCommands() {
     { id: "calibration", title: "Judgment Calibration", detail: "When you say you are sure, how often are you right?", lane: "Progress", tab: "secondBrain", open: "calibration", icon: "icon-balance.png", keywords: ["calibration", "judgment", "confidence"] },
     { id: "avoidance-patterns", title: "Debt of Inaction", detail: "What you keep not doing, detected from real saved patterns.", lane: "Progress", tab: "secondBrain", open: "avoidancePatterns", icon: "icon-warning.png", keywords: ["avoidance", "procrastination", "inaction", "debt"] },
     { id: "open-loops", title: "Open Loops", detail: "What hasn't closed yet - unresolved decisions, overdue dates, paused practice.", lane: "Progress", tab: "secondBrain", open: "openLoops", icon: "icon-warning.png", keywords: ["open loops", "unresolved", "unfinished", "pending"] },
+    { id: "rejection-list", title: "What You've Let Go Of", detail: "What you've chosen to decline, and why - not another goal list.", lane: "Progress", tab: "secondBrain", open: "rejectionList", icon: "icon-boundary.png", keywords: ["reject", "decline", "say no", "boundaries", "let go"] },
     { id: "inspire-hub", title: "Inspire Hub", detail: "Creators, athletes, leaders, entrepreneurs, and pressure-to-growth stories.", lane: "Discover", tab: "stories", icon: "icon-stories.png", keywords: ["inspire", "stories", "creators", "leaders"] },
     { id: "discuss-mirror", title: "Discuss your mirror safely", detail: "Share a reflection prompt with a trusted peer, mentor, or Support Circle.", lane: "Decisions & Memory", tab: "secondBrain", open: "growthCommunity", icon: "icon-support.png", keywords: ["discuss", "mirror", "peer", "mentor"] },
 
@@ -3643,6 +3655,11 @@ function historySearchEntries() {
   trackerState.journalEntries.filter((e) => e.user_id === myId).forEach((e) => entries.push({
     id: `hs-journal-${e.id}`, type: "Journal", title: e.display_time || "Journal entry",
     snippet: cleanText(e.text, 90), fullText: e.text, date: e.created_at
+  }));
+
+  trackerState.rejectionList.filter((e) => e.user_id === myId).forEach((e) => entries.push({
+    id: `hs-rejection-${e.id}`, type: "Rejection", title: e.title,
+    snippet: cleanText(e.reason, 90), fullText: `Declined: ${e.title}${e.reason ? `\nReason: ${e.reason}` : ""}`, date: e.createdAt
   }));
 
   (trackerState.mood.entries || []).filter((e) => e.user_id === myId).forEach((e) => entries.push({
@@ -10429,6 +10446,33 @@ function networkContactCards() {
   `).join("");
 }
 
+function rejectionListCards() {
+  const entries = trackerState.rejectionList
+    .filter((item) => item.user_id === currentUserId() || !item.user_id)
+    .slice()
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  if (!entries.length) {
+    return `
+      <section class="empty-feature">
+        <img src="assets/icon-boundary.png" alt="">
+        <div><strong>Nothing recorded yet.</strong><p>Add something you've chosen to decline, when it happens.</p></div>
+      </section>
+    `;
+  }
+  return `
+    <div class="ledger-sheet">
+      ${entries.map((item) => `
+        <article class="ledger-entry">
+          <p class="ledger-entry-stamp">${escapeHTML(new Date(item.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }))}</p>
+          <p class="ledger-entry-text">${escapeHTML(item.title)}</p>
+          ${item.reason ? `<p class="ledger-entry-note">${escapeHTML(item.reason)}</p>` : ""}
+          <button class="text-action danger-text" type="button" data-delete-rejection="${escapeHTML(item.id)}">Delete</button>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
 function roleplayScenarioCards() {
   return roleplayScenarios.map((scenario) => `
     <button class="wide-action" type="button" data-start-roleplay="${scenario.id}">
@@ -12117,7 +12161,8 @@ function historyEntryIcon(type) {
     "Future Scan": "icon-assessment.png",
     "Failure Inoculation": "icon-warning.png",
     "Estate Auction": "icon-money.png",
-    "Self Archaeology": "icon-learn.png"
+    "Self Archaeology": "icon-learn.png",
+    "Rejection": "icon-boundary.png"
   };
   return icons[type] || "icon-chat.png";
 }
@@ -14033,6 +14078,42 @@ const modals = {
   `;
   },
 
+  freshEyesReframe: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="fresh-eyes-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Fresh Eyes</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="fresh-eyes-title">Would you choose this today?</h3>
+      <p class="muted">This gives no advice - it just puts the choice back in front of you as if you were seeing it for the first time, today.</p>
+      <div class="admin-form">
+        <label>What are you holding onto, even though it might not be working?<textarea id="fresh-eyes-description" maxlength="800" placeholder="A relationship, a job, a course, a plan...">${escapeHTML(freshEyesDescription)}</textarea></label>
+        <label>How long have you been at this? (optional)<input id="fresh-eyes-duration" type="text" maxlength="100" value="${escapeHTML(freshEyesDuration)}" placeholder="e.g. 2 years"></label>
+      </div>
+      <p class="form-error" id="fresh-eyes-error" aria-live="polite">${escapeHTML(freshEyesError)}</p>
+      <button class="primary-action" type="button" data-fresh-eyes-reframe ${freshEyesLoading ? "disabled" : ""}>${freshEyesLoading ? "Reframing it..." : "Reframe it"}</button>
+      ${freshEyesResult ? `<div class="advice-stack"><div><strong>Seeing it fresh</strong><span>${escapeHTML(freshEyesResult)}</span></div></div>` : ""}
+    </div>
+  `,
+
+  rejectionList: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="rejection-list-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">What You've Let Go Of</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="rejection-list-title">Not another goal list</h3>
+      <p class="muted">Most tools here help you plan what to do. This is what you've decided not to do - too many options, not too few, is usually the real problem in your 20s.</p>
+      <div class="admin-form">
+        <input id="rejection-title-input" type="text" maxlength="160" placeholder="An opportunity, a request, an expectation you declined">
+        <textarea id="rejection-reason-input" maxlength="400" placeholder="Why, if you want to remember (optional)"></textarea>
+      </div>
+      <p class="form-error" id="rejection-error" aria-live="polite"></p>
+      <button class="primary-action" type="button" data-save-rejection>Add</button>
+      ${rejectionListCards()}
+    </div>
+  `,
+
   challengeHub: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="challenge-title">
       <div class="modal-top">
@@ -14351,6 +14432,13 @@ function openModal(name, payload) {
     beforeYouTextResult = "";
     beforeYouTextLoading = false;
     beforeYouTextError = "";
+  }
+  if (name === "freshEyesReframe" && !modalLayer.classList.contains("is-open")) {
+    freshEyesDescription = "";
+    freshEyesDuration = "";
+    freshEyesResult = "";
+    freshEyesLoading = false;
+    freshEyesError = "";
   }
   if (name === "calmReset" && !modalLayer.classList.contains("is-open")) {
     calmResetTechnique = "breathing";
@@ -14839,6 +14927,18 @@ function commitQuickCapture(text, category) {
 // triage), plain-text reply, nothing saved - purely a rehearsal step,
 // consistent with this app never pretending to actually send anything.
 const BEFORE_YOU_TEXT_SYSTEM_PROMPT = "You help someone review a real message before they actually send it to a real person - a friend, family member, or partner. This is a one-time honest read, not a conversation and not a rewrite service. Read the message and whatever context they give about the relationship or situation. In 3-5 plain sentences, no markdown, no bullet points: say plainly whether it says what they actually seem to mean, whether it is likely to land the way they want, and at most one concrete thing to reconsider if something could be clearer, kinder, or more honest. Point at what to change - do not rewrite the whole message for them. Never invent facts about the relationship beyond what they told you. If the message is fine as-is, say so plainly instead of inventing a critique to seem useful.";
+
+// Fresh Eyes reframe (sunk cost check) - deliberately gives no advice and no
+// verdict. The only job is to retell the user's own situation as if they
+// were encountering this exact choice for the first time today, with none
+// of the time/money/emotion already spent counted as a reason to continue,
+// then end on a direct question they answer for themselves.
+const FRESH_EYES_SYSTEM_PROMPT = "You help someone see a decision they're stuck on with fresh eyes. They will describe something they're holding onto - a relationship, a job, a course, a plan - that might not be working. This is a one-time reframe, not advice and not a conversation. Retell their exact situation back to them as if they were encountering this same choice for the very first time today, with none of the time, money, or emotional investment they've already put in counted as a reason to continue - describe concretely what the choice actually looks like stripped of that history, using the specifics they gave you, not generic language. End with one direct question putting the choice back in front of them (for example, close to 'Knowing only what this actually is today, would you choose it?') - never answer that question for them, never say what they should do, never use the phrase 'sunk cost' or explain the concept, just do the reframe. Keep it to 4-6 plain sentences, no markdown, no bullet points.";
+
+async function requestFreshEyesReframe(description, duration) {
+  const prompt = `What I'm holding onto: "${cleanText(description, 800)}"${duration ? `\nHow long I've been at this: ${cleanText(duration, 100)}` : ""}`;
+  return requestCompassDirect(FRESH_EYES_SYSTEM_PROMPT, prompt);
+}
 
 async function reviewBeforeYouText(message, context) {
   const prompt = `Message I'm thinking about sending: "${cleanText(message, 800)}"${context ? `\nContext on the relationship/situation: ${cleanText(context, 300)}` : ""}`;
@@ -17145,6 +17245,9 @@ document.addEventListener("click", async (event) => {
   const insightEncouragementButton = event.target.closest("[data-insight-encouragement]");
   const classifyQuickCaptureButton = event.target.closest("[data-classify-quick-capture]");
   const reviewBeforeYouTextButton = event.target.closest("[data-review-before-you-text]");
+  const freshEyesReframeButton = event.target.closest("[data-fresh-eyes-reframe]");
+  const saveRejectionButton = event.target.closest("[data-save-rejection]");
+  const deleteRejectionButton = event.target.closest("[data-delete-rejection]");
   const confirmQuickCaptureButton = event.target.closest("[data-confirm-quick-capture]");
   const redoQuickCaptureButton = event.target.closest("[data-redo-quick-capture]");
   const dismissInsightButton = event.target.closest("[data-dismiss-insight]");
@@ -17288,6 +17391,61 @@ document.addEventListener("click", async (event) => {
     } finally {
       beforeYouTextLoading = false;
       openModal("beforeYouText");
+    }
+  }
+
+  if (freshEyesReframeButton) {
+    const descriptionInput = modalLayer.querySelector("#fresh-eyes-description");
+    const durationInput = modalLayer.querySelector("#fresh-eyes-duration");
+    freshEyesDescription = cleanText(descriptionInput ? descriptionInput.value : "", 800);
+    freshEyesDuration = cleanText(durationInput ? durationInput.value : "", 100);
+    if (!freshEyesDescription) {
+      freshEyesError = "Describe what you're holding onto first.";
+      openModal("freshEyesReframe");
+      return;
+    }
+    freshEyesLoading = true;
+    freshEyesError = "";
+    freshEyesResult = "";
+    openModal("freshEyesReframe");
+    try {
+      freshEyesResult = await requestFreshEyesReframe(freshEyesDescription, freshEyesDuration);
+    } catch (error) {
+      console.error("[Compass AI] Fresh Eyes reframe failed", error);
+      freshEyesError = "Couldn't reframe that just now - try again?";
+    } finally {
+      freshEyesLoading = false;
+      openModal("freshEyesReframe");
+    }
+  }
+
+  if (saveRejectionButton) {
+    const titleInput = modalLayer.querySelector("#rejection-title-input");
+    const reasonInput = modalLayer.querySelector("#rejection-reason-input");
+    const error = modalLayer.querySelector("#rejection-error");
+    const title = cleanText(titleInput ? titleInput.value : "", 160);
+    const reason = cleanText(reasonInput ? reasonInput.value : "", 400);
+    if (!title) {
+      if (error) error.textContent = "Add what you declined first.";
+      return;
+    }
+    trackerState.rejectionList.unshift({
+      id: `rejection-${Date.now()}`,
+      user_id: currentUserId(),
+      title,
+      reason,
+      createdAt: new Date().toISOString()
+    });
+    saveTrackerState();
+    openModal("rejectionList");
+  }
+
+  if (deleteRejectionButton) {
+    const id = deleteRejectionButton.dataset.deleteRejection;
+    if (window.confirm("Delete this entry?")) {
+      trackerState.rejectionList = trackerState.rejectionList.filter((item) => !(item.id === id && (item.user_id === currentUserId() || !item.user_id)));
+      saveTrackerState();
+      openModal("rejectionList");
     }
   }
 
