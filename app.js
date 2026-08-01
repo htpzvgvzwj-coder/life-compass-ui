@@ -1232,6 +1232,13 @@ let beforeYouTextResult = "";
 let beforeYouTextLoading = false;
 let beforeYouTextError = "";
 let futureMirrorMode = "scan";
+// Quick Call - fourth Future Mirror mode, for decisions too small to deserve
+// Future Scan's full station machinery. Deliberately no AI call: the whole
+// point is speed and actually deciding, not another round of analysis.
+let quickCallDecision = "";
+let quickCallOptionsText = "";
+let quickCallError = "";
+let quickCallPick = null;
 
 // Future Scan - third Future Mirror mode ("help the user see the truth before
 // they choose", not a checklist and not another open-ended chat - Compass AI
@@ -3446,6 +3453,7 @@ function commandLauncherCommands() {
     { id: "home", title: "Home", detail: "What Compass remembers, and a way back into the conversation.", lane: "Home", tab: "home", icon: "icon-home.png", keywords: ["home", "dashboard", "memory", "shelf"] },
     { id: "future-scan", title: "Run Future Scan", detail: "Check identity, values, hidden costs, and no-action future.", lane: "Decide", tab: "secondBrain", open: "decisionLab", icon: "icon-decide.png", keywords: ["decision", "choose", "future scan", "risk"] },
     { id: "build-mode-coach", title: "Build Mode", detail: "An AI coach trains you toward one specific goal - interview, money, confidence, and more.", lane: "Decide", tab: "secondBrain", open: "decisionLab", icon: "icon-decide.png", keywords: ["coach", "training", "practice plan", "build mode"] },
+    { id: "quick-call", title: "Quick Call", detail: "A fast nudge for decisions too small for a full scan.", lane: "Decide", tab: "secondBrain", open: "decisionLab", payload: "quick", icon: "icon-time.png", keywords: ["quick", "decide", "pick", "choice"] },
     { id: "cost-living", title: "Real Cost of Living", detail: "Estimate SG-style living costs before a decision.", lane: "Decide", tab: "secondBrain", open: "costOfLiving", icon: "icon-money.png", keywords: ["money", "cost", "budget", "rent"] },
     { id: "money-plan", title: "Money Plan", detail: "Real Needs/Wants/Savings numbers, and a savings goal.", lane: "Decide", tab: "secondBrain", open: "moneyPlan", icon: "icon-money.png", keywords: ["money", "budget", "savings", "needs", "wants"] },
     { id: "tax", title: "Basic Tax Obligations", detail: "Plain-English tax checklist.", lane: "Decide", tab: "secondBrain", open: "taxObligations", icon: "icon-receipt.png", keywords: ["tax", "cpf", "income"] },
@@ -11655,6 +11663,27 @@ function futureScanClarifySection() {
   `;
 }
 
+function quickCallEntrySection() {
+  return `
+    <h3>For decisions too small for a full scan.</h3>
+    <p class="muted">Future Scan is built for big, weighty choices. Quick Call is for the small ones - what to do this weekend, which of two things to pick - where deciding and moving on matters more than perfect analysis.</p>
+    <label>What are you deciding?
+      <input id="quick-call-decision" type="text" placeholder="Example: What to do Saturday night" value="${escapeHTML(quickCallDecision)}">
+    </label>
+    <label>List your options, one per line
+      <textarea id="quick-call-options" placeholder="Stay in and rest
+Go out with friends
+Catch up on that assignment">${escapeHTML(quickCallOptionsText)}</textarea>
+    </label>
+    <div class="advice-stack">
+      <div><strong>10-10-10 check</strong><span>How will you feel about this in 10 minutes? In 10 months? In 10 years? If it won't matter in a year, that itself tells you something.</span></div>
+    </div>
+    ${quickCallError ? `<p class="form-error">${escapeHTML(quickCallError)}</p>` : ""}
+    <button class="primary-action mirror-run-action" type="button" data-quick-call-pick>Just pick one for me</button>
+    ${quickCallPick ? `<p class="tiny-note">Randomly picked: <strong>${escapeHTML(quickCallPick)}</strong>. For a decision this size, a good-enough option you actually commit to usually beats holding out for the perfect one - you can always choose differently next time.</p>` : ""}
+  `;
+}
+
 // Dossier archetype: a station reads as a numbered exhibit in a case file -
 // "Filed" once it's actually been run, "Open" while it's still outstanding -
 // instead of a generic risk-pill badge.
@@ -13781,8 +13810,12 @@ const modals = {
             <img src="assets/icon-balance.png" alt="">
             <strong>Advanced</strong>
           </button>
+          <button type="button" class="${futureMirrorMode === "quick" ? "is-selected" : ""}" data-future-mirror-mode="quick">
+            <img src="assets/icon-time.png" alt="">
+            <strong>Quick Call</strong>
+          </button>
         </div>
-        ${futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorMode === "advanced" ? advancedModeEntrySection() : futureScanEntrySection()}
+        ${futureMirrorMode === "build" ? buildModeEntrySection() : futureMirrorMode === "advanced" ? advancedModeEntrySection() : futureMirrorMode === "quick" ? quickCallEntrySection() : futureScanEntrySection()}
       </section>
       <div class="mirror-tools-row">
         ${costOfLivingEntryCard()}
@@ -14187,6 +14220,9 @@ function openModal(name, payload) {
   }
   if (name === "selfDebtNew") {
     selfDebtPrefillTitle = typeof payload === "string" ? payload : "";
+  }
+  if (name === "decisionLab" && payload) {
+    futureMirrorMode = payload;
   }
   if (name === "quickCapture" && !modalLayer.classList.contains("is-open")) {
     quickCaptureText = "";
@@ -16759,6 +16795,7 @@ document.addEventListener("click", async (event) => {
   const opportunityCategoryButton = event.target.closest("[data-opportunity-category]");
   const opportunityAi = event.target.closest("[data-opportunity-ai]");
   const futureMirrorModeButton = event.target.closest("[data-future-mirror-mode]");
+  const quickCallPickButton = event.target.closest("[data-quick-call-pick]");
   const scanFromEntry = event.target.closest("[data-scan-from-entry]");
   const startFutureScanButton = event.target.closest("[data-start-future-scan]");
   const scanClarifyChip = event.target.closest("[data-scan-clarify-chip]");
@@ -17912,6 +17949,21 @@ document.addEventListener("click", async (event) => {
 
   if (futureMirrorModeButton) {
     futureMirrorMode = futureMirrorModeButton.dataset.futureMirrorMode;
+    openModal("decisionLab");
+  }
+  if (quickCallPickButton) {
+    const decisionInput = modalLayer.querySelector("#quick-call-decision");
+    const optionsInput = modalLayer.querySelector("#quick-call-options");
+    quickCallDecision = decisionInput ? decisionInput.value : "";
+    quickCallOptionsText = optionsInput ? optionsInput.value : "";
+    const options = quickCallOptionsText.split("\n").map((line) => cleanText(line, 80)).filter(Boolean).slice(0, 6);
+    if (options.length < 2) {
+      quickCallError = "List at least 2 options first.";
+      quickCallPick = null;
+    } else {
+      quickCallError = "";
+      quickCallPick = options[Math.floor(Math.random() * options.length)];
+    }
     openModal("decisionLab");
   }
 
