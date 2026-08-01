@@ -11799,10 +11799,22 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .des
 /* .is-quiet included here to beat .desktop-command-bar.is-quiet
    .desktop-command-search's pre-existing opacity:0.55 rule (same
    specificity otherwise - the exact mistake already made once on
-   .phone-shell in this same file, not repeating it here). */
+   .phone-shell in this same file, not repeating it here).
+   z-index:2 (real bug found and fixed here): .app-screen (#screen-root,
+   right above this in the DOM) is `position:relative; z-index:1` for this
+   same [data-active-screen] scope. .app-screen is transparent but spans
+   the phone-shell's full width, and an element's box is fully hit-testable
+   regardless of background transparency - with no z-index of its own
+   (z-index:auto), this card was sitting BELOW .app-screen's z-index:1 in
+   the same stacking context, so clicks anywhere on it were being captured
+   by .app-screen's own (empty) box instead of ever reaching this button.
+   This silently affected Quick Jump/SOS the entire time they've existed,
+   not just the new 8-domain grid below - it just went unnoticed until the
+   grid made someone actually try clicking one. */
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar.is-quiet .desktop-command-search,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-bar.is-quiet .desktop-command-search {
   position: absolute;
+  z-index: 2;
   left: 12%;
   top: 6%;
   /* Fixed px, not width:%+aspect-ratio - .sos-fab's top below needs to
@@ -11872,6 +11884,7 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .des
 
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab {
+  z-index: 2;
   left: 12%;
   top: calc(6% + 117px + 10px);
   right: auto;
@@ -11919,6 +11932,7 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   position: absolute;
+  z-index: 2;
   left: 12%;
   width: 38%;
   top: calc(6% + 117px + 10px + 117px + 10px);
