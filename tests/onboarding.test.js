@@ -73,7 +73,7 @@ function suggestOnboardingFeature(answerText) {
   return match || { id: "general" };
 }
 
-assert.strictEqual(SKILL_GUIDES.length, 17, "Skill Guides should have 17 entries (expanded again with raising-a-local-issue/spot-misinformation-before-sharing)");
+assert.strictEqual(SKILL_GUIDES.length, 19, "Skill Guides should have 19 entries (expanded again with youre-not-actually-behind/what-graduate-numbers-actually-say)");
 const guideIds = new Set(SKILL_GUIDES.map((guide) => guide.id));
 assert.strictEqual(guideIds.size, SKILL_GUIDES.length, "Skill Guide ids must be unique");
 SKILL_GUIDES.forEach((guide) => {

@@ -6338,6 +6338,19 @@ const SKILL_GUIDES = [
     ]
   },
   {
+    id: "what-graduate-numbers-actually-say",
+    title: "What actually happens after you graduate - real numbers, not vibes",
+    category: "Work",
+    summary: "Singapore's own annual Graduate Employment Survey, used as one data point, not a verdict.",
+    steps: [
+      "Singapore's 2024/2025 Graduate Employment Survey for private education institution (PEI) programmes - about 6,150 full-time bachelor's graduates across 26 institutions - found 78.9% were employed within 6 months of graduating. That means roughly 1 in 5 weren't yet, and that's the normal published outcome, not a crisis number.",
+      "Median gross monthly salary for those graduates in full-time permanent roles was S$3,500 - a real figure to check your own expectations against, not an aspirational one.",
+      "Outcomes vary by field and institution, not one flat number for everyone - a 'further study versus start working now' decision doesn't have a single statistically right answer either, whatever it feels like from the outside.",
+      "This is one graduating cohort's 6-month snapshot (2024/2025 PEI programmes specifically), not a permanent constant and not what happens 3+ years out - a public university's own GES numbers, or a different year, can read differently. Treat it as one real reference point, not the whole picture.",
+      "The honest read: most people in this survey found employment within 6 months either way. There isn't a large, real gap in these numbers that makes one path catastrophic and the other safe - most of that gap is anxiety, not statistics."
+    ]
+  },
+  {
     id: "end-a-relationship-well",
     title: "Ending a relationship without ghosting or blowing up",
     category: "Relationships",
@@ -6364,6 +6377,19 @@ const SKILL_GUIDES = [
       "Notice your own early warning signs - what you tend to do differently in the weeks before you feel really low - so you can catch it earlier next time.",
       "Build one small, boring routine that doesn't depend on motivation, like a regular sleep time or one meal you always eat - it holds you up when everything else feels like too much.",
       "Tell at least one person your actual state sometimes, not just \"I'm fine\" - isolation is what turns a bad week into a bad month."
+    ]
+  },
+  {
+    id: "youre-not-actually-behind",
+    title: "You're probably not as behind as you think",
+    category: "Mind",
+    summary: "Real Singapore research on the milestones you're comparing yourself against - not another pep talk.",
+    steps: [
+      "Youth STEPS - the National Youth Council and IPS Social Lab's real, first-of-its-kind study that tracked over 3,000 Singaporeans aged 17-24 from 2017 to 2022 - found life satisfaction dropped from 74% to 64% over those years. That decline shows up broadly across the group, not just in people who feel 'behind' - it's closer to a normal part of your 20s than a personal failure.",
+      "The same study found 39% of respondents that age had never been in a relationship - not a rare exception, close to 2 in 5 people. If you're comparing yourself to a timeline where everyone else has this figured out, the real data doesn't back that up.",
+      "The researchers themselves named the assumption that a good life needs education, then a job, then marriage and kids, in that exact order, as a script worth challenging - their own language was 'encouragement to explore alternative pathways,' not a warning that you're off track.",
+      "What you're actually comparing yourself to online is a curated highlight reel, not real data - the honest survey numbers above show far more spread and lateness in real people's lives than what shows up in anyone's feed.",
+      "None of this means direction doesn't matter or that timing is meaningless - it means the specific age something happens by is a much weaker signal of how your life turns out than it feels like when you're anxious about it."
     ]
   },
   {
