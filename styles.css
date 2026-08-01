@@ -11773,13 +11773,12 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .app
   display: none;
 }
 
-/* .money-plan-fab has no default appearance anywhere else (unlike
-   .sos-fab/.desktop-command-search, which are real features on every
-   screen just restyled here) - hidden by default everywhere, only
-   shown+positioned for Home/2BB below. */
-.money-plan-fab {
+/* .bb-domain-grid (replaces the old standalone .money-plan-fab - Money is
+   now one cell in this grid, not a separate card) has no default appearance
+   anywhere else, same as .money-plan-fab before it - hidden by default
+   everywhere, only shown+positioned for Home/2BB below. */
+.bb-domain-grid {
   display: none;
-  position: absolute;
 }
 
 /* display:contents (not position:absolute) - giving .desktop-command-bar
@@ -11836,8 +11835,8 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .deskto
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search .bb-card-image,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab .bb-card-image,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab .bb-card-image,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .money-plan-fab .bb-card-image,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .money-plan-fab .bb-card-image {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button .bb-card-image,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button .bb-card-image {
   display: block;
   position: absolute;
   inset: 0;
@@ -11850,8 +11849,8 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .deskto
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search::after,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab::after,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab::after,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .money-plan-fab::after,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .money-plan-fab::after {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button::after,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -11891,8 +11890,8 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos
 
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab .bb-sos-label,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab .bb-sos-label,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .money-plan-fab .bb-sos-label,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .money-plan-fab .bb-sos-label {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button .bb-sos-label,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button .bb-sos-label {
   position: absolute;
   left: 5px;
   right: 5px;
@@ -11903,18 +11902,34 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .mon
   color: var(--warm-ink);
 }
 
-/* Third card in the same column, stacked below SOS - same fixed-px
-   width/height as the other two so this next `top` addition stays
-   entirely in one axis (px), the exact fix for the calc() bug two
-   cards up from here already explains in full. */
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .money-plan-fab,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .money-plan-fab {
+/* 8-domain grid, stacked below SOS at the same top offset Money's card
+   used to start at. The chat card itself starts at left:52% (see the "2BB
+   photo redesign" block), so this column only has 52%-12%=40% of the
+   phone-shell's width to work with before it would collide - width:38%
+   below keeps a 2% safety margin. Columns use grid-template-columns:
+   repeat(2, 1fr) (relative, not a hardcoded px width like the single-card
+   fabs above) specifically so the two columns always split whatever that
+   38% resolves to at the phone-shell's real rendered width, instead of
+   guessing one fixed pixel width that could overflow on a narrower render.
+   Row height stays fixed px, same "don't mix % and px in one calc()" rule
+   as .sos-fab's top above. */
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  position: absolute;
   left: 12%;
+  width: 38%;
   top: calc(6% + 117px + 10px + 117px + 10px);
   right: auto;
   bottom: auto;
-  width: 84px;
-  height: 117px;
+}
+
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button {
+  position: relative;
+  height: 78px;
   display: block;
   padding: 0;
   border-radius: 10px;
@@ -11929,13 +11944,25 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .mon
   body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar.is-quiet .desktop-command-search,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-bar.is-quiet .desktop-command-search,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab,
-  body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab,
-  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .money-plan-fab,
-  body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .money-plan-fab {
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab {
     position: static;
     width: auto;
     aspect-ratio: auto;
     height: 80px;
+  }
+
+  /* Grid stays a grid at mobile too, just drops the desktop-only 38% width
+     assumption - static position lets it sit in normal document flow,
+     1fr columns still split whatever width it's given. */
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid,
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid {
+    position: static;
+    width: auto;
+  }
+
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button,
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button {
+    height: 70px;
   }
 }
 
