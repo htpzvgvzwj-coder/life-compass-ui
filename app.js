@@ -389,6 +389,9 @@ let sosView = "categories";
 let sosResultCategoryId = null;
 let sosInputError = "";
 let sosBusy = false;
+let calmResetTechnique = "breathing";
+let groundingStep = 0;
+let reframeSavedAt = null;
 
 async function classifySosSituation(text) {
   const reply = await requestCompassDirect(SOS_TRIAGE_SYSTEM_PROMPT, text);
@@ -410,6 +413,7 @@ function sosTriageModal() {
       <section class="mirror-empty-card sos-crisis-banner">
         <p class="eyebrow">If this is a mental health emergency</p>
         ${mentalHealth.resources.map((resource) => `<p class="tiny-note"><strong>${escapeHTML(resource.title)}</strong>: ${escapeHTML(resource.detail)}</p>`).join("")}
+        <button class="secondary-action compact-action" type="button" data-open="calmReset">Try a 2-minute reset first</button>
       </section>
       ${sosView === "result" && resultCategory && resultCategory.id !== "mental-health" ? `
         <div class="content-rail-title"><strong>${escapeHTML(resultCategory.label)}</strong><span></span></div>
@@ -433,6 +437,43 @@ function sosTriageModal() {
           ${sosInputError ? `<p class="form-error">${escapeHTML(sosInputError)}</p>` : ""}
         </div>
         <button class="primary-action" type="button" data-sos-get-help ${sosBusy ? "disabled" : ""}>${sosBusy ? "Sorting..." : "Get help"}</button>
+      `}
+    </div>
+  `;
+}
+
+const GROUNDING_STEPS = [
+  { count: "5", sense: "things you can see" },
+  { count: "4", sense: "things you can hear" },
+  { count: "3", sense: "things you can touch" },
+  { count: "2", sense: "things you can smell" },
+  { count: "1", sense: "thing you can taste" }
+];
+
+function calmResetModal() {
+  return `
+    <div class="modal-card calm-reset-modal" role="dialog" aria-modal="true" aria-labelledby="calm-reset-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">2-minute reset</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="calm-reset-title">Take a moment before anything else</h3>
+      <div class="calm-reset-tabs">
+        <button class="calm-reset-tab ${calmResetTechnique === "breathing" ? "is-active" : ""}" type="button" data-calm-reset-tab="breathing">Breathing</button>
+        <button class="calm-reset-tab ${calmResetTechnique === "grounding" ? "is-active" : ""}" type="button" data-calm-reset-tab="grounding">Grounding</button>
+      </div>
+      ${calmResetTechnique === "breathing" ? `
+        <div class="calm-reset-breathing">
+          <div class="calm-breath-circle" aria-hidden="true"></div>
+          <p class="muted">Breathe in as the circle grows, hold as it pauses, breathe out as it shrinks, hold again. Repeat for about 2 minutes.</p>
+        </div>
+      ` : `
+        <div class="calm-reset-grounding">
+          <p class="eyebrow">Step ${groundingStep + 1} of ${GROUNDING_STEPS.length}</p>
+          <h4>Name ${GROUNDING_STEPS[groundingStep].count} ${escapeHTML(GROUNDING_STEPS[groundingStep].sense)}</h4>
+          <p class="muted">Take your time. You don't need to say them out loud.</p>
+          <button class="primary-action" type="button" data-grounding-next>${groundingStep >= GROUNDING_STEPS.length - 1 ? "Done" : "Next"}</button>
+        </div>
       `}
     </div>
   `;
@@ -12636,6 +12677,8 @@ const modals = {
 
   sosTriage: () => sosTriageModal(),
 
+  calmReset: () => calmResetModal(),
+
   ghostRoommate: () => ghostRoommateModal(),
 
   legacyDebugger: () => legacyDebuggerModal(),
@@ -13259,6 +13302,13 @@ const modals = {
         <h3 id="mood-guidance-title">${escapeHTML(suggestion.title)}</h3>
         <p class="muted">${escapeHTML(suggestion.summary)}</p>
         <div class="support-note"><strong>${escapeHTML(suggestion.technique)}</strong><p>${escapeHTML(suggestion.detail)}</p></div>
+        <div class="content-rail-title"><strong>Reframe it</strong><span></span></div>
+        <p class="muted">Optional - write the thought down, then a more balanced way to see it. This gets saved to your journal, not sent anywhere.</p>
+        <label class="mood-reflection-label">What's the thought that's bothering you?<textarea id="reframe-thought-input" aria-label="The thought that's bothering you"></textarea></label>
+        <label class="mood-reflection-label">What's a more balanced way to see it?<textarea id="reframe-balanced-input" aria-label="A more balanced way to see it"></textarea></label>
+        <p id="reframe-error" class="form-error"></p>
+        <button class="secondary-action compact-action" type="button" data-save-reframe>Save this reflection</button>
+        ${reframeSavedAt ? `<p class="tiny-note">Saved to your journal.</p>` : ""}
       </div>
     `;
   },
@@ -14150,6 +14200,13 @@ function openModal(name, payload) {
     beforeYouTextResult = "";
     beforeYouTextLoading = false;
     beforeYouTextError = "";
+  }
+  if (name === "calmReset" && !modalLayer.classList.contains("is-open")) {
+    calmResetTechnique = "breathing";
+    groundingStep = 0;
+  }
+  if (name === "moodGuidance" && !modalLayer.classList.contains("is-open")) {
+    reframeSavedAt = null;
   }
   if (name === "addKeyResult" && !modalLayer.classList.contains("is-open")) {
     roadmapError = "";
@@ -16883,6 +16940,9 @@ document.addEventListener("click", async (event) => {
   const sosGetHelpButton = event.target.closest("[data-sos-get-help]");
   const sosCategoryButton = event.target.closest("[data-sos-category]");
   const sosBackButton = event.target.closest("[data-sos-back]");
+  const calmResetTabButton = event.target.closest("[data-calm-reset-tab]");
+  const groundingNextButton = event.target.closest("[data-grounding-next]");
+  const saveReframeButton = event.target.closest("[data-save-reframe]");
   const microInsuranceScenarioButton = event.target.closest("[data-micro-insurance-scenario]");
   const moveInRoommateButton = event.target.closest("[data-move-in-roommate]");
   const sendRoommateReplyButton = event.target.closest("[data-send-roommate-reply]");
@@ -17154,6 +17214,44 @@ document.addEventListener("click", async (event) => {
     sosView = "categories";
     sosResultCategoryId = null;
     openModal("sosTriage");
+  }
+  if (calmResetTabButton) {
+    calmResetTechnique = calmResetTabButton.dataset.calmResetTab;
+    groundingStep = 0;
+    openModal("calmReset");
+  }
+  if (groundingNextButton) {
+    if (groundingStep >= GROUNDING_STEPS.length - 1) {
+      groundingStep = 0;
+      closeModal();
+    } else {
+      groundingStep += 1;
+      openModal("calmReset");
+    }
+  }
+  if (saveReframeButton) {
+    const thoughtInput = modalLayer.querySelector("#reframe-thought-input");
+    const balancedInput = modalLayer.querySelector("#reframe-balanced-input");
+    const error = modalLayer.querySelector("#reframe-error");
+    const thought = cleanText(thoughtInput ? thoughtInput.value : "", 600);
+    const balanced = cleanText(balancedInput ? balancedInput.value : "", 600);
+    if (!thought || !balanced) {
+      if (error) error.textContent = "Fill in both the thought and the more balanced view before saving.";
+      return;
+    }
+    trackerState.journalEntries.unshift({
+      id: `reframe-${Date.now()}`,
+      user_id: currentUserId(),
+      text: `Thought: ${thought}\nBalanced view: ${balanced}`,
+      kind: "reframe",
+      created_at: new Date().toISOString(),
+      display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    });
+    trackerState.journalEntries = trackerState.journalEntries.slice(0, 80);
+    saveTrackerState();
+    maybeRunPersonalityInference();
+    reframeSavedAt = new Date().toISOString();
+    openModal("moodGuidance");
   }
   if (microInsuranceScenarioButton) {
     microInsuranceScenarioId = microInsuranceScenarioButton.dataset.microInsuranceScenario;
