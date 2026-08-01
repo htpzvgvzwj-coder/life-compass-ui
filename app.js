@@ -685,6 +685,7 @@ const roleplayScenarios = [
   { id: "asking-help", title: "Asking for help", opening: "You said you wanted to talk. What kind of help do you need?", skill: "Clear help-seeking" },
   { id: "job-interview", title: "Job interview practice", opening: "Tell me about yourself and why you want this role.", skill: "Confidence and preparation" },
   { id: "parents-teachers", title: "Talking to parents or teachers", opening: "I can listen, but I need you to explain what has been going on.", skill: "Honest communication" },
+  { id: "parent-independence", title: "Asking your parents for more independence", opening: "You're still under my roof, so what makes you think this is just your decision to make?", skill: "Negotiating autonomy respectfully" },
   { id: "handling-conflict", title: "Handling conflict", opening: "I feel like you ignored what I said. What do you want to say about that?", skill: "Repair and calm response" },
   { id: "budget-decision", title: "Budget decision practice", opening: "You want to buy it today, but rent and transport are also coming up. What is your plan?", skill: "Money decision-making" }
 ];
@@ -1184,6 +1185,11 @@ let quickCaptureText = "";
 let quickCaptureClassification = null;
 let quickCaptureLoading = false;
 let quickCaptureError = "";
+let beforeYouTextMessage = "";
+let beforeYouTextContext = "";
+let beforeYouTextResult = "";
+let beforeYouTextLoading = false;
+let beforeYouTextError = "";
 let futureMirrorMode = "scan";
 
 // Future Scan - third Future Mirror mode ("help the user see the truth before
@@ -3407,6 +3413,7 @@ function commandLauncherCommands() {
     { id: "mood", title: "Mood Check-In", detail: "Log today's mood and energy.", lane: "Check-In", tab: "secondBrain", open: "mood", icon: "icon-mood.png", keywords: ["mood", "energy", "check in"] },
     { id: "career-studio", title: "Career Studio", detail: "Resume, portfolio, interviews, job matching, paycheck checks.", lane: "Career Studio", tab: "secondBrain", open: "careerStudio", icon: "icon-work.png", keywords: ["career", "resume", "interview", "job"] },
     { id: "networking", title: "Networking", detail: "Mentors, referrals, alumni - and when you last actually reached out.", lane: "Career Studio", tab: "secondBrain", open: "networkContacts", icon: "icon-support.png", keywords: ["networking", "mentor", "referral", "alumni", "contacts"] },
+    { id: "before-you-text", title: "Before You Text", detail: "A one-time honest read on a real message before it goes to a real person.", lane: "People & Boundaries", tab: "secondBrain", open: "beforeYouText", icon: "icon-boundary.png", keywords: ["text", "message", "send", "draft", "conversation"] },
     { id: "skill-guides", title: "Skill Guides", detail: "Payslips, renting, SIM plans, cooking, first aid, and more.", lane: "Practical & Safety", tab: "secondBrain", open: "skillGuides", icon: "icon-guide.png", keywords: ["skills", "adulting", "guide", "home"] },
     { id: "due-dates", title: "Real Due Dates", detail: "Track bills, renewals, rent, and real deadlines.", lane: "Practical & Safety", tab: "secondBrain", open: "realLifeEvents", icon: "icon-checkin.png", keywords: ["deadline", "due", "bill", "reminder"] },
     { id: "opportunities", title: "Discover Opportunities", detail: "Browse doors by stage, need, time, and category.", lane: "Discover", tab: "discover", discoverMode: "opportunities", icon: "icon-support.png", keywords: ["opportunity", "internship", "scholarship", "volunteer"] },
@@ -10206,6 +10213,7 @@ function supportContactCards() {
         <p class="eyebrow">${escapeHTML(contact.relationship)}</p>
         <h3>${escapeHTML(contact.name)}</h3>
         <p>${escapeHTML(contact.preferred_contact_method)} - ${escapeHTML(contact.phone)}</p>
+        ${contact.lastContactedAt ? `<p class="tiny-note">Last checked in ${escapeHTML(contact.lastContactedAt)}</p>` : ""}
         ${contact.note ? `<small>${escapeHTML(contact.note)}</small>` : ""}
       </div>
       <div class="support-contact-actions">
@@ -10215,6 +10223,22 @@ function supportContactCards() {
       </div>
     </article>
   `).join("");
+}
+
+// Used by Before You Text (in 2BB) to gently surface who hasn't had a
+// real check-in logged in a while - reads Support Circle's existing
+// contacts rather than a separate list, since "people you trust" and
+// "people worth checking in with" are usually the same people. Only
+// contacts with a lastContactedAt actually set are considered "stale" -
+// someone who's never logged one isn't flagged, since that's a missing
+// data point, not evidence of anything.
+function staleSupportContacts(daysThreshold = 14) {
+  const myId = currentUserId();
+  return trackerState.supportContacts
+    .filter((contact) => (contact.user_id === myId || !contact.user_id) && contact.lastContactedAt)
+    .filter((contact) => daysSince(contact.lastContactedAt) >= daysThreshold)
+    .sort((a, b) => daysSince(b.lastContactedAt) - daysSince(a.lastContactedAt))
+    .slice(0, 3);
 }
 
 function networkContactCards() {
@@ -12010,6 +12034,9 @@ const screens = {
             <button class="bb-icon-btn" type="button" data-open="growthTrajectory" aria-label="Growth trajectory" title="Growth Trajectory">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"></path><path d="M15 7h6v6"></path></svg>
             </button>
+            <button class="bb-icon-btn" type="button" data-open="beforeYouText" aria-label="Before You Text" title="Before You Text">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>
+            </button>
           </div>
         </header>
         <div class="bb-status">
@@ -13072,7 +13099,8 @@ const modals = {
       relationship: "Friend",
       phone: "",
       preferred_contact_method: "SMS",
-      note: ""
+      note: "",
+      lastContactedAt: ""
     };
     return `
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="support-editor-title">
@@ -13095,6 +13123,7 @@ const modals = {
               ${["SMS", "WhatsApp", "Phone", "Copy details"].map((method) => `<option ${contact.preferred_contact_method === method ? "selected" : ""}>${method}</option>`).join("")}
             </select>
           </label>
+          <label>Last actually checked in (optional)<input id="contact-last-contacted" type="date" value="${escapeHTML(contact.lastContactedAt || "")}"></label>
           <label>Optional note<textarea id="contact-note">${escapeHTML(contact.note)}</textarea></label>
           <p class="form-error" id="contact-error" aria-live="polite"></p>
         </div>
@@ -13773,6 +13802,39 @@ const modals = {
     </div>
   `,
 
+  // Before You Text: a one-time honest read on a real message before it
+  // goes to a real person - reuses requestCompassDirect (see
+  // reviewBeforeYouText), nothing is ever actually sent from here. Also
+  // surfaces staleSupportContacts() as a quiet nudge, not a notification.
+  beforeYouText: () => {
+    const stale = staleSupportContacts();
+    return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="before-you-text-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Before You Text</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="before-you-text-title">A read before it actually goes to them</h3>
+      <p class="muted">Paste what you're thinking of sending. Compass gives one honest read - it never sends anything for you.</p>
+      <div class="admin-form">
+        <label>What you're thinking of sending<textarea id="before-you-text-message" maxlength="800" placeholder="Type or paste the message here...">${escapeHTML(beforeYouTextMessage)}</textarea></label>
+        <label>Relationship or context (optional)<input id="before-you-text-context" type="text" maxlength="200" value="${escapeHTML(beforeYouTextContext)}" placeholder="e.g. my mum, we've been arguing about curfew"></label>
+      </div>
+      <p class="form-error" id="before-you-text-error" aria-live="polite">${escapeHTML(beforeYouTextError)}</p>
+      <button class="primary-action" type="button" data-review-before-you-text ${beforeYouTextLoading ? "disabled" : ""}>${beforeYouTextLoading ? "Reading it..." : "Get a read on this"}</button>
+      ${beforeYouTextResult ? `<div class="advice-stack"><div><strong>Compass's read</strong><span>${escapeHTML(beforeYouTextResult)}</span></div></div>` : ""}
+      ${stale.length ? `
+        <div class="advice-stack">
+          <div>
+            <strong>Haven't checked in in a while</strong>
+            <span>${stale.map((contact) => `${escapeHTML(contact.name)} (${daysSince(contact.lastContactedAt)}d)`).join(", ")} - from your Support Circle, only shown because you'd already logged a check-in date for them.</span>
+          </div>
+        </div>
+      ` : ""}
+    </div>
+  `;
+  },
+
   challengeHub: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="challenge-title">
       <div class="modal-top">
@@ -14081,6 +14143,13 @@ function openModal(name, payload) {
     quickCaptureClassification = null;
     quickCaptureLoading = false;
     quickCaptureError = "";
+  }
+  if (name === "beforeYouText" && !modalLayer.classList.contains("is-open")) {
+    beforeYouTextMessage = "";
+    beforeYouTextContext = "";
+    beforeYouTextResult = "";
+    beforeYouTextLoading = false;
+    beforeYouTextError = "";
   }
   if (name === "addKeyResult" && !modalLayer.classList.contains("is-open")) {
     roadmapError = "";
@@ -14554,6 +14623,18 @@ function commitQuickCapture(text, category) {
   }
   saveTrackerState();
   maybeRunCompassInsights();
+}
+
+// "Before You Text" - a one-time honest read on a real message before it
+// goes to a real person, not a rewrite service and not a chat. Reuses
+// requestCompassDirect (same single-call pattern as Quick Capture/SOS
+// triage), plain-text reply, nothing saved - purely a rehearsal step,
+// consistent with this app never pretending to actually send anything.
+const BEFORE_YOU_TEXT_SYSTEM_PROMPT = "You help someone review a real message before they actually send it to a real person - a friend, family member, or partner. This is a one-time honest read, not a conversation and not a rewrite service. Read the message and whatever context they give about the relationship or situation. In 3-5 plain sentences, no markdown, no bullet points: say plainly whether it says what they actually seem to mean, whether it is likely to land the way they want, and at most one concrete thing to reconsider if something could be clearer, kinder, or more honest. Point at what to change - do not rewrite the whole message for them. Never invent facts about the relationship beyond what they told you. If the message is fine as-is, say so plainly instead of inventing a critique to seem useful.";
+
+async function reviewBeforeYouText(message, context) {
+  const prompt = `Message I'm thinking about sending: "${cleanText(message, 800)}"${context ? `\nContext on the relationship/situation: ${cleanText(context, 300)}` : ""}`;
+  return requestCompassDirect(BEFORE_YOU_TEXT_SYSTEM_PROMPT, prompt);
 }
 
 // ---- Future Scan ---------------------------------------------------------
@@ -16851,6 +16932,7 @@ document.addEventListener("click", async (event) => {
   const insightActionButton = event.target.closest("[data-insight-action]");
   const insightEncouragementButton = event.target.closest("[data-insight-encouragement]");
   const classifyQuickCaptureButton = event.target.closest("[data-classify-quick-capture]");
+  const reviewBeforeYouTextButton = event.target.closest("[data-review-before-you-text]");
   const confirmQuickCaptureButton = event.target.closest("[data-confirm-quick-capture]");
   const redoQuickCaptureButton = event.target.closest("[data-redo-quick-capture]");
   const dismissInsightButton = event.target.closest("[data-dismiss-insight]");
@@ -16969,6 +17051,31 @@ document.addEventListener("click", async (event) => {
     } finally {
       quickCaptureLoading = false;
       openModal("quickCapture");
+    }
+  }
+
+  if (reviewBeforeYouTextButton) {
+    const messageInput = modalLayer.querySelector("#before-you-text-message");
+    const contextInput = modalLayer.querySelector("#before-you-text-context");
+    beforeYouTextMessage = cleanText(messageInput ? messageInput.value : "", 800);
+    beforeYouTextContext = cleanText(contextInput ? contextInput.value : "", 200);
+    if (!beforeYouTextMessage) {
+      beforeYouTextError = "Paste the message first.";
+      renderScreen(activeTab);
+      return;
+    }
+    beforeYouTextLoading = true;
+    beforeYouTextError = "";
+    beforeYouTextResult = "";
+    renderScreen(activeTab);
+    try {
+      beforeYouTextResult = await reviewBeforeYouText(beforeYouTextMessage, beforeYouTextContext);
+    } catch (error) {
+      console.error("[Compass AI] Before You Text review failed", error);
+      beforeYouTextError = "Couldn't get a read on that just now - try again?";
+    } finally {
+      beforeYouTextLoading = false;
+      openModal("beforeYouText");
     }
   }
 
@@ -18823,6 +18930,7 @@ document.addEventListener("click", async (event) => {
       relationship: modalLayer.querySelector("#contact-relationship").value,
       phone,
       preferred_contact_method: modalLayer.querySelector("#contact-method").value,
+      lastContactedAt: modalLayer.querySelector("#contact-last-contacted").value,
       note: modalLayer.querySelector("#contact-note").value.trim(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
