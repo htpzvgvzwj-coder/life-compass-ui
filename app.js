@@ -1234,6 +1234,7 @@ const defaultSettingsState = {
 // otherwise holds to.
 const defaultChatState = {
   messages: [
+    // Segment 1 - Identity / getting started (Jun 8)
     {
       from: "assistant",
       text: "Hi, I am Compass AI. Ask me anything you need help with: study, planning, motivation, emotions, app features, or everyday decisions.",
@@ -1241,46 +1242,62 @@ const defaultChatState = {
     },
     {
       from: "user",
-      text: "Honestly I feel like everyone my age already has their life figured out and I'm just starting to think about all this adulting stuff",
+      text: "honestly feel like everyone my age already has their life figured out and I'm just starting to think about all this adulting stuff sia",
       createdAt: "2026-06-08T10:17:00.000Z"
     },
     {
       from: "assistant",
-      text: "That feeling is more common than it looks from the outside - a real Singapore study (Youth STEPS, tracked over 3,000 people your age for 6 years) found close to 2 in 5 haven't hit milestones you'd assume 'everyone' has by now. Since you're just starting, the most useful first move is building your Personal Blueprint - most of the other tools here read from it, so it's worth doing properly rather than rushing it.",
+      text: "Eh don't stress like that lah - real Singapore study (Youth STEPS, tracked 3,000+ people your age for 6 years) found close to 2 in 5 haven't hit the milestones you think 'everyone' already has. You're not behind lor, just starting later than you thought you needed to. Let's build your Blueprint properly first - most of my other tools read off that one.",
       createdAt: "2026-06-08T10:18:00.000Z",
       suggestedOpen: { id: "blueprint", title: "Discover Yourself" }
     },
+    // Segment 2 - Money (Jun 15)
     {
       from: "user",
-      text: "just set up my money plan, take home is only like 2200 from my internship + tuition gigs",
+      text: "just set up my money plan sia, take home only like 2200 from internship + tuition gigs, feel a bit shiok that i actually sat down and did it though",
       createdAt: "2026-06-15T19:02:00.000Z"
     },
     {
       from: "assistant",
-      text: "Got it - with $2200 the 55/25/20 split gives you about $1210 for needs, $550 wants, $440 savings a month. You set 'Emergency fund' as the goal, target $3000 - that's roughly 7 months at this pace if you stick to it, which is realistic, not aggressive.",
+      text: "That's already a win can - a lot of people never even sit down to look at the number properly. With $2200 the 55/25/20 split gives you about $1210 needs, $550 wants, $440 savings a month. Emergency fund target $3000 - roughly 7 months at this pace, quite realistic one, not aggressive.",
       createdAt: "2026-06-15T19:03:00.000Z"
     },
+    // Segment 3 - Career (Jun 22)
     {
       from: "user",
-      text: "put together my resume finally, feels rough",
+      text: "put together my resume finally, feels rough leh",
       createdAt: "2026-06-22T14:30:00.000Z"
     },
     {
       from: "assistant",
-      text: "A first draft always feels rough - that's normal. Your Blueprint has Independence and Growth as top values, so I'd lean your headline toward roles where you're not just executing someone else's checklist. Want to see which real role archetypes actually line up with what you said matters to you?",
+      text: "First draft always feels rough lah, that's normal. Your Blueprint says Independence and Growth matter most to you, so I'd lean the headline toward roles where you're not just executing someone else's checklist. Want to see which real role archetypes actually line up with what you said matters?",
       createdAt: "2026-06-22T14:32:00.000Z",
       suggestedOpen: { id: "career-studio", title: "Career Studio" }
     },
+    // Segment 4 - Independent living (Jun 26)
     {
       from: "user",
-      text: "added my project mentor Ms Tan to my network contacts, she offered to refer me for an analyst role",
+      text: "thinking of moving out next year, honestly dunno how the whole transport concession card and stuff works sia",
+      createdAt: "2026-06-26T13:10:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Ah that one's actually covered properly - got a real guide on getting around SG (concession card, real-time apps, the 45-min transfer rule) and another on what to check on day one when you move in. Worth going through both before you actually need them, not after lor.",
+      createdAt: "2026-06-26T13:12:00.000Z",
+      suggestedOpen: { id: "skill-guides", title: "Skill Guides" }
+    },
+    // Segment 5 - Relationships (Jun 29)
+    {
+      from: "user",
+      text: "added my project mentor Ms Tan to my network contacts, she offered to refer me for an analyst role!! quite happy about this one",
       createdAt: "2026-06-29T09:10:00.000Z"
     },
     {
       from: "assistant",
-      text: "That's a concrete lead, worth following up on directly instead of leaving it sitting in your contacts list. Set yourself a reminder to actually message her back this week rather than letting it go quiet.",
+      text: "Wah, that's a real lead sia, worth following up on directly instead of letting it sit in your contacts list lor. Message her back this week while it's still fresh, don't wait until it goes cold.",
       createdAt: "2026-06-29T09:11:00.000Z"
     },
+    // Segment 6 - Emotional resilience (Jul 6)
     {
       from: "user",
       text: "kind of a rough week, keep comparing myself to people who already started work or are doing NS",
@@ -1288,9 +1305,10 @@ const defaultChatState = {
     },
     {
       from: "assistant",
-      text: "That's worth sitting with rather than pushing past - a few low days doesn't mean something's wrong, and comparing your actual timeline to other people's highlight reel rarely holds up against real data. If it helps, there's a 5-4-3-2-1 grounding exercise in SOS that takes about 2 minutes and doesn't require explaining anything to anyone.",
+      text: "Eh, that's worth sitting with for a bit instead of just pushing past it lah. A few low days doesn't mean something's wrong, and comparing your real timeline to everyone else's highlight reel never really holds up. If it helps, there's a 5-4-3-2-1 grounding thing in SOS, takes about 2 minutes, don't even need to explain anything to anyone.",
       createdAt: "2026-07-06T21:49:00.000Z"
     },
+    // Segment 7 - Decision-making (Jul 13)
     {
       from: "user",
       text: "did my first mock interview today, way more nervous than i expected",
@@ -1298,9 +1316,31 @@ const defaultChatState = {
     },
     {
       from: "assistant",
-      text: "That's exactly what the practice is for - better to find out you go quiet under pressure here than in a real one. I logged the session; the feedback flagged one story that was missing the 'Result' part of STAR. Worth tightening that specific answer before the next real interview.",
+      text: "That's exactly what the practice is for lor - better find out you go blank under pressure here than the real one. Logged the session; feedback flagged one story missing the 'Result' part of STAR. Tighten that one before the real interview.",
       createdAt: "2026-07-13T16:22:00.000Z"
     },
+    {
+      from: "user",
+      text: "also couldn't decide if i study at the library or a cafe tonight, used your quick call thing, picked cafe lol",
+      createdAt: "2026-07-13T19:00:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Hah, for a decision that small, picking one and actually going beats overthinking it every time can.",
+      createdAt: "2026-07-13T19:01:00.000Z"
+    },
+    // Segment 8 - Civic (Jul 17)
+    {
+      from: "user",
+      text: "saw a broken lift in my block for like 2 weeks now, kind of annoyed, dunno who to even complain to",
+      createdAt: "2026-07-17T18:30:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "That one's actually a specific channel thing ah - OneService app handles stuff like broken lifts/litter/pests, goes straight to whoever owns the issue instead of you guessing. Town Council is more for estate-level upgrading and events, not day-to-day repairs like this one.",
+      createdAt: "2026-07-17T18:32:00.000Z"
+    },
+    // Segment 9 - Rejection List + identity/Blueprint evolution (Jul 20)
     {
       from: "user",
       text: "i turned down that 'exposure' internship, unpaid and honestly they just wanted free labor",
@@ -1308,10 +1348,11 @@ const defaultChatState = {
     },
     {
       from: "assistant",
-      text: "Noted that down in what you've let go of - turning down something that costs real time for no real return isn't a missed opportunity, it's a decision. Also, your Blueprint just updated and a few things shifted since June - worth a look at what actually changed.",
+      text: "Noted that down in what you've let go of lah - turning down something that costs real time for no real return isn't a missed opportunity, it's a decision. Also your Blueprint just updated and a few things shifted since June, worth a look at what actually changed sia.",
       createdAt: "2026-07-20T11:06:00.000Z",
       suggestedOpen: { id: "knowledge-vault", title: "Knowledge Vault" }
     },
+    // Segment 10 - Money follow-up + wrap-up (Jul 28, Aug 1)
     {
       from: "user",
       text: "saved another $80 from tuition this week",
@@ -1319,7 +1360,7 @@ const defaultChatState = {
     },
     {
       from: "assistant",
-      text: "Added that to your Emergency fund - you're a good way toward the $3000 target now. Keep going at this pace and you'll get there without changing anything else.",
+      text: "Added that to your Emergency fund - you're a good way toward the $3000 target now. Keep this pace and you'll get there without changing anything else can.",
       createdAt: "2026-07-28T20:16:00.000Z"
     },
     {
@@ -1329,7 +1370,7 @@ const defaultChatState = {
     },
     {
       from: "assistant",
-      text: "Two real things waiting on you: your BTO ballot milestone date already passed without being marked handled - worth checking if that actually happened or you just forgot to log it. And it's been a couple weeks since you last checked in with Wei Jie on your Support Circle - nothing urgent, just don't let it go quiet.",
+      text: "Two real things waiting on you ah: your BTO ballot milestone date already passed without being marked handled, worth checking if that actually happened. And it's been a couple weeks since you last checked in with Wei Jie on your Support Circle - nothing urgent, just don't let it go quiet lor.",
       createdAt: "2026-08-01T08:41:00.000Z"
     }
   ],
@@ -1581,6 +1622,26 @@ const trackerState = normalizeTrackerState(loadJson(scopedKey("steadyTrackerStat
 const contentState = normalizeContentState(loadJson("steadyContentState", defaultContentState));
 const settingsState = normalizeSettingsState(loadJson("steadySettingsState", defaultSettingsState));
 const chatState = normalizeChatState(loadSessionJson(scopedKey("steadyChatState"), defaultChatState));
+
+// DEMO DATA force-seed (see the DEMO DATA notes above defaultChatState/
+// defaultTrackerState). loadJson/loadSessionJson only fall back to the
+// seeded defaults when NOTHING was ever saved under that scoped key - the
+// demo login had already been used for real testing before this data was
+// seeded, so its real saved state silently took priority over the new
+// defaults and the seeded content never actually showed. This forces the
+// seed in for that one login specifically, once (gated by a version
+// marker so refreshing mid-demo doesn't keep wiping out anything typed
+// live during the demo itself - bump DEMO_SEED_VERSION to force a re-seed
+// if the seeded content is ever edited again).
+const DEMO_SEED_VERSION = "2026-08-01-v2";
+if (currentUserId() === DEMO_USER_ID && localStorage.getItem("compassDemoSeedVersion") !== DEMO_SEED_VERSION) {
+  Object.assign(trackerState, JSON.parse(JSON.stringify(defaultTrackerState)));
+  chatState.messages = JSON.parse(JSON.stringify(defaultChatState.messages));
+  chatState.documents = [];
+  saveTrackerState();
+  saveChatState();
+  localStorage.setItem("compassDemoSeedVersion", DEMO_SEED_VERSION);
+}
 
 function loadJson(key, fallback) {
   try {

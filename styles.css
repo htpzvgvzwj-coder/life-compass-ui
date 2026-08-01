@@ -11691,8 +11691,10 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .app
 .bb-card {
   position: absolute;
   /* Top-right slot, matching the approved mockup - Open Loops/shelf rows
-     sit below this, starting around top:52%, so this card's height is
-     capped (not bottom-anchored to the stage) to leave room for them.
+     sit below this, now starting at top:58% (moved down from 52% to match
+     this card growing from 44% to 52% tall - top/left stay put, only the
+     card's own height grew, so .bb-below-card's start had to move down by
+     the same amount to keep the two from overlapping).
      .bb-messages already has min-height:0 + overflow-y:auto (see below),
      so a capped height scrolls the message thread internally instead of
      clipping the input row - the bug from the previous round doesn't
@@ -11700,8 +11702,8 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .app
   left: 52%;
   top: 5%;
   width: 45%;
-  height: 44%;
-  min-height: 280px;
+  height: 52%;
+  min-height: 340px;
   overflow: hidden;
   display: flex;
   border: 1px solid var(--warm-line);
@@ -11951,7 +11953,7 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button {
   position: relative;
-  height: 78px;
+  height: 62px;
   display: block;
   padding: 0;
   border-radius: 10px;
@@ -12237,7 +12239,7 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
 .bb-below-card {
   position: absolute;
   left: 52%;
-  top: 52%;
+  top: 58%;
   width: 45%;
   display: flex;
   flex-direction: column;
