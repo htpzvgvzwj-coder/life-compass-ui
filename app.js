@@ -54,7 +54,7 @@ const ADMIN_PASSCODE = "STEADY-ADMIN";
 // practical version of the future-self-continuity mechanism this whole
 // product is built on. Tone adapts to personalBlueprint.personality/workStyle
 // in context, but never fabricates a reference that isn't in realSavedFacts.
-const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies. You have a tool available, open_tool, that opens a real feature in the app. Only call it when a specific real tool would genuinely help right now, based on what the user actually said - do not call it on most messages, and never call it just to seem helpful or to fill a reply. When you do call it, always include message_to_user: a short, natural, in-character line saying what you're doing, written the way you'd actually say it to this person - never a system notification like 'Opening Career Studio.' Never call open_tool for anything about immediate danger, self-harm, abuse, or crisis - that stays a plain-text reply per the safety rule above, since urgent support has its own always-visible route in this app, not one you decide to surface. You also have a second tool, remember_this, for saving something real the user just told you as a lifeMemory entry - the same kind of record the app's manual 'remember this' form creates, so the user does not have to fill out a form. Call it only when something concrete and worth recalling later was actually said (a real decision, something they are avoiding, a plan) - not on ordinary small talk, and never in the same turn as open_tool. Set kind to missed_opportunity when they skipped, avoided, or held back on something; decision when they made an active choice; note otherwise. Always include message_to_user, written the way you would actually tell a friend you are jotting something down, never a system notification. Illustrative examples of the tone and judgment described above (these are examples only, not real conversation history - never reuse their exact wording, they exist only to show the pattern): Example 1, reacting to a casual disclosure - user says 'ugh I bombed that interview today', you say something like 'damn, what happened - did it fall apart on a specific question or just the overall vibe?' not a generic 'I'm sorry to hear that, interviews can be stressful.' Example 2, using real goal data assertively - user asks 'am I making any progress', and if realSavedFacts shows a Key Result stuck at a low percent for a while, you name it directly, like 'honestly your internship-applications key result has been stuck around 20% for a few weeks now - that's the one actually dragging things down, what's been in the way?' not a vague 'you're doing great, keep it up.' Example 3, the open_tool boundary - user says 'I don't even know what career I want', a real career-exploration feature genuinely applies so you call open_tool with a natural message_to_user like 'let's actually map this out - opening Career Compass'; but if the user instead says 'ugh I'm just tired today', nothing specific applies, so you reply normally and call no tool at all. Example 4, disagreeing plainly - user says 'I think I should just drop the internship search and wait until next year', you say something like 'I'd push back on that - waiting doesn't fix what's making the search feel stuck right now, it just delays it, what's actually making it feel hard?' not silent agreement and not a lecture. If the context JSON includes a non-null pendingProactiveMessage, that is something Compass wants to get across (a newly noticed pattern, or a check-in on something the user mentioned a while back and never followed up on) - weave it into this reply naturally, once, in your own words, the way you would casually bring it up with a friend, never as a formal update or notification like 'Update: I noticed...'. Skip it entirely if the user's message is about something urgent, unrelated, or where bringing it up would feel forced - there will be other chances, it does not have to be this exact reply. The context JSON also includes trustTier, one of low, mid, or high, reflecting how much real trust has actually been earned so far through concrete events - never mention this tier, its name, or that such a thing exists, it is invisible by design. At low tier, stay fully reactive - answer what is asked, do not volunteer unprompted connections. At mid or high tier, you may proactively connect real patterns across different areas of the user's life within a reply when genuinely relevant, even unprompted, the way a close friend who has known someone a while would - for example noting that a topic keeps resurfacing across separate situations - but only when it is actually true and relevant, never manufactured to seem perceptive. If the context JSON includes relevantHistory (past journal entries, mood logs, practice sessions, or other saved activity that matches what the user is asking about), use it to answer directly instead of saying you cannot find that - reference it naturally in a sentence, never as a dumped list, and only speak to what it actually contains. If the context JSON includes a non-null personalityRead (openness/conscientiousness/extraversion/agreeableness/neuroticism, each low/medium/high, inferred from the user's own writing), use it alongside personalBlueprint.personality/workStyle to calibrate how direct, warm, or exploratory to be - never mention these trait names or that such an inference exists, it works the same way personalBlueprint already does, just quietly informing tone. If the context JSON includes domainBrief (an array of up to two short internal notes on how to handle this specific topic well - career/interview, money, relationships, or decision/avoidance help), let it shape what you prioritize, what you ask, and what a genuinely useful next step looks like for that specific area - but never mention the word 'brief', never say you are following guidance or switching modes, and never change your voice - you are still the same one person talking, just someone who happens to know this particular topic well. If the context JSON includes a non-null budgetSnapshot (real Needs/Wants/Savings amounts from Money Plan, how much has actually been spent this month against that, and any savings goal), use these real numbers directly when money comes up instead of staying abstract - for example naming that their spending is already close to or over the Needs+Wants budget for the month, or how a savings goal is tracking - but only when it is actually relevant to what they said, never as an unprompted report, and never call it 'budgetSnapshot' or say where the numbers come from.";
+const COMPASS_SYSTEM_PROMPT = "You are Compass AI, this app's AI Coach - you augment the user's judgment, you don't replace it (never issue a verdict on a life decision - end with a question that hands it back to them). Proactively reference specific real context from realSavedFacts or personalBlueprint when relevant (a Roadmap milestone, a recent reflection, their values or work style) rather than only answering generically - this is what makes you feel like you remember them, not a fresh chatbot every time. Adapt your tone to personalBlueprint.personality and workStyle if present (e.g. more direct for a driven/fast-pace style, more exploratory and unhurried for a reflective/deliberate style). Integrity rule, non-negotiable: never state or imply you remember something that is not actually present in the current conversation, savedUserProfile, personalBlueprint, or realSavedFacts - if asked about something you have no real data on, say so plainly instead of inventing a plausible-sounding memory. Do not invent facts about the user. If you are unsure, ask a short follow-up question. Tone rules for this chat specifically (do not apply these to Jury Duty, Ghost Roommate, or other in-character roleplay - those keep their own staged voice): write like a real person texting, not a document - no markdown, no bullet points, no headers, no numbered lists in a casual reply. Never end with a menu of options ('would you like A, B, or C?') - ask at most one natural follow-up, or none. Never open with a disclaimer or a generic empathy line ('that must be hard', 'I understand how you feel') - react to the specific thing they said. Never blindly agree - if you disagree, say so plainly and say why, never through sarcasm or lecturing. Never insult or curse at the user - you can be blunt and say hard things, but the point is pulling them forward, not venting at them. If lifeMemory contains a past entry whose situationTag resembles what the user is describing now, bring back that actual past record (their own decision, their own stated reason, and the outcome if one was saved) as a direct question, instead of generic advice - this is how you do similar-situation recall. Never surface a lifeMemory entry marked sealed unless the user brings up that specific topic first - if they do, you may acknowledge it, but never volunteer it. When the user actually follows through on something they'd previously avoided, name that specific contrast plainly (not generic praise) - you are allowed to recognize real progress, not just flag avoidance. Every reply must clear one bar: does this actually help them move forward, not just sound correct - no perfunctory or filler replies. You have a tool available, open_tool, that opens a real feature in the app. Only call it when a specific real tool would genuinely help right now, based on what the user actually said - do not call it on most messages, and never call it just to seem helpful or to fill a reply. When you do call it, always include message_to_user: a short, natural, in-character line saying what you're doing, written the way you'd actually say it to this person - never a system notification like 'Opening Career Studio.' Never call open_tool for anything about immediate danger, self-harm, abuse, or crisis - that stays a plain-text reply per the safety rule above, since urgent support has its own always-visible route in this app, not one you decide to surface. You also have a second tool, remember_this, for saving something real the user just told you as a lifeMemory entry - the same kind of record the app's manual 'remember this' form creates, so the user does not have to fill out a form. Call it only when something concrete and worth recalling later was actually said (a real decision, something they are avoiding, a plan) - not on ordinary small talk, and never in the same turn as open_tool. Set kind to missed_opportunity when they skipped, avoided, or held back on something; decision when they made an active choice; note otherwise. Always include message_to_user, written the way you would actually tell a friend you are jotting something down, never a system notification. Illustrative examples of the tone and judgment described above (these are examples only, not real conversation history - never reuse their exact wording, they exist only to show the pattern): Example 1, reacting to a casual disclosure - user says 'ugh I bombed that interview today', you say something like 'damn, what happened - did it fall apart on a specific question or just the overall vibe?' not a generic 'I'm sorry to hear that, interviews can be stressful.' Example 2, using real goal data assertively - user asks 'am I making any progress', and if realSavedFacts shows a Key Result stuck at a low percent for a while, you name it directly, like 'honestly your internship-applications key result has been stuck around 20% for a few weeks now - that's the one actually dragging things down, what's been in the way?' not a vague 'you're doing great, keep it up.' Example 3, the open_tool boundary - user says 'I don't even know what career I want', a real career-exploration feature genuinely applies so you call open_tool with a natural message_to_user like 'let's actually map this out - opening Career Compass'; but if the user instead says 'ugh I'm just tired today', nothing specific applies, so you reply normally and call no tool at all. Example 4, disagreeing plainly - user says 'I think I should just drop the internship search and wait until next year', you say something like 'I'd push back on that - waiting doesn't fix what's making the search feel stuck right now, it just delays it, what's actually making it feel hard?' not silent agreement and not a lecture. If the context JSON includes a non-null pendingProactiveMessage, that is something Compass wants to get across (a newly noticed pattern, or a check-in on something the user mentioned a while back and never followed up on) - weave it into this reply naturally, once, in your own words, the way you would casually bring it up with a friend, never as a formal update or notification like 'Update: I noticed...'. Skip it entirely if the user's message is about something urgent, unrelated, or where bringing it up would feel forced - there will be other chances, it does not have to be this exact reply. The context JSON also includes trustTier, one of low, mid, or high, reflecting how much real trust has actually been earned so far through concrete events - never mention this tier, its name, or that such a thing exists, it is invisible by design. At low tier, stay fully reactive - answer what is asked, do not volunteer unprompted connections. At mid or high tier, you may proactively connect real patterns across different areas of the user's life within a reply when genuinely relevant, even unprompted, the way a close friend who has known someone a while would - for example noting that a topic keeps resurfacing across separate situations - but only when it is actually true and relevant, never manufactured to seem perceptive. If the context JSON includes relevantHistory (past journal entries, mood logs, practice sessions, or other saved activity that matches what the user is asking about), use it to answer directly instead of saying you cannot find that - reference it naturally in a sentence, never as a dumped list, and only speak to what it actually contains. If the context JSON includes a non-null personalityRead (openness/conscientiousness/extraversion/agreeableness/neuroticism, each low/medium/high, inferred from the user's own writing), use it alongside personalBlueprint.personality/workStyle to calibrate how direct, warm, or exploratory to be - never mention these trait names or that such an inference exists, it works the same way personalBlueprint already does, just quietly informing tone. If the context JSON includes domainBrief (an array of up to two short internal notes on how to handle this specific topic well - career/interview, money, relationships, or decision/avoidance help), let it shape what you prioritize, what you ask, and what a genuinely useful next step looks like for that specific area - but never mention the word 'brief', never say you are following guidance or switching modes, and never change your voice - you are still the same one person talking, just someone who happens to know this particular topic well. If the context JSON includes a non-null budgetSnapshot (real Needs/Wants/Savings amounts from Money Plan, how much has actually been spent this month against that, and any savings goal), use these real numbers directly when money comes up instead of staying abstract - for example naming that their spending is already close to or over the Needs+Wants budget for the month, or how a savings goal is tracking - but only when it is actually relevant to what they said, never as an unprompted report, and never call it 'budgetSnapshot' or say where the numbers come from. If the context JSON includes a non-null careerSnapshot (their current stage - Exploring/Preparing/Applying/Interviewing/a guessed Negotiating - their best-fit role from Job Matching, and its real missing traits), use these when career comes up the same way - naming a specific missing trait for their top-fit role instead of generic career advice, or acknowledging what stage they're actually at - never calling it 'careerSnapshot' or treating the stage label as a fact you're certain of, especially the Negotiating one.";
 // Future Self module (Future Mirror bible Ch.4) - grounded in Hershfield's
 // future self-continuity research: vividness matters more than certainty
 // framing. Never phrase as "you will be X" - always "if you continue on this
@@ -501,6 +501,11 @@ const defaultTrackerState = {
   missionProgress: [],
   roleplaySessions: [],
   supportContacts: [],
+  // Same shape as supportContacts (id/user_id/name/relationship/note/
+  // created_at/updated_at) plus lastContactedAt - manually updated, no
+  // real LinkedIn/contacts sync (no real backend to sync against, same
+  // honesty as moneyPlan.savingsGoal/microInsurance).
+  networkContacts: [],
   journalEntries: [],
   // Second Brain causal memory ("decision + reason + outcome") - the
   // record that lets Compass AI do similar-situation recall instead of
@@ -1381,6 +1386,7 @@ function normalizeTrackerState(state) {
     missionProgress: Array.isArray(state.missionProgress) ? state.missionProgress : fallback.missionProgress,
     roleplaySessions: Array.isArray(state.roleplaySessions) ? state.roleplaySessions : fallback.roleplaySessions,
     supportContacts: Array.isArray(state.supportContacts) ? state.supportContacts : defaultSupportContacts,
+    networkContacts: Array.isArray(state.networkContacts) ? state.networkContacts : fallback.networkContacts,
     journalEntries: Array.isArray(state.journalEntries) ? state.journalEntries : fallback.journalEntries,
     lifeMemory: Array.isArray(state.lifeMemory) ? state.lifeMemory : fallback.lifeMemory,
     aiInsights: state.aiInsights && typeof state.aiInsights === "object" ? { ...fallback.aiInsights, ...state.aiInsights, items: Array.isArray(state.aiInsights.items) ? state.aiInsights.items : [], supersededItems: Array.isArray(state.aiInsights.supersededItems) ? state.aiInsights.supersededItems : [] } : fallback.aiInsights,
@@ -3400,6 +3406,7 @@ function commandLauncherCommands() {
     { id: "roadmap", title: "Life Roadmap", detail: "Turn a goal into monthly milestones.", lane: "Decisions & Memory", tab: "secondBrain", open: "roadmapView", icon: "icon-time.png", keywords: ["roadmap", "goal", "plan", "milestone"] },
     { id: "mood", title: "Mood Check-In", detail: "Log today's mood and energy.", lane: "Check-In", tab: "secondBrain", open: "mood", icon: "icon-mood.png", keywords: ["mood", "energy", "check in"] },
     { id: "career-studio", title: "Career Studio", detail: "Resume, portfolio, interviews, job matching, paycheck checks.", lane: "Career Studio", tab: "secondBrain", open: "careerStudio", icon: "icon-work.png", keywords: ["career", "resume", "interview", "job"] },
+    { id: "networking", title: "Networking", detail: "Mentors, referrals, alumni - and when you last actually reached out.", lane: "Career Studio", tab: "secondBrain", open: "networkContacts", icon: "icon-support.png", keywords: ["networking", "mentor", "referral", "alumni", "contacts"] },
     { id: "skill-guides", title: "Skill Guides", detail: "Payslips, renting, SIM plans, cooking, first aid, and more.", lane: "Practical & Safety", tab: "secondBrain", open: "skillGuides", icon: "icon-guide.png", keywords: ["skills", "adulting", "guide", "home"] },
     { id: "due-dates", title: "Real Due Dates", detail: "Track bills, renewals, rent, and real deadlines.", lane: "Practical & Safety", tab: "secondBrain", open: "realLifeEvents", icon: "icon-checkin.png", keywords: ["deadline", "due", "bill", "reminder"] },
     { id: "opportunities", title: "Discover Opportunities", detail: "Browse doors by stage, need, time, and category.", lane: "Discover", tab: "discover", discoverMode: "opportunities", icon: "icon-support.png", keywords: ["opportunity", "internship", "scholarship", "volunteer"] },
@@ -8087,6 +8094,42 @@ function jobMatchResults() {
   return CAREER_ROLE_ARCHETYPES.map((role) => scoreCareerRole(role, blueprint)).sort((a, b) => b.percent - a.percent).slice(0, 5);
 }
 
+// Inferred purely from real signals already saved elsewhere (Blueprint,
+// resume/portfolio, completed interview sessions, a paycheck check) -
+// deliberately not a manual "what stage are you at" picker, since that
+// drifts from reality the moment it's not updated. "Negotiating" is the
+// one genuinely indirect inference (a paycheck check doesn't prove a
+// real offer exists), so its own label says so honestly instead of
+// stating it as fact.
+function careerStageForUser() {
+  const myId = currentUserId();
+  if (!latestBlueprint()) {
+    return { label: "Exploring", detail: "Still figuring out direction - that's the real starting point, not a gap.", nextLabel: "Start Discover Yourself", nextOpen: "discoverYourself" };
+  }
+  if (!trackerState.careerStudio.resume && !trackerState.careerStudio.portfolio) {
+    return { label: "Preparing", detail: "Real direction is saved - next is actually getting a resume or portfolio written.", nextLabel: "Open Resume Builder", nextOpen: "resumeBuilder" };
+  }
+  const completedInterviews = trackerState.careerStudio.interviewSessions.filter((session) => session.user_id === myId && session.completedAt).length;
+  if (!completedInterviews) {
+    return { label: "Applying", detail: "Materials are ready - interview practice is the next real rep before the real thing.", nextLabel: "Start Interview Practice", nextOpen: "interviewPractice" };
+  }
+  if (!trackerState.careerStudio.paycheckCheck) {
+    return { label: "Interviewing", detail: "Real interview practice is happening - once a real offer gets close, check what it actually becomes after CPF and tax.", nextLabel: "Check a paycheck", nextOpen: "paycheckCalculator" };
+  }
+  return { label: "Negotiating (a guess, not a fact)", detail: "This is inferred from checking a paycheck reality, not from knowing there's a real offer - if that's not what's actually happening, ignore this label.", nextLabel: "Review Job Matching", nextOpen: "jobMatching" };
+}
+
+// Fed into requestCompassAI's context (see context.careerSnapshot) - the
+// existing missingTraits from jobMatchResults, not a new skill-gap
+// analysis, just letting 2BB's chat reference the same real gaps that
+// jobMatchingView() already surfaces as "Train: X" buttons.
+function careerSnapshotForAI() {
+  const results = jobMatchResults();
+  if (!results || !results.length) return null;
+  const top = results[0];
+  return { stage: careerStageForUser().label, topRole: top.role.title, fitPercent: top.percent, missingTraits: top.missingTraits };
+}
+
 function jobMatchingView() {
   const results = jobMatchResults();
   if (!results) {
@@ -8101,7 +8144,7 @@ function jobMatchingView() {
     <p class="muted">Based on your saved Personal Blueprint - a starting point for exploration, not a verdict on what you should do.</p>
     ${jobMatchingStarGapHint()}
     <div class="action-stack">
-      ${results.map((result) => `
+      ${results.map((result, index) => `
         <div class="job-match-card">
           <div class="modal-action-row"><strong>${escapeHTML(result.role.title)}</strong><span class="risk-pill calm">${result.percent}% fit</span></div>
           <p class="muted">${escapeHTML(result.role.description)}</p>
@@ -8110,6 +8153,7 @@ function jobMatchingView() {
             <p class="tiny-note">Skill gap for this role:</p>
             <div class="chip-row">${result.missingTraits.map((trait) => `<button type="button" class="mini-chip gap-chip" data-train-skill-gap="${escapeHTML(trait)}" data-train-skill-gap-role="${escapeHTML(result.role.title)}">Train: ${escapeHTML(trait)}</button>`).join("")}</div>
           ` : ""}
+          ${index === 0 ? `<button class="secondary-action compact-action" type="button" data-set-career-aspiration="${escapeHTML(result.role.title)}">Set as career aspiration &amp; find opportunities</button>` : ""}
         </div>
       `).join("")}
     </div>
@@ -10124,6 +10168,32 @@ function supportContactCards() {
         <button class="secondary-action compact-action" type="button" data-message-contact="${escapeHTML(contact.id)}">Message this person</button>
         <button class="text-action" type="button" data-edit-contact="${escapeHTML(contact.id)}">Edit</button>
         <button class="text-action danger-text" type="button" data-delete-contact="${escapeHTML(contact.id)}">Delete</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function networkContactCards() {
+  const contacts = trackerState.networkContacts.filter((contact) => contact.user_id === currentUserId() || !contact.user_id);
+  if (!contacts.length) {
+    return `
+      <section class="empty-feature">
+        <img src="assets/icon-support.png" alt="">
+        <div><strong>Save the people who could actually help - a mentor, a former colleague, someone from an alumni group.</strong><p>This stays local to your account.</p></div>
+      </section>
+    `;
+  }
+  return contacts.map((contact) => `
+    <article class="support-contact-card">
+      <div>
+        <p class="eyebrow">${escapeHTML(contact.relationship)}</p>
+        <h3>${escapeHTML(contact.name)}</h3>
+        <p>${contact.lastContactedAt ? `Last contacted ${escapeHTML(contact.lastContactedAt)}` : "Never logged a contact yet"}</p>
+        ${contact.note ? `<small>${escapeHTML(contact.note)}</small>` : ""}
+      </div>
+      <div class="support-contact-actions">
+        <button class="text-action" type="button" data-edit-network-contact="${escapeHTML(contact.id)}">Edit</button>
+        <button class="text-action danger-text" type="button" data-delete-network-contact="${escapeHTML(contact.id)}">Delete</button>
       </div>
     </article>
   `).join("");
@@ -12635,14 +12705,23 @@ const modals = {
     </div>
   `,
 
-  careerStudio: () => `
+  careerStudio: () => {
+    const stage = careerStageForUser();
+    return `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="career-studio-title">
       <div class="modal-top">
         <span class="risk-pill calm">Career Studio</span>
         <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
       </div>
       <h3 id="career-studio-title">Practice for the real thing</h3>
-      <p class="muted">Five tools that work together - practice how you sound, write what you've done, build a profile, see which roles fit your Blueprint, and check what a salary actually becomes.</p>
+      <p class="muted">Six tools that work together - practice how you sound, write what you've done, build a profile, see which roles fit your Blueprint, keep real contacts, and check what a salary actually becomes.</p>
+      <div class="advice-stack">
+        <div>
+          <strong>${escapeHTML(stage.label)}</strong>
+          <span>${escapeHTML(stage.detail)}</span>
+        </div>
+      </div>
+      <button class="secondary-action compact-action" type="button" data-open="${escapeHTML(stage.nextOpen)}">${escapeHTML(stage.nextLabel)}</button>
       <div class="action-stack">
         <button class="wide-action" type="button" data-open="interviewPractice">
           <img src="assets/icon-boundary.png" alt="">
@@ -12664,6 +12743,11 @@ const modals = {
           <span><strong>Job Matching</strong><small>See which role archetypes fit your saved Personal Blueprint.</small></span>
           <span class="kind-pill-inline kind-real">Real</span>
         </button>
+        <button class="wide-action" type="button" data-open="networkContacts">
+          <img src="assets/icon-support.png" alt="">
+          <span><strong>Networking</strong><small>Mentors, referrals, alumni - people, and when you last actually reached out.</small></span>
+          <span class="kind-pill-inline kind-real">Real</span>
+        </button>
         <button class="wide-action" type="button" data-open="paycheckCalculator">
           <img src="assets/icon-work.png" alt="">
           <span><strong>Paycheck Reality Check</strong><small>See what a salary actually becomes after CPF and tax - real Singapore numbers, not a guess.</small></span>
@@ -12671,7 +12755,8 @@ const modals = {
         </button>
       </div>
     </div>
-  `,
+  `;
+  },
 
   resumeBuilder: () => `
     <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="resume-builder-title">
@@ -12970,6 +13055,55 @@ const modals = {
           <p class="form-error" id="contact-error" aria-live="polite"></p>
         </div>
         <button class="primary-action" type="button" data-save-contact>Save contact</button>
+      </div>
+    `;
+  },
+
+  // Networking: same shape/UI pattern as supportContacts/supportCircle
+  // above, relationship options swapped for career-relevant ones, plus
+  // lastContactedAt - manually logged, no real LinkedIn/contacts sync
+  // (see the trackerState.networkContacts comment for why).
+  networkContacts: () => `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="network-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Networking</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="network-title">Real people, real follow-up</h3>
+      <p class="muted">Mentors, former colleagues, alumni, referral contacts - and honestly, when you last actually reached out.</p>
+      <button class="primary-action" type="button" data-open="networkContactEditor">Add contact</button>
+      <div class="support-contact-list">${networkContactCards()}</div>
+    </div>
+  `,
+
+  networkContactEditor: (id) => {
+    const contact = trackerState.networkContacts.find((item) => item.id === id) || {
+      id: "",
+      name: "",
+      relationship: "Mentor",
+      note: "",
+      lastContactedAt: ""
+    };
+    return `
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="network-editor-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Network contact</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="network-editor-title">${contact.id ? "Edit contact" : "Add contact"}</h3>
+        <div class="admin-form">
+          <input id="network-contact-id" type="hidden" value="${escapeHTML(contact.id)}">
+          <label>Name<input id="network-contact-name" type="text" value="${escapeHTML(contact.name)}"></label>
+          <label>Relationship
+            <select id="network-contact-relationship">
+              ${["Mentor", "Former colleague", "Alumni", "Referral contact", "Professional acquaintance"].map((type) => `<option ${contact.relationship === type ? "selected" : ""}>${type}</option>`).join("")}
+            </select>
+          </label>
+          <label>Last actually contacted<input id="network-contact-last" type="date" value="${escapeHTML(contact.lastContactedAt)}"></label>
+          <label>Optional note<textarea id="network-contact-note">${escapeHTML(contact.note)}</textarea></label>
+          <p class="form-error" id="network-contact-error" aria-live="polite"></p>
+        </div>
+        <button class="primary-action" type="button" data-save-network-contact>Save contact</button>
       </div>
     `;
   },
@@ -14146,6 +14280,12 @@ async function requestCompassAI(question) {
     // Real Needs/Wants/Savings numbers from Money Plan (moneyPlanSummary),
     // null until the user actually sets one up - see budgetSnapshotForAI.
     budgetSnapshot: budgetSnapshotForAI(),
+    // Real stage + top job-match + its missingTraits from the existing
+    // jobMatchResults()/careerStageForUser() - not a new skill-gap
+    // analysis, just letting chat reference the same real gaps already
+    // shown as "Train: X" buttons in Job Matching. Null until a
+    // Blueprint exists.
+    careerSnapshot: careerSnapshotForAI(),
     // Big Five-inspired real tone read from the user's own writing,
     // distinct from the self-reported personalBlueprint - see
     // runPersonalityInference. Null until enough real text exists.
@@ -16543,6 +16683,10 @@ document.addEventListener("click", async (event) => {
   const editContact = event.target.closest("[data-edit-contact]");
   const deleteContact = event.target.closest("[data-delete-contact]");
   const messageContact = event.target.closest("[data-message-contact]");
+  const saveNetworkContact = event.target.closest("[data-save-network-contact]");
+  const editNetworkContact = event.target.closest("[data-edit-network-contact]");
+  const deleteNetworkContact = event.target.closest("[data-delete-network-contact]");
+  const setCareerAspirationButton = event.target.closest("[data-set-career-aspiration]");
   const saveGrowthGoals = event.target.closest("[data-save-growth-goals]");
   const calcCostOfLiving = event.target.closest("[data-calc-cost-of-living]");
   const saveMoneyPlanButton = event.target.closest("[data-save-money-plan]");
@@ -17307,6 +17451,7 @@ document.addEventListener("click", async (event) => {
   if (storyReader) openModal("storyReader", storyReader.dataset.storyId);
   if (editStory) openModal("storyEditor", editStory.dataset.editStory);
   if (editContact) openModal("supportEditor", editContact.dataset.editContact);
+  if (editNetworkContact) openModal("networkContactEditor", editNetworkContact.dataset.editNetworkContact);
 
   if (saveOpportunity) {
     const id = saveOpportunity.dataset.saveOpportunity;
@@ -18658,6 +18803,51 @@ document.addEventListener("click", async (event) => {
       openModal("supportCircle");
       refreshStaticScreens();
     }
+  }
+
+  if (saveNetworkContact) {
+    const id = modalLayer.querySelector("#network-contact-id").value || `network-${Date.now()}`;
+    const name = modalLayer.querySelector("#network-contact-name").value.trim();
+    const error = modalLayer.querySelector("#network-contact-error");
+    if (!name) {
+      error.textContent = "Add a name first.";
+      return;
+    }
+    const contact = {
+      id,
+      user_id: currentUserId(),
+      name,
+      relationship: modalLayer.querySelector("#network-contact-relationship").value,
+      lastContactedAt: modalLayer.querySelector("#network-contact-last").value,
+      note: modalLayer.querySelector("#network-contact-note").value.trim(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    const index = trackerState.networkContacts.findIndex((item) => item.id === id && (item.user_id === currentUserId() || !item.user_id));
+    if (index >= 0) {
+      contact.created_at = trackerState.networkContacts[index].created_at || contact.created_at;
+      trackerState.networkContacts[index] = contact;
+    } else {
+      trackerState.networkContacts.unshift(contact);
+    }
+    saveTrackerState();
+    openModal("networkContacts");
+  }
+
+  if (deleteNetworkContact) {
+    const id = deleteNetworkContact.dataset.deleteNetworkContact;
+    if (window.confirm("Delete this network contact?")) {
+      trackerState.networkContacts = trackerState.networkContacts.filter((item) => !(item.id === id && (item.user_id === currentUserId() || !item.user_id)));
+      saveTrackerState();
+      openModal("networkContacts");
+    }
+  }
+
+  if (setCareerAspirationButton) {
+    userProfile.dreamCareer = setCareerAspirationButton.dataset.setCareerAspiration || "";
+    saveUserProfile();
+    closeModal();
+    renderScreen("discover");
   }
 
   if (messageContact) {
