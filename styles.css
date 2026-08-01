@@ -11117,6 +11117,14 @@ body {
   color: var(--color-primary);
 }
 
+.chat-bubble-time {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 9.5px;
+  font-weight: 500;
+  opacity: 0.6;
+}
+
 .chat-bubble p {
   margin: 0;
   font-size: 14.5px;

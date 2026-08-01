@@ -526,13 +526,32 @@ function createDefaultLifeVerseState() {
   return engine && engine.createInitialState ? engine.createInitialState({ profile: defaultUserProfile }) : null;
 }
 
+// Demo login this data is bound to - see the DEMO DATA note above
+// defaultChatState. All seeded entries below use this exact user_id.
+const DEMO_USER_ID = "joannetan2320@gmail.com";
+// The narrative dates below (chat timestamps, journal/memory entries) are
+// hardcoded absolute 2026 dates - fine for display, since nothing reads
+// them back for pass/fail logic. staleSupportContacts()/dueRealLifeEvents()
+// DO compare against the real device clock (Date.now()) though, so those
+// two specific fields are computed relative to whenever the page actually
+// loads, not hardcoded - keeps "stale" and "overdue" genuinely true no
+// matter what the real calendar date is on the day of the demo.
+function demoDateOnlyDaysAgo(days) {
+  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+}
+
 const defaultTrackerState = {
   mood: {
     label: "Calm",
-    score: 72,
-    note: "Clear enough to plan the next step.",
-    history: [58, 66, 61, 72, 69, 74, 72],
-    entries: []
+    score: 70,
+    note: "Feeling steady today.",
+    history: [68, 74, 62, 38, 58, 72, 70],
+    entries: [
+      { id: "mood-demo-1", user_id: DEMO_USER_ID, label: "Okay", score: 62, note: "Bit tired juggling tuition gigs and job hunting.", created_at: "2026-06-24T21:00:00.000Z", display_time: "Jun 24, 9:00 PM" },
+      { id: "mood-demo-2", user_id: DEMO_USER_ID, label: "Stressed", score: 38, note: "Comparing myself to everyone who already has NS/a job sorted.", created_at: "2026-07-06T21:50:00.000Z", display_time: "Jul 6, 9:50 PM" },
+      { id: "mood-demo-3", user_id: DEMO_USER_ID, label: "Okay", score: 58, note: "A bit better after messaging Wei Jie.", created_at: "2026-07-08T19:20:00.000Z", display_time: "Jul 8, 7:20 PM" },
+      { id: "mood-demo-4", user_id: DEMO_USER_ID, label: "Calm", score: 70, note: "Feeling steady today.", created_at: "2026-08-01T08:30:00.000Z", display_time: "Aug 1, 8:30 AM" }
+    ]
   },
   receipts: [
     { merchant: "RapidKL", category: "Transport", amount: 3.5, method: "Card", time: "8:20 AM" },
@@ -541,16 +560,22 @@ const defaultTrackerState = {
   assessment: null,
   missionProgress: [],
   roleplaySessions: [],
-  supportContacts: [],
+  supportContacts: [
+    { id: "support-demo-1", user_id: DEMO_USER_ID, name: "Wei Jie", relationship: "Best friend", phone: "9123 4567", preferred_contact_method: "Text", lastContactedAt: demoDateOnlyDaysAgo(18), note: "Would actually call at 2am if things got bad.", created_at: "2026-06-10T00:00:00.000Z", updated_at: "2026-07-14T00:00:00.000Z" }
+  ],
   // Same shape as supportContacts (id/user_id/name/relationship/note/
   // created_at/updated_at) plus lastContactedAt - manually updated, no
   // real LinkedIn/contacts sync (no real backend to sync against, same
   // honesty as moneyPlan.savingsGoal/microInsurance).
-  networkContacts: [],
+  networkContacts: [
+    { id: "network-demo-1", user_id: DEMO_USER_ID, name: "Ms Tan", relationship: "Former colleague", lastContactedAt: "2026-06-29", note: "My ops-intern project mentor - offered to refer me for an analyst role.", created_at: "2026-06-29T09:00:00.000Z", updated_at: "2026-06-29T09:00:00.000Z" }
+  ],
   // "What You've Let Go Of" - the deliberate mirror of roadmapGoals: a
   // record of what was declined/let go of, not another goal list. Pure
   // manual entry, same honesty as networkContacts above.
-  rejectionList: [],
+  rejectionList: [
+    { id: "rejection-demo-1", user_id: DEMO_USER_ID, title: "An 'exposure only' internship offer", reason: "No pay and no real mentorship, just free labor for a resume line.", createdAt: "2026-07-20T11:05:00.000Z" }
+  ],
   // Real usage history for the "use it once and it's gone" tools -
   // Quick Call/Calm Reset/Before You Text/Fresh Eyes were all deliberately
   // stateless when built, but only ever logged on a real completed action
@@ -558,11 +583,22 @@ const defaultTrackerState = {
   // returned) - never on merely opening the tool, which would be a weak
   // signal dressed up as real usage. Breathing has no such completion
   // signal, so it stays unlogged.
-  quickCallHistory: [],
-  calmResetHistory: [],
-  beforeYouTextHistory: [],
+  quickCallHistory: [
+    { id: "qc-demo-1", user_id: DEMO_USER_ID, decision: "Study at the library or a cafe tonight", pick: "Cafe - change of scene", createdAt: "2026-07-13T15:00:00.000Z" }
+  ],
+  calmResetHistory: [
+    { id: "cr-demo-1", user_id: DEMO_USER_ID, technique: "grounding", createdAt: "2026-07-06T22:05:00.000Z" }
+  ],
+  beforeYouTextHistory: [
+    { id: "byt-demo-1", user_id: DEMO_USER_ID, message: "Can I get a later curfew now that I'm managing my own money and schedule?", result: "This reads calm and reasonable - it leads with a real reason (managing your own money/schedule) instead of just asking. One thing to consider: naming a specific new time makes it easier for them to say yes than leaving it open-ended.", createdAt: "2026-07-20T11:10:00.000Z" }
+  ],
   freshEyesHistory: [],
-  journalEntries: [],
+  journalEntries: [
+    { id: "journal-demo-1", user_id: DEMO_USER_ID, text: "Starting to actually think about life after school. Feels overdue but better late than never I guess.", created_at: "2026-06-08T20:00:00.000Z", display_time: "Jun 8, 8:00 PM" },
+    { id: "journal-demo-2", user_id: DEMO_USER_ID, text: "Bad day. Everyone seems ahead of me. Trying not to spiral about it.", created_at: "2026-07-06T22:10:00.000Z", display_time: "Jul 6, 10:10 PM" },
+    { id: "journal-demo-3", user_id: DEMO_USER_ID, kind: "reframe", text: "Thought: I'm behind everyone my age.\nBalanced view: Youth STEPS found almost 2 in 5 people my age haven't hit these milestones either - I'm not actually the outlier I think I am.", created_at: "2026-07-06T22:15:00.000Z", display_time: "Jul 6, 10:15 PM" },
+    { id: "journal-demo-4", user_id: DEMO_USER_ID, kind: "identity", text: "If I couldn't mention school or grades: someone who notices when a friend goes quiet, who'd rather ask an awkward question than guess, and who's still figuring out what she actually wants instead of just what looks good.", created_at: "2026-07-27T20:30:00.000Z", display_time: "Jul 27, 8:30 PM" }
+  ],
   // Second Brain causal memory ("decision + reason + outcome") - the
   // record that lets Compass AI do similar-situation recall instead of
   // generic advice: a real past decision, why the user says they made it,
@@ -570,7 +606,11 @@ const defaultTrackerState = {
   // to the AI as context (so it doesn't contradict what it privately
   // knows) but the system prompt instructs it never to surface a sealed
   // entry unless the user brings that topic up first.
-  lifeMemory: [],
+  lifeMemory: [
+    { id: "memory-demo-1", user_id: DEMO_USER_ID, situationTag: "Case competition deadline", decision: "Didn't submit for the case competition", reason: "Ran out of time balancing tuition gigs", outcome: "Realized afterward I should've asked for an extension instead of just skipping it", sealed: false, kind: "missed_opportunity", relatedGoalId: null, predictedConfidence: null, source: "manual", created_at: "2026-06-25T18:00:00.000Z", display_time: "Jun 25, 6:00 PM" },
+    { id: "memory-demo-2", user_id: DEMO_USER_ID, situationTag: "Mock interview nerves", decision: "First interview practice went okay but froze on the STAR question", reason: "", outcome: "", sealed: false, kind: "note", relatedGoalId: null, predictedConfidence: null, source: "manual", created_at: "2026-07-13T16:25:00.000Z", display_time: "Jul 13, 4:25 PM" },
+    { id: "memory-demo-3", user_id: DEMO_USER_ID, situationTag: "Turning down unpaid internship", decision: "Declined the 'exposure only' internship offer", reason: "No pay and no real mentorship, just free labor", outcome: "", sealed: false, kind: "decision", relatedGoalId: null, predictedConfidence: null, source: "manual", created_at: "2026-07-20T11:07:00.000Z", display_time: "Jul 20, 11:07 AM" }
+  ],
   // EverOS-inspired "skills/profile" layer, distinct from lifeMemory
   // (episodes - what happened) and personalBlueprint (user-declared, set
   // once at onboarding). aiInsights is AI-INFERRED from accumulated
@@ -612,9 +652,34 @@ const defaultTrackerState = {
   // blueprint.history[blueprint.history.length-1] rather than keeping its
   // own copy of "what the user is like".
   blueprint: {
-    history: []
+    history: [
+      {
+        version: 1, versionedAt: "Jun 8, 2026",
+        values: ["Growth", "Independence", "Stability"],
+        personality: { style: "reflective", pace: "deliberate" }, personalityChoice: "reflective-deliberate",
+        strengths: ["Organisation", "Empathy", "Persistence"], strengthsOther: "",
+        blindSpots: [],
+        motivationStyle: "external-accountability", motivationChoice: "external-accountability",
+        learningStyle: "step-by-step", learningChoice: "step-by-step",
+        workStyle: "short-bursts", workChoice: "short-bursts",
+        decisionStyle: "research-heavy", decisionChoice: "research-heavy"
+      },
+      {
+        version: 2, versionedAt: "Jul 20, 2026",
+        values: ["Growth", "Independence", "Achievement"],
+        personality: { style: "adaptive", pace: "fast" }, personalityChoice: "adaptive-fast",
+        strengths: ["Organisation", "Empathy", "Leadership"], strengthsOther: "",
+        blindSpots: [],
+        motivationStyle: "internal-purpose", motivationChoice: "internal-purpose",
+        learningStyle: "step-by-step", learningChoice: "step-by-step",
+        workStyle: "short-bursts", workChoice: "short-bursts",
+        decisionStyle: "quick-plan", decisionChoice: "quick-plan"
+      }
+    ]
   },
-  reflectionEntries: [],
+  reflectionEntries: [
+    { id: "refl-demo-1", user_id: DEMO_USER_ID, mode: "identity", createdAt: "2026-07-27T20:30:00.000Z", displayTime: "Jul 27", resurfaceAt: "2026-08-26T20:30:00.000Z", resurfacedAt: null, dismissedAt: null, ignoredCount: 0, content: "If I couldn't mention school or grades: someone who notices when a friend goes quiet, who'd rather ask an awkward question than guess, and who's still figuring out what she actually wants instead of just what looks good.", linkedDecisionId: null, tags: ["identity"] }
+  ],
   decisions: [],
   roadmapGoals: [],
   futureSelfSnapshots: [],
@@ -635,11 +700,16 @@ const defaultTrackerState = {
   // reminder about the user's own reflections, not a real external
   // deadline. This is the one category with a genuine user-entered due
   // date (rent, bills, renewals, appointments) - see pendingInboxItems().
-  realLifeEvents: [],
+  realLifeEvents: [
+    { id: "rle-demo-1", user_id: DEMO_USER_ID, title: "BTO ballot results out", dueDate: demoDateOnlyDaysAgo(7), recurrence: "once", note: "Check HDB portal for the result.", category: "milestone", status: "active", createdAt: "2026-06-20T00:00:00.000Z", lastHandledAt: null }
+  ],
   // Skill Guides progress (self-audit finding): every existing coaching
   // surface is chat/roleplay-shaped, which can't actually teach a hands-on
   // skill like laundry or cooking - see SKILL_GUIDES below.
-  skillGuideProgress: {},
+  skillGuideProgress: {
+    "getting-around-sg": { checkedSteps: [0, 1, 2], completedAt: null },
+    "civic-duties-basics": { checkedSteps: [0, 2], completedAt: null }
+  },
   // Build Mode - a goal-based coach router and training path. Multiple
   // entries can be active at once because a user may want different coaches
   // for different goals.
@@ -647,8 +717,27 @@ const defaultTrackerState = {
     entries: []
   },
   careerStudio: {
-    interviewSessions: [],
-    resume: null,
+    interviewSessions: [
+      {
+        id: "int-demo-1", user_id: DEMO_USER_ID, persona: "bank-competency", startedAt: "2026-07-13T16:00:00.000Z", completedAt: "2026-07-13T16:20:00.000Z",
+        transcript: [
+          { turn: 1, sender: "interviewer", text: "Tell me about a time you had to manage multiple priorities under a tight deadline." },
+          { turn: 1, sender: "candidate", text: "During my ops internship I had to clean transaction data and build a weekly dashboard at the same time as my tuition schedule, so I had to plan out which hours went where." }
+        ],
+        feedback: [
+          { momentRef: "Turn 1 answer", observation: "The Situation and Task were clear, but the answer stopped before saying what actually happened as a result.", suggestion: "Close with a concrete outcome - e.g. how the dashboard turned out or what changed because of it.", starGaps: ["result"] }
+        ]
+      }
+    ],
+    resume: {
+      fullName: "",
+      headline: "Business Analytics undergrad, part-time tuition + ops intern experience",
+      rawExperience: "Ops intern at a fintech startup (3 months) - helped clean transaction data and build a weekly reporting dashboard.\nTuition: taught secondary school Math and Science part-time for 2 years.",
+      rawEducation: "Diploma in Business Studies, Ngee Ann Polytechnic (2023-2026, in progress)",
+      rawSkills: "Excel, SQL basics, Python (learning), Written communication, Organisation",
+      polishedText: "",
+      updatedAt: "2026-06-22T14:30:00.000Z"
+    },
     portfolio: null,
     paycheckCheck: null
   },
@@ -681,7 +770,7 @@ const defaultTrackerState = {
   // is a manually-updated figure, same "no fake bank connection" honesty
   // as microInsurance - this app has no real backend to sync a real
   // account against.
-  moneyPlan: { takeHomeMonthly: null, needsPercent: 55, wantsPercent: 25, savingsPercent: 20, savingsGoal: { label: "", target: 0, saved: 0 }, updatedAt: null },
+  moneyPlan: { takeHomeMonthly: 2200, needsPercent: 55, wantsPercent: 25, savingsPercent: 20, savingsGoal: { label: "Emergency fund", target: 3000, saved: 1530 }, updatedAt: "2026-07-28T20:16:00.000Z" },
   guardianShare: { token: null, manageSecret: null, goalIds: [], includePersonalBlueprint: false, includeChatHistory: false, includeCostOfLiving: false, updatedAt: null },
   ghostRoommate: { active: false, personaId: null, startedAt: null, week: 0, relationship: 60, history: [], moveOutReason: "", currentWeek: null },
   legacyIssues: [],
@@ -1133,11 +1222,115 @@ const defaultSettingsState = {
   }
 };
 
+// DEMO DATA (2026-08-01) - seeded directly into the default state so a
+// fresh login shows an ~8-week-old, lived-in account for presenting to
+// judges, per explicit instruction: no toggle, no confirmation dialog,
+// bound to one specific demo login (joannetan2320@gmail.com) rather than
+// showing for every visitor. MUST BE REVERTED (git revert this commit)
+// before this deployment is ever used by real users - every trackerState
+// field touched here is real user data everywhere else in this app, and
+// baking in fabricated history for anyone who logs in with a fresh email
+// would violate the "no data without a real source" rule this whole app
+// otherwise holds to.
 const defaultChatState = {
   messages: [
     {
       from: "assistant",
-      text: "Hi, I am Compass AI. Ask me anything you need help with: study, planning, motivation, emotions, app features, or everyday decisions."
+      text: "Hi, I am Compass AI. Ask me anything you need help with: study, planning, motivation, emotions, app features, or everyday decisions.",
+      createdAt: "2026-06-08T10:15:00.000Z"
+    },
+    {
+      from: "user",
+      text: "Honestly I feel like everyone my age already has their life figured out and I'm just starting to think about all this adulting stuff",
+      createdAt: "2026-06-08T10:17:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "That feeling is more common than it looks from the outside - a real Singapore study (Youth STEPS, tracked over 3,000 people your age for 6 years) found close to 2 in 5 haven't hit milestones you'd assume 'everyone' has by now. Since you're just starting, the most useful first move is building your Personal Blueprint - most of the other tools here read from it, so it's worth doing properly rather than rushing it.",
+      createdAt: "2026-06-08T10:18:00.000Z",
+      suggestedOpen: { id: "blueprint", title: "Discover Yourself" }
+    },
+    {
+      from: "user",
+      text: "just set up my money plan, take home is only like 2200 from my internship + tuition gigs",
+      createdAt: "2026-06-15T19:02:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Got it - with $2200 the 55/25/20 split gives you about $1210 for needs, $550 wants, $440 savings a month. You set 'Emergency fund' as the goal, target $3000 - that's roughly 7 months at this pace if you stick to it, which is realistic, not aggressive.",
+      createdAt: "2026-06-15T19:03:00.000Z"
+    },
+    {
+      from: "user",
+      text: "put together my resume finally, feels rough",
+      createdAt: "2026-06-22T14:30:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "A first draft always feels rough - that's normal. Your Blueprint has Independence and Growth as top values, so I'd lean your headline toward roles where you're not just executing someone else's checklist. Want to see which real role archetypes actually line up with what you said matters to you?",
+      createdAt: "2026-06-22T14:32:00.000Z",
+      suggestedOpen: { id: "career-studio", title: "Career Studio" }
+    },
+    {
+      from: "user",
+      text: "added my project mentor Ms Tan to my network contacts, she offered to refer me for an analyst role",
+      createdAt: "2026-06-29T09:10:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "That's a concrete lead, worth following up on directly instead of leaving it sitting in your contacts list. Set yourself a reminder to actually message her back this week rather than letting it go quiet.",
+      createdAt: "2026-06-29T09:11:00.000Z"
+    },
+    {
+      from: "user",
+      text: "kind of a rough week, keep comparing myself to people who already started work or are doing NS",
+      createdAt: "2026-07-06T21:47:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "That's worth sitting with rather than pushing past - a few low days doesn't mean something's wrong, and comparing your actual timeline to other people's highlight reel rarely holds up against real data. If it helps, there's a 5-4-3-2-1 grounding exercise in SOS that takes about 2 minutes and doesn't require explaining anything to anyone.",
+      createdAt: "2026-07-06T21:49:00.000Z"
+    },
+    {
+      from: "user",
+      text: "did my first mock interview today, way more nervous than i expected",
+      createdAt: "2026-07-13T16:20:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "That's exactly what the practice is for - better to find out you go quiet under pressure here than in a real one. I logged the session; the feedback flagged one story that was missing the 'Result' part of STAR. Worth tightening that specific answer before the next real interview.",
+      createdAt: "2026-07-13T16:22:00.000Z"
+    },
+    {
+      from: "user",
+      text: "i turned down that 'exposure' internship, unpaid and honestly they just wanted free labor",
+      createdAt: "2026-07-20T11:05:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Noted that down in what you've let go of - turning down something that costs real time for no real return isn't a missed opportunity, it's a decision. Also, your Blueprint just updated and a few things shifted since June - worth a look at what actually changed.",
+      createdAt: "2026-07-20T11:06:00.000Z",
+      suggestedOpen: { id: "knowledge-vault", title: "Knowledge Vault" }
+    },
+    {
+      from: "user",
+      text: "saved another $80 from tuition this week",
+      createdAt: "2026-07-28T20:15:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Added that to your Emergency fund - you're a good way toward the $3000 target now. Keep going at this pace and you'll get there without changing anything else.",
+      createdAt: "2026-07-28T20:16:00.000Z"
+    },
+    {
+      from: "user",
+      text: "morning! anything I should look at today",
+      createdAt: "2026-08-01T08:40:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Two real things waiting on you: your BTO ballot milestone date already passed without being marked handled - worth checking if that actually happened or you just forgot to log it. And it's been a couple weeks since you last checked in with Wei Jie on your Support Circle - nothing urgent, just don't let it go quiet.",
+      createdAt: "2026-08-01T08:41:00.000Z"
     }
   ],
   documents: []
@@ -11627,7 +11820,7 @@ function applyPendingProactiveMessage() {
 function chatMessages() {
   const messages = chatState.messages.map((message) => `
     <div class="chat-bubble ${message.from === "user" ? "is-user" : "is-ai"}">
-      <span>${message.from === "user" ? displayName() : "Compass AI"}</span>
+      <span>${message.from === "user" ? displayName() : "Compass AI"}${message.createdAt ? `<small class="chat-bubble-time">${escapeHTML(new Date(message.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</small>` : ""}</span>
       <p>${escapeHTML(message.text)}</p>
       ${message.suggestedOpen ? `<button class="chat-suggested-open" type="button" data-run-suggested-command="${escapeHTML(message.suggestedOpen.id)}">Open ${escapeHTML(message.suggestedOpen.title)}</button>` : ""}
     </div>
@@ -16939,7 +17132,7 @@ function finishBuildTrainingSession() {
 async function sendChatMessage(text) {
   const clean = text.trim();
   if (!clean || isCompassResponding) return;
-  chatState.messages.push({ from: "user", text: clean });
+  chatState.messages.push({ from: "user", text: clean, createdAt: new Date().toISOString() });
   saveChatState();
   isCompassResponding = true;
   renderScreen("compass");
@@ -16977,6 +17170,7 @@ async function sendChatMessage(text) {
     chatState.messages.push({
       from: "assistant",
       text: displayText,
+      createdAt: new Date().toISOString(),
       suggestedOpen: matchedTool ? { id: matchedTool.id, title: matchedTool.title } : null
     });
     saveChatState();
@@ -16991,7 +17185,7 @@ async function sendChatMessage(text) {
     maybeRunPersonalityInference();
   } catch (error) {
     console.error("[Compass AI] Request failed", error);
-    chatState.messages.push({ from: "assistant", text: COMPASS_API_ERROR, local: true });
+    chatState.messages.push({ from: "assistant", text: COMPASS_API_ERROR, local: true, createdAt: new Date().toISOString() });
     saveChatState();
   } finally {
     isCompassResponding = false;
