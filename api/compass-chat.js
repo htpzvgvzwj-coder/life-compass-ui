@@ -85,7 +85,7 @@ function extractChatCompletionText(data) {
 // `message_to_user` is a required argument on the model's own tool call,
 // not text we synthesize - see buildToolSchemas below for why.
 const REMEMBER_THIS_KINDS = ["missed_opportunity", "decision", "note"];
-const TOOL_NAMES = ["open_tool", "remember_this", "update_memory"];
+const TOOL_NAMES = ["open_tool", "remember_this", "update_memory", "log_savings", "log_rejection"];
 
 function parseOpenToolArgs(rawArgs) {
   if (!rawArgs || typeof rawArgs !== "object") return null;
@@ -128,10 +128,39 @@ function parseUpdateMemoryArgs(rawArgs) {
   };
 }
 
+function parseLogSavingsArgs(rawArgs) {
+  if (!rawArgs || typeof rawArgs !== "object") return null;
+  const { amount, note, message_to_user } = rawArgs;
+  const amountNum = Number(amount);
+  if (!Number.isFinite(amountNum) || amountNum <= 0) return null;
+  if (typeof message_to_user !== "string" || !message_to_user.trim()) return null;
+  return {
+    tool: "log_savings",
+    amount: Math.min(amountNum, 100000),
+    note: typeof note === "string" ? note.trim().slice(0, 200) : "",
+    message_to_user: message_to_user.trim()
+  };
+}
+
+function parseLogRejectionArgs(rawArgs) {
+  if (!rawArgs || typeof rawArgs !== "object") return null;
+  const { title, reason, message_to_user } = rawArgs;
+  if (typeof title !== "string" || !title.trim()) return null;
+  if (typeof message_to_user !== "string" || !message_to_user.trim()) return null;
+  return {
+    tool: "log_rejection",
+    title: title.trim().slice(0, 160),
+    reason: typeof reason === "string" ? reason.trim().slice(0, 400) : "",
+    message_to_user: message_to_user.trim()
+  };
+}
+
 function parseNamedToolArgs(name, rawArgs) {
   if (name === "open_tool") return parseOpenToolArgs(rawArgs);
   if (name === "remember_this") return parseRememberThisArgs(rawArgs);
   if (name === "update_memory") return parseUpdateMemoryArgs(rawArgs);
+  if (name === "log_savings") return parseLogSavingsArgs(rawArgs);
+  if (name === "log_rejection") return parseLogRejectionArgs(rawArgs);
   return null;
 }
 
@@ -230,12 +259,44 @@ function buildUpdateMemorySchema() {
   };
 }
 
+function buildLogSavingsSchema() {
+  return {
+    name: "log_savings",
+    description: "Log a real amount the user just said they saved, adding it to their existing Money Plan savings goal. Only call this if budgetSnapshot in context shows they already have an active savings goal - if they don't have one yet, don't invent one; suggest opening Money Plan with open_tool instead.",
+    properties: {
+      amount: { type: "number", description: "The real amount they just said they saved, as a plain number." },
+      note: { type: "string", description: "What it was for, if they said so." },
+      message_to_user: { type: "string", description: "A short, natural line telling the user you've logged it - write it the way you'd actually say it, not a system notification." }
+    },
+    required: ["amount", "message_to_user"]
+  };
+}
+
+function buildLogRejectionSchema() {
+  return {
+    name: "log_rejection",
+    description: "Save something real the user just said they declined or chose not to pursue - an opportunity, a request, an expectation - to their Rejection List (the same list the manual 'What You've Let Go Of' form writes to). Only call this when they describe an actual, specific thing they turned down, not general venting or a hypothetical.",
+    properties: {
+      title: { type: "string", description: "What they declined, in their own terms." },
+      reason: { type: "string", description: "Why, if they said why." },
+      message_to_user: { type: "string", description: "A short, natural line telling the user you've noted it down - write it the way you'd actually say it, not a system notification." }
+    },
+    required: ["title", "message_to_user"]
+  };
+}
+
 function buildToolSchemas(tools) {
-  return { openTool: buildOpenToolSchema(tools), rememberThis: buildRememberThisSchema(), updateMemory: buildUpdateMemorySchema() };
+  return {
+    openTool: buildOpenToolSchema(tools),
+    rememberThis: buildRememberThisSchema(),
+    updateMemory: buildUpdateMemorySchema(),
+    logSavings: buildLogSavingsSchema(),
+    logRejection: buildLogRejectionSchema()
+  };
 }
 
 function schemaList(schemas) {
-  return [schemas.openTool, schemas.rememberThis, schemas.updateMemory].filter(Boolean);
+  return [schemas.openTool, schemas.rememberThis, schemas.updateMemory, schemas.logSavings, schemas.logRejection].filter(Boolean);
 }
 
 function groqToolsParam(schemas) {

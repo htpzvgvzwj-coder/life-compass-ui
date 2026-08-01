@@ -14876,6 +14876,38 @@ function updateLifeMemoryFromChat(toolCall) {
   return true;
 }
 
+// log_savings tool support - adds a real amount straight to Money Plan's
+// savings goal from conversation, the chat equivalent of the manual
+// "Update saved amount" input. Soft-fails (like updateLifeMemoryFromChat
+// above) rather than inventing a savings goal that was never set up: the
+// schema description tells the model to only call this when a real goal
+// already exists, but the client never trusts that alone.
+function logSavingsFromChat(toolCall) {
+  if (!(trackerState.moneyPlan.savingsGoal.target > 0)) {
+    console.error("[Compass AI] log_savings called with no active Money Plan savings goal - ignored");
+    return false;
+  }
+  trackerState.moneyPlan.savingsGoal.saved += toolCall.amount;
+  trackerState.moneyPlan.updatedAt = new Date().toISOString();
+  saveTrackerState();
+  return true;
+}
+
+// log_rejection tool support - same shape as the manual saveRejectionButton
+// handler, just written directly from a real log_rejection tool call
+// instead of the user opening the "What You've Let Go Of" form themselves.
+function logRejectionFromChat(toolCall) {
+  trackerState.rejectionList.unshift({
+    id: `rejection-ai-${Date.now()}`,
+    user_id: currentUserId(),
+    title: cleanText(toolCall.title, 160),
+    reason: cleanText(toolCall.reason, 400),
+    createdAt: new Date().toISOString()
+  });
+  saveTrackerState();
+  return true;
+}
+
 function validateToolCall(raw) {
   if (!raw || typeof raw !== "object") return null;
   if (raw.tool === "open_tool" && typeof raw.tool_id === "string" && typeof raw.message_to_user === "string") {
@@ -14895,6 +14927,12 @@ function validateToolCall(raw) {
   }
   if (raw.tool === "update_memory" && typeof raw.situation_tag === "string" && typeof raw.outcome === "string" && typeof raw.message_to_user === "string") {
     return { tool: "update_memory", situation_tag: raw.situation_tag, outcome: raw.outcome, message_to_user: raw.message_to_user };
+  }
+  if (raw.tool === "log_savings" && Number.isFinite(raw.amount) && raw.amount > 0 && typeof raw.message_to_user === "string") {
+    return { tool: "log_savings", amount: Math.min(raw.amount, 100000), note: typeof raw.note === "string" ? raw.note : "", message_to_user: raw.message_to_user };
+  }
+  if (raw.tool === "log_rejection" && typeof raw.title === "string" && raw.title.trim() && typeof raw.message_to_user === "string") {
+    return { tool: "log_rejection", title: raw.title, reason: typeof raw.reason === "string" ? raw.reason : "", message_to_user: raw.message_to_user };
   }
   return null;
 }
@@ -16926,6 +16964,12 @@ async function sendChatMessage(text) {
     }
     if (toolCall && toolCall.tool === "update_memory") {
       updateLifeMemoryFromChat(toolCall);
+    }
+    if (toolCall && toolCall.tool === "log_savings") {
+      logSavingsFromChat(toolCall);
+    }
+    if (toolCall && toolCall.tool === "log_rejection") {
+      logRejectionFromChat(toolCall);
     }
     const displayText = toolCall && toolCall.tool !== "open_tool"
       ? toolCall.message_to_user
