@@ -551,6 +551,17 @@ const defaultTrackerState = {
   // record of what was declined/let go of, not another goal list. Pure
   // manual entry, same honesty as networkContacts above.
   rejectionList: [],
+  // Real usage history for the "use it once and it's gone" tools -
+  // Quick Call/Calm Reset/Before You Text/Fresh Eyes were all deliberately
+  // stateless when built, but only ever logged on a real completed action
+  // (a pick made, a grounding sequence finished, a review actually
+  // returned) - never on merely opening the tool, which would be a weak
+  // signal dressed up as real usage. Breathing has no such completion
+  // signal, so it stays unlogged.
+  quickCallHistory: [],
+  calmResetHistory: [],
+  beforeYouTextHistory: [],
+  freshEyesHistory: [],
   journalEntries: [],
   // Second Brain causal memory ("decision + reason + outcome") - the
   // record that lets Compass AI do similar-situation recall instead of
@@ -1451,6 +1462,10 @@ function normalizeTrackerState(state) {
     supportContacts: Array.isArray(state.supportContacts) ? state.supportContacts : defaultSupportContacts,
     networkContacts: Array.isArray(state.networkContacts) ? state.networkContacts : fallback.networkContacts,
     rejectionList: Array.isArray(state.rejectionList) ? state.rejectionList : fallback.rejectionList,
+    quickCallHistory: Array.isArray(state.quickCallHistory) ? state.quickCallHistory : fallback.quickCallHistory,
+    calmResetHistory: Array.isArray(state.calmResetHistory) ? state.calmResetHistory : fallback.calmResetHistory,
+    beforeYouTextHistory: Array.isArray(state.beforeYouTextHistory) ? state.beforeYouTextHistory : fallback.beforeYouTextHistory,
+    freshEyesHistory: Array.isArray(state.freshEyesHistory) ? state.freshEyesHistory : fallback.freshEyesHistory,
     journalEntries: Array.isArray(state.journalEntries) ? state.journalEntries : fallback.journalEntries,
     lifeMemory: Array.isArray(state.lifeMemory) ? state.lifeMemory : fallback.lifeMemory,
     aiInsights: state.aiInsights && typeof state.aiInsights === "object" ? { ...fallback.aiInsights, ...state.aiInsights, items: Array.isArray(state.aiInsights.items) ? state.aiInsights.items : [], supersededItems: Array.isArray(state.aiInsights.supersededItems) ? state.aiInsights.supersededItems : [] } : fallback.aiInsights,
@@ -3660,6 +3675,26 @@ function historySearchEntries() {
   trackerState.rejectionList.filter((e) => e.user_id === myId).forEach((e) => entries.push({
     id: `hs-rejection-${e.id}`, type: "Rejection", title: e.title,
     snippet: cleanText(e.reason, 90), fullText: `Declined: ${e.title}${e.reason ? `\nReason: ${e.reason}` : ""}`, date: e.createdAt
+  }));
+
+  trackerState.quickCallHistory.filter((e) => e.user_id === myId).forEach((e) => entries.push({
+    id: `hs-quickcall-${e.id}`, type: "Quick Call", title: e.decision || "Quick Call",
+    snippet: cleanText(e.pick, 90), fullText: `Decided: ${e.decision || "-"}\nPicked: ${e.pick}`, date: e.createdAt
+  }));
+
+  trackerState.calmResetHistory.filter((e) => e.user_id === myId).forEach((e) => entries.push({
+    id: `hs-calmreset-${e.id}`, type: "Calm Reset", title: "5-4-3-2-1 grounding",
+    snippet: "Completed the grounding exercise.", fullText: "Completed the 5-4-3-2-1 grounding exercise.", date: e.createdAt
+  }));
+
+  trackerState.beforeYouTextHistory.filter((e) => e.user_id === myId).forEach((e) => entries.push({
+    id: `hs-beforeyoutext-${e.id}`, type: "Before You Text", title: cleanText(e.message, 80) || "Before You Text",
+    snippet: cleanText(e.result, 90), fullText: `Message: ${e.message}\nRead: ${e.result}`, date: e.createdAt
+  }));
+
+  trackerState.freshEyesHistory.filter((e) => e.user_id === myId).forEach((e) => entries.push({
+    id: `hs-fresheyes-${e.id}`, type: "Fresh Eyes", title: cleanText(e.description, 80) || "Fresh Eyes",
+    snippet: cleanText(e.result, 90), fullText: `Holding onto: ${e.description}\nReframe: ${e.result}`, date: e.createdAt
   }));
 
   (trackerState.mood.entries || []).filter((e) => e.user_id === myId).forEach((e) => entries.push({
@@ -12162,7 +12197,11 @@ function historyEntryIcon(type) {
     "Failure Inoculation": "icon-warning.png",
     "Estate Auction": "icon-money.png",
     "Self Archaeology": "icon-learn.png",
-    "Rejection": "icon-boundary.png"
+    "Rejection": "icon-boundary.png",
+    "Quick Call": "icon-time.png",
+    "Calm Reset": "icon-mood.png",
+    "Before You Text": "icon-boundary.png",
+    "Fresh Eyes": "icon-decide.png"
   };
   return icons[type] || "icon-chat.png";
 }
@@ -17385,6 +17424,8 @@ document.addEventListener("click", async (event) => {
     renderScreen(activeTab);
     try {
       beforeYouTextResult = await reviewBeforeYouText(beforeYouTextMessage, beforeYouTextContext);
+      trackerState.beforeYouTextHistory.unshift({ id: `byt-${Date.now()}`, user_id: currentUserId(), message: cleanText(beforeYouTextMessage, 150), result: cleanText(beforeYouTextResult, 150), createdAt: new Date().toISOString() });
+      saveTrackerState();
     } catch (error) {
       console.error("[Compass AI] Before You Text review failed", error);
       beforeYouTextError = "Couldn't get a read on that just now - try again?";
@@ -17410,6 +17451,8 @@ document.addEventListener("click", async (event) => {
     openModal("freshEyesReframe");
     try {
       freshEyesResult = await requestFreshEyesReframe(freshEyesDescription, freshEyesDuration);
+      trackerState.freshEyesHistory.unshift({ id: `fe-${Date.now()}`, user_id: currentUserId(), description: cleanText(freshEyesDescription, 150), result: cleanText(freshEyesResult, 150), createdAt: new Date().toISOString() });
+      saveTrackerState();
     } catch (error) {
       console.error("[Compass AI] Fresh Eyes reframe failed", error);
       freshEyesError = "Couldn't reframe that just now - try again?";
@@ -17533,6 +17576,8 @@ document.addEventListener("click", async (event) => {
   if (groundingNextButton) {
     if (groundingStep >= GROUNDING_STEPS.length - 1) {
       groundingStep = 0;
+      trackerState.calmResetHistory.unshift({ id: `cr-${Date.now()}`, user_id: currentUserId(), technique: "grounding", createdAt: new Date().toISOString() });
+      saveTrackerState();
       closeModal();
     } else {
       groundingStep += 1;
@@ -18236,6 +18281,8 @@ document.addEventListener("click", async (event) => {
     } else {
       quickCallError = "";
       quickCallPick = options[Math.floor(Math.random() * options.length)];
+      trackerState.quickCallHistory.unshift({ id: `qc-${Date.now()}`, user_id: currentUserId(), decision: quickCallDecision, pick: quickCallPick, createdAt: new Date().toISOString() });
+      saveTrackerState();
     }
     openModal("decisionLab");
   }
