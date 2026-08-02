@@ -15350,6 +15350,50 @@ function logRejectionFromChat(toolCall) {
   return true;
 }
 
+// log_mood tool support - the chat equivalent of the manual mood tracker
+// modal (saveMood handler). Deliberately lighter than the manual save:
+// keeps the same real fields (label/score/note, entries.unshift, instant
+// local moodSuggestion) but skips the AI-enhanced suggestion follow-up
+// call and the streak-celebration UI animation, both of which are tied
+// to the modal actually being open - the streak count and full mood
+// history still update for real, just without the modal-only flourish.
+function logMoodFromChat(toolCall) {
+  trackerState.mood.label = toolCall.label;
+  trackerState.mood.score = toolCall.score;
+  trackerState.mood.note = toolCall.note || "Mood logged from a chat with 2BB.";
+  trackerState.mood.history = [...trackerState.mood.history.slice(-6), toolCall.score];
+  trackerState.mood.entries.unshift({
+    id: `mood-ai-${Date.now()}`,
+    user_id: currentUserId(),
+    label: toolCall.label,
+    score: toolCall.score,
+    note: trackerState.mood.note,
+    affectedChoice: "",
+    tomorrowAdjustment: "",
+    created_at: new Date().toISOString(),
+    display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+  });
+  trackerState.moodSuggestion = generateMoodSuggestion(trackerState.mood.label, trackerState.mood.score, trackerState.mood.note);
+  saveTrackerState();
+  return true;
+}
+
+// log_journal tool support - same shape as the manual journal entry form
+// (saveJournal handler), written directly from a real log_journal tool
+// call instead of the user opening Quick Capture/the journal form.
+function logJournalFromChat(toolCall) {
+  trackerState.journalEntries.unshift({
+    id: `journal-ai-${Date.now()}`,
+    user_id: currentUserId(),
+    text: cleanText(toolCall.text, 1200),
+    created_at: new Date().toISOString(),
+    display_time: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+  });
+  trackerState.journalEntries = trackerState.journalEntries.slice(0, 80);
+  saveTrackerState();
+  return true;
+}
+
 function validateToolCall(raw) {
   if (!raw || typeof raw !== "object") return null;
   if (raw.tool === "open_tool" && typeof raw.tool_id === "string" && typeof raw.message_to_user === "string") {
@@ -15375,6 +15419,18 @@ function validateToolCall(raw) {
   }
   if (raw.tool === "log_rejection" && typeof raw.title === "string" && raw.title.trim() && typeof raw.message_to_user === "string") {
     return { tool: "log_rejection", title: raw.title, reason: typeof raw.reason === "string" ? raw.reason : "", message_to_user: raw.message_to_user };
+  }
+  if (raw.tool === "log_mood" && typeof raw.label === "string" && typeof raw.message_to_user === "string") {
+    return {
+      tool: "log_mood",
+      label: ["Calm", "Okay", "Tired", "Stressed"].includes(raw.label) ? raw.label : "Okay",
+      score: Number.isFinite(raw.score) ? Math.max(0, Math.min(100, Math.round(raw.score))) : 50,
+      note: typeof raw.note === "string" ? raw.note : "",
+      message_to_user: raw.message_to_user
+    };
+  }
+  if (raw.tool === "log_journal" && typeof raw.text === "string" && raw.text.trim() && typeof raw.message_to_user === "string") {
+    return { tool: "log_journal", text: raw.text, message_to_user: raw.message_to_user };
   }
   return null;
 }
@@ -17412,6 +17468,12 @@ async function sendChatMessage(text) {
     }
     if (toolCall && toolCall.tool === "log_rejection") {
       logRejectionFromChat(toolCall);
+    }
+    if (toolCall && toolCall.tool === "log_mood") {
+      logMoodFromChat(toolCall);
+    }
+    if (toolCall && toolCall.tool === "log_journal") {
+      logJournalFromChat(toolCall);
     }
     const displayText = toolCall && toolCall.tool !== "open_tool"
       ? toolCall.message_to_user

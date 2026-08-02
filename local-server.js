@@ -129,7 +129,8 @@ function extractChatCompletionText(data) {
 // a new lifeMemory entry), or update_memory (attaches an outcome to an
 // EXISTING lifeMemory entry instead of creating an unrelated new one).
 const REMEMBER_THIS_KINDS = ['missed_opportunity', 'decision', 'note'];
-const TOOL_NAMES = ['open_tool', 'remember_this', 'update_memory', 'log_savings', 'log_rejection'];
+const LOG_MOOD_LABELS = ['Calm', 'Okay', 'Tired', 'Stressed'];
+const TOOL_NAMES = ['open_tool', 'remember_this', 'update_memory', 'log_savings', 'log_rejection', 'log_mood', 'log_journal'];
 
 function parseOpenToolArgs(rawArgs) {
   if (!rawArgs || typeof rawArgs !== 'object') return null;
@@ -199,12 +200,40 @@ function parseLogRejectionArgs(rawArgs) {
   };
 }
 
+function parseLogMoodArgs(rawArgs) {
+  if (!rawArgs || typeof rawArgs !== 'object') return null;
+  const { label, score, note, message_to_user } = rawArgs;
+  if (typeof message_to_user !== 'string' || !message_to_user.trim()) return null;
+  const scoreNum = Number(score);
+  return {
+    tool: 'log_mood',
+    label: LOG_MOOD_LABELS.includes(label) ? label : 'Okay',
+    score: Number.isFinite(scoreNum) ? Math.max(0, Math.min(100, Math.round(scoreNum))) : 50,
+    note: typeof note === 'string' ? note.trim().slice(0, 300) : '',
+    message_to_user: message_to_user.trim(),
+  };
+}
+
+function parseLogJournalArgs(rawArgs) {
+  if (!rawArgs || typeof rawArgs !== 'object') return null;
+  const { text, message_to_user } = rawArgs;
+  if (typeof text !== 'string' || !text.trim()) return null;
+  if (typeof message_to_user !== 'string' || !message_to_user.trim()) return null;
+  return {
+    tool: 'log_journal',
+    text: text.trim().slice(0, 1200),
+    message_to_user: message_to_user.trim(),
+  };
+}
+
 function parseNamedToolArgs(name, rawArgs) {
   if (name === 'open_tool') return parseOpenToolArgs(rawArgs);
   if (name === 'remember_this') return parseRememberThisArgs(rawArgs);
   if (name === 'update_memory') return parseUpdateMemoryArgs(rawArgs);
   if (name === 'log_savings') return parseLogSavingsArgs(rawArgs);
   if (name === 'log_rejection') return parseLogRejectionArgs(rawArgs);
+  if (name === 'log_mood') return parseLogMoodArgs(rawArgs);
+  if (name === 'log_journal') return parseLogJournalArgs(rawArgs);
   return null;
 }
 
@@ -324,6 +353,32 @@ function buildLogRejectionSchema() {
   };
 }
 
+function buildLogMoodSchema() {
+  return {
+    name: 'log_mood',
+    description: 'Log how the user says they\'re feeling right now as a real mood check-in, the same record the manual mood tracker creates - so today\'s check-in is done without them having to open the mood tracker separately. Only call this when they clearly describe their current overall mood, not a fleeting reaction to one line in the conversation.',
+    properties: {
+      label: { type: 'string', enum: LOG_MOOD_LABELS, description: 'The closest match to how they describe feeling overall right now.' },
+      score: { type: 'number', description: 'Their mood on a 0-100 scale if you can reasonably infer one from what they said (e.g. clearly very low or clearly good) - otherwise a neutral middle value.' },
+      note: { type: 'string', description: 'A short note in their own words about why, if they said why.' },
+      message_to_user: { type: 'string', description: 'A short, natural line telling the user you\'ve logged their mood - write it the way you\'d actually say it, not a system notification.' },
+    },
+    required: ['label', 'message_to_user'],
+  };
+}
+
+function buildLogJournalSchema() {
+  return {
+    name: 'log_journal',
+    description: 'Save a real reflection or thought the user just shared as a journal entry, the same record the manual journal form creates. Only call this for something genuinely reflective and worth keeping, and only when they aren\'t already describing a specific decision or something they turned down (use remember_this or log_rejection instead for those).',
+    properties: {
+      text: { type: 'string', description: 'The reflection, in their own words - rephrase for clarity if needed but keep their meaning and tone.' },
+      message_to_user: { type: 'string', description: 'A short, natural line telling the user you\'ve saved it - write it the way you\'d actually say it, not a system notification.' },
+    },
+    required: ['text', 'message_to_user'],
+  };
+}
+
 function buildToolSchemas(tools) {
   return {
     openTool: buildOpenToolSchema(tools),
@@ -331,11 +386,13 @@ function buildToolSchemas(tools) {
     updateMemory: buildUpdateMemorySchema(),
     logSavings: buildLogSavingsSchema(),
     logRejection: buildLogRejectionSchema(),
+    logMood: buildLogMoodSchema(),
+    logJournal: buildLogJournalSchema(),
   };
 }
 
 function schemaList(schemas) {
-  return [schemas.openTool, schemas.rememberThis, schemas.updateMemory, schemas.logSavings, schemas.logRejection].filter(Boolean);
+  return [schemas.openTool, schemas.rememberThis, schemas.updateMemory, schemas.logSavings, schemas.logRejection, schemas.logMood, schemas.logJournal].filter(Boolean);
 }
 
 function groqToolsParam(schemas) {
