@@ -12809,6 +12809,19 @@ function profileScreen() {
       <button class="secondary-action signout-action" type="button" data-save-voice>Save voice preference</button>
     </section>
     <section class="profile-card">
+      <p class="eyebrow">Compass AI notifications</p>
+      <p class="muted">When 2BB notices something worth reaching out about on its own (not just replying to you), it can send a real notification - even if you're on a different tab. This only works while this app is open in a browser tab somewhere; closing the browser entirely still means silence.</p>
+      <div class="toggle-row">
+        <span>Status</span>
+        <strong>${notificationStatusLabel()}</strong>
+      </div>
+      ${typeof Notification === "undefined"
+        ? `<p class="muted">Your browser doesn't support notifications - nothing to turn on here.</p>`
+        : Notification.permission === "denied"
+          ? `<p class="muted">Blocked in your browser's site settings - change it there to re-enable, this app can't re-ask.</p>`
+          : `<button class="secondary-action" type="button" data-toggle-notifications>${userProfile.notificationsEnabled ? "Turn off notifications" : "Turn on notifications"}</button>`}
+    </section>
+    <section class="profile-card">
       <div class="toggle-row"><span>Login method</span><strong>Local device login (not verified)</strong></div>
       <div class="toggle-row"><span>Role permissions</span><strong>${isAdmin() ? "Admin" : "User"}</strong></div>
       <div class="toggle-row"><span>Progress storage</span><strong>This browser only</strong></div>
@@ -13109,6 +13122,15 @@ const screens = {
 
   profile: () => profileScreen(),
 
+  // DEAD CODE - unreachable. TAB_ALIASES maps "settings" -> "profile", so
+  // canonicalTab() resolves any navigation to "settings" straight to the
+  // "profile" key above (profileScreen()) before this ever gets read.
+  // Found live (2026-08-02) after a notifications toggle was accidentally
+  // built into this exact template and confirmed via browser inspection
+  // to never actually render - the real Settings nav icon opens
+  // profileScreen(), not this. Left in place rather than deleted (out of
+  // scope for the round that found it), but do not add anything new here
+  // - it will never be seen by a real user. Add to profileScreen() instead.
   settings: () => `
     <header class="screen-head compact-head">
       <div>
@@ -13146,19 +13168,6 @@ const screens = {
         `).join("")}
       </div>
       <button class="secondary-action signout-action" type="button" data-save-voice>Save voice preference</button>
-    </section>
-    <section class="profile-card">
-      <p class="eyebrow">Compass AI notifications</p>
-      <p class="muted">When 2BB notices something worth reaching out about on its own (not just replying to you), it can send a real notification - even if you're on a different tab. This only works while this app is open in a browser tab somewhere; closing the browser entirely still means silence.</p>
-      <div class="toggle-row">
-        <span>Status</span>
-        <strong>${notificationStatusLabel()}</strong>
-      </div>
-      ${typeof Notification === "undefined"
-        ? `<p class="muted">Your browser doesn't support notifications - nothing to turn on here.</p>`
-        : Notification.permission === "denied"
-          ? `<p class="muted">Blocked in your browser's site settings - change it there to re-enable, this app can't re-ask.</p>`
-          : `<button class="secondary-action" type="button" data-toggle-notifications>${userProfile.notificationsEnabled ? "Turn off notifications" : "Turn on notifications"}</button>`}
     </section>
     <div class="profile-actions">
       <button class="secondary-action" type="button" data-open="supportCircle">Support Circle</button>
