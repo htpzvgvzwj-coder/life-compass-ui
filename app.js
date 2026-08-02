@@ -654,6 +654,18 @@ const defaultTrackerState = {
   // (which is self-reported once at onboarding) - inferred from the
   // user's own journal/chat text, never a formal assessment.
   personalityRead: { traits: {}, confidence: "", lastRunAt: null, basedOnCount: 0 },
+  // Self-Perception Gap (from the "identity balance sheet" idea in the
+  // 10-idea differentiation audit): personalBlueprint (self-declared) and
+  // personalityRead (independently inferred from their own writing) were
+  // both already real, both already built, but never actually compared to
+  // each other. Deliberately NOT a numeric gap score - the two use
+  // incompatible frameworks (self-report scenario choices vs. inferred
+  // Big Five), so forcing them into one number would mean inventing a
+  // mapping between them that isn't real. Instead the AI writes one honest
+  // sentence noting real alignment or divergence, same "never diagnose"
+  // discipline as personalityRead itself. Cached with version markers so
+  // it only regenerates when either underlying input actually changed.
+  selfPerceptionRead: { note: "", generatedForBlueprintVersion: 0, generatedForBasedOnCount: 0 },
   // Open Loops "not ready to face this yet" button - snoozes one specific
   // derived loop for a week without pretending it's resolved (unlike the
   // other two buttons, this doesn't create any new record, just delays
@@ -1574,6 +1586,7 @@ let activeTab = "home";
 let isCompassResponding = false;
 let isCompassInsightsRefreshing = false;
 let isPersonalityReadRefreshing = false;
+let isSelfPerceptionReadRefreshing = false;
 // Quick capture Inbox (text-only v1): draft text -> AI classifies into one
 // of 7 categories -> user confirms before anything is actually saved.
 let quickCaptureText = "";
@@ -1831,6 +1844,7 @@ function normalizeTrackerState(state) {
     trustMoments: state.trustMoments && typeof state.trustMoments === "object" ? { firedIds: Array.isArray(state.trustMoments.firedIds) ? state.trustMoments.firedIds : [], watchedAvoidanceIds: Array.isArray(state.trustMoments.watchedAvoidanceIds) ? state.trustMoments.watchedAvoidanceIds : [] } : fallback.trustMoments,
     proactiveQueue: Array.isArray(state.proactiveQueue) ? state.proactiveQueue : fallback.proactiveQueue,
     personalityRead: state.personalityRead && typeof state.personalityRead === "object" ? { ...fallback.personalityRead, ...state.personalityRead, traits: state.personalityRead.traits && typeof state.personalityRead.traits === "object" ? state.personalityRead.traits : {} } : fallback.personalityRead,
+    selfPerceptionRead: state.selfPerceptionRead && typeof state.selfPerceptionRead === "object" ? { ...fallback.selfPerceptionRead, ...state.selfPerceptionRead } : fallback.selfPerceptionRead,
     openLoopsSnoozed: Array.isArray(state.openLoopsSnoozed) ? state.openLoopsSnoozed : fallback.openLoopsSnoozed,
     challengeProgress: Array.isArray(state.challengeProgress) ? state.challengeProgress : fallback.challengeProgress,
     savedOpportunities: Array.isArray(state.savedOpportunities) ? state.savedOpportunities : fallback.savedOpportunities,
@@ -4824,6 +4838,7 @@ async function runPersonalityInference({ force = false } = {}) {
     basedOnCount: trackerState.journalEntries.filter((e) => e.user_id === myId).length + chatState.messages.filter((m) => m.from === "user").length
   };
   saveTrackerState();
+  maybeRunSelfPerceptionRead();
   return true;
 }
 
@@ -4841,6 +4856,75 @@ function personalityReadSummaryText() {
   const labels = { openness: "Openness", conscientiousness: "Conscientiousness", extraversion: "Extraversion", agreeableness: "Agreeableness", neuroticism: "Neuroticism" };
   const line = PERSONALITY_TRAIT_KEYS.filter((key) => traits[key]).map((key) => `${labels[key]}: ${traits[key]}`).join(" · ");
   return `${line}${trackerState.personalityRead.confidence ? ` - ${trackerState.personalityRead.confidence}` : ""}`;
+}
+
+// Self-Perception Gap - plain-language summary of the self-declared side
+// (Personal Blueprint), used both as input to the AI comparison and as
+// this section's own "here's what you told us" line in the modal.
+function selfDescribedIdentitySummary() {
+  const blueprint = latestBlueprint();
+  if (!blueprint) return null;
+  const personalityOption = BLUEPRINT_PERSONALITY_SCENARIO.options.find((option) => option.value === blueprint.personalityChoice);
+  const parts = [];
+  if (blueprint.values && blueprint.values.length) parts.push(`values ${blueprint.values.join(", ")}`);
+  if (blueprint.strengths && blueprint.strengths.length) parts.push(`sees their strengths as ${blueprint.strengths.join(", ")}`);
+  if (personalityOption) parts.push(`reacts to sudden change by "${personalityOption.label.toLowerCase()}"`);
+  return parts.length ? parts.join("; ") : null;
+}
+
+// Only recompute when either underlying input actually changed since the
+// last comparison - same "don't re-run on every render" discipline as
+// shouldRunPersonalityInference/shouldRunCompassInsights.
+function selfPerceptionGapSectionHtml() {
+  const selfDescribed = selfDescribedIdentitySummary();
+  const hasInferredRead = Object.keys(trackerState.personalityRead.traits || {}).length > 0;
+  if (!selfDescribed || !hasInferredRead) return "";
+  const note = trackerState.selfPerceptionRead.note;
+  return `
+    <div>
+      <strong>Self vs. read</strong>
+      <span>${note ? escapeHTML(note) : `Not compared yet - tap "Compare self vs. read" below.`}</span>
+    </div>
+  `;
+}
+
+function shouldRunSelfPerceptionRead() {
+  const blueprint = latestBlueprint();
+  const traits = trackerState.personalityRead.traits || {};
+  if (!blueprint || !Object.keys(traits).length) return false;
+  const cache = trackerState.selfPerceptionRead;
+  return blueprint.version !== cache.generatedForBlueprintVersion || trackerState.personalityRead.basedOnCount !== cache.generatedForBasedOnCount;
+}
+
+// Deliberately not a numeric "gap score" - personalBlueprint (self-report
+// scenario choices) and personalityRead (inferred Big Five) are
+// incompatible frameworks, and forcing a percentage between them would
+// mean inventing a mapping that isn't real. Instead the AI writes one
+// honest sentence about real alignment or divergence, told explicitly not
+// to manufacture a difference that isn't there - same never-diagnose
+// discipline runPersonalityInference itself already follows.
+async function runSelfPerceptionRead({ force = false } = {}) {
+  const selfDescribed = selfDescribedIdentitySummary();
+  const inferred = trackerState.personalityRead.traits || {};
+  if (!selfDescribed || !Object.keys(inferred).length) return false;
+  if (!force && !shouldRunSelfPerceptionRead()) return false;
+  const systemPrompt = "You compare two independent descriptions of the same person: one they wrote about themselves in a self-report quiz (their own chosen values/strengths/reaction style), and one inferred by a separate model purely from their own journal/chat writing (a soft Big Five read). Write exactly one honest, specific sentence noting where these two pictures genuinely agree or diverge - if they mostly agree, say so plainly instead of manufacturing a difference that isn't really there. Never diagnose, never claim this is a formal psychological measurement, never invent a trait that wasn't given to you. Respond with plain text only, no JSON, no markdown, no preamble.";
+  const userPrompt = `Self-described (their own Blueprint quiz answers): ${selfDescribed}.\n\nInferred from their own writing (soft Big Five read): ${personalityReadSummaryText()}.\n\nWrite the one honest observation now.`;
+  const reply = await requestCompassDirect(systemPrompt, userPrompt);
+  trackerState.selfPerceptionRead = {
+    note: cleanText(reply, 300),
+    generatedForBlueprintVersion: latestBlueprint().version,
+    generatedForBasedOnCount: trackerState.personalityRead.basedOnCount
+  };
+  saveTrackerState();
+  return true;
+}
+
+function maybeRunSelfPerceptionRead() {
+  if (!shouldRunSelfPerceptionRead()) return;
+  runSelfPerceptionRead().catch((error) => {
+    console.error("[Compass AI] Background self-perception read failed.", error);
+  });
 }
 
 // Fire-and-forget background trigger, same pattern as
@@ -11759,6 +11843,7 @@ function saveBlueprintSession(sessionId) {
   };
   history.push(nextVersion);
   saveTrackerState();
+  maybeRunSelfPerceptionRead();
   return nextVersion;
 }
 
@@ -13158,9 +13243,13 @@ const modals = {
             : `<span>Nothing yet - these happen on their own as you keep using Compass, not as tasks to complete.</span>`}
         </div>
         <div><strong>Tone read (inferred, not a real assessment)</strong><span>${escapeHTML(personalityReadSummaryText())}</span></div>
+        ${selfPerceptionGapSectionHtml()}
       </div>
       <div class="profile-actions">
         <button class="secondary-action compact-action" type="button" data-refresh-personality-read ${isPersonalityReadRefreshing ? "disabled" : ""}>${isPersonalityReadRefreshing ? "Reading..." : "Refresh tone read"}</button>
+        ${selfDescribedIdentitySummary() && Object.keys(trackerState.personalityRead.traits || {}).length
+          ? `<button class="secondary-action compact-action" type="button" data-refresh-self-perception ${isSelfPerceptionReadRefreshing ? "disabled" : ""}>${isSelfPerceptionReadRefreshing ? "Comparing..." : "Compare self vs. read"}</button>`
+          : ""}
       </div>
     </div>
   `;
@@ -17939,6 +18028,7 @@ document.addEventListener("click", async (event) => {
   const historyExpandButton = event.target.closest("[data-toggle-history-card]");
   const refreshInsightsButton = event.target.closest("[data-refresh-compass-insights]");
   const refreshPersonalityButton = event.target.closest("[data-refresh-personality-read]");
+  const refreshSelfPerceptionButton = event.target.closest("[data-refresh-self-perception]");
   const openLoopPracticeButton = event.target.closest("[data-open-loop-practice]");
   const openLoopActionButton = event.target.closest("[data-open-loop-action]");
   const openLoopSnoozeButton = event.target.closest("[data-open-loop-snooze]");
@@ -18005,6 +18095,19 @@ document.addEventListener("click", async (event) => {
       console.error("[Compass AI] Manual personality read refresh failed.", error);
     } finally {
       isPersonalityReadRefreshing = false;
+      renderScreen(activeTab);
+    }
+  }
+
+  if (refreshSelfPerceptionButton) {
+    isSelfPerceptionReadRefreshing = true;
+    renderScreen(activeTab);
+    try {
+      await runSelfPerceptionRead({ force: true });
+    } catch (error) {
+      console.error("[Compass AI] Manual self-perception comparison failed.", error);
+    } finally {
+      isSelfPerceptionReadRefreshing = false;
       renderScreen(activeTab);
     }
   }
