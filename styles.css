@@ -11691,19 +11691,19 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .app
 .bb-card {
   position: absolute;
   /* Top-right slot, matching the approved mockup - Open Loops/shelf rows
-     sit below this, now starting at top:58% (moved down from 52% to match
-     this card growing from 44% to 52% tall - top/left stay put, only the
-     card's own height grew, so .bb-below-card's start had to move down by
-     the same amount to keep the two from overlapping).
-     .bb-messages already has min-height:0 + overflow-y:auto (see below),
-     so a capped height scrolls the message thread internally instead of
-     clipping the input row - the bug from the previous round doesn't
-     reappear here. */
+     sit below this, now starting at top:63% (moved down again to match
+     this card growing to 56% tall - top/left stay put, only the card's
+     own height grew, so .bb-below-card's start had to move down by the
+     same amount to keep the two from overlapping). Deliberately not
+     pushed any taller than this - .phone-shell has overflow:hidden, so
+     .bb-below-card's own content (2 rows of mini-cards) needs real room
+     left below top:63% or it gets silently clipped at the shell's bottom
+     edge, not just visually cramped. */
   left: 52%;
   top: 5%;
   width: 45%;
-  height: 52%;
-  min-height: 340px;
+  height: 56%;
+  min-height: 380px;
   overflow: hidden;
   display: flex;
   border: 1px solid var(--warm-line);
@@ -12239,7 +12239,7 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
 .bb-below-card {
   position: absolute;
   left: 52%;
-  top: 58%;
+  top: 63%;
   width: 45%;
   display: flex;
   flex-direction: column;
@@ -12258,6 +12258,8 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
 .bb-row {
   display: flex;
   gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .bb-row-empty {
@@ -12267,7 +12269,7 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
 }
 
 .bb-mini-card {
-  flex: 1 1 0;
+  flex: 0 0 128px;
   display: flex;
   flex-direction: column;
   align-items: center;

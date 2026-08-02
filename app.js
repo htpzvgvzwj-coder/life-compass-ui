@@ -590,7 +590,7 @@ const defaultTrackerState = {
     { id: "cr-demo-1", user_id: DEMO_USER_ID, technique: "grounding", createdAt: "2026-07-06T22:05:00.000Z" }
   ],
   beforeYouTextHistory: [
-    { id: "byt-demo-1", user_id: DEMO_USER_ID, message: "Can I get a later curfew now that I'm managing my own money and schedule?", result: "This reads calm and reasonable - it leads with a real reason (managing your own money/schedule) instead of just asking. One thing to consider: naming a specific new time makes it easier for them to say yes than leaving it open-ended.", createdAt: "2026-07-20T11:10:00.000Z" }
+    { id: "byt-demo-1", user_id: DEMO_USER_ID, message: "Can I get a later curfew now that I'm managing my own money and schedule?", result: "This reads calm and reasonable - it leads with a real reason (managing your own money/schedule) instead of just asking. One thing to consider: naming a specific new time makes it easier for them to say yes than leaving it open-ended.", createdAt: "2026-07-19T20:30:00.000Z" }
   ],
   freshEyesHistory: [],
   journalEntries: [
@@ -608,8 +608,7 @@ const defaultTrackerState = {
   // entry unless the user brings that topic up first.
   lifeMemory: [
     { id: "memory-demo-1", user_id: DEMO_USER_ID, situationTag: "Case competition deadline", decision: "Didn't submit for the case competition", reason: "Ran out of time balancing tuition gigs", outcome: "Realized afterward I should've asked for an extension instead of just skipping it", sealed: false, kind: "missed_opportunity", relatedGoalId: null, predictedConfidence: null, source: "manual", created_at: "2026-06-25T18:00:00.000Z", display_time: "Jun 25, 6:00 PM" },
-    { id: "memory-demo-2", user_id: DEMO_USER_ID, situationTag: "Mock interview nerves", decision: "First interview practice went okay but froze on the STAR question", reason: "", outcome: "", sealed: false, kind: "note", relatedGoalId: null, predictedConfidence: null, source: "manual", created_at: "2026-07-13T16:25:00.000Z", display_time: "Jul 13, 4:25 PM" },
-    { id: "memory-demo-3", user_id: DEMO_USER_ID, situationTag: "Turning down unpaid internship", decision: "Declined the 'exposure only' internship offer", reason: "No pay and no real mentorship, just free labor", outcome: "", sealed: false, kind: "decision", relatedGoalId: null, predictedConfidence: null, source: "manual", created_at: "2026-07-20T11:07:00.000Z", display_time: "Jul 20, 11:07 AM" }
+    { id: "memory-demo-2", user_id: DEMO_USER_ID, situationTag: "Mock interview nerves", decision: "First interview practice went okay but froze on the STAR question", reason: "", outcome: "", sealed: false, kind: "note", relatedGoalId: null, predictedConfidence: null, source: "manual", created_at: "2026-07-14T09:00:00.000Z", display_time: "Jul 14, 9:00 AM" }
   ],
   // EverOS-inspired "skills/profile" layer, distinct from lifeMemory
   // (episodes - what happened) and personalBlueprint (user-declared, set
@@ -1633,7 +1632,7 @@ const chatState = normalizeChatState(loadSessionJson(scopedKey("steadyChatState"
 // marker so refreshing mid-demo doesn't keep wiping out anything typed
 // live during the demo itself - bump DEMO_SEED_VERSION to force a re-seed
 // if the seeded content is ever edited again).
-const DEMO_SEED_VERSION = "2026-08-01-v2";
+const DEMO_SEED_VERSION = "2026-08-01-v3";
 if (currentUserId() === DEMO_USER_ID && localStorage.getItem("compassDemoSeedVersion") !== DEMO_SEED_VERSION) {
   Object.assign(trackerState, JSON.parse(JSON.stringify(defaultTrackerState)));
   chatState.messages = JSON.parse(JSON.stringify(defaultChatState.messages));
@@ -12559,7 +12558,13 @@ const screens = {
   compass: () => {
     const dueSoon = dueRealLifeEvents()[0] || null;
     const loops = openLoopsEntries().slice(0, 3);
-    const shelfEntries = historySearchEntries().slice(0, 3);
+    // 7, not 3 - wide enough to surface a real spread of distinct feature
+    // types (mood, journal, rejection list, before-you-text, remembered
+    // decisions, quick call, calm reset all showed up here with the demo
+    // data) rather than just whichever 3 happen to be most recent, which
+    // tended to cluster on one day. .bb-row scrolls horizontally at this
+    // width instead of squeezing every card unreadably thin.
+    const shelfEntries = historySearchEntries().slice(0, 7);
     return `
     <div class="bb-card">
       <div class="bb-card-inner">
