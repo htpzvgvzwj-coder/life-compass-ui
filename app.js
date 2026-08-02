@@ -3919,17 +3919,70 @@ function refreshDesktopRightRail(tab = activeTab) {
 // for a genuinely fresh account too - zero everywhere, not hidden.
 function growthGlancePanelHtml() {
   const calibration = calibrationStats();
+  const blueprintSummary = blueprintEvolutionSummary();
   const blueprintVersions = trackerState.blueprint.history.length;
-  const totalEntries = historySearchEntries().length;
-  const calibrationReadLabels = { overconfident: "you tend to feel more sure than outcomes back up", underconfident: "you tend to doubt yourself more than outcomes warrant", calibrated: "your confidence roughly tracks how things actually go", "not-enough": "not enough resolved decisions yet to read a pattern" };
-  const calibrationRow = calibration
-    ? `<strong>${calibration.avgConfidence}% confident, ${calibration.avgAccuracy}% matched</strong><span>${calibrationReadLabels[calibration.read] || ""}</span>`
-    : `<strong>Judgment Calibration</strong><span>Not enough resolved decisions yet - Future Scan Check-Backs feed this.</span>`;
+  const entries = historySearchEntries();
+  const totalEntries = entries.length;
+  const distinctAreas = new Set(entries.map((entry) => entry.type)).size;
+
+  // Two bars (stated confidence vs. self-rated actual outcome) instead of
+  // two numbers side by side in text - the point of this metric IS the gap
+  // between them, and a gap is something you see faster than you read.
+  const calibrationReadLabels = { overconfident: "you tend to feel more sure than outcomes back up", underconfident: "you tend to doubt yourself more than outcomes warrant", calibrated: "your confidence roughly tracks how things actually go" };
+  let calibrationBlock;
+  if (calibration && calibration.read !== "not-enough") {
+    const gapLabel = calibration.read === "calibrated" ? "Well calibrated" : `${calibration.read === "overconfident" ? "Overconfident" : "Underconfident"} by ${Math.abs(calibration.gap)} pts`;
+    calibrationBlock = `
+      <div class="bb-glance-block">
+        <p class="bb-glance-label">Judgment Calibration</p>
+        <div class="bb-glance-bar-row"><div class="bb-glance-bar-label"><span>Felt sure</span><strong>${calibration.avgConfidence}%</strong></div><div class="bb-glance-bar-track"><span class="bb-glance-bar-fill bb-glance-bar-felt" style="width:${calibration.avgConfidence}%"></span></div></div>
+        <div class="bb-glance-bar-row"><div class="bb-glance-bar-label"><span>Actually matched</span><strong>${calibration.avgAccuracy}%</strong></div><div class="bb-glance-bar-track"><span class="bb-glance-bar-fill bb-glance-bar-actual" style="width:${calibration.avgAccuracy}%"></span></div></div>
+        <p class="bb-glance-verdict"><strong>${escapeHTML(gapLabel)}</strong> - ${escapeHTML(calibrationReadLabels[calibration.read] || "")}</p>
+      </div>
+    `;
+  } else {
+    calibrationBlock = `
+      <div class="bb-glance-block">
+        <p class="bb-glance-label">Judgment Calibration</p>
+        <p class="bb-glance-sub">Not enough resolved decisions yet - Future Scan Check-Backs feed this.</p>
+      </div>
+    `;
+  }
+
+  // Pull one real, human-readable "then -> now" change instead of just a
+  // version count - a count alone doesn't show that anything actually
+  // shifted, and the identity-evolution comparison (blueprintEvolutionSummary,
+  // Identity domain round) already computed exactly this.
+  let blueprintChange = "";
+  if (blueprintSummary) {
+    if (blueprintSummary.valuesDropped.length && blueprintSummary.valuesAdded.length) {
+      blueprintChange = `${blueprintSummary.valuesDropped[0]} → ${blueprintSummary.valuesAdded[0]}`;
+    } else if (blueprintSummary.strengthsDropped.length && blueprintSummary.strengthsAdded.length) {
+      blueprintChange = `${blueprintSummary.strengthsDropped[0]} → ${blueprintSummary.strengthsAdded[0]}`;
+    } else {
+      const changedField = blueprintSummary.styleFields.find((field) => field.changed);
+      if (changedField) blueprintChange = `${changedField.label}: ${changedField.then || "?"} → ${changedField.now || "?"}`;
+    }
+  }
+  const blueprintBlock = `
+    <div class="bb-glance-block">
+      <p class="bb-glance-label">Blueprint - ${blueprintVersions} version${blueprintVersions === 1 ? "" : "s"}</p>
+      ${blueprintChange ? `<p class="bb-glance-chip">${escapeHTML(blueprintChange)}</p>` : `<p class="bb-glance-sub">${blueprintVersions ? "saved so far" : "not started yet"}</p>`}
+    </div>
+  `;
+
+  const entriesBlock = `
+    <div class="bb-glance-block">
+      <p class="bb-glance-label">${totalEntries} thing${totalEntries === 1 ? "" : "s"} remembered</p>
+      <p class="bb-glance-sub">${distinctAreas ? `across ${distinctAreas} area${distinctAreas === 1 ? "" : "s"} of your life` : "nothing saved yet"}</p>
+    </div>
+  `;
+
   return `
     <p class="bb-glance-title">Growth at a glance</p>
-    <div class="bb-glance-row">${calibrationRow}</div>
-    <div class="bb-glance-row"><strong>${blueprintVersions} Blueprint version${blueprintVersions === 1 ? "" : "s"}</strong><span>${blueprintVersions >= 2 ? "values have shifted since your first one" : "saved so far"}</span></div>
-    <div class="bb-glance-row"><strong>${totalEntries} real ${totalEntries === 1 ? "entry" : "entries"}</strong><span>remembered across everything you've used here</span></div>
+    ${calibrationBlock}
+    ${blueprintBlock}
+    ${entriesBlock}
   `;
 }
 
