@@ -17688,6 +17688,15 @@ async function sendChatMessage(text) {
     const matchedTool = toolCall && toolCall.tool === "open_tool"
       ? commandLauncherCommands().find((command) => command.id === toolCall.tool_id)
       : null;
+    // The 4 "just do it" execution tools previously left the user with only
+    // 2BB's word that something real changed - no way to actually see it,
+    // unlike open_tool which always offers a jump-to button. Same lookup
+    // discipline as matchedTool above: resolved against the real catalog,
+    // never assumed to exist.
+    const autoActionCommandIds = { log_savings: "money-plan", log_rejection: "rejection-list", log_mood: "mood", log_journal: "journal" };
+    const autoActionTool = toolCall && autoActionCommandIds[toolCall.tool]
+      ? commandLauncherCommands().find((command) => command.id === autoActionCommandIds[toolCall.tool])
+      : null;
     if (toolCall && toolCall.tool === "remember_this") {
       saveLifeMemoryFromChat(toolCall);
     }
@@ -17713,7 +17722,9 @@ async function sendChatMessage(text) {
       from: "assistant",
       text: displayText,
       createdAt: new Date().toISOString(),
-      suggestedOpen: matchedTool ? { id: matchedTool.id, title: matchedTool.title } : null
+      suggestedOpen: matchedTool
+        ? { id: matchedTool.id, title: matchedTool.title }
+        : (autoActionTool ? { id: autoActionTool.id, title: autoActionTool.title } : null)
     });
     saveChatState();
     speak(displayText);
