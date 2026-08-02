@@ -4081,6 +4081,7 @@ function commandLauncherCommands() {
     { id: "ghost-roommate", title: "Ghost Roommate", detail: "Move in with someone - a relationship that remembers.", lane: "People & Boundaries", tab: "secondBrain", open: "ghostRoommate", icon: "icon-home.png", keywords: ["roommate", "relationship", "living together"] },
     { id: "end-relationship-well", title: "Ending a relationship well", detail: "A clean ending without ghosting or blowing up.", lane: "People & Boundaries", tab: "secondBrain", open: "skillGuideDetail", payload: "end-a-relationship-well", icon: "icon-boundary.png", keywords: ["breakup", "relationship", "ending"] },
     { id: "living-with-someone", title: "Living with someone", detail: "Check agreements, chores, quiet hours, repair conversations.", lane: "People & Boundaries", tab: "secondBrain", open: "skillGuideDetail", payload: "before-renting-room", icon: "icon-home.png", keywords: ["roommate", "living", "chores", "agreement"] },
+    { id: "civic-duties-basics", title: "Voting and civic duties", detail: "What's automatic, what you have to act on yourself, and what's just internet noise.", lane: "Practical & Safety", tab: "secondBrain", open: "skillGuideDetail", payload: "civic-duties-basics", icon: "icon-guide.png", keywords: ["vote", "voting", "election", "national service", "civic", "town council"] },
     { id: "jury-trial", title: "Jury Duty on Yourself", detail: "Put a real decision on trial.", lane: "Advanced Labs", tab: "secondBrain", open: "juryTrial", icon: "icon-balance.png", keywords: ["jury", "trial", "decision", "verdict"] },
     { id: "failure-inoculation", title: "Failure Inoculation", detail: "This week's task is designed to fail. That is the point.", lane: "Advanced Labs", tab: "secondBrain", open: "failureInoculation", icon: "icon-warning.png", keywords: ["failure", "inoculation", "resilience"] },
     { id: "legacy-debugger", title: "Inherited Debugging", detail: "Refactor habits you did not choose, issue by issue.", lane: "Advanced Labs", tab: "secondBrain", open: "legacyDebugger", icon: "icon-settings.png", keywords: ["inherited", "habits", "debug", "refactor"] },
@@ -13153,9 +13154,11 @@ const screens = {
         <span>Status</span>
         <strong>${notificationStatusLabel()}</strong>
       </div>
-      ${typeof Notification !== "undefined" && Notification.permission === "denied"
-        ? `<p class="muted">Blocked in your browser's site settings - change it there to re-enable, this app can't re-ask.</p>`
-        : `<button class="secondary-action" type="button" data-toggle-notifications>${userProfile.notificationsEnabled ? "Turn off notifications" : "Turn on notifications"}</button>`}
+      ${typeof Notification === "undefined"
+        ? `<p class="muted">Your browser doesn't support notifications - nothing to turn on here.</p>`
+        : Notification.permission === "denied"
+          ? `<p class="muted">Blocked in your browser's site settings - change it there to re-enable, this app can't re-ask.</p>`
+          : `<button class="secondary-action" type="button" data-toggle-notifications>${userProfile.notificationsEnabled ? "Turn off notifications" : "Turn on notifications"}</button>`}
     </section>
     <div class="profile-actions">
       <button class="secondary-action" type="button" data-open="supportCircle">Support Circle</button>
@@ -18261,13 +18264,13 @@ document.addEventListener("click", async (event) => {
     beforeYouTextContext = cleanText(contextInput ? contextInput.value : "", 200);
     if (!beforeYouTextMessage) {
       beforeYouTextError = "Paste the message first.";
-      renderScreen(activeTab);
+      openModal("beforeYouText");
       return;
     }
     beforeYouTextLoading = true;
     beforeYouTextError = "";
     beforeYouTextResult = "";
-    renderScreen(activeTab);
+    openModal("beforeYouText");
     try {
       beforeYouTextResult = await reviewBeforeYouText(beforeYouTextMessage, beforeYouTextContext);
       trackerState.beforeYouTextHistory.unshift({ id: `byt-${Date.now()}`, user_id: currentUserId(), message: cleanText(beforeYouTextMessage, 150), result: cleanText(beforeYouTextResult, 150), createdAt: new Date().toISOString() });

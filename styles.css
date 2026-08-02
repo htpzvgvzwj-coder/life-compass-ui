@@ -12103,9 +12103,17 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
 }
 
 @media (max-width: 760px) {
+  /* Stays visible and flows in normal document order right after the
+     domain grid above (both become position:static together) instead of
+     disappearing entirely - Quick Jump/SOS/the domain grid all keep their
+     mobile content this way, this panel should not be the one exception
+     that only exists on desktop. */
   body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-glance-panel,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-glance-panel {
-    display: none;
+    position: static;
+    width: auto;
+    height: auto;
+    margin-top: 10px;
   }
 }
 
