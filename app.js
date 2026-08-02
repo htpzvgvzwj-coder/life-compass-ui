@@ -509,7 +509,15 @@ const defaultUserProfile = {
   background: "",
   startingTrait: "",
   difficulty: "standard",
-  characterCreated: false
+  characterCreated: false,
+  // Phase B of closing compass_push_notification_gap: real OS-level
+  // notifications via the browser Notification API, not true Web Push -
+  // no service worker, no backend subscription storage, deliberately
+  // scoped down from full push (see requestCompassNotificationPermission).
+  // This is the user's own opt-in intent, separate from the browser's
+  // actual granted/denied permission state - both must be true for a
+  // notification to actually fire (see fireProactiveNotification).
+  notificationsEnabled: false
 };
 
 function lifeVerseEngine() {
@@ -4686,14 +4694,82 @@ async function runCompassInsights({ force = false } = {}) {
   return true;
 }
 
+// Real OS-level notification via the plain Notification API - deliberately
+// NOT Web Push (see compass_push_notification_gap): no service worker, no
+// backend subscription storage, no VAPID keys. This only fires while the
+// app is open in some browser tab (even backgrounded/unfocused) - closing
+// the browser entirely still means silence, same honest limitation as
+// before, just a real improvement over "only when you happen to be on the
+// 2BB tab specifically." Requires both the user's own opt-in
+// (userProfile.notificationsEnabled) AND the browser's actual granted
+// permission - either alone is not enough.
+function fireProactiveNotification(text) {
+  if (!userProfile.notificationsEnabled) return;
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  try {
+    const notification = new Notification("2BB", { body: text, tag: "compass-proactive" });
+    notification.onclick = () => {
+      window.focus();
+      renderScreen("compass");
+      notification.close();
+    };
+  } catch (error) {
+    console.error("[Compass AI] Notification failed to fire", error);
+  }
+}
+
+// Settings toggle handler - Notification.requestPermission() must be
+// triggered by a real user gesture (a button click), never fired
+// automatically on page load, so this is only ever called from the
+// data-toggle-notifications click handler in bindRenderedNavigation.
+function requestCompassNotificationPermission() {
+  if (typeof Notification === "undefined") {
+    userProfile.notificationsEnabled = false;
+    saveUserProfile();
+    renderScreen(activeTab);
+    return;
+  }
+  if (Notification.permission === "granted") {
+    userProfile.notificationsEnabled = true;
+    saveUserProfile();
+    renderScreen(activeTab);
+    return;
+  }
+  if (Notification.permission === "denied") {
+    // The browser blocks re-prompting once denied - reflect the real
+    // state honestly instead of pretending the toggle did something.
+    userProfile.notificationsEnabled = false;
+    saveUserProfile();
+    renderScreen(activeTab);
+    return;
+  }
+  Notification.requestPermission().then((result) => {
+    userProfile.notificationsEnabled = result === "granted";
+    saveUserProfile();
+    renderScreen(activeTab);
+  });
+}
+
+function notificationStatusLabel() {
+  if (typeof Notification === "undefined") return "Not supported in this browser";
+  if (Notification.permission === "denied") return "Blocked in browser settings";
+  if (userProfile.notificationsEnabled && Notification.permission === "granted") return "On";
+  return "Off";
+}
+
 // Shared by every proactive-message source (fresh aiInsights, stale
 // check-ins) so delivery is one code path - see requestCompassAI (low/mid
 // tier: folded into the AI's next reply) and applyPendingProactiveMessage
 // (high tier: Compass speaks first when the chat screen opens). Capped so
-// a quiet user can't accumulate an unbounded backlog.
+// a quiet user can't accumulate an unbounded backlog. High trust tier also
+// fires a real notification here, immediately - this is the actual "AI
+// reaches out first" moment, not gated behind the user happening to open
+// the 2BB tab (applyPendingProactiveMessage still separately delivers the
+// same message into the chat thread itself when they do).
 function queueProactiveMessage(type, text) {
   trackerState.proactiveQueue.push({ id: `proactive-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, text: cleanText(text, 220), createdAt: new Date().toISOString() });
   trackerState.proactiveQueue = trackerState.proactiveQueue.slice(-5);
+  if (trustTier() === "high") fireProactiveNotification(text);
 }
 
 // A real friend checks back on something you mentioned and never heard
@@ -12934,6 +13010,17 @@ const screens = {
       </div>
       <button class="secondary-action signout-action" type="button" data-save-voice>Save voice preference</button>
     </section>
+    <section class="profile-card">
+      <p class="eyebrow">Compass AI notifications</p>
+      <p class="muted">When 2BB notices something worth reaching out about on its own (not just replying to you), it can send a real notification - even if you're on a different tab. This only works while this app is open in a browser tab somewhere; closing the browser entirely still means silence.</p>
+      <div class="toggle-row">
+        <span>Status</span>
+        <strong>${notificationStatusLabel()}</strong>
+      </div>
+      ${typeof Notification !== "undefined" && Notification.permission === "denied"
+        ? `<p class="muted">Blocked in your browser's site settings - change it there to re-enable, this app can't re-ask.</p>`
+        : `<button class="secondary-action" type="button" data-toggle-notifications>${userProfile.notificationsEnabled ? "Turn off notifications" : "Turn on notifications"}</button>`}
+    </section>
     <div class="profile-actions">
       <button class="secondary-action" type="button" data-open="supportCircle">Support Circle</button>
       <button class="secondary-action" type="button" data-open="receiptPlan">Receipt Plan</button>
@@ -17724,6 +17811,7 @@ document.addEventListener("click", async (event) => {
   const saveAiProfile = event.target.closest("[data-save-ai-profile]");
   const completeMission = event.target.closest("[data-complete-mission]");
   const saveVoice = event.target.closest("[data-save-voice]");
+  const toggleNotifications = event.target.closest("[data-toggle-notifications]");
   const startRoleplay = event.target.closest("[data-start-roleplay]");
   const sendRoleplay = event.target.closest("[data-send-roleplay]");
   const finishRoleplay = event.target.closest("[data-finish-roleplay]");
@@ -18688,6 +18776,16 @@ document.addEventListener("click", async (event) => {
     saveUserProfile();
     renderScreen(activeTab);
     refreshStaticScreens();
+  }
+
+  if (toggleNotifications) {
+    if (userProfile.notificationsEnabled) {
+      userProfile.notificationsEnabled = false;
+      saveUserProfile();
+      renderScreen(activeTab);
+    } else {
+      requestCompassNotificationPermission();
+    }
   }
 
   if (startRoleplay) {
