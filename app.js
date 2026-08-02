@@ -559,7 +559,17 @@ const defaultTrackerState = {
   ],
   assessment: null,
   missionProgress: [],
-  roleplaySessions: [],
+  roleplaySessions: [
+    {
+      id: "roleplay-demo-1", user_id: DEMO_USER_ID, scenario_type: "parent-independence",
+      summary: "Practiced asking parents for more independence before actually bringing it up for real.",
+      messages: [
+        { sender: "assistant", message: "You're still under my roof, so what makes you think this is just your decision to make?" },
+        { sender: "user", message: "I get that, but I'm managing my own money and schedule now, so I think a later curfew makes sense." }
+      ],
+      started_at: "2026-07-19T19:50:00.000Z"
+    }
+  ],
   supportContacts: [
     { id: "support-demo-1", user_id: DEMO_USER_ID, name: "Wei Jie", relationship: "Best friend", phone: "9123 4567", preferred_contact_method: "Text", lastContactedAt: demoDateOnlyDaysAgo(18), note: "Would actually call at 2am if things got bad.", created_at: "2026-06-10T00:00:00.000Z", updated_at: "2026-07-14T00:00:00.000Z" }
   ],
@@ -687,7 +697,18 @@ const defaultTrackerState = {
   // session accumulates every station's result rather than 10 separate
   // arrays. Plugs into the existing reflection-resurfacing system
   // (allReflectionLikeEntries/dueForResurfacing) as a third _source.
-  futureScans: [],
+  futureScans: [
+    {
+      id: "scan-demo-1", user_id: DEMO_USER_ID,
+      scanContext: {
+        rawInput: "Whether to actually pursue the analyst role Ms Tan offered to refer me for",
+        clarifyingQuestion: "Is this role something you actually want, or mainly because the referral makes it easy?",
+        clarifyingAnswer: "Mostly the second one if I'm honest, not sure it's actually what I want long-term"
+      },
+      stations: {},
+      createdAt: "2026-07-15T12:00:00.000Z"
+    }
+  ],
   // Judgment calibration (GitHub research idea, inspired by Decidr): a
   // permanent record per resolved Check-Back, independent of the live
   // checkBack station state (which can be reset/overwritten per scan) -
@@ -1699,7 +1720,7 @@ const chatState = normalizeChatState(loadSessionJson(scopedKey("steadyChatState"
 // marker so refreshing mid-demo doesn't keep wiping out anything typed
 // live during the demo itself - bump DEMO_SEED_VERSION to force a re-seed
 // if the seeded content is ever edited again).
-const DEMO_SEED_VERSION = "2026-08-01-v4";
+const DEMO_SEED_VERSION = "2026-08-01-v5";
 if (currentUserId() === DEMO_USER_ID && localStorage.getItem("compassDemoSeedVersion") !== DEMO_SEED_VERSION) {
   Object.assign(trackerState, JSON.parse(JSON.stringify(defaultTrackerState)));
   chatState.messages = JSON.parse(JSON.stringify(defaultChatState.messages));
@@ -12625,13 +12646,14 @@ const screens = {
   compass: () => {
     const dueSoon = dueRealLifeEvents()[0] || null;
     const loops = openLoopsEntries().slice(0, 3);
-    // 7, not 3 - wide enough to surface a real spread of distinct feature
-    // types (mood, journal, rejection list, before-you-text, remembered
-    // decisions, quick call, calm reset all showed up here with the demo
-    // data) rather than just whichever 3 happen to be most recent, which
-    // tended to cluster on one day. .bb-row scrolls horizontally at this
-    // width instead of squeezing every card unreadably thin.
-    const shelfEntries = historySearchEntries().slice(0, 7);
+    // 9, not 3 - wide enough to surface a real spread of distinct feature
+    // types (mood, journal, rejection list, before-you-text, roleplay
+    // practice, future scan, remembered decisions, interview practice,
+    // quick call all showed up here with the demo data) rather than just
+    // whichever few happen to be most recent, which tended to cluster on
+    // one day. .bb-row scrolls horizontally at this width instead of
+    // squeezing every card unreadably thin.
+    const shelfEntries = historySearchEntries().slice(0, 9);
     return `
     <div class="bb-card">
       <div class="bb-card-inner">
