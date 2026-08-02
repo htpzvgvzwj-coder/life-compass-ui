@@ -45,6 +45,7 @@ const navItems = [...document.querySelectorAll(".nav-item")];
 const viewButtons = [...document.querySelectorAll(".view-button")];
 const staticScreens = [...document.querySelectorAll("[data-static-screen]")];
 const desktopRightRail = document.querySelector("#desktop-right-rail");
+const bbGlancePanel = document.querySelector("#bb-glance-panel");
 
 const ADMIN_PASSCODE = "STEADY-ADMIN";
 // AI Coach (Future Mirror bible Ch.8) - built after Blueprint/Reflection/
@@ -714,7 +715,16 @@ const defaultTrackerState = {
   // checkBack station state (which can be reset/overwritten per scan) -
   // this is what lets calibrationStats() aggregate across every decision
   // the user has ever checked back on, not just the current one.
-  calibrationRecords: [],
+  // 3 records is the minimum calibrationStats() needs before it reads as
+  // anything other than "not-enough" - these 3 (85/80/90 confidence vs
+  // matched/partial/missed outcomes) average to a real ~35-point
+  // confidence-vs-accuracy gap, which is what actually makes this a
+  // genuine, distinctive insight to show rather than an empty stat.
+  calibrationRecords: [
+    { id: "cal-demo-1", user_id: DEMO_USER_ID, scanId: null, confidence: 85, outcomeMatch: "matched", situationSummary: "Group project partner would pull their weight", resolvedAt: "2026-06-30T10:00:00.000Z" },
+    { id: "cal-demo-2", user_id: DEMO_USER_ID, scanId: null, confidence: 80, outcomeMatch: "partial", situationSummary: "Landing the analyst-role referral interview", resolvedAt: "2026-07-16T10:00:00.000Z" },
+    { id: "cal-demo-3", user_id: DEMO_USER_ID, scanId: "scan-demo-1", confidence: 90, outcomeMatch: "missed", situationSummary: "The referral role turning out to be a good fit", resolvedAt: "2026-07-29T10:00:00.000Z" }
+  ],
   // Real Life Events (self-audit finding): every existing "due" mechanism
   // in Compass - Self-Debt, resurfacing, Check-Back - is an app-invented
   // reminder about the user's own reflections, not a real external
@@ -1720,7 +1730,7 @@ const chatState = normalizeChatState(loadSessionJson(scopedKey("steadyChatState"
 // marker so refreshing mid-demo doesn't keep wiping out anything typed
 // live during the demo itself - bump DEMO_SEED_VERSION to force a re-seed
 // if the seeded content is ever edited again).
-const DEMO_SEED_VERSION = "2026-08-01-v5";
+const DEMO_SEED_VERSION = "2026-08-01-v6";
 if (currentUserId() === DEMO_USER_ID && localStorage.getItem("compassDemoSeedVersion") !== DEMO_SEED_VERSION) {
   Object.assign(trackerState, JSON.parse(JSON.stringify(defaultTrackerState)));
   chatState.messages = JSON.parse(JSON.stringify(defaultChatState.messages));
@@ -3896,6 +3906,36 @@ function desktopRightRailHtml(tab) {
 function refreshDesktopRightRail(tab = activeTab) {
   if (!desktopRightRail) return;
   desktopRightRail.innerHTML = desktopRightRailHtml(tab);
+}
+
+// "Growth at a glance" - fills the real blank space between Quick Jump/SOS
+// and the 8-domain grid with 3 live-computed numbers, not decoration.
+// Deliberately not a check-in streak (that would need several consecutive
+// real days of mood entries relative to whenever this actually loads,
+// which is fragile the same way lastContactedAt/dueDate would be if
+// hardcoded - see demoDateOnlyDaysAgo() above). All 3 numbers here are
+// either count-based or content-based, so they're correct immediately
+// and stay correct regardless of the real calendar date. Works honestly
+// for a genuinely fresh account too - zero everywhere, not hidden.
+function growthGlancePanelHtml() {
+  const calibration = calibrationStats();
+  const blueprintVersions = trackerState.blueprint.history.length;
+  const totalEntries = historySearchEntries().length;
+  const calibrationReadLabels = { overconfident: "you tend to feel more sure than outcomes back up", underconfident: "you tend to doubt yourself more than outcomes warrant", calibrated: "your confidence roughly tracks how things actually go", "not-enough": "not enough resolved decisions yet to read a pattern" };
+  const calibrationRow = calibration
+    ? `<strong>${calibration.avgConfidence}% confident, ${calibration.avgAccuracy}% matched</strong><span>${calibrationReadLabels[calibration.read] || ""}</span>`
+    : `<strong>Judgment Calibration</strong><span>Not enough resolved decisions yet - Future Scan Check-Backs feed this.</span>`;
+  return `
+    <p class="bb-glance-title">Growth at a glance</p>
+    <div class="bb-glance-row">${calibrationRow}</div>
+    <div class="bb-glance-row"><strong>${blueprintVersions} Blueprint version${blueprintVersions === 1 ? "" : "s"}</strong><span>${blueprintVersions >= 2 ? "values have shifted since your first one" : "saved so far"}</span></div>
+    <div class="bb-glance-row"><strong>${totalEntries} real ${totalEntries === 1 ? "entry" : "entries"}</strong><span>remembered across everything you've used here</span></div>
+  `;
+}
+
+function refreshGrowthGlancePanel() {
+  if (!bbGlancePanel) return;
+  bbGlancePanel.innerHTML = growthGlancePanelHtml();
 }
 
 function commandLauncherCommands() {
@@ -14770,6 +14810,7 @@ function renderScreen(tab) {
   screenRoot.innerHTML = getScreen(tab);
   bindRenderedNavigation(screenRoot);
   refreshDesktopRightRail(tab);
+  refreshGrowthGlancePanel();
   if (tab === "discover") mountFeedSwipeCard();
   const navTab = tab === "assess" || tab === "compass" ? "secondBrain" : tab === "stories" ? "discover" : tab;
   navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.tab === navTab));
