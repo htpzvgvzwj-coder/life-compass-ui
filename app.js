@@ -700,7 +700,7 @@ const defaultTrackerState = {
   // deadline. This is the one category with a genuine user-entered due
   // date (rent, bills, renewals, appointments) - see pendingInboxItems().
   realLifeEvents: [
-    { id: "rle-demo-1", user_id: DEMO_USER_ID, title: "BTO ballot results out", dueDate: demoDateOnlyDaysAgo(7), recurrence: "once", note: "Check HDB portal for the result.", category: "milestone", status: "active", createdAt: "2026-06-20T00:00:00.000Z", lastHandledAt: null }
+    { id: "rle-demo-1", user_id: DEMO_USER_ID, title: "BTO ballot results out", dueDate: demoDateOnlyDaysAgo(20), recurrence: "once", note: "Check HDB portal for the result.", category: "milestone", status: "active", createdAt: "2026-06-20T00:00:00.000Z", lastHandledAt: null }
   ],
   // Skill Guides progress (self-audit finding): every existing coaching
   // surface is chat/roleplay-shaped, which can't actually teach a hands-on
@@ -1250,7 +1250,23 @@ const defaultChatState = {
       createdAt: "2026-06-08T10:18:00.000Z",
       suggestedOpen: { id: "blueprint", title: "Discover Yourself" }
     },
-    // Segment 2 - Money (Jun 15)
+    {
+      from: "user",
+      text: "ok going to try it now",
+      createdAt: "2026-06-08T10:25:00.000Z"
+    },
+    // Segment 2 - finished Blueprint (Jun 12)
+    {
+      from: "user",
+      text: "finished my blueprint just now, kind of interesting seeing it laid out like that",
+      createdAt: "2026-06-12T16:40:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Nice one - now you've actually got something for the other tools to read off lah, not just vibes. Growth, Independence, Stability came out as your top values, if that sounds off just redo it whenever, it's not locked in.",
+      createdAt: "2026-06-12T16:41:00.000Z"
+    },
+    // Segment 3 - Money (Jun 15)
     {
       from: "user",
       text: "just set up my money plan sia, take home only like 2200 from internship + tuition gigs, feel a bit shiok that i actually sat down and did it though",
@@ -1261,7 +1277,17 @@ const defaultChatState = {
       text: "That's already a win can - a lot of people never even sit down to look at the number properly. With $2200 the 55/25/20 split gives you about $1210 needs, $550 wants, $440 savings a month. Emergency fund target $3000 - roughly 7 months at this pace, quite realistic one, not aggressive.",
       createdAt: "2026-06-15T19:03:00.000Z"
     },
-    // Segment 3 - Career (Jun 22)
+    {
+      from: "user",
+      text: "damn that's a lot of admin lol but ok",
+      createdAt: "2026-06-15T19:05:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Heh, welcome to adulting lor. At least now it's an actual plan instead of just hoping the money lasts.",
+      createdAt: "2026-06-15T19:06:00.000Z"
+    },
+    // Segment 4 - Career (Jun 22)
     {
       from: "user",
       text: "put together my resume finally, feels rough leh",
@@ -1273,7 +1299,17 @@ const defaultChatState = {
       createdAt: "2026-06-22T14:32:00.000Z",
       suggestedOpen: { id: "career-studio", title: "Career Studio" }
     },
-    // Segment 4 - Independent living (Jun 26)
+    {
+      from: "user",
+      text: "checked job matching, apparently i'm 72% match for something called Operations/Project Management",
+      createdAt: "2026-06-22T15:10:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "That actually tracks - Organisation is one of your top strengths from the Blueprint. Worth a proper look, but don't force it either just because the number is decent ah.",
+      createdAt: "2026-06-22T15:12:00.000Z"
+    },
+    // Segment 5 - Independent living (Jun 26)
     {
       from: "user",
       text: "thinking of moving out next year, honestly dunno how the whole transport concession card and stuff works sia",
@@ -1285,7 +1321,7 @@ const defaultChatState = {
       createdAt: "2026-06-26T13:12:00.000Z",
       suggestedOpen: { id: "skill-guides", title: "Skill Guides" }
     },
-    // Segment 5 - Relationships (Jun 29)
+    // Segment 6 - Relationships (Jun 29)
     {
       from: "user",
       text: "added my project mentor Ms Tan to my network contacts, she offered to refer me for an analyst role!! quite happy about this one",
@@ -1296,7 +1332,17 @@ const defaultChatState = {
       text: "Wah, that's a real lead sia, worth following up on directly instead of letting it sit in your contacts list lor. Message her back this week while it's still fresh, don't wait until it goes cold.",
       createdAt: "2026-06-29T09:11:00.000Z"
     },
-    // Segment 6 - Emotional resilience (Jul 6)
+    {
+      from: "user",
+      text: "messaged her already, she replied fast which is a good sign right",
+      createdAt: "2026-06-29T09:40:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Yeah, a fast reply usually means it's a real lead and not just a polite gesture lor. Good sign.",
+      createdAt: "2026-06-29T09:41:00.000Z"
+    },
+    // Segment 7 - Emotional resilience (Jul 6)
     {
       from: "user",
       text: "kind of a rough week, keep comparing myself to people who already started work or are doing NS",
@@ -1307,7 +1353,17 @@ const defaultChatState = {
       text: "Eh, that's worth sitting with for a bit instead of just pushing past it lah. A few low days doesn't mean something's wrong, and comparing your real timeline to everyone else's highlight reel never really holds up. If it helps, there's a 5-4-3-2-1 grounding thing in SOS, takes about 2 minutes, don't even need to explain anything to anyone.",
       createdAt: "2026-07-06T21:49:00.000Z"
     },
-    // Segment 7 - Decision-making (Jul 13)
+    {
+      from: "user",
+      text: "did the grounding thing just now, feel a bit better actually",
+      createdAt: "2026-07-06T22:10:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Good, that's the point ah - doesn't fix everything but takes the edge off enough to think straight again.",
+      createdAt: "2026-07-06T22:11:00.000Z"
+    },
+    // Segment 8 - Decision-making / interview (Jul 13)
     {
       from: "user",
       text: "did my first mock interview today, way more nervous than i expected",
@@ -1328,7 +1384,7 @@ const defaultChatState = {
       text: "Hah, for a decision that small, picking one and actually going beats overthinking it every time can.",
       createdAt: "2026-07-13T19:01:00.000Z"
     },
-    // Segment 8 - Civic (Jul 17)
+    // Segment 9 - Civic (Jul 17)
     {
       from: "user",
       text: "saw a broken lift in my block for like 2 weeks now, kind of annoyed, dunno who to even complain to",
@@ -1339,7 +1395,7 @@ const defaultChatState = {
       text: "That one's actually a specific channel thing ah - OneService app handles stuff like broken lifts/litter/pests, goes straight to whoever owns the issue instead of you guessing. Town Council is more for estate-level upgrading and events, not day-to-day repairs like this one.",
       createdAt: "2026-07-17T18:32:00.000Z"
     },
-    // Segment 9 - Rejection List + identity/Blueprint evolution (Jul 20)
+    // Segment 10 - Rejection List + identity/Blueprint evolution (Jul 20)
     {
       from: "user",
       text: "i turned down that 'exposure' internship, unpaid and honestly they just wanted free labor",
@@ -1351,7 +1407,17 @@ const defaultChatState = {
       createdAt: "2026-07-20T11:06:00.000Z",
       suggestedOpen: { id: "knowledge-vault", title: "Knowledge Vault" }
     },
-    // Segment 10 - Money follow-up + wrap-up (Jul 28, Aug 1)
+    {
+      from: "user",
+      text: "just looked at it, wild that the motivation thing changed that much",
+      createdAt: "2026-07-20T20:00:00.000Z"
+    },
+    {
+      from: "assistant",
+      text: "Makes sense though - back in June you needed someone checking in on you to actually follow through, now you're doing stuff like this on your own initiative. That's a real shift, not random lah.",
+      createdAt: "2026-07-20T20:01:00.000Z"
+    },
+    // Segment 11 - Money follow-up (Jul 28)
     {
       from: "user",
       text: "saved another $80 from tuition this week",
@@ -1362,6 +1428,7 @@ const defaultChatState = {
       text: "Added that to your Emergency fund - you're a good way toward the $3000 target now. Keep this pace and you'll get there without changing anything else can.",
       createdAt: "2026-07-28T20:16:00.000Z"
     },
+    // Segment 12 - wrap-up (Aug 1)
     {
       from: "user",
       text: "morning! anything I should look at today",
@@ -1632,7 +1699,7 @@ const chatState = normalizeChatState(loadSessionJson(scopedKey("steadyChatState"
 // marker so refreshing mid-demo doesn't keep wiping out anything typed
 // live during the demo itself - bump DEMO_SEED_VERSION to force a re-seed
 // if the seeded content is ever edited again).
-const DEMO_SEED_VERSION = "2026-08-01-v3";
+const DEMO_SEED_VERSION = "2026-08-01-v4";
 if (currentUserId() === DEMO_USER_ID && localStorage.getItem("compassDemoSeedVersion") !== DEMO_SEED_VERSION) {
   Object.assign(trackerState, JSON.parse(JSON.stringify(defaultTrackerState)));
   chatState.messages = JSON.parse(JSON.stringify(defaultChatState.messages));
