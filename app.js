@@ -666,6 +666,13 @@ const defaultTrackerState = {
   // discipline as personalityRead itself. Cached with version markers so
   // it only regenerates when either underlying input actually changed.
   selfPerceptionRead: { note: "", generatedForBlueprintVersion: 0, generatedForBasedOnCount: 0 },
+  // Chapter Recap: a short AI-written narrative pulling together real
+  // events from historySearchEntries() across the last 30 days into one
+  // story, instead of the user having to piece it together themselves
+  // across a dozen separate trackers. User-triggered only (not a
+  // background job like personalityRead/aiInsights) since it's a heavier
+  // synthesis over many real entries at once, not a small per-event check.
+  chapterRecap: { text: "", generatedAt: null, entryCount: 0 },
   // Open Loops "not ready to face this yet" button - snoozes one specific
   // derived loop for a week without pretending it's resolved (unlike the
   // other two buttons, this doesn't create any new record, just delays
@@ -1587,6 +1594,7 @@ let isCompassResponding = false;
 let isCompassInsightsRefreshing = false;
 let isPersonalityReadRefreshing = false;
 let isSelfPerceptionReadRefreshing = false;
+let isChapterRecapRunning = false;
 // Quick capture Inbox (text-only v1): draft text -> AI classifies into one
 // of 7 categories -> user confirms before anything is actually saved.
 let quickCaptureText = "";
@@ -1845,6 +1853,7 @@ function normalizeTrackerState(state) {
     proactiveQueue: Array.isArray(state.proactiveQueue) ? state.proactiveQueue : fallback.proactiveQueue,
     personalityRead: state.personalityRead && typeof state.personalityRead === "object" ? { ...fallback.personalityRead, ...state.personalityRead, traits: state.personalityRead.traits && typeof state.personalityRead.traits === "object" ? state.personalityRead.traits : {} } : fallback.personalityRead,
     selfPerceptionRead: state.selfPerceptionRead && typeof state.selfPerceptionRead === "object" ? { ...fallback.selfPerceptionRead, ...state.selfPerceptionRead } : fallback.selfPerceptionRead,
+    chapterRecap: state.chapterRecap && typeof state.chapterRecap === "object" ? { ...fallback.chapterRecap, ...state.chapterRecap } : fallback.chapterRecap,
     openLoopsSnoozed: Array.isArray(state.openLoopsSnoozed) ? state.openLoopsSnoozed : fallback.openLoopsSnoozed,
     challengeProgress: Array.isArray(state.challengeProgress) ? state.challengeProgress : fallback.challengeProgress,
     savedOpportunities: Array.isArray(state.savedOpportunities) ? state.savedOpportunities : fallback.savedOpportunities,
@@ -4925,6 +4934,48 @@ function maybeRunSelfPerceptionRead() {
   runSelfPerceptionRead().catch((error) => {
     console.error("[Compass AI] Background self-perception read failed.", error);
   });
+}
+
+// Chapter Recap - pulls historySearchEntries() (already the single
+// normalized shape covering 15+ real trackers) down to a rolling window
+// instead of a calendar month, so there's no "empty on the 1st" cliff.
+function chapterRecapEntries(days = 30) {
+  const cutoff = Date.now() - days * 86400000;
+  return historySearchEntries()
+    .filter((entry) => entry.date && new Date(entry.date).getTime() >= cutoff)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+// User-triggered only, unlike personalityRead/selfPerceptionRead's
+// background triggers - this reads across many real entries at once
+// (a heavier synthesis, not a small per-event check), so it stays an
+// explicit action the user asks for, same category as Future Scan.
+// Requires >= 3 real entries in the window - fewer than that isn't a
+// "chapter," it's one or two data points, and forcing a narrative out of
+// that would mean padding with generic text that isn't grounded in
+// anything real.
+async function runChapterRecap() {
+  const entries = chapterRecapEntries();
+  if (entries.length < 3) return false;
+  const linesText = entries.map((entry) => `- [${new Date(entry.date).toLocaleDateString([], { month: "short", day: "numeric" })}] ${entry.type}: ${entry.snippet || entry.title}`).join("\n");
+  const systemPrompt = "You write a short, honest recap (3-5 sentences) of someone's real last 30 days in a personal-growth app, using ONLY the concrete events given to you below - never invent an event, feeling, or outcome that isn't in the list. If a real pattern genuinely connects different events (e.g. a mood dip around a real setback, a decision they actually followed through on), name it - but if the events don't clearly connect, just recap them honestly without forcing a connection that isn't there. Write like a friend who's actually been paying attention, not a corporate wrap-up or a therapist. No generic encouragement that isn't earned by what's actually in the list. Plain text only, no markdown, no bullet points, no preamble.";
+  const userPrompt = `Real events from their last 30 days, oldest first:\n${linesText}\n\nWrite the recap now, grounded strictly in these events.`;
+  const reply = await requestCompassDirect(systemPrompt, userPrompt);
+  trackerState.chapterRecap = { text: cleanText(reply, 900), generatedAt: new Date().toISOString(), entryCount: entries.length };
+  saveTrackerState();
+  return true;
+}
+
+function chapterRecapSectionHtml() {
+  const entries = chapterRecapEntries();
+  const cache = trackerState.chapterRecap;
+  if (!cache.text && entries.length < 3) return "";
+  return `
+    <div>
+      <strong>Your last 30 days</strong>
+      <span>${cache.text ? escapeHTML(cache.text) : `${entries.length} real things happened recently - tap "Recap my last 30 days" below to see them pulled into one story.`}</span>
+    </div>
+  `;
 }
 
 // Fire-and-forget background trigger, same pattern as
@@ -13244,11 +13295,15 @@ const modals = {
         </div>
         <div><strong>Tone read (inferred, not a real assessment)</strong><span>${escapeHTML(personalityReadSummaryText())}</span></div>
         ${selfPerceptionGapSectionHtml()}
+        ${chapterRecapSectionHtml()}
       </div>
       <div class="profile-actions">
         <button class="secondary-action compact-action" type="button" data-refresh-personality-read ${isPersonalityReadRefreshing ? "disabled" : ""}>${isPersonalityReadRefreshing ? "Reading..." : "Refresh tone read"}</button>
         ${selfDescribedIdentitySummary() && Object.keys(trackerState.personalityRead.traits || {}).length
           ? `<button class="secondary-action compact-action" type="button" data-refresh-self-perception ${isSelfPerceptionReadRefreshing ? "disabled" : ""}>${isSelfPerceptionReadRefreshing ? "Comparing..." : "Compare self vs. read"}</button>`
+          : ""}
+        ${chapterRecapEntries().length >= 3
+          ? `<button class="secondary-action compact-action" type="button" data-run-chapter-recap ${isChapterRecapRunning ? "disabled" : ""}>${isChapterRecapRunning ? "Writing..." : (trackerState.chapterRecap.text ? "Refresh recap" : "Recap my last 30 days")}</button>`
           : ""}
       </div>
     </div>
@@ -18029,6 +18084,7 @@ document.addEventListener("click", async (event) => {
   const refreshInsightsButton = event.target.closest("[data-refresh-compass-insights]");
   const refreshPersonalityButton = event.target.closest("[data-refresh-personality-read]");
   const refreshSelfPerceptionButton = event.target.closest("[data-refresh-self-perception]");
+  const runChapterRecapButton = event.target.closest("[data-run-chapter-recap]");
   const openLoopPracticeButton = event.target.closest("[data-open-loop-practice]");
   const openLoopActionButton = event.target.closest("[data-open-loop-action]");
   const openLoopSnoozeButton = event.target.closest("[data-open-loop-snooze]");
@@ -18108,6 +18164,19 @@ document.addEventListener("click", async (event) => {
       console.error("[Compass AI] Manual self-perception comparison failed.", error);
     } finally {
       isSelfPerceptionReadRefreshing = false;
+      renderScreen(activeTab);
+    }
+  }
+
+  if (runChapterRecapButton) {
+    isChapterRecapRunning = true;
+    renderScreen(activeTab);
+    try {
+      await runChapterRecap();
+    } catch (error) {
+      console.error("[Compass AI] Chapter recap failed.", error);
+    } finally {
+      isChapterRecapRunning = false;
       renderScreen(activeTab);
     }
   }
