@@ -10862,12 +10862,29 @@ function discoverTileGrid(tiles, emptyText) {
 // the full opportunity card's own button already triggers - chosen over
 // the external "View opportunity" link as the tile's primary action so
 // tapping a tile doesn't immediately leave the app.
+// Real gap found and fixed after shipping: the first version only showed
+// the static curated list, silently dropping community-submitted
+// opportunities the old communityBrowseOpportunitiesSection()/
+// communityOpportunitiesRail() did include. Merges both real sources now
+// (community ones only when signed in, same status==="published" filter
+// feedBuildItems() already applies) - blocked-submitter filtering isn't
+// replicated here (blockedCommunityUserIds() isn't exposed to app.js),
+// same accepted scope reduction as the Feed tiles already have.
 function discoverOpportunityTiles() {
-  const items = visibleOpportunities().slice(0, 6);
-  return discoverTileGrid(
+  const signedIn = typeof hasCommunitySession === "function" && hasCommunitySession();
+  const staticItems = visibleOpportunities();
+  const communityItems = (signedIn && typeof communityOpportunitiesCacheSnapshot === "function")
+    ? communityOpportunitiesCacheSnapshot().filter((item) => item.status === "published")
+    : [];
+  const items = [...staticItems, ...communityItems].slice(0, 6);
+  // "Share an opportunity" (data-open="communityOpportunitySubmit") is a
+  // real action the old communityOpportunitiesRail() had - restored here,
+  // signed-in only, same reasoning as Connect's restored Blocked/+New.
+  const shareRow = signedIn ? `<div class="discover-connect-switch"><span class="discover-connect-spacer"></span><button type="button" class="discover-mini" data-open="communityOpportunitySubmit">+ Share</button></div>` : "";
+  return `${shareRow}${discoverTileGrid(
     items.map((item) => discoverTile(item.title, item.category, `data-prepare-opportunity="${escapeHTML(item.title)}" data-prepare-opportunity-category="${escapeHTML(item.category)}"`)),
     "No opportunities match right now."
-  );
+  )}`;
 }
 
 // Connect = People + Groups merged under one mode with its own
@@ -10880,13 +10897,25 @@ function discoverOpportunityTiles() {
 // tiles would mean guessing at private internals.
 function discoverConnectSection() {
   const view = discoverConnectView === "groups" ? "groups" : "people";
+  const signedIn = typeof hasCommunitySession === "function" && hasCommunitySession();
+  // Real actions the old discoverPeopleSection()/discoverGroupsSection()
+  // had (Blocked members / Create a squad) - genuinely dropped when this
+  // was first rewritten as tiles, not a deliberate scope cut like the
+  // filter chips were. Restored here as a small contextual action next
+  // to the switcher, since the compact panel has no room for a whole
+  // second header row per view the way the old full-page sections did.
+  const contextAction = !signedIn ? "" : view === "people"
+    ? `<button type="button" class="discover-mini" data-open="communityMembersBlocked">Blocked</button>`
+    : `<button type="button" class="discover-mini" data-open="communityCreateSquad">+ New</button>`;
   const switcher = `
     <div class="discover-connect-switch">
       <button type="button" class="discover-mini ${view === "people" ? "is-active" : ""}" data-discover-connect="people">People</button>
       <button type="button" class="discover-mini ${view === "groups" ? "is-active" : ""}" data-discover-connect="groups">Groups</button>
+      <span class="discover-connect-spacer"></span>
+      ${contextAction}
     </div>
   `;
-  if (!(typeof hasCommunitySession === "function" && hasCommunitySession())) {
+  if (!signedIn) {
     return `${switcher}<div class="discover-auth-wrap">${communityAuthGateScreen()}</div>`;
   }
   return `${switcher}${view === "people" ? `<div class="discover-people-wrap">${communityPeopleSection()}</div>` : discoverGroupTiles()}`;
@@ -10918,10 +10947,17 @@ function discoverFeedTiles() {
     .filter((post) => post.status === "published")
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, 6);
-  return discoverTileGrid(
+  // "Sign out of Community" (data-community-sign-out) is a real action the
+  // old discoverUpdatesSection() had - genuinely dropped, not a deliberate
+  // scope cut (unlike the weekly theme banner, which is purely
+  // informational and left out since its underlying communityThemeCard()
+  // isn't exposed to app.js). Restored here since this is otherwise the
+  // only remaining unreachable real control from the pre-redesign screens.
+  const signOutRow = `<div class="discover-connect-switch"><span class="discover-connect-spacer"></span><button type="button" class="discover-mini" data-community-sign-out>Sign out</button></div>`;
+  return `${signOutRow}${discoverTileGrid(
     posts.map((post) => discoverTile(cleanText(post.body, 42), homeRelativeDateLabel(post.created_at) || "Today", "")),
     "No posts yet."
-  );
+  )}`;
 }
 
 function discoverExplorePanel() {

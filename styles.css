@@ -12544,7 +12544,12 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
 .discover-connect-switch {
   flex: 0 0 auto;
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+.discover-connect-spacer {
+  flex: 1 1 auto;
 }
 
 .discover-mini {
