@@ -160,97 +160,21 @@
       </section>
     </div>
 
-    <div class="onboarding-layer" id="character-creation-layer" aria-hidden="true">
-      <section class="onboarding-card character-creation-card" role="dialog" aria-modal="true" aria-labelledby="character-creation-title">
-        <p class="eyebrow">Before you start</p>
-        <h2 id="character-creation-title">Who are you becoming?</h2>
-        <p class="muted">These choices shape your starting point, not your ceiling - every path stays fully playable.</p>
-        <form id="character-creation-form" class="character-creation-form">
-          <fieldset>
-            <legend>Age group</legend>
-            <label><input type="radio" name="ageGroup" value="late-teens" checked> Late teens (17-19) - less independence to start, more to prove</label>
-            <label><input type="radio" name="ageGroup" value="young-adult"> Young adult (20-24) - the standard starting point</label>
-            <label><input type="radio" name="ageGroup" value="adult"> Adult (25-29) - more independence and career readiness already</label>
-          </fieldset>
-          <fieldset>
-            <legend>Background</legend>
-            <label><input type="radio" name="background" value="fresh-graduate" checked> Fresh graduate - qualifications ready, but cash is tight</label>
-            <label><input type="radio" name="background" value="already-working"> Already working - some income and experience already banked</label>
-            <label><input type="radio" name="background" value="studying-part-time"> Studying while working - steady study habits, but often tired</label>
-          </fieldset>
-          <fieldset>
-            <legend>Starting trait</legend>
-            <label><input type="radio" name="startingTrait" value="disciplined" checked> Disciplined - stronger study habits and self-control</label>
-            <label><input type="radio" name="startingTrait" value="sociable"> Sociable - a stronger support network from day one</label>
-            <label><input type="radio" name="startingTrait" value="ambitious"> Ambitious - stronger career readiness and reputation</label>
-            <label><input type="radio" name="startingTrait" value="careful-with-money"> Careful with money - stronger budgeting habit and confidence</label>
-          </fieldset>
-          <fieldset>
-            <legend>Difficulty</legend>
-            <label><input type="radio" name="difficulty" value="relaxed"> Relaxed - more starting cash, less starting stress</label>
-            <label><input type="radio" name="difficulty" value="standard" checked> Standard - a balanced starting point</label>
-            <label><input type="radio" name="difficulty" value="challenging"> Challenging - less starting cash, more starting stress</label>
-          </fieldset>
-          <button class="primary-action" type="submit">Continue</button>
-        </form>
-      </section>
-    </div>
-
-    <div class="onboarding-layer" id="opening-narrative-layer" aria-hidden="true">
-      <section class="onboarding-card opening-narrative-card" role="dialog" aria-modal="true" aria-labelledby="opening-narrative-title">
-        <p class="eyebrow">LifeVerse</p>
-        <h2 id="opening-narrative-title">Your first apartment</h2>
-        <p>The keys are still new in your hand. The room is small, the fridge is empty, and tomorrow morning will start whether you are ready or not.</p>
-        <p>Nobody is going to tell you the correct answer today. Every decision shapes your future. Every relationship matters. Every day is another opportunity.</p>
-        <p class="muted">You will learn this world by living in it, not by reading a manual - explore, make mistakes, and check the Life Report whenever you want to understand why something happened.</p>
-        <button class="primary-action" type="button" id="opening-narrative-continue">Begin</button>
-      </section>
-    </div>
-
     <div class="modal-layer" id="modal-layer" aria-hidden="true"></div>
-    <script src="https://unpkg.com/three@0.146.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/three@0.146.0/examples/js/loaders/GLTFLoader.js"></script>
+    <!-- The LifeVerse engine (event-bus.js through life-sim.js, ~28 files)
+         plus the character-creation/opening-narrative layers above them
+         and the three.js/GLTFLoader CDN scripts they needed were
+         deliberately deleted 2026-08-03 - a new Life Sim will be built
+         here later. The "Life Sim" nav tab stays real (see
+         screens.simulator in app.js), just showing a placeholder until
+         then. Files themselves were intentionally left on disk
+         (event-bus.js, lifeverse-*.js, life-sim.js, and their assets
+         under assets/environment/ and assets/life-sim/) in case the
+         rebuild reuses any of them - just no longer referenced here. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="event-bus.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="trace-engine.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="command-bus.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="state-store.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="persistence-service.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="save-service.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="entity-models.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="component-registry.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="service-registry.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="simulation-engine.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-state.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-time.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-needs.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-player.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-activities.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-career.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-education.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-finance.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-housing.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-transportation.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-relationships.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-health.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-mental-wellbeing.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-economy.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-npc-simulation.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-world-simulation.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-legal.js?v=lifeverse-volume7-real-life-20260720-1"></script>
-    <script src="lifeverse-progression.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-system-registry.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-life-report.js?v=lifeverse-volume04-20260708-1"></script>
-    <script src="lifeverse-fast-forward.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-core.js?v=lifeverse-volume6-gameplay-20260714-1"></script>
-    <script src="lifeverse-material-library.js?v=lifeverse-volume050-20260709-1"></script>
-    <script src="lifeverse-render-pipeline.js?v=road-detail-props-phase3-20260721-1"></script>
-    <script src="lifeverse-asset-manager.js?v=lifeverse-objaverse-pipeline-20260722-1"></script>
-    <script src="lifeverse-ux.js?v=lifeverse-volume050-20260709-1"></script>
-    <script src="life-sim.js?v=lifesim-colorgrade-20260722-1"></script>
     <script src="community-matching.js?v=mutual-match-badge-20260721-1"></script>
     <script src="community-supabase.js?v=community-v1-20260719-1"></script>
     <script src="community.js?v=honesty-pass-20260722-1"></script>
-    <script src="app.js?v=lifesim-colorgrade-20260722-1"></script>
+    <script src="app.js?v=lifesim-engine-removed-20260803-1"></script>
   </body>
 </html>

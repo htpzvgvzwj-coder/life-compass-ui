@@ -37,10 +37,6 @@ const authEmailInput = document.querySelector("#auth-email");
 const authUsernameInput = document.querySelector("#onboarding-username");
 const authAdminPassInput = document.querySelector("#auth-admin-pass");
 const authError = document.querySelector("#onboarding-error");
-const characterCreationLayer = document.querySelector("#character-creation-layer");
-const characterCreationForm = document.querySelector("#character-creation-form");
-const openingNarrativeLayer = document.querySelector("#opening-narrative-layer");
-const openingNarrativeContinueButton = document.querySelector("#opening-narrative-continue");
 const navItems = [...document.querySelectorAll(".nav-item")];
 const viewButtons = [...document.querySelectorAll(".view-button")];
 const staticScreens = [...document.querySelectorAll("[data-static-screen]")];
@@ -520,21 +516,6 @@ const defaultUserProfile = {
   notificationsEnabled: false
 };
 
-function lifeVerseEngine() {
-  return window.LifeVerseGame || null;
-}
-
-function createDefaultLifeVerseState() {
-  // Called once at module-load time to seed defaultTrackerState, before the
-  // real userProfile const further down the file is initialized - must stay
-  // on the static default here. Character-creation choices are applied later,
-  // for real, via the opening-narrative "Begin" handler which calls
-  // createInitialState({ profile: userProfile, applyCharacterCreation: true })
-  // directly, well after the whole script has finished loading.
-  const engine = lifeVerseEngine();
-  return engine && engine.createInitialState ? engine.createInitialState({ profile: defaultUserProfile }) : null;
-}
-
 // Demo login this data is bound to - see the DEMO DATA note above
 // defaultChatState. All seeded entries below use this exact user_id.
 const DEMO_USER_ID = "joannetan2320@gmail.com";
@@ -798,7 +779,13 @@ const defaultTrackerState = {
     portfolio: null,
     paycheckCheck: null
   },
-  lifeVerse: createDefaultLifeVerseState(),
+  // The LifeVerse engine (~28 dedicated JS files + this tab's rendering
+  // code) was deliberately deleted 2026-08-03 - a new Life Sim will be
+  // built here later. The "Life Sim" nav tab itself stays (see
+  // screens.simulator), just showing a placeholder in the meantime. This
+  // field stays null and is no longer read anywhere; kept only so an
+  // existing saved account's old lifeVerse blob doesn't need a migration.
+  lifeVerse: null,
   lifeSim: {
     stats: {
       money: 500,
@@ -891,40 +878,6 @@ const roleplayScenarios = [
   { id: "handling-conflict", title: "Handling conflict", opening: "I feel like you ignored what I said. What do you want to say about that?", skill: "Repair and calm response" },
   { id: "budget-decision", title: "Budget decision practice", opening: "You want to buy it today, but rent and transport are also coming up. What is your plan?", skill: "Money decision-making" }
 ];
-
-const lifeSimLocations = [
-  { id: "home", name: "Home", description: "Your HDB home base. Rest, reset, and manage your routine." },
-  { id: "gym", name: "Gym", description: "A neighbourhood gym for discipline, strength, and stress control." },
-  { id: "work", name: "Office", description: "A bright office tower where skills and money grow, but pressure can rise too." },
-  { id: "food", name: "Hawker Centre", description: "A hawker-centre-inspired place for everyday meals and small happiness." },
-  { id: "mall", name: "Orchard Road", description: "A colourful shopping belt with tempting spending choices." },
-  { id: "park", name: "Park", description: "A green space for slowing down, breathing, and balancing stress." },
-  { id: "library", name: "Library", description: "A quiet study space with shelves, desks, and focus-friendly corners." },
-  { id: "hospital", name: "Hospital", description: "A clean care space with reception, waiting seats, and health support cues." },
-  { id: "cafe", name: "Cafe", description: "A warm small cafe for reflection, laptops, and gentle social energy." },
-  { id: "beach", name: "Sentosa", description: "A calm coastal escape for recovery, perspective, and fresh air." },
-  { id: "airport", name: "Airport", description: "A travel gateway that hints at future mobility, planning, and opportunity." },
-  { id: "train", name: "Train Station", description: "A transit hub with gates, route boards, and daily movement through the city." },
-  { id: "university", name: "University Town", description: "A campus area for long-term learning, lectures, and student life." },
-  { id: "marina-bay", name: "Marina Bay", description: "The city's financial skyline - ambition, pressure, and the clearest symbol of \"making it\"." },
-  { id: "chinatown", name: "Chinatown", description: "A shophouse street of red and gold, where heritage and daily life sit side by side." },
-  { id: "little-india", name: "Little India", description: "A vivid, spice-scented street lined with colourful shopfronts and a small temple." },
-  { id: "bugis", name: "Bugis", description: "A street market meets a modern junction - bargains, crowds, and city energy." },
-  { id: "raffles-place", name: "Raffles Place", description: "The historic CBD - banks, trading floors, and the older, taller heart of the city's economy." },
-  { id: "clarke-quay", name: "Clarke Quay", description: "A riverside strip of restored shophouses turned restaurants and bars - nightlife, socialising, and letting off steam." },
-  { id: "punggol", name: "Punggol", description: "A northeast waterfront new town built around the Punggol Waterway - modern HDB estates, a light-rail line, and quieter family life." },
-  { id: "hdb-hub", name: "HDB Hub", description: "Government and housing services - taxes, CPF, and BTO applications. The unglamorous paperwork side of being an adult." },
-  { id: "woodlands", name: "Woodlands", description: "A northern regional town built around its transport hub, a big mall, HDB estates, and the checkpoint to Malaysia." }
-];
-
-const lifeSimActivities = {
-  home: [{ id: "rest", name: "Rest", durationMinutes: 480, effect: { health: 10, stress: -10, daysPassed: 1 } }],
-  gym: [{ id: "exercise", name: "Exercise", durationMinutes: 90, effect: { health: 8, stress: -3, money: -10, daysPassed: 1 } }],
-  work: [{ id: "work-shift", name: "Work Shift", durationMinutes: 480, effect: { money: 80, stress: 10, skills: 2, daysPassed: 1 } }],
-  food: [{ id: "eat-meal", name: "Eat Meal", durationMinutes: 45, effect: { health: 3, happiness: 5, money: -12, daysPassed: 1 } }],
-  mall: [{ id: "shopping", name: "Shopping", durationMinutes: 90, effect: { happiness: 8, money: -50, stress: -2, daysPassed: 1 } }],
-  park: [{ id: "relax", name: "Relax", durationMinutes: 60, effect: { stress: -8, happiness: 5, daysPassed: 1 } }]
-};
 
 const defaultSupportContacts = [];
 
@@ -1882,7 +1835,7 @@ function normalizeTrackerState(state) {
       portfolio: (state.careerStudio && state.careerStudio.portfolio && typeof state.careerStudio.portfolio === "object") ? state.careerStudio.portfolio : fallback.careerStudio.portfolio,
       paycheckCheck: (state.careerStudio && state.careerStudio.paycheckCheck && typeof state.careerStudio.paycheckCheck === "object") ? state.careerStudio.paycheckCheck : fallback.careerStudio.paycheckCheck
     },
-    lifeVerse: normalizeLifeVerseState(state.lifeVerse || fallback.lifeVerse),
+    lifeVerse: state.lifeVerse || fallback.lifeVerse,
     lifeSim: normalizeLifeSimState(state.lifeSim || fallback.lifeSim),
     activeRoleplaySessionId: state.activeRoleplaySessionId || null,
     systemTutorialsSeen: (state.systemTutorialsSeen && typeof state.systemTutorialsSeen === "object") ? state.systemTutorialsSeen : {},
@@ -1938,11 +1891,6 @@ function normalizeTrackerState(state) {
 function latestBlueprint() {
   const history = trackerState.blueprint && Array.isArray(trackerState.blueprint.history) ? trackerState.blueprint.history : [];
   return history.length ? history[history.length - 1] : null;
-}
-
-function normalizeLifeVerseState(state = {}) {
-  const engine = lifeVerseEngine();
-  return engine && engine.normalizeState ? engine.normalizeState(state, { profile: userProfile || defaultUserProfile }) : state;
 }
 
 function normalizeLifeSimState(state = {}) {
@@ -2287,8 +2235,7 @@ function growthTimelineEvents() {
   // ever fed into Your Story - reaching out for real, timestamped support
   // was invisible to the one place meant to reflect everything you've
   // actually done. Guarded since a Compass account has no obligation to
-  // ever sign into Community - checkCommunityAchievements() already reads
-  // these same two snapshots the same way.
+  // ever sign into Community.
   if (typeof hasCommunitySession === "function" && hasCommunitySession()) {
     const communityMyId = communityUserId();
     (typeof communityPostsCacheSnapshot === "function" ? communityPostsCacheSnapshot() : [])
@@ -3643,35 +3590,6 @@ function homeLedgerRows(skipKind) {
         </button>
       `).join("")}
     </div>
-  `;
-}
-
-// LifeVerse gets its own dedicated portal instead of sitting in the uniform
-// quick-access grid - it's the flagship feature (a full life simulation, not
-// a single tool), and a returning player has a real, live world to show
-// instead of a generic promo tile.
-function lifeVerseHomeSpotlight() {
-  const started = Boolean(userProfile.characterCreated);
-  const state = started ? lifeVerseState() : null;
-  return `
-    <section class="lifeverse-home-spotlight" data-tab-jump="simulator">
-      <div class="lifeverse-home-spotlight-orb" aria-hidden="true"></div>
-      <div class="lifeverse-home-spotlight-top">
-        <p class="eyebrow">LifeVerse</p>
-        <h2>${started ? "Your life is still running." : "Live a full adult life before you have to."}</h2>
-      </div>
-      ${started ? `
-        <div class="lifeverse-home-spotlight-stats">
-          <span><strong>Day ${state.time.day}</strong>In progress</span>
-          <span><strong>$${Math.round(state.finance.money)}</strong>Cash</span>
-          <span><strong>${state.career.employed ? "Employed" : "Unemployed"}</strong>${escapeHTML(state.career.status)}</span>
-        </div>
-        <button class="lifeverse-home-spotlight-cta" type="button" data-tab-jump="simulator">Continue your life</button>
-      ` : `
-        <p class="lifeverse-home-spotlight-text">Housing, money, a job, relationships, even the trouble you can get into - a real simulation, not a quiz.</p>
-        <button class="lifeverse-home-spotlight-cta" type="button" data-tab-jump="simulator">Start your life</button>
-      `}
-    </section>
   `;
 }
 
@@ -5154,1248 +5072,6 @@ async function runCommandLauncher(id) {
   if (command.open) {
     openModal(command.open, command.payload);
   }
-}
-
-function lifeVerseState() {
-  trackerState.lifeVerse = normalizeLifeVerseState(trackerState.lifeVerse || createDefaultLifeVerseState());
-  return trackerState.lifeVerse;
-}
-
-// Community actions (posting, joining a squad, sharing a milestone) nudge the
-// user's own LifeVerse simulation - this is what makes Community feel
-// connected to the rest of the app instead of a bolted-on forum.
-function bumpCommunityTrust(amount) {
-  const state = lifeVerseState();
-  state.npcSimulation.communityTrust = window.LifeVerseGame.clamp(Number(state.npcSimulation.communityTrust || 0) + amount);
-  saveTrackerState();
-  syncCommunityProfileSnapshot();
-}
-
-// Idea from a GitHub research pass (Habitica-style): a real-life daily
-// check-in streak nourishes the same HP/Energy stats shown in the LifeVerse
-// HUD, instead of being a completely separate progress bar - so "I kept my
-// streak" and "my character is thriving" read as one system, not two.
-// Deliberately positive-only, no HP/Energy loss for a missed day - Build
-// Mode already stripped punitive "Proof Log"/"Feedback Scorecard" framing
-// from this app (see tests/build-mode.test.js), so a Habitica-style penalty
-// mechanic would cut against that established, deliberate design direction.
-// Guarded by a per-kind "already boosted today" date on the state itself so
-// logging a second mood entry (or a page re-render re-reading the streak)
-// the same day can't be farmed for free stats - only the FIRST check-in of
-// a given kind each calendar day actually nudges the stat.
-function applyGrowthCheckInBoost(kind, streak) {
-  const state = lifeVerseState();
-  state.growthSync = state.growthSync || {};
-  const dateKey = `${kind}BoostDate`;
-  const today = new Date().toDateString();
-  if (state.growthSync[dateKey] === today) return null;
-  state.growthSync[dateKey] = today;
-
-  const boost = Math.min(2 + Math.min(Math.max(streak, 1) - 1, 6) * 0.5, 5);
-  let statLabel;
-  if (kind === "mood") {
-    state.needs.energy = window.LifeVerseGame.clamp(Number(state.needs.energy || 0) + boost);
-    statLabel = "Energy";
-  } else {
-    state.health.physical = window.LifeVerseGame.clamp(Number(state.health.physical || 0) + boost);
-    statLabel = "HP";
-  }
-  if (streak >= 7) {
-    window.LifeVerseGame.addAchievement(
-      state,
-      `growth-${kind}-streak-7`,
-      "One Week Strong",
-      `Kept a 7-day ${kind === "mood" ? "mood check-in" : "daily reflection"} streak going.`
-    );
-  }
-  saveTrackerState();
-  return { boost: Math.round(boost * 10) / 10, statLabel };
-}
-
-async function syncCommunityProfileSnapshot() {
-  if (!hasCommunitySession()) return;
-  const client = getCommunitySupabaseClient();
-  if (!client) return;
-  const state = lifeVerseState();
-  try {
-    await client.from("profiles").update({
-      community_trust_snapshot: Math.round(state.npcSimulation.communityTrust || 0),
-      community_mood_snapshot: state.world ? state.world.communityMood : null
-    }).eq("id", communityUserId());
-  } catch (error) {
-    console.error("[Community] syncCommunityProfileSnapshot failed", error);
-  }
-}
-
-async function syncCommunityBadges() {
-  if (!hasCommunitySession()) return;
-  const client = getCommunitySupabaseClient();
-  if (!client) return;
-  const state = lifeVerseState();
-  const communityBadges = (state.progression.achievements || [])
-    .filter((achievement) => achievement.id.startsWith("community-"))
-    .map((achievement) => ({ id: achievement.id, title: achievement.title, unlockedAt: achievement.unlockedAt }));
-  try {
-    await client.from("profiles").update({ badges: communityBadges }).eq("id", communityUserId());
-  } catch (error) {
-    console.error("[Community] syncCommunityBadges failed", error);
-  }
-}
-
-// Non-ranking contribution badges (idea 9) - reuses the existing, already
-// idempotent LifeVerseGame.addAchievement. Never surfaced as a leaderboard,
-// just unordered chips on post/squad cards.
-function checkCommunityAchievements() {
-  if (!hasCommunitySession()) return;
-  const state = lifeVerseState();
-  const myId = communityUserId();
-  const myPosts = communityPostsCacheSnapshot().filter((post) => post.author_id === myId && post.status === "published");
-  const mySquadMemberships = communitySquadMembersCacheSnapshot().filter((member) => member.user_id === myId);
-  const myConnections = communityAccountabilityConnectionsSnapshot().filter((connection) => connection.status === "accepted" && (connection.requester_id === myId || connection.recipient_id === myId));
-
-  let unlockedAny = false;
-  if (myPosts.length >= 1 && window.LifeVerseGame.addAchievement(state, "community-first-post", "First Post", "Published your first Community post.")) unlockedAny = true;
-  if (myPosts.length >= 5 && window.LifeVerseGame.addAchievement(state, "community-five-posts", "Steady Voice", "Published 5 Community posts.")) unlockedAny = true;
-  if (mySquadMemberships.length >= 1 && window.LifeVerseGame.addAchievement(state, "community-squad-joined", "Joined a Squad", "Joined your first Community squad.")) unlockedAny = true;
-  if (myPosts.some((post) => post.post_type === "milestone") && window.LifeVerseGame.addAchievement(state, "community-milestone-share", "Milestone Shared", "Shared a completed roadmap milestone with the Community.")) unlockedAny = true;
-  if (myConnections.length >= 1 && window.LifeVerseGame.addAchievement(state, "community-accountability-connected", "Found an Accountability Partner", "Connected with an accountability partner in Community.")) unlockedAny = true;
-
-  if (unlockedAny) {
-    saveTrackerState();
-    syncCommunityBadges();
-  }
-}
-
-// First deliberate crossing of the Future Mirror <-> LifeVerse boundary
-// ("separate system from LifeVerse - no shared state, no cross-reads" per
-// the comment near defaultTrackerState.futureMirror). Future Scan's
-// noActionFuture/hiddenCosts stations use this to ground their AI narrative
-// in a real simulated outcome instead of a purely imagined one. Always
-// clones lifeVerseState() and discards the clone after use - the user's
-// real LifeVerse save is never read-written here, only read-copied.
-function lifeVerseNoActionSnapshot(days) {
-  const clone = JSON.parse(JSON.stringify(lifeVerseState()));
-  let result = window.LifeVerseGame.dispatchLifeVerseCommand(clone, {
-    type: "FastForwardCommand",
-    actor: "future-scan",
-    payload: { days }
-  });
-  // Standalone (non-live-game) use: a scripted mid-window intervention would
-  // normally pause for the player to choose - here there's no player to ask,
-  // so auto-resolve with the first listed choice to always get a complete
-  // event instead of leaving the clone mid-decision.
-  let guard = 0;
-  while (result.pendingIntervention && guard < 5) {
-    result = window.LifeVerseGame.dispatchLifeVerseCommand(clone, {
-      type: "ResolveFastForwardInterventionCommand",
-      actor: "future-scan",
-      payload: { choiceId: result.pendingIntervention.choices[0].id }
-    });
-    guard += 1;
-  }
-  return { state: clone, event: result.event };
-}
-
-function syncLifeSimFromLifeVerse() {
-  const state = lifeVerseState();
-  if (!state) return;
-  const stats = lifeSimStats();
-  stats.money = Math.round(Number(state.finance.money) || 0);
-  stats.health = clampStat(state.health.physical);
-  stats.stress = clampStat(state.needs.stress);
-  stats.skills = clampStat(Math.round((state.player.skills.career + state.player.skills.learning + state.player.skills.lifeManagement) / 3));
-  stats.happiness = clampStat(Math.round((state.needs.purpose + state.relationships.support + state.mentalWellbeing.motivation) / 3));
-  stats.daysPassed = Math.max(0, Number(state.time.day || 1) - 1);
-}
-
-function lifeVerseViewModel() {
-  const engine = lifeVerseEngine();
-  const state = lifeVerseState();
-  return engine && engine.getViewModel ? engine.getViewModel(state) : null;
-}
-
-function lifeVerseGameShell() {
-  const state = lifeVerseState();
-  const view = lifeVerseViewModel();
-  if (!state || !view) {
-    return `
-      <section class="lifeverse-shell">
-        <p class="eyebrow">LifeVerse</p>
-        <h3>LifeVerse is loading.</h3>
-        <p>Refresh once if the game systems do not appear.</p>
-      </section>
-    `;
-  }
-  return `
-    <section class="lifeverse-shell volume04-world-first" data-lifeverse-shell data-lifeverse-view="${escapeHTML(state.activeView || "today")}">
-      ${lifeVerseTopHud(state, view)}
-      ${lifeVerseCriticalNeeds(state)}
-      ${lifeVerseWorldFirstContext(state, view)}
-      ${lifeVerseGameDock(state)}
-      ${lifeVerseOverlayPanel(state, view)}
-      ${lifeVerseConsequenceToast()}
-    </section>
-  `;
-}
-
-function lifeVerseTopHud(state, view) {
-  const hud = lifeVerseEngine()?.lifeVerseUx?.getMinimalHud
-    ? lifeVerseEngine().lifeVerseUx.getMinimalHud(state)
-    : {
-      time: view.time.time,
-      day: view.time.dayOfWeek,
-      date: view.time.date,
-      money: state.finance.money,
-      health: state.health.physical,
-      energy: state.needs.energy,
-      objective: view.needsSummary || "Choose one grounded action."
-    };
-  return `
-    <div class="lifeverse-hud">
-      <div class="lifeverse-time-card" aria-label="In-game time">
-        <span>${escapeHTML(hud.day)}</span>
-        <strong>${escapeHTML(hud.time)}</strong>
-        <small>${escapeHTML(hud.date)}</small>
-      </div>
-      <div class="lifeverse-hud-stats" aria-label="Minimal status">
-        <span><small>Money</small><strong>${formatCurrency(hud.money)}</strong></span>
-        <span><small>Health</small><strong>${Math.round(hud.health)}</strong></span>
-        <span><small>Energy</small><strong>${Math.round(hud.energy)}</strong></span>
-      </div>
-      <div class="lifeverse-objective-pill">
-        <small>Current reminder</small>
-        <strong>${escapeHTML(hud.objective)}</strong>
-      </div>
-    </div>
-  `;
-}
-
-function lifeVerseCriticalNeeds(state) {
-  const critical = lifeVerseEngine()?.lifeVerseUx?.getCriticalNeeds
-    ? lifeVerseEngine().lifeVerseUx.getCriticalNeeds(state)
-    : [];
-  if (!critical.length) return "";
-  return `
-    <aside class="lifeverse-dynamic-hud" aria-label="Needs warning">
-      ${critical.slice(0, 3).map((need) => `
-        <span class="lifeverse-need-pill is-${escapeHTML(need.severity || "warning")}">
-          <strong>${escapeHTML(need.label)}</strong>${Math.round(need.value)}/100
-        </span>
-      `).join("")}
-    </aside>
-  `;
-}
-
-function lifeVerseWorldFirstContext(state) {
-  const location = trackerState.lifeSim.currentLocation;
-  const locationInfo = lifeSimLocations.find((item) => item.id === location);
-  const activities = lifeVerseActivitiesForLocation(location);
-  const interactions = lifeVerseEngine()?.lifeVerseUx?.getLocationInteractions
-    ? lifeVerseEngine().lifeVerseUx.getLocationInteractions(state, location, activities)
-    : [];
-  if (!locationInfo && !interactions.length && !activities.length) {
-    return `<div class="lifeverse-subtle-hint" aria-label="Explore hint">Move near a place to interact</div>`;
-  }
-  return `
-    <section class="lifeverse-context-prompt ${locationInfo ? "" : "is-exploring"}" aria-label="Context interaction">
-      <div>
-        <p class="eyebrow">${locationInfo ? "Context interaction" : "Explore mode"}</p>
-        <h3>${escapeHTML(locationInfo ? locationInfo.name : "Walk toward a place")}</h3>
-        <span>${escapeHTML(locationInfo ? locationInfo.description : "The world is the primary interface. Move near a recognizable LifeVerse place.")}</span>
-      </div>
-      <div class="lifeverse-context-actions">
-        ${interactions.length ? interactions.map(lifeVerseContextButton).join("") : activities.slice(0, 2).map(lifeVerseActivityCard).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function lifeVerseContextButton(action) {
-  if (action.fastForwardDays) {
-    return `
-      <button class="lifeverse-context-button" type="button" data-lifeverse-fast-forward="${escapeHTML(action.fastForwardDays)}">
-        <strong>${escapeHTML(action.object)}</strong>
-        <span>${escapeHTML(action.hint)}</span>
-      </button>
-    `;
-  }
-  if (action.activityId) {
-    return `
-      <button class="lifeverse-context-button" type="button" data-lifeverse-activity="${escapeHTML(action.activityId)}">
-        <strong>${escapeHTML(action.object)}</strong>
-        <span>${escapeHTML(action.hint)}</span>
-      </button>
-    `;
-  }
-  return `
-    <button class="lifeverse-context-button" type="button" data-lifeverse-system-action="${escapeHTML(action.systemId)}:${escapeHTML(action.actionId)}">
-      <strong>${escapeHTML(action.object)}</strong>
-      <span>${escapeHTML(action.hint)}</span>
-    </button>
-  `;
-}
-
-function lifeVerseGameDock(state) {
-  const items = [
-    ["phone", "Phone"],
-    ["journal", "Journal"],
-    ["map", "Map"],
-    ["pause", "Pause"]
-  ];
-  const active = state.activeView || "today";
-  return `
-    <nav class="lifeverse-game-dock" aria-label="LifeVerse in-game tools">
-      ${items.map(([id, label]) => `
-        <button type="button" data-lifeverse-tab="${id}" class="${active === id ? "is-active" : ""}">
-          <span>${label.slice(0, 2)}</span>
-          <strong>${label}</strong>
-        </button>
-      `).join("")}
-    </nav>
-  `;
-}
-
-function lifeVerseInterventionPanel(state) {
-  const pending = state.simulation.pendingIntervention;
-  return `
-    <section class="lifeverse-overlay-panel lifeverse-intervention-panel" data-lifeverse-intervention>
-      <div class="lifeverse-panel-head">
-        <div>
-          <p class="eyebrow">A decision point</p>
-          <h3>${escapeHTML(pending.title)}</h3>
-        </div>
-      </div>
-      <p class="lifeverse-note">${escapeHTML(pending.prompt)}</p>
-      <div class="lifeverse-intervention-choices">
-        ${(pending.choices || []).map((choice) => `
-          <button type="button" data-lifeverse-intervention-choice="${escapeHTML(choice.id)}">
-            <strong>${escapeHTML(choice.label)}</strong>
-            <span>${escapeHTML(choice.description)}</span>
-          </button>
-        `).join("")}
-      </div>
-      <p class="lifeverse-note">Fast Forward is paused until you choose.</p>
-    </section>
-  `;
-}
-
-function lifeVerseOverlayPanel(state, view) {
-  if (state.simulation && state.simulation.pendingIntervention) return lifeVerseInterventionPanel(state);
-  const active = state.activeView || "today";
-  if (active === "phone") return lifeVersePhonePanel(state);
-  if (active === "journal") return lifeVerseJournalPanel(state, view);
-  if (active === "map" || active === "world") return lifeVerseMapPanel(state);
-  if (active === "pause" || active === "profile") return lifeVersePausePanel(state, view);
-  if (active === "fastForward") return lifeVerseFastForwardPanel(state, view);
-  if (active === "report") return lifeVerseReportPanel(state, view);
-  if (active === "life") return lifeVerseLifePanel(state, view);
-  return "";
-}
-
-function lifeVerseCloseOverlayButton() {
-  return `<button class="lifeverse-mini-button" type="button" data-lifeverse-tab="today">Return to world</button>`;
-}
-
-function lifeVersePhonePanel(state) {
-  const apps = lifeVerseEngine()?.lifeVerseUx?.getPhoneApps
-    ? lifeVerseEngine().lifeVerseUx.getPhoneApps(state)
-    : [];
-  return `
-    <section class="lifeverse-phone-overlay lifeverse-overlay-panel" aria-label="In-game phone">
-      <div class="lifeverse-phone-device">
-        <div class="lifeverse-phone-head">
-          <span>${escapeHTML(state.player.name || "Player")}'s Phone</span>
-          ${lifeVerseCloseOverlayButton()}
-        </div>
-        <div class="lifeverse-phone-apps">
-          ${apps.map((app) => lifeVersePhoneAppButton(app)).join("")}
-        </div>
-        <div class="lifeverse-phone-card">
-          <p class="eyebrow">Quick life actions</p>
-          <button type="button" data-lifeverse-tab="fastForward"><strong>Open Calendar Fast Forward</strong><span>Preview how repeated days may compound.</span></button>
-          <button type="button" data-lifeverse-system-action="finance:set-week-budget"><strong>Set weekly budget</strong><span>Plan this week's money before pressure rises.</span></button>
-          <button type="button" data-lifeverse-system-action="mentalWellbeing:stress-reset"><strong>Take a stress reset</strong><span>Calm pressure before the next choice.</span></button>
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function lifeVersePhoneAppButton(app) {
-  const attrs = app.target
-    ? `data-tab-jump="${escapeHTML(app.target)}"`
-    : `data-lifeverse-tab="${escapeHTML(app.view || "phone")}"`;
-  return `
-    <button type="button" class="lifeverse-phone-app" data-lifeverse-phone-action="${escapeHTML(app.id)}" ${attrs}>
-      <i>${escapeHTML(app.icon)}</i>
-      <strong>${escapeHTML(app.title)}</strong>
-      <span>${escapeHTML(app.text)}</span>
-    </button>
-  `;
-}
-
-function lifeVerseJournalPanel(state, view) {
-  const report = view.latestReport;
-  return `
-    <section class="lifeverse-overlay-panel lifeverse-journal-panel">
-      <div class="lifeverse-panel-head">
-        <div>
-          <p class="eyebrow">Journal</p>
-          <h3>Reflection after living, not during living.</h3>
-        </div>
-        ${lifeVerseCloseOverlayButton()}
-      </div>
-      ${lifeVerseScheduleRail(state)}
-      ${lifeVerseTodayLog(state)}
-      <div class="lifeverse-section-title"><strong>Recent traces</strong><span>${(state.traces || []).length} total</span></div>
-      <div class="lifeverse-report-list">
-        ${(state.traces || []).slice(-5).reverse().map((trace) => `
-          <span><b>${escapeHTML(trace.cause)}</b>${escapeHTML(trace.reflectionPrompt || "What can this teach you?")}</span>
-        `).join("") || `<span>No traces yet. Live one action first.</span>`}
-      </div>
-      <div class="lifeverse-journal-actions">
-        <button type="button" data-lifeverse-report-now>Create Life Report</button>
-        ${report ? `<button type="button" data-lifeverse-tab="report">Read latest report</button>` : ""}
-      </div>
-    </section>
-  `;
-}
-
-function lifeVerseTodayLog(state) {
-  const items = (state.events || []).slice(-8).reverse();
-  if (!items.length) {
-    return `
-      <div class="lifeverse-today-log">
-        <div class="lifeverse-section-title"><strong>Today's log</strong><span>No events yet</span></div>
-        <p>Live one action to start building today's story.</p>
-      </div>
-    `;
-  }
-  return `
-    <div class="lifeverse-today-log">
-      <div class="lifeverse-section-title"><strong>Today's log</strong><span>${items.length} recent</span></div>
-      ${items.map((event) => `
-        <article class="lifeverse-today-log-entry">
-          <strong>${escapeHTML(event.title)}</strong>
-          <ul>${(event.consequences || []).map((line) => `<li>${escapeHTML(line)}</li>`).join("") || `<li>${escapeHTML(event.summary || "Something changed.")}</li>`}</ul>
-          ${event.reflection ? `<p class="lifeverse-today-log-reflection">${escapeHTML(event.reflection)}</p>` : ""}
-        </article>
-      `).join("")}
-    </div>
-  `;
-}
-
-function lifeVerseMapPanel(state) {
-  const locations = lifeSimLocations.map((location) => ({
-    ...location,
-    active: trackerState.lifeSim.currentLocation === location.id
-  }));
-  return `
-    <section class="lifeverse-overlay-panel lifeverse-map-panel">
-      <div class="lifeverse-panel-head">
-        <div>
-          <p class="eyebrow">Map</p>
-          <h3>${escapeHTML(state.world.district)}</h3>
-        </div>
-        ${lifeVerseCloseOverlayButton()}
-      </div>
-      <div class="lifeverse-map-grid">
-        ${locations.map((location) => `
-          <article class="${location.active ? "is-current" : ""}">
-            <strong>${escapeHTML(location.name)}</strong>
-            <span>${escapeHTML(location.description)}</span>
-            ${location.active
-              ? `<span class="lifeverse-map-current-tag">You are here</span>`
-              : `<button type="button" class="lifeverse-mini-button" data-lifeverse-travel="${escapeHTML(location.id)}">Take the MRT here</button>`}
-          </article>
-        `).join("")}
-      </div>
-      ${lifeVerseWorldPanel(state, { compact: true })}
-    </section>
-  `;
-}
-
-function lifeVersePausePanel(state, view) {
-  return `
-    <section class="lifeverse-overlay-panel lifeverse-pause-panel">
-      <div class="lifeverse-panel-head">
-        <div>
-          <p class="eyebrow">Pause</p>
-          <h3>Game controls and progress.</h3>
-        </div>
-        ${lifeVerseCloseOverlayButton()}
-      </div>
-      <div class="lifeverse-pause-actions">
-        <button type="button" data-lifeverse-tab="phone">Continue</button>
-        <button type="button" data-lifeverse-tab="profile">Progress profile</button>
-        <button type="button" data-lifeverse-tab="fastForward">Fast Forward</button>
-        <button type="button" data-lifeverse-reset>Reset LifeVerse</button>
-        <button type="button" data-tab-jump="secondBrain">Exit to Compass</button>
-      </div>
-      ${lifeVerseProfilePanel(state, view)}
-    </section>
-  `;
-}
-
-function lifeVerseNeedsBars(state) {
-  const needs = [
-    ["energy", "Energy"],
-    ["hunger", "Food"],
-    ["sleep", "Sleep"],
-    ["social", "Social"],
-    ["stress", "Stress"],
-    ["purpose", "Purpose"]
-  ];
-  return `
-    <div class="lifeverse-needs-grid">
-      ${needs.map(([key, label]) => {
-        const value = Math.round(Number(state.needs[key]) || 0);
-        const inverse = key === "stress";
-        const tone = inverse ? (value > 70 ? "danger" : value > 45 ? "warn" : "good") : (value < 35 ? "danger" : value < 55 ? "warn" : "good");
-        return `
-          <div class="lifeverse-need ${tone}">
-            <span>${label}</span>
-            <i><b style="width:${value}%"></b></i>
-            <strong>${value}</strong>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
-}
-
-function lifeVerseActivitiesForLocation(locationId) {
-  const engine = lifeVerseEngine();
-  const state = lifeVerseState();
-  return engine && engine.getAvailableActivities ? engine.getAvailableActivities(state, { locationId }) : [];
-}
-
-function lifeVerseActivityCard(activity) {
-  const duration = lifeVerseEngine()?.durationLabel ? lifeVerseEngine().durationLabel(activity.durationMinutes) : `${activity.durationMinutes} min`;
-  return `
-    <button class="lifeverse-activity-card" type="button" data-lifeverse-activity="${escapeHTML(activity.id)}">
-      <span>${escapeHTML(activity.category)}</span>
-      <strong>${escapeHTML(activity.title)}</strong>
-      <small>${escapeHTML(duration)} - ${escapeHTML(activity.consequence)}</small>
-    </button>
-  `;
-}
-
-function lifeVerseScheduleRail(state) {
-  const items = (state.schedule || []).slice(-4).reverse();
-  if (!items.length) {
-    return `
-      <div class="lifeverse-schedule">
-        <div class="lifeverse-section-title"><strong>Today schedule</strong><span>No actions yet</span></div>
-        <p>Choose one activity to start living the day.</p>
-      </div>
-    `;
-  }
-  return `
-    <div class="lifeverse-schedule">
-      <div class="lifeverse-section-title"><strong>Today schedule</strong><span>${items.length} recent</span></div>
-      ${items.map((item) => `
-        <article>
-          <strong>${escapeHTML(item.title)}</strong>
-          <span>${escapeHTML(item.start)} -> ${escapeHTML(item.end)}</span>
-        </article>
-      `).join("")}
-    </div>
-  `;
-}
-
-function lifeVerseLifePanel(state, view) {
-  const systems = (view && view.systems && view.systems.length)
-    ? view.systems
-    : (lifeVerseEngine()?.systems ? lifeVerseEngine().systems().map((system) => ({
-      id: system.id,
-      title: system.title,
-      chapter: system.chapter,
-      summary: typeof system.summary === "function" ? system.summary(state) : "",
-      metrics: typeof system.metrics === "function" ? system.metrics(state) : [],
-      actions: system.actions || []
-    })) : []);
-  return `
-    <section class="lifeverse-panel">
-      <div class="lifeverse-panel-head">
-        <div>
-          <p class="eyebrow">Life</p>
-          <h3>Choose one life decision and see what it costs, supports, or delays.</h3>
-        </div>
-      </div>
-      <div class="lifeverse-system-stack">
-        ${systems.length ? systems.map(lifeVerseSystemCard).join("") : `
-          <div class="lifeverse-empty">
-            <strong>Life systems are loading</strong>
-            <span>Refresh once if Career, Education, Finance, Housing, and Transport do not appear.</span>
-          </div>
-        `}
-      </div>
-    </section>
-  `;
-}
-
-const SYSTEM_TUTORIAL_HINTS = {
-  career: "Career tracks your job readiness, performance, and burnout. Preparation and consistency matter more than luck here.",
-  education: "Education builds skills and qualifications over time - it pays off later, not immediately.",
-  finance: "Finance is your money, savings, debt, credit, and investments. Small habits here compound into big outcomes.",
-  housing: "Housing affects your comfort, cost of living, and how far you commute every day.",
-  transportation: "Transportation is how you get around - it trades money, time, and stress against each other.",
-  relationships: "Relationships track the people supporting you. Neglect them and support quietly disappears.",
-  health: "Health reflects sleep, food, and activity over time - it rarely drops from one bad day, only from a bad pattern.",
-  mentalWellbeing: "Mental wellbeing tracks stress, motivation, and burnout risk - protect it before it protects itself.",
-  economy: "Economy is the world around you - inflation and job market shift on their own, and you adapt to them.",
-  npcSimulation: "NPC Simulation is the community around you - neighbours keep living their own lives whether you visit or not.",
-  worldSimulation: "World Simulation is the wider city - it evolves in the background and quietly shapes every other system.",
-  progression: "Progression reflects long-term growth across every system, not a simple level-up counter."
-};
-
-function lifeVerseSystemTutorialHint(system) {
-  if (trackerState.systemTutorialsSeen[system.id]) return "";
-  const hint = SYSTEM_TUTORIAL_HINTS[system.id];
-  if (!hint) return "";
-  return `
-    <div class="lifeverse-system-tutorial" data-lifeverse-system-tutorial="${escapeHTML(system.id)}">
-      <span>${escapeHTML(hint)}</span>
-      <button type="button" data-dismiss-system-tutorial="${escapeHTML(system.id)}">Got it</button>
-    </div>
-  `;
-}
-
-function lifeVerseSystemCard(system) {
-  return `
-    <article class="lifeverse-system-card">
-      <div class="lifeverse-system-head">
-        <div>
-          <span>${escapeHTML(system.chapter || "Volume 02")}</span>
-          <strong>${escapeHTML(system.title || "Life system")}</strong>
-          <small>${escapeHTML(system.summary || "")}</small>
-        </div>
-      </div>
-      ${lifeVerseSystemTutorialHint(system)}
-      <div class="lifeverse-system-metrics">
-        ${(system.metrics || []).slice(0, 9).map(([label, value]) => `
-          <span><small>${escapeHTML(label)}</small><b>${escapeHTML(value)}</b></span>
-        `).join("")}
-      </div>
-      <div class="lifeverse-system-actions">
-        ${(system.actions || []).map((action) => `
-          <button type="button" data-lifeverse-system-action="${escapeHTML(system.id)}:${escapeHTML(action.id)}">
-            <strong>${escapeHTML(action.title)}</strong>
-            <span>${escapeHTML(lifeVerseActionMeta(action))}</span>
-            <small>${escapeHTML(action.description)}</small>
-          </button>
-        `).join("")}
-      </div>
-    </article>
-  `;
-}
-
-function lifeVerseActionMeta(action) {
-  const duration = lifeVerseEngine()?.durationLabel ? lifeVerseEngine().durationLabel(action.durationMinutes || 30) : `${action.durationMinutes || 30} min`;
-  const effects = action.effects || {};
-  const parts = [duration];
-  if (effects.finance && Number(effects.finance.money)) parts.push(`Money ${Number(effects.finance.money) > 0 ? "+" : ""}${formatCurrency(effects.finance.money)}`);
-  if (effects.needs && Number(effects.needs.stress)) parts.push(`Stress ${Number(effects.needs.stress) > 0 ? "+" : ""}${effects.needs.stress}`);
-  if (effects.career) parts.push("Career impact");
-  if (effects.education) parts.push("Education impact");
-  if (effects.housing) parts.push("Housing impact");
-  if (effects.transportation) parts.push("Transport impact");
-  if (effects.relationships) parts.push("Relationship impact");
-  if (effects.health) parts.push("Health impact");
-  if (effects.mentalWellbeing) parts.push("Wellbeing impact");
-  if (effects.economy || effects.worldSimulation) parts.push("World impact");
-  if (effects.npcSimulation) parts.push("NPC impact");
-  if (effects.progression) parts.push("Progression impact");
-  return parts.join(" - ");
-}
-
-function lifeVerseWorldPanel(state) {
-  return `
-    <section class="lifeverse-panel">
-      <div class="lifeverse-panel-head">
-        <div>
-          <p class="eyebrow">World</p>
-          <h3>${escapeHTML(state.world.district)}</h3>
-        </div>
-      </div>
-      <div class="lifeverse-world-list">
-        <article><span>Weather</span><strong>${escapeHTML(state.world.weather)}</strong></article>
-        <article><span>Economy</span><strong>${escapeHTML(state.world.economy)}</strong></article>
-        <article><span>Cost of living</span><strong>${Math.round(state.world.costOfLiving)}/100</strong></article>
-        <article><span>Transport load</span><strong>${escapeHTML(state.world.transportLoad)}</strong></article>
-        <article><span>Community mood</span><strong>${escapeHTML(state.world.communityMood)}</strong></article>
-        <article><span>Job market</span><strong>${Math.round(state.economy.jobMarket)}/100</strong></article>
-        <article><span>Inflation pressure</span><strong>${Math.round(state.economy.inflation)}/100</strong></article>
-        <article><span>Community trust</span><strong>${Math.round(state.npcSimulation.communityTrust)}/100</strong></article>
-        <article><span>World climate</span><strong>${escapeHTML(state.worldSimulation.economyClimate)}</strong></article>
-        <article><span>Housing market pressure</span><strong>${Math.round(state.worldSimulation.housingMarketPressure)}/100</strong></article>
-        <article><span>Transport reliability</span><strong>${Math.round(state.worldSimulation.transportationReliability)}/100</strong></article>
-        <article><span>Education opportunity</span><strong>${Math.round(state.worldSimulation.educationOpportunityLevel)}/100</strong></article>
-        <article><span>Public health</span><strong>${Math.round(state.worldSimulation.publicHealthCondition)}/100</strong></article>
-        <article><span>Social trust</span><strong>${Math.round(state.worldSimulation.socialTrustLevel)}/100</strong></article>
-        <article><span>District activity</span><strong>${Math.round(state.worldSimulation.districtActivityLevel)}/100</strong></article>
-      </div>
-      ${(state.worldSimulation.randomEvents || []).length ? `
-        <div class="lifeverse-section-title"><strong>Latest world event</strong><span>${escapeHTML(state.worldSimulation.randomEvents[0].title)}</span></div>
-        <p class="lifeverse-note">${escapeHTML(state.worldSimulation.randomEvents[0].summary)}</p>
-      ` : ""}
-      <div class="lifeverse-section-title"><strong>District NPCs</strong><span>${(state.npcs || []).length} simulated lives</span></div>
-      <div class="lifeverse-world-list">
-        ${(state.npcs || []).slice(0, 4).map((npc) => `
-          <article>
-            <span>${escapeHTML(npc.role)} - ${escapeHTML(npc.location)}</span>
-            <strong>${escapeHTML(npc.name)}</strong>
-            <small>${escapeHTML(npc.lastDecision)} - Relationship ${Math.round(npc.relationship)}/100</small>
-          </article>
-        `).join("")}
-      </div>
-      <p class="lifeverse-note">District conditions can shape money, transport, housing, health, relationships, and opportunity over time.</p>
-    </section>
-  `;
-}
-
-function lifeVerseFastForwardPanel(state) {
-  const timeline = lifeVerseEngine()?.lifeVerseUx?.getFastForwardTimeline
-    ? lifeVerseEngine().lifeVerseUx.getFastForwardTimeline(30)
-    : [];
-  return `
-    <section class="lifeverse-overlay-panel lifeverse-fast-forward-panel">
-      <div class="lifeverse-panel-head">
-        <div>
-          <p class="eyebrow">Fast Forward</p>
-          <h3>Watch time pass through routines, pressure, and consequence.</h3>
-        </div>
-        ${lifeVerseCloseOverlayButton()}
-      </div>
-      <div class="lifeverse-time-lapse">
-        ${timeline.map((item, index) => `
-          <article>
-            <i>${index + 1}</i>
-            <span>${escapeHTML(item)}</span>
-          </article>
-        `).join("")}
-      </div>
-      <div class="lifeverse-fast-grid">
-        <button type="button" data-lifeverse-fast-forward="7"><strong>7 days</strong><span>One week of routine</span></button>
-        <button type="button" data-lifeverse-fast-forward="30"><strong>30 days</strong><span>One month of costs and habits</span></button>
-        <button type="button" data-lifeverse-fast-forward="180"><strong>6 months</strong><span>Compounding study, work, money, and health patterns</span></button>
-        <button type="button" data-lifeverse-fast-forward="365"><strong>1 year</strong><span>Long-term adult-life consequences</span></button>
-        <button type="button" data-lifeverse-fast-forward="1825"><strong>5 years</strong><span>Major direction, stability, and opportunity effects</span></button>
-      </div>
-      <p class="lifeverse-note">Fast Forward is not prediction. It simulates possible consequences from current stats and habits.</p>
-    </section>
-  `;
-}
-
-function lifeVerseReportPanel(state, view) {
-  const report = view.latestReport;
-  if (!report) {
-    return `
-      <section class="lifeverse-overlay-panel lifeverse-report-panel">
-        <div class="lifeverse-panel-head">
-          <div>
-            <p class="eyebrow">Life Report</p>
-            <h3>No report yet.</h3>
-          </div>
-          ${lifeVerseCloseOverlayButton()}
-          <button class="lifeverse-mini-button" type="button" data-lifeverse-report-now>Create report</button>
-        </div>
-        <p class="lifeverse-note">Make choices or use Fast Forward, then Life Report will explain what happened and why.</p>
-      </section>
-    `;
-  }
-  return `
-    <section class="lifeverse-overlay-panel lifeverse-report-panel">
-      <div class="lifeverse-panel-head">
-        <div>
-          <p class="eyebrow">Life Report</p>
-          <h3>${escapeHTML(report.title)}</h3>
-          <span>${escapeHTML(report.createdAt)}</span>
-        </div>
-        ${lifeVerseCloseOverlayButton()}
-      </div>
-      <div class="lifeverse-memory-report">
-        ${(lifeVerseEngine()?.lifeVerseUx?.getReportChapters
-          ? lifeVerseEngine().lifeVerseUx.getReportChapters(report)
-          : []).map((chapter, index) => `
-          <article>
-            <i>${String(index + 1).padStart(2, "0")}</i>
-            <div>
-              <strong>${escapeHTML(chapter.title)}</strong>
-              ${(chapter.items || []).slice(0, 5).map((item) => `<span>${escapeHTML(item)}</span>`).join("")}
-            </div>
-          </article>
-        `).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function lifeVerseReportList(title, items = []) {
-  return `
-    <div class="lifeverse-report-list">
-      <strong>${escapeHTML(title)}</strong>
-      ${(items || []).map((item) => `<span>${escapeHTML(item)}</span>`).join("")}
-    </div>
-  `;
-}
-
-function lifeVerseProfilePanel(state, view) {
-  return `
-    <section class="lifeverse-panel">
-      <div class="lifeverse-panel-head">
-        <div>
-          <p class="eyebrow">Profile</p>
-          <h3>${escapeHTML(state.player.name)} - ${escapeHTML(state.player.lifeStage)}</h3>
-          <span>${escapeHTML(state.player.emotionalState)} - Independence ${state.progression.independenceIndex}/100</span>
-        </div>
-        <button class="lifeverse-mini-button" type="button" data-lifeverse-reset>Reset LifeVerse</button>
-      </div>
-      <div class="lifeverse-life-grid compact">
-        <article>
-          <span>Life level</span>
-          <strong>${Math.round(state.progression.lifeLevel)} - ${Math.round(state.progression.lifeXp)} XP</strong>
-          <small>XP grows through decisions, reflection, and Fast Forward learning.</small>
-        </article>
-        <article>
-          <span>Stability</span>
-          <strong>${Math.round(state.progression.stabilityScore)}/100</strong>
-          <small>Finance, housing, health, and transport reliability.</small>
-        </article>
-        <article>
-          <span>Resilience</span>
-          <strong>${Math.round(state.progression.resilienceScore)}/100</strong>
-          <small>Recovery, stress handling, support, and burnout protection.</small>
-        </article>
-        <article>
-          <span>Opportunity</span>
-          <strong>${Math.round(state.progression.opportunityScore)}/100</strong>
-          <small>Career, education, network, and world opportunity.</small>
-        </article>
-        <article>
-          <span>Legacy</span>
-          <strong>${Math.round(state.progression.legacyScore)}/100</strong>
-          <small>Trust, community contribution, milestones, and achievements.</small>
-        </article>
-        ${Object.entries(state.player.capability).map(([key, value]) => `
-          <article>
-            <span>${escapeHTML(key.replace(/([A-Z])/g, " $1"))}</span>
-            <strong>${Math.round(value)}/100</strong>
-            <small>Capability grows through repeated behaviour.</small>
-          </article>
-        `).join("")}
-      </div>
-      ${(state.progression.achievements || []).length ? `
-        <div class="lifeverse-section-title"><strong>Achievements</strong><span>${state.progression.achievements.length} unlocked</span></div>
-        <div class="lifeverse-world-list">
-          ${(state.progression.achievements || []).slice(0, 3).map((achievement) => `
-            <article>
-              <span>${escapeHTML(achievement.unlockedAt || "LifeVerse")}</span>
-              <strong>${escapeHTML(achievement.title)}</strong>
-              <small>${escapeHTML(achievement.description)}</small>
-            </article>
-          `).join("")}
-        </div>
-      ` : ""}
-    </section>
-  `;
-}
-
-function lifeSimStats() {
-  trackerState.lifeSim = normalizeLifeSimState(trackerState.lifeSim);
-  return trackerState.lifeSim.stats;
-}
-
-function lifeSimStatCards() {
-  const verse = lifeVerseState();
-  if (verse) {
-    return [
-      ["Money", formatCurrency(verse.finance.money), "money", "$"],
-      ["Energy", Math.round(verse.needs.energy), "health", "E"],
-      ["Stress", Math.round(verse.needs.stress), "stress", "S"],
-      ["Skill", Math.round((verse.player.skills.career + verse.player.skills.learning + verse.player.skills.lifeManagement) / 3), "skills", "K"],
-      ["Purpose", Math.round(verse.needs.purpose), "happiness", "+"],
-      ["Day", verse.time.day, "days", "D"]
-    ].map(([label, value, key, icon]) => `
-      <span class="sim-stat ${key}">
-        <i>${icon}</i>
-        <small>${label}</small>
-        <strong data-sim-stat="${key}">${value}</strong>
-      </span>
-    `).join("");
-  }
-  const stats = lifeSimStats();
-  return [
-    ["Money", `$${stats.money}`, "money", "$"],
-    ["Health", stats.health, "health", "H"],
-    ["Stress", stats.stress, "stress", "S"],
-    ["Skills", stats.skills, "skills", "K"],
-    ["Happy", stats.happiness, "happiness", "+"],
-    ["Days", stats.daysPassed, "days", "D"]
-  ].map(([label, value, key, icon]) => `
-    <span class="sim-stat ${key}">
-      <i>${icon}</i>
-      <small>${label}</small>
-      <strong data-sim-stat="${key}">${value}</strong>
-    </span>
-  `).join("");
-}
-
-function lifeSimLocationPanel() {
-  const location = lifeSimLocations.find((item) => item.id === trackerState.lifeSim.currentLocation);
-  if (!location) {
-    return `
-      <div class="life-sim-location-card is-empty" data-sim-location-card>
-        <p class="eyebrow">Explore mode</p>
-        <h3>Find a glowing zone.</h3>
-        <p class="muted">Move near a recognizable place. Every location has real things to do there.</p>
-        <div class="sim-activity-list" data-sim-activity-list></div>
-      </div>
-    `;
-  }
-  return `
-    <div class="life-sim-location-card" data-sim-location-card>
-      <p class="eyebrow">Current location</p>
-      <h3 data-sim-location-title>${escapeHTML(location.name)}</h3>
-      <p class="muted" data-sim-location-description>${escapeHTML(location.description)}</p>
-      <div class="sim-activity-list" data-sim-activity-list>${lifeSimActivityButtons(location.id)}</div>
-    </div>
-  `;
-}
-
-function lifeSimActivityButtons(locationId) {
-  const verseActivities = lifeVerseActivitiesForLocation(locationId);
-  if (verseActivities.length) {
-    return verseActivities.map((activity) => `
-      <button class="sim-activity-button" type="button" data-lifeverse-activity="${escapeHTML(activity.id)}">
-        <strong>${escapeHTML(activity.title)}</strong>
-        <span>${escapeHTML(lifeVerseActivityImpactText(activity))}</span>
-      </button>
-    `).join("");
-  }
-  const activities = lifeSimActivities[locationId] || [];
-  if (!activities.length) return `<p class="muted">No activity available here yet.</p>`;
-  return activities.map((activity) => `
-    <button class="sim-activity-button" type="button" data-sim-activity="${activity.id}" data-sim-location="${locationId}">
-      <strong>${escapeHTML(activity.name)}</strong>
-      <span>${escapeHTML(lifeSimEffectText(activity.effect))}</span>
-    </button>
-  `).join("");
-}
-
-function lifeVerseActivityImpactText(activity) {
-  const effects = activity.effects || {};
-  const labels = [];
-  if (effects.finance && Number(effects.finance.money)) labels.push(`Money ${Number(effects.finance.money) > 0 ? "+" : ""}${effects.finance.money}`);
-  if (effects.needs && Number(effects.needs.energy)) labels.push(`Energy ${Number(effects.needs.energy) > 0 ? "+" : ""}${effects.needs.energy}`);
-  if (effects.needs && Number(effects.needs.stress)) labels.push(`Stress ${Number(effects.needs.stress) > 0 ? "+" : ""}${effects.needs.stress}`);
-  if (effects.health && Number(effects.health.physical)) labels.push(`Health ${Number(effects.health.physical) > 0 ? "+" : ""}${effects.health.physical}`);
-  if (effects.skills) labels.push("Skills +");
-  return `${lifeVerseEngine()?.durationLabel ? lifeVerseEngine().durationLabel(activity.durationMinutes) : `${activity.durationMinutes} min`} | ${labels.join(" | ") || "Routine impact"}`;
-}
-
-function lifeSimEffectText(effect = {}) {
-  const labels = [
-    ["Money", effect.money],
-    ["Health", effect.health],
-    ["Stress", effect.stress],
-    ["Skills", effect.skills],
-    ["Happiness", effect.happiness],
-    ["Days", effect.daysPassed]
-  ].filter(([, value]) => Number(value));
-  return labels.map(([label, value]) => `${label} ${Number(value) > 0 ? "+" : ""}${value}`).join(" | ");
-}
-
-function markLifeVerseConsequence(lastActivity, consequences, options = {}) {
-  trackerState.lifeSim.lastActivity = lastActivity || "";
-  trackerState.lifeSim.consequences = Array.isArray(consequences) ? consequences.filter(Boolean) : (consequences ? [String(consequences)] : []);
-  trackerState.lifeSim.reflection = options.reflection || "";
-  trackerState.lifeSim.consequenceToastUntil = Date.now() + 6000;
-  trackerState.lifeSim.reportPromptReady = Boolean(options.reportPromptReady);
-}
-
-function lifeVerseConsequenceToast(now = Date.now()) {
-  const sim = trackerState.lifeSim || {};
-  if (!(sim.consequences || []).length || Number(sim.consequenceToastUntil || 0) <= now) return "";
-  return `
-    <aside class="lifeverse-consequence-toast" aria-live="polite">
-      <p class="eyebrow">${sim.reportPromptReady ? "Fast Forward finished" : "What just happened"}</p>
-      <strong>${escapeHTML(sim.lastActivity || "LifeVerse update")}</strong>
-      <ul>${sim.consequences.map((line) => `<li>${escapeHTML(line)}</li>`).join("")}</ul>
-      ${sim.reflection ? `<p class="lifeverse-toast-reflection">${escapeHTML(sim.reflection)}</p>` : ""}
-      ${sim.reportPromptReady ? `<button type="button" data-lifeverse-tab="report">View Life Report</button>` : ""}
-    </aside>
-  `;
-}
-
-function applyLifeSimChanges(effect = {}) {
-  const stats = lifeSimStats();
-  stats.money = Math.round(Number(stats.money || 0) + Number(effect.money || 0));
-  stats.health = clampStat(stats.health + Number(effect.health || 0));
-  stats.stress = clampStat(stats.stress + Number(effect.stress || 0));
-  stats.skills = clampStat(stats.skills + Number(effect.skills || 0));
-  stats.happiness = clampStat(stats.happiness + Number(effect.happiness || 0));
-  stats.daysPassed = Math.max(0, Math.round(Number(stats.daysPassed || 0) + Number(effect.daysPassed || 0)));
-}
-
-function lifeSimConsequence(stats) {
-  if (stats.money < 0) return "You are in debt. Your rent and daily spending became difficult to manage.";
-  if (stats.health < 30) return "Your health declined because you did not maintain healthy habits.";
-  if (stats.stress > 80) return "Your stress became too high and affected your daily life.";
-  if (stats.skills > 50 && stats.stress < 70) return "Your skills improved and you became more prepared for better opportunities.";
-  if (stats.money > 1500 && stats.health > 60) return "You built a stable routine and improved your adult life.";
-  return "Your adult-life routine stayed balanced, but the next month still depends on your choices. Keep watching money, health, stress, and growth.";
-}
-
-function updateLifeSimDom() {
-  const shell = document.querySelector("[data-lifeverse-shell]");
-  if (shell) {
-    shell.outerHTML = lifeVerseGameShell();
-  }
-  const stats = lifeSimStats();
-  const statMap = {
-    money: `$${stats.money}`,
-    health: stats.health,
-    stress: stats.stress,
-    skills: stats.skills,
-    happiness: stats.happiness,
-    days: stats.daysPassed
-  };
-  Object.entries(statMap).forEach(([key, value]) => {
-    document.querySelectorAll(`[data-sim-stat="${key}"]`).forEach((node) => {
-      node.textContent = value;
-    });
-  });
-
-  const location = lifeSimLocations.find((item) => item.id === trackerState.lifeSim.currentLocation);
-  const title = document.querySelector("[data-sim-location-title]");
-  const description = document.querySelector("[data-sim-location-description]");
-  const activityList = document.querySelector("[data-sim-activity-list]");
-  const card = document.querySelector("[data-sim-location-card]");
-  if (location) {
-    if (card) card.classList.remove("is-empty");
-    if (title) title.textContent = location.name;
-    if (description) description.textContent = location.description;
-    if (activityList) activityList.innerHTML = lifeSimActivityButtons(location.id);
-  } else if (card) {
-    card.classList.add("is-empty");
-    card.innerHTML = `
-      <p class="eyebrow">Explore mode</p>
-      <h3>Find a glowing zone.</h3>
-      <p class="muted">Move near a recognizable place. Some locations have playable actions now; others are visual spaces for this remaster.</p>
-      <div class="sim-activity-list" data-sim-activity-list></div>
-    `;
-  }
-}
-
-function performLifeVerseActivity(activityId) {
-  const engine = lifeVerseEngine();
-  const state = lifeVerseState();
-  if (!engine || !state || !activityId) return null;
-  const runActivity = engine.performActivityCommand || engine.performActivity;
-  if (!runActivity) return null;
-  const result = runActivity(state, activityId, {
-    locationId: trackerState.lifeSim.currentLocation || ""
-  });
-  if (result && !result.error) {
-    trackerState.lifeVerse = result.state;
-    trackerState.lifeVerse.activeView = "today";
-    syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence(result.activity.title, result.event.consequences, { reflection: result.event.reflection });
-    if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
-  }
-  return result;
-}
-
-function performLifeVerseSystemAction(systemId, actionId) {
-  const engine = lifeVerseEngine();
-  const state = lifeVerseState();
-  if (!engine || !state || !systemId || !actionId) return null;
-  const runAction = engine.performSystemActionCommand || engine.performSystemAction;
-  if (!runAction) return null;
-  const result = runAction(state, systemId, actionId);
-  if (result && !result.error) {
-    trackerState.lifeVerse = result.state;
-    trackerState.lifeVerse.activeView = "today";
-    syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence(result.action.title, result.event.consequences, { reflection: result.event.reflection });
-    if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
-  } else if (result && result.error) {
-    markLifeVerseConsequence("Action unavailable", result.error);
-  }
-  return result;
-}
-
-function fastForwardLifeVerse(days = 30) {
-  const engine = lifeVerseEngine();
-  const state = lifeVerseState();
-  if (!engine || !state) return null;
-  const runFastForward = engine.fastForwardCommand || engine.fastForward;
-  if (!runFastForward) return null;
-  const result = runFastForward(state, days);
-  if (result && !result.error) {
-    trackerState.lifeVerse = result.state;
-    if (result.pendingIntervention) {
-      // Fast Forward paused partway through - hold on "today" so the
-      // intervention panel (which lifeVerseOverlayPanel shows unconditionally
-      // while a decision is pending) is what the player actually sees.
-      trackerState.lifeVerse.activeView = "today";
-      syncLifeSimFromLifeVerse();
-      if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
-      return result;
-    }
-    trackerState.lifeVerse.activeView = "today";
-    syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence(`${days} Days Later`, result.event.consequences, { reflection: result.event.reflection, reportPromptReady: true });
-    if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
-  }
-  return result;
-}
-
-function resolveLifeVerseIntervention(choiceId) {
-  const engine = lifeVerseEngine();
-  const state = lifeVerseState();
-  if (!engine || !state) return null;
-  const resolve = engine.resolveFastForwardInterventionCommand || engine.resolveFastForwardIntervention;
-  if (!resolve) return null;
-  const result = resolve(state, choiceId);
-  if (result && !result.error) {
-    trackerState.lifeVerse = result.state;
-    trackerState.lifeVerse.activeView = "today";
-    syncLifeSimFromLifeVerse();
-    markLifeVerseConsequence("Decision made", result.event.consequences, { reflection: result.event.reflection, reportPromptReady: true });
-    if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
-  }
-  return result;
-}
-
-function createLifeVerseReport() {
-  const engine = lifeVerseEngine();
-  const state = lifeVerseState();
-  if (!engine || !state) return null;
-  const runReport = engine.generateLifeReportCommand || engine.generateLifeReport;
-  if (!runReport) return null;
-  const report = runReport(state, { type: "reflection" });
-  trackerState.lifeVerse = state;
-  trackerState.lifeVerse.activeView = "report";
-  markLifeVerseConsequence(report.title, report.overview);
-  if (engine.saveLifeVerseState) engine.saveLifeVerseState(trackerState.lifeVerse, { slot: "autosave" });
-  return report;
-}
-
-function resetLifeVerse() {
-  const engine = lifeVerseEngine();
-  trackerState.lifeVerse = engine && engine.reset ? engine.reset({ profile: userProfile }) : createDefaultLifeVerseState();
-  syncLifeSimFromLifeVerse();
-  trackerState.lifeSim.lastActivity = "";
-  trackerState.lifeSim.consequences = [];
-  trackerState.lifeSim.reflection = "";
-  trackerState.lifeSim.consequenceToastUntil = 0;
-  trackerState.lifeSim.reportPromptReady = false;
-}
-
-function destroyLifeSim() {
-  if (lifeSimInstance && typeof lifeSimInstance.destroy === "function") {
-    lifeSimInstance.destroy();
-  }
-  lifeSimInstance = null;
-  window.__CompassLifeSimDebug = null;
-}
-
-function enterLifeSimMode() {
-  document.body.classList.add("life-sim-active");
-  const root = document.documentElement;
-  if (root.requestFullscreen && !document.fullscreenElement) {
-    root.requestFullscreen().catch(() => {});
-  }
-  if (screen.orientation && screen.orientation.lock) {
-    screen.orientation.lock("landscape").catch(() => {});
-  }
-}
-
-function exitLifeSimMode() {
-  document.body.classList.remove("life-sim-active");
-  if (screen.orientation && screen.orientation.unlock) {
-    try {
-      screen.orientation.unlock();
-    } catch (error) {
-      // Some browsers expose unlock but do not allow it outside installed PWAs.
-    }
-  }
-  if (document.fullscreenElement && document.exitFullscreen) {
-    document.exitFullscreen().catch(() => {});
-  }
-}
-
-// renderScreen("simulator") replaces #screen-root's innerHTML wholesale on
-// every overlay change (map/journal/pause all live in that same template),
-// which destroys and recreates #life-sim-root along with it - mountLifeSim()
-// always has to build a brand new CompassLifeSim instance, there is no
-// "already mounted, just update" path. That's fine for stats (those live in
-// trackerState.lifeVerse, untouched by remounts) but it means any 3D-only
-// state - like the player's physical position - resets to the default spawn
-// every time, silently undoing a teleport requested just before the remount.
-// Route the destination through the remount instead of fighting it.
-let pendingTeleportLocationId = null;
-
-function mountLifeSim() {
-  const root = document.querySelector("#life-sim-root");
-  if (!root) return;
-  // Backfills interviewPracticeSessions for returning players whose real
-  // practice history predates this sync existing (it otherwise only
-  // updates when a new session finishes) - cheap and idempotent to run
-  // every time the sim is opened.
-  syncInterviewPracticeToLifeVerse();
-  destroyLifeSim();
-  if (!window.CompassLifeSim || typeof window.CompassLifeSim.mount !== "function") {
-    root.innerHTML = `<div class="sim-canvas-fallback"><strong>3D simulator is unavailable</strong><span>Refresh the page once, then open Life Sim again.</span></div>`;
-    return;
-  }
-  // Normal Life Sim entry should open from the curated street-camera start in
-  // life-sim.js. Only explicit map travel should override that with a zone
-  // spawn; restoring `currentLocation` here made public builds reopen beside
-  // wall-like district meshes instead of the intended game view.
-  const initialLocationId = pendingTeleportLocationId || null;
-  pendingTeleportLocationId = null;
-  const mountOptions = {
-    getLifeVerseState: () => lifeVerseState(),
-    onLocationChange(location) {
-      trackerState.lifeSim.currentLocation = location ? location.id : null;
-      saveTrackerState();
-      updateLifeSimDom();
-    }
-  };
-  if (initialLocationId) mountOptions.initialLocationId = initialLocationId;
-  lifeSimInstance = window.CompassLifeSim.mount(root, mountOptions);
-  window.__CompassLifeSimDebug = lifeSimInstance && typeof lifeSimInstance.getDebugState === "function"
-    ? () => lifeSimInstance.getDebugState()
-    : null;
-}
-
-function lifeVersePresentationPause(kind = "soft", duration = 420) {
-  const game = document.querySelector("[data-life-sim-game]");
-  if (!game) return Promise.resolve();
-  const overlay = document.createElement("div");
-  overlay.className = `lifeverse-transition-flash is-${kind}`;
-  overlay.setAttribute("aria-hidden", "true");
-  overlay.innerHTML = kind === "fast-forward"
-    ? `<span>Time is moving...</span>`
-    : kind === "report-open"
-      ? `<span>Opening reflection...</span>`
-      : `<span>LifeVerse</span>`;
-  game.appendChild(overlay);
-  game.classList.add(`is-${kind}-presentation`);
-  return new Promise((resolve) => {
-    window.setTimeout(() => {
-      overlay.classList.add("is-leaving");
-      window.setTimeout(() => {
-        overlay.remove();
-        game.classList.remove(`is-${kind}-presentation`);
-        resolve();
-      }, 180);
-    }, duration);
-  });
 }
 
 const FUTURE_SELF_HORIZONS = [
@@ -8388,18 +7064,6 @@ async function finishInterviewSession(session, persona) {
     console.error("[Interview Practice] Feedback generation failed", error);
   }
   session.completedAt = new Date().toISOString();
-  syncInterviewPracticeToLifeVerse();
-}
-
-// Real Interview Practice sessions (AI-based, careerStudio) had zero
-// connection to LifeVerse's career simulation - practicing the actual skill
-// had no payoff in the sim. Mirrors bumpCommunityTrust's one-way sync
-// pattern: a plain count, not an AI-parsed score, keeps LifeVerse's own
-// formula deterministic and free of AI dependence.
-function syncInterviewPracticeToLifeVerse() {
-  const state = lifeVerseState();
-  state.career.interviewPracticeSessions = trackerState.careerStudio.interviewSessions.filter((session) => session.completedAt).length;
-  saveTrackerState();
 }
 
 function interviewPersonaPicker() {
@@ -13306,43 +11970,27 @@ const screens = {
   `;
   },
 
+  // The previous LifeVerse engine (~28 dedicated JS files, the 3D
+  // life-sim.js frontend, and this tab's rendering code) was deliberately
+  // deleted 2026-08-03 - a new Life Sim will be built here later. The
+  // nav tab itself stays real and reachable; this is a genuine "not
+  // built yet" placeholder, not a broken screen pretending to work.
   simulator: () => `
-    <section class="life-sim-game" data-life-sim-game>
-      <div id="life-sim-root" class="life-sim-root" aria-label="Realistic 3D Singapore adult-life simulator"></div>
-      <div class="life-sim-color-grade" aria-hidden="true"></div>
-
-      <div class="life-sim-rotate" aria-hidden="true">
-        <strong>Rotate your phone</strong>
-        <span>Life Sim is designed for full-screen landscape play.</span>
+    <header class="screen-head compact-head">
+      <div>
+        <p class="eyebrow">Life Sim</p>
+        <h2 class="screen-title">Being rebuilt.</h2>
+        <p class="screen-subtitle">The playable life simulator is being rebuilt from scratch. This tab will come back to life once it's ready.</p>
       </div>
-
-      <header class="life-sim-game-topbar">
-        <div>
-          <p class="eyebrow">LifeVerse</p>
-          <h2>Playable Adult Life Simulator</h2>
-        </div>
-        <button class="sim-exit-button" type="button" data-tab-jump="home">Exit</button>
-      </header>
-
-      ${lifeVerseGameShell()}
-
-      <div class="life-sim-controls-note">
-        <strong>Move</strong>
-        <span>Joystick / WASD</span>
-        <strong>Look</strong>
-        <span>Drag right side</span>
-      </div>
-
-      <div class="sim-joystick" data-sim-joystick aria-hidden="true">
-        <span data-sim-joystick-knob></span>
-      </div>
-
-      <div class="sim-look-pad" data-sim-look-pad aria-hidden="true">
-        <span>Drag to rotate</span>
-      </div>
-
-      <button class="asset-credits-tag" type="button" data-open="assetCredits">Asset Credits</button>
+    </header>
+    <section class="empty-feature">
+      <img src="assets/icon-time.png" alt="">
+      <div><strong>Nothing here yet</strong><p>In the meantime, Second Brain and Discover cover the rest of adult-life prep.</p></div>
     </section>
+    <div class="profile-actions">
+      <button class="primary-action compact-action" type="button" data-tab-jump="secondBrain">Go to Second Brain</button>
+      <button class="secondary-action compact-action" type="button" data-tab-jump="discover">Go to Discover</button>
+    </div>
   `,
 
   discover: () => communityMergedScreen(),
@@ -15277,16 +13925,9 @@ function bindRenderedNavigation(container) {
       event.preventDefault();
       event.stopPropagation();
       const targetTab = button.dataset.tabJump;
-      if (targetTab === "simulator") setLifeVerseDefaultWorldView();
       if (targetTab) renderScreen(targetTab);
     });
   });
-}
-
-function setLifeVerseDefaultWorldView() {
-  trackerState.lifeVerse = lifeVerseState();
-  trackerState.lifeVerse.activeView = "today";
-  if (trackerState.lifeSim) trackerState.lifeSim.reportPromptReady = false;
 }
 
 // The persistent corner-popup version of this (Compass/Life Report portraits
@@ -15350,12 +13991,6 @@ function renderScreen(tab) {
     applyCoachProactiveOpener();
     if (isEnteringCompass) applyPendingProactiveMessage();
   }
-  if (tab === "simulator") {
-    enterLifeSimMode();
-  } else {
-    destroyLifeSim();
-    exitLifeSimMode();
-  }
   screenRoot.innerHTML = getScreen(tab);
   bindRenderedNavigation(screenRoot);
   refreshDesktopRightRail(tab);
@@ -15366,9 +14001,6 @@ function renderScreen(tab) {
   if (tab === "compass") {
     const chatMessagesEl = document.querySelector("#chat-messages");
     if (chatMessagesEl) chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-  }
-  if (tab === "simulator") {
-    requestAnimationFrame(mountLifeSim);
   }
 }
 
@@ -16324,33 +14956,6 @@ async function runFutureScanValues() {
   }
 }
 
-// Maps the Hidden Cost Scanner's 6 labels onto real LifeVerse state fields.
-// betterWhenHigh: true means the field going DOWN over the simulated window
-// is the cost (e.g. sleep draining); false means the field going UP is the
-// cost (burnoutRisk rising). scaleFactor turns a raw 30-day point delta into
-// a 0-100 severity - tuned so a typical drift lands in a believable 20-70
-// band rather than always pinning to 0 or 100.
-const HIDDEN_COST_FIELD_MAP = [
-  { label: "Sleep", get: (state) => state.needs.sleep, betterWhenHigh: true },
-  { label: "Energy", get: (state) => state.needs.energy, betterWhenHigh: true },
-  { label: "Focus", get: (state) => state.mentalWellbeing.burnoutRisk, betterWhenHigh: false },
-  { label: "Confidence", get: (state) => state.mentalWellbeing.confidence, betterWhenHigh: true },
-  { label: "Future opportunity", get: (state) => state.career.readiness, betterWhenHigh: true },
-  { label: "Relationships", get: (state) => state.relationships.support, betterWhenHigh: true }
-];
-const HIDDEN_COST_SCALE_FACTOR = 2.5;
-
-function computeHiddenCostSeverities() {
-  const before = lifeVerseState();
-  const beforeValues = HIDDEN_COST_FIELD_MAP.map((field) => Number(field.get(before)) || 0);
-  const { state: after } = lifeVerseNoActionSnapshot(30);
-  return HIDDEN_COST_FIELD_MAP.map((field, index) => {
-    const afterValue = Number(field.get(after)) || 0;
-    const delta = field.betterWhenHigh ? beforeValues[index] - afterValue : afterValue - beforeValues[index];
-    return { label: field.label, severity: Math.max(0, Math.min(100, Math.round(delta * HIDDEN_COST_SCALE_FACTOR))) };
-  });
-}
-
 function futureScanHiddenCostsView() {
   const result = activeFutureScan.stations.hiddenCosts;
   return `
@@ -16377,35 +14982,18 @@ function futureScanHiddenCostsView() {
   `;
 }
 
+// The real severities here always came from LifeVerse's simulation engine
+// (computeHiddenCostSeverities(), deleted 2026-08-03 along with the rest
+// of the engine - a new Life Sim will be built later). This station
+// can't honestly run without it - inventing severity numbers instead
+// would be exactly the kind of fabricated data this app has never done
+// anywhere else. Left registered (not removed from the station list) so
+// it can come back once a new engine exists to compute real numbers
+// again, rather than surgically stripping it from the 4 places Future
+// Scan's other 10 stations still share with it.
 async function runFutureScanHiddenCosts() {
-  futureScanStationError = "";
-  futureScanStationLoading = "hiddenCosts";
+  futureScanStationError = "The Hidden Cost Scanner needs Compass's life simulation to compute real severities - that engine is being rebuilt right now, so this scan is paused until it's back.";
   openModal("futureScanStation", "hiddenCosts");
-  try {
-    const severities = computeHiddenCostSeverities();
-    const severitiesText = severities.map((item) => `${item.label}: severity ${item.severity}/100`).join("; ");
-    const prompt = `${scanContextText("hiddenCosts")}\n\nCompass's own life simulation engine computed these real severities for this user if this pattern continues for about a month: ${severitiesText}.\n\nFor EACH of these exact labels, in this exact order, write a one-sentence reason grounded in the real severity number and the user's specific real situation - do not invent a different severity, only explain why it lands there for them. Respond as strict JSON only: {"costs":[{"label":"string","reason":"string"}]}`;
-    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
-    const parsed = extractJsonObject(reply);
-    if (!parsed || !Array.isArray(parsed.costs)) throw new Error("Hidden cost reply was not valid JSON.");
-    const reasonByLabel = new Map(parsed.costs.map((item) => [cleanText(item.label || "", 40).toLowerCase(), cleanText(item.reason || "", 160)]));
-    const result = {
-      costs: severities.map((item) => ({
-        label: item.label,
-        severity: item.severity,
-        reason: reasonByLabel.get(item.label.toLowerCase()) || "This reflects how this pattern affects that part of your life if it continues."
-      })),
-      personalized: Boolean(userProfile.characterCreated),
-      generatedAt: new Date().toISOString()
-    };
-    saveFutureScanStation("hiddenCosts", result);
-  } catch (error) {
-    console.error("[Future Scan] Hidden cost scan failed", error);
-    futureScanStationError = "This scan is having trouble running right now. Please try again.";
-  } finally {
-    futureScanStationLoading = "";
-    openModal("futureScanStation", "hiddenCosts");
-  }
 }
 
 function futureScanNoActionView() {
@@ -16442,45 +15030,16 @@ function futureScanNoActionView() {
 
 const FUTURE_SCAN_NO_ACTION_CHECKPOINTS = [["1 week", 7], ["1 month", 30], ["6 months", 180], ["1 year", 365]];
 
+// Same real constraint as runFutureScanHiddenCosts() above: this station's
+// checkpoints came from lifeVerseNoActionSnapshot() (LifeVerse engine,
+// deleted 2026-08-03) actually simulating "if nothing changes" forward -
+// without a real engine behind it, generating this timeline would mean
+// the AI inventing outcomes with no real basis, which this app has never
+// done. Paused, not removed from the station list, until a new engine
+// exists to ground it in something real again.
 async function runFutureScanNoAction() {
-  futureScanStationError = "";
-  futureScanStationLoading = "noActionFuture";
+  futureScanStationError = "This scan needs Compass's life simulation to project real outcomes forward - that engine is being rebuilt right now, so it's paused until it's back.";
   openModal("futureScanStation", "noActionFuture");
-  try {
-    const simulated = {};
-    FUTURE_SCAN_NO_ACTION_CHECKPOINTS.forEach(([label, days]) => {
-      const { event } = lifeVerseNoActionSnapshot(days);
-      simulated[label] = {
-        summary: event ? cleanText(event.summary, 200) : "",
-        consequences: event && Array.isArray(event.consequences) ? event.consequences.slice(0, 3) : []
-      };
-    });
-    const factsBlock = FUTURE_SCAN_NO_ACTION_CHECKPOINTS
-      .map(([label]) => `${label}: ${simulated[label].consequences.join(" ") || simulated[label].summary}`)
-      .join("\n");
-    const prompt = `${scanContextText("noActionFuture")}\n\nReal simulated outcome data for this user if nothing changes, from Compass's own life simulation engine:\n${factsBlock}\n\nIf the user changes NOTHING and keeps doing exactly what they're doing now regarding this situation, describe what that realistically looks like at each checkpoint. Use the real simulated data above as the primary basis for each entry - do not contradict it, but add interpretation relevant to their specific real-life situation. Be concrete, not generic. Respond as strict JSON only: {"timeline":{"1 week":"string","1 month":"string","6 months":"string","1 year":"string"}}`;
-    const reply = await requestCompassDirect(FUTURE_SCAN_SYSTEM_PROMPT, prompt);
-    const parsed = extractJsonObject(reply);
-    if (!parsed || !parsed.timeline) throw new Error("No-Action Future reply was not valid JSON.");
-    const result = {
-      timeline: {
-        "1 week": cleanText(parsed.timeline["1 week"] || "", 200),
-        "1 month": cleanText(parsed.timeline["1 month"] || "", 200),
-        "6 months": cleanText(parsed.timeline["6 months"] || "", 200),
-        "1 year": cleanText(parsed.timeline["1 year"] || "", 200)
-      },
-      simulated,
-      personalized: Boolean(userProfile.characterCreated),
-      generatedAt: new Date().toISOString()
-    };
-    saveFutureScanStation("noActionFuture", result);
-  } catch (error) {
-    console.error("[Future Scan] No-action future failed", error);
-    futureScanStationError = "This scan is having trouble running right now. Please try again.";
-  } finally {
-    futureScanStationLoading = "";
-    openModal("futureScanStation", "noActionFuture");
-  }
 }
 
 function futureScanPressureView() {
@@ -18026,72 +16585,22 @@ authForm.addEventListener("submit", (event) => {
   userProfile.email = email;
   userProfile.username = username;
   userProfile.role = authAdminPassInput.value.trim() === ADMIN_PASSCODE ? "admin" : "user";
+  // Character creation + the "Your first apartment" opening narrative
+  // (gating entry into a LifeVerse game session) were removed 2026-08-03
+  // along with the LifeVerse engine - sign-in now goes straight to Home.
+  // characterCreated stays true unconditionally so a real future Life
+  // Sim rebuild can decide its own fresh entry flow rather than this
+  // sign-in path silently trying to gate on a flag from the old one.
+  userProfile.characterCreated = true;
   saveUserProfile();
   applyScopedTrackerState();
   applyScopedChatState();
   saveTrackerState();
   hideAuth();
-  if (!userProfile.characterCreated) {
-    showCharacterCreation();
-  } else {
-    renderScreen("home");
-    refreshStaticScreens();
-  }
+  renderScreen("home");
+  refreshStaticScreens();
+  if (!trackerState.onboarding.completedAt) openModal("firstRunOnboarding");
 });
-
-function showCharacterCreation() {
-  if (!characterCreationLayer) return;
-  characterCreationLayer.classList.add("is-open");
-  characterCreationLayer.setAttribute("aria-hidden", "false");
-}
-
-function hideCharacterCreation() {
-  if (!characterCreationLayer) return;
-  characterCreationLayer.classList.remove("is-open");
-  characterCreationLayer.setAttribute("aria-hidden", "true");
-}
-
-function showOpeningNarrative() {
-  if (!openingNarrativeLayer) return;
-  openingNarrativeLayer.classList.add("is-open");
-  openingNarrativeLayer.setAttribute("aria-hidden", "false");
-}
-
-function hideOpeningNarrative() {
-  if (!openingNarrativeLayer) return;
-  openingNarrativeLayer.classList.remove("is-open");
-  openingNarrativeLayer.setAttribute("aria-hidden", "true");
-}
-
-if (characterCreationForm) {
-  characterCreationForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const formData = new FormData(characterCreationForm);
-    userProfile.ageGroup = String(formData.get("ageGroup") || "young-adult");
-    userProfile.background = String(formData.get("background") || "fresh-graduate");
-    userProfile.startingTrait = String(formData.get("startingTrait") || "disciplined");
-    userProfile.difficulty = String(formData.get("difficulty") || "standard");
-    saveUserProfile();
-    hideCharacterCreation();
-    showOpeningNarrative();
-  });
-}
-
-if (openingNarrativeContinueButton) {
-  openingNarrativeContinueButton.addEventListener("click", () => {
-    const engine = lifeVerseEngine();
-    if (engine && engine.createInitialState) {
-      trackerState.lifeVerse = engine.createInitialState({ profile: userProfile, applyCharacterCreation: true });
-      saveTrackerState();
-    }
-    userProfile.characterCreated = true;
-    saveUserProfile();
-    hideOpeningNarrative();
-    renderScreen("home");
-    refreshStaticScreens();
-    if (!trackerState.onboarding.completedAt) openModal("firstRunOnboarding");
-  });
-}
 
 navItems.forEach((item) => {
   item.addEventListener("click", () => renderScreen(item.dataset.tab));
@@ -18298,16 +16807,6 @@ document.addEventListener("click", async (event) => {
   const saveStory = event.target.closest("[data-save-story]");
   const saveAdmin = event.target.closest("[data-save-admin-settings]");
   const signOut = event.target.closest("[data-sign-out]");
-  const simActivity = event.target.closest("[data-sim-activity]");
-  const simFastForward = event.target.closest("[data-sim-fast-forward]");
-  const simReset = event.target.closest("[data-sim-reset]");
-  const lifeVerseTab = event.target.closest("[data-lifeverse-tab]");
-  const lifeVerseActivity = event.target.closest("[data-lifeverse-activity]");
-  const lifeVerseSystemAction = event.target.closest("[data-lifeverse-system-action]");
-  const lifeVerseFastForward = event.target.closest("[data-lifeverse-fast-forward]");
-  const lifeVerseReportNow = event.target.closest("[data-lifeverse-report-now]");
-  const lifeVerseReset = event.target.closest("[data-lifeverse-reset]");
-  const lifeVerseTravel = event.target.closest("[data-lifeverse-travel]");
   const dismissSystemTutorial = event.target.closest("[data-dismiss-system-tutorial]");
   const toggleTaxItem = event.target.closest("[data-toggle-tax-item]");
   const saveGuardianShareButton = event.target.closest("[data-save-guardian-share]");
@@ -18378,7 +16877,6 @@ document.addEventListener("click", async (event) => {
   const redoQuickCaptureButton = event.target.closest("[data-redo-quick-capture]");
   const dismissInsightButton = event.target.closest("[data-dismiss-insight]");
   const tryAdvancedFindingButton = event.target.closest("[data-try-advanced-finding]");
-  const lifeVerseInterventionChoice = event.target.closest("[data-lifeverse-intervention-choice]");
 
   if (commandRunButton) {
     event.preventDefault();
@@ -18963,116 +17461,12 @@ document.addEventListener("click", async (event) => {
       openModal("sosTriage");
     }
   }
-  if (lifeVerseTravel) {
-    const destinationId = lifeVerseTravel.dataset.lifeverseTravel;
-    // Closing the map overlay goes through renderScreen("simulator"), which
-    // always remounts the 3D scene from scratch (see mountLifeSim) - calling
-    // teleportTo() on the live instance here would just get thrown away.
-    // Queue the destination so the remount itself spawns there instead.
-    pendingTeleportLocationId = destinationId;
-    trackerState.lifeSim.currentLocation = destinationId;
-    saveTrackerState();
-    trackerState.lifeVerse = lifeVerseState();
-    trackerState.lifeVerse.activeView = "today";
-    renderScreen("simulator");
-  }
   if (tabJump) {
-    if (tabJump.dataset.tabJump === "simulator") setLifeVerseDefaultWorldView();
     renderScreen(tabJump.dataset.tabJump);
   }
   if (openLink) {
     const url = safeExternalUrl(openLink.dataset.openLink);
     if (url) window.open(url, "_blank", "noopener,noreferrer");
-  }
-  if (lifeVerseTab) {
-    trackerState.lifeVerse = lifeVerseState();
-    trackerState.lifeVerse.activeView = lifeVerseTab.dataset.lifeverseTab || "today";
-    if (trackerState.lifeVerse.activeView === "journal" || trackerState.lifeVerse.activeView === "report") {
-      trackerState.lifeSim.reportPromptReady = false;
-    }
-    saveTrackerState();
-    renderScreen("simulator");
-  }
-  if (lifeVerseActivity) {
-    const result = performLifeVerseActivity(lifeVerseActivity.dataset.lifeverseActivity);
-    if (result && !result.error) {
-      saveTrackerState();
-      renderScreen("simulator");
-      refreshStaticScreens();
-    }
-  }
-  if (lifeVerseSystemAction) {
-    const [systemId, actionId] = String(lifeVerseSystemAction.dataset.lifeverseSystemAction || "").split(":");
-    const result = performLifeVerseSystemAction(systemId, actionId);
-    if (result && !result.error) {
-      saveTrackerState();
-      renderScreen("simulator");
-      refreshStaticScreens();
-    }
-  }
-  if (lifeVerseFastForward) {
-    const days = Number(lifeVerseFastForward.dataset.lifeverseFastForward || 30);
-    await lifeVersePresentationPause("fast-forward", 620);
-    const result = fastForwardLifeVerse(days);
-    if (result && !result.error) {
-      saveTrackerState();
-      renderScreen("simulator");
-      refreshStaticScreens();
-    }
-  }
-  if (lifeVerseInterventionChoice) {
-    const choiceId = lifeVerseInterventionChoice.dataset.lifeverseInterventionChoice;
-    await lifeVersePresentationPause("fast-forward", 420);
-    const result = resolveLifeVerseIntervention(choiceId);
-    if (result && !result.error) {
-      saveTrackerState();
-      renderScreen("simulator");
-      refreshStaticScreens();
-    }
-  }
-  if (lifeVerseReportNow) {
-    await lifeVersePresentationPause("report-open", 260);
-    const report = createLifeVerseReport();
-    if (report) {
-      saveTrackerState();
-      renderScreen("simulator");
-      refreshStaticScreens();
-    }
-  }
-  if (lifeVerseReset) {
-    if (window.confirm("Reset LifeVerse game progress for this user?")) {
-      resetLifeVerse();
-      saveTrackerState();
-      renderScreen("simulator");
-      refreshStaticScreens();
-    }
-  }
-  if (simActivity) {
-    const locationId = simActivity.dataset.simLocation;
-    const activity = (lifeSimActivities[locationId] || []).find((item) => item.id === simActivity.dataset.simActivity);
-    if (activity) {
-      applyLifeSimChanges(activity.effect);
-      markLifeVerseConsequence(activity.name, `${activity.name} completed. ${lifeSimEffectText(activity.effect)}`);
-      saveTrackerState();
-      updateLifeSimDom();
-      renderScreen("simulator");
-      refreshStaticScreens();
-    }
-  }
-  if (simFastForward) {
-    fastForwardLifeVerse(30);
-    saveTrackerState();
-    renderScreen("simulator");
-    refreshStaticScreens();
-  }
-  if (simReset) {
-    if (window.confirm("Reset the Life Simulator stats to the MVP starting values?")) {
-      trackerState.lifeSim = normalizeLifeSimState(defaultTrackerState.lifeSim);
-      resetLifeVerse();
-      saveTrackerState();
-      renderScreen("simulator");
-      refreshStaticScreens();
-    }
   }
   if (chatPrompt) {
     await sendChatMessage(chatPrompt.dataset.chatPrompt || "");
@@ -19566,9 +17960,7 @@ document.addEventListener("click", async (event) => {
       renderScreen(activeTab);
       refreshStaticScreens();
       const newStreak = reflectionCheckInStreak().streak;
-      const growthBoost = applyGrowthCheckInBoost("reflection", newStreak);
-      const boostSuffix = growthBoost ? ` · +${growthBoost.boost} ${growthBoost.statLabel} in Life Sim` : "";
-      triggerCheckInCelebration((newStreak > 1 ? `🌱 Saved! ${newStreak}-day reflection streak` : "🌱 Reflection saved") + boostSuffix);
+      triggerCheckInCelebration(newStreak > 1 ? `🌱 Saved! ${newStreak}-day reflection streak` : "🌱 Reflection saved");
     }
   }
 
@@ -19862,9 +18254,7 @@ document.addEventListener("click", async (event) => {
     refreshStaticScreens();
     void enhanceMoodSuggestionWithAI(trackerState.mood.label, score, note);
     const newStreak = moodCheckInStreak().streak;
-    const growthBoost = applyGrowthCheckInBoost("mood", newStreak);
-    const boostSuffix = growthBoost ? ` · +${growthBoost.boost} ${growthBoost.statLabel} in Life Sim` : "";
-    triggerCheckInCelebration((newStreak > 1 ? `🔥 Logged! ${newStreak}-day streak` : "✅ Mood logged for today") + boostSuffix);
+    triggerCheckInCelebration(newStreak > 1 ? `🔥 Logged! ${newStreak}-day streak` : "✅ Mood logged for today");
   }
 
   if (saveAiProfile) {
@@ -20083,8 +18473,6 @@ document.addEventListener("click", async (event) => {
       if (result.status === "blocked") {
         openModal("safety", result.reason);
       } else {
-        bumpCommunityTrust(pendingMilestone ? 5 : 2);
-        checkCommunityAchievements();
         renderScreen("community");
       }
       refreshStaticScreens();
@@ -20193,9 +18581,7 @@ document.addEventListener("click", async (event) => {
     const squadId = joinSquadButton.dataset.joinSquad;
     const ok = await joinSquad(squadId);
     if (ok) {
-      bumpCommunityTrust(3);
       await refreshCommunityData();
-      checkCommunityAchievements();
     }
     renderScreen("community");
     if (modalLayer.classList.contains("is-open")) openModal("communityGroup", squadId);
@@ -20291,7 +18677,6 @@ document.addEventListener("click", async (event) => {
   if (acceptAccountabilityRequestButton) {
     await respondAccountabilityConnection(acceptAccountabilityRequestButton.dataset.acceptAccountabilityRequest, "accepted");
     await refreshCommunityData();
-    checkCommunityAchievements();
     renderScreen("community");
   }
   if (declineAccountabilityRequestButton) {
@@ -20397,9 +18782,7 @@ document.addEventListener("click", async (event) => {
     }
     try {
       await submitSkillTag({ type, category, note });
-      if (type === "offered") bumpCommunityTrust(2);
       await refreshCommunityData();
-      checkCommunityAchievements();
       closeModal();
       renderScreen("community");
     } catch (err) {
@@ -20810,12 +19193,5 @@ viewButtons.forEach((button) => {
 refreshStaticScreens();
 const startupParams = new URLSearchParams(window.location.search);
 const startupTab = startupParams.get("tab") || "home";
-const startupLifeVerseView = startupParams.get("lifeverseView");
-if (startupLifeVerseView) {
-  trackerState.lifeVerse = lifeVerseState();
-  trackerState.lifeVerse.activeView = startupLifeVerseView;
-} else if (startupTab === "simulator") {
-  setLifeVerseDefaultWorldView();
-}
 renderScreen(screens[startupTab] ? startupTab : "home");
 showAuthIfNeeded();
