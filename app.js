@@ -14101,11 +14101,14 @@ function renderScreen(tab) {
   if (tab === "discover") mountFeedSwipeCard();
   // See ensureCommunityDataLoaded() in community.js for why this exists -
   // without it, Discover/Connect/Feed/History only ever showed real data
-  // if some other action had already warmed the cache this session.
-  // Safe to call on every render: a no-op once loaded or already loading.
+  // if some other action had already warmed the cache this session. Only
+  // re-render when it reports it actually just performed the fetch
+  // (didLoad === true) - re-rendering on every no-op call (while a fetch
+  // is already in flight, or once already loaded) would re-enter this
+  // exact branch again on each render and loop forever.
   if (tab === "discover" && typeof hasCommunitySession === "function" && hasCommunitySession() && typeof ensureCommunityDataLoaded === "function") {
-    ensureCommunityDataLoaded().then(() => {
-      if (activeTab === "discover") renderScreen("discover");
+    ensureCommunityDataLoaded().then((didLoad) => {
+      if (didLoad && activeTab === "discover") renderScreen("discover");
     });
   }
   const navTab = tab === "assess" || tab === "compass" ? "secondBrain" : tab === "stories" ? "discover" : tab;

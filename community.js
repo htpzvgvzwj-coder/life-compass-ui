@@ -192,12 +192,21 @@
   // Discover/Community saw genuinely empty Feed/Connect panels regardless
   // of how much real data existed in the database, because nothing had
   // triggered a fetch yet. This is the safe entry point for a screen to
-  // call on render: a no-op once data is loaded or already loading, so it
-  // can be called from renderScreen() on every render without causing
-  // repeat fetches or request pile-ups.
+  // call on render.
+  // Returns whether it actually kicked off a fetch, NOT just whether data
+  // is now loaded - the caller (renderScreen) uses this to decide whether
+  // to re-render. Returning something truthy on every no-op call would
+  // create a live infinite loop: renderScreen -> ensureCommunityDataLoaded
+  // (no-ops instantly while a fetch is already in flight) -> .then
+  // re-renders -> renderScreen again -> ... forever, starving the event
+  // loop of the tick the real fetch's own .then needs to ever resolve.
+  // Found exactly this way live: the page froze solid, CDP eval timed out,
+  // "document_idle" never reached. Only the one call that genuinely
+  // performs the fetch should trigger a re-render once it resolves.
   async function ensureCommunityDataLoaded() {
-    if (communityDataLoaded || communityDataLoading) return;
+    if (communityDataLoaded || communityDataLoading) return false;
     await refreshCommunityData();
+    return true;
   }
 
   // ---------------------------------------------------------------------
