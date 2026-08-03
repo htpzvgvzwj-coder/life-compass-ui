@@ -10481,14 +10481,32 @@ function aiTraceLogModal() {
 // list screens) still exists for deliberate lookup - see communityMergedScreen.
 let feedIndex = 0;
 let feedItems = [];
-let communityViewMode = "for-you";
-const DISCOVER_VIEW_MODES = [
-  { id: "for-you", label: "For You" },
-  { id: "opportunities", label: "Opportunities" },
-  { id: "people", label: "People" },
-  { id: "groups", label: "Groups" },
-  { id: "updates", label: "Updates" }
-];
+// Discover redesign (2026-08-03): the old flat 5-way toggle
+// (for-you/opportunities/people/groups/updates, communityViewMode/
+// DISCOVER_VIEW_MODES) is replaced by a "For You" spotlight (always
+// visible, not a mode) plus a 3-way Explore panel - Opportunities,
+// Connect (with its own People/Groups sub-toggle), Feed (= old Updates).
+// setDiscoverMode() is the one place external jump targets (starter path
+// steps, command launcher entries, onboarding finish) get translated into
+// this pair, so "people"/"groups"/"opportunities"/"updates" - the real
+// values already used elsewhere in the codebase - keep working unchanged.
+let discoverExploreMode = "opportunities";
+let discoverConnectView = "people";
+
+function setDiscoverMode(modeId) {
+  if (modeId === "people" || modeId === "groups") {
+    discoverExploreMode = "connect";
+    discoverConnectView = modeId;
+  } else if (modeId === "connect") {
+    discoverExploreMode = "connect";
+  } else if (modeId === "updates" || modeId === "feed") {
+    discoverExploreMode = "feed";
+  } else if (modeId === "opportunities" || modeId === "browse") {
+    discoverExploreMode = "opportunities";
+  }
+  // "for-you" (or anything unrecognized) needs no change - For You is
+  // always visible as the spotlight, never a switchable mode.
+}
 
 function feedUserTags() {
   const goalText = [
@@ -10716,23 +10734,222 @@ function feedScreenContent() {
 }
 
 function communityMergedScreen() {
-  const activeMode = DISCOVER_VIEW_MODES.some((mode) => mode.id === communityViewMode) ? communityViewMode : "for-you";
   return `
-    <header class="screen-head compact-head community-head">
+    <header class="discover-topbar">
       <div>
-        <p class="eyebrow">Discover</p>
-        <h2 class="screen-title">Opportunities, people, groups, and updates without the mess.</h2>
-        <p class="screen-subtitle">Choose the kind of discovery you need instead of scrolling through every community feature at once.</p>
+        <p class="eyebrow">Life Compass</p>
+        <h1 class="discover-title">Discover</h1>
       </div>
-      <div class="avatar"><img src="assets/icon-support.png" alt=""></div>
+      <div class="discover-search" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="m21 21-4.4-4.4M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        <span>Find work, people, groups, questions</span>
+      </div>
     </header>
-    <div class="mirror-example-row mode-toggle-row community-mode-toggle discover-mode-toggle">
-      ${DISCOVER_VIEW_MODES.map((mode) => `<button type="button" class="${activeMode === mode.id ? "is-selected" : ""}" data-community-view-mode="${escapeHTML(mode.id)}">${escapeHTML(mode.label)}</button>`).join("")}
+    <div class="discover-grid">
+      ${discoverSpotlightCard()}
+      ${discoverExplorePanel()}
     </div>
-    ${discoverModeContent(activeMode)}
   `;
 }
 
+// Real "next step" headline + real starter-path progress (done/total,
+// percent bar, up to 3 step pills) + real top pick from feedBuildItems()
+// as the bottom launch strip - nothing here is placeholder copy, unlike
+// the visual mockup's decorative filler ("Career shadowing" etc).
+function discoverSpotlightCard() {
+  const path = activeStarterPath();
+  const progress = starterPathProgress(path);
+  const completedIds = (trackerState.starterPath && trackerState.starterPath.completedStepIds) || [];
+  const nextStep = path ? (path.steps.find((step) => !completedIds.includes(step.id)) || path.steps[0]) : null;
+  const pills = path
+    ? path.steps.slice(0, 3).map((step) => `<span class="discover-pill ${completedIds.includes(step.id) ? "is-done" : ""}">${escapeHTML(cleanText(step.title || step.label || "", 24))}</span>`).join("")
+    : "";
+  const topPick = feedBuildItems()[0] || null;
+  return `
+    <article class="discover-spotlight" aria-label="For You">
+      <div class="discover-flow" aria-hidden="true">
+        <svg viewBox="0 0 760 430">
+          <path class="discover-flow-glow" d="M52 330C122 242 202 330 292 230C386 126 480 210 572 100C626 34 682 60 724 26"></path>
+          <path class="discover-flow-thin" d="M52 330C122 242 202 330 292 230C386 126 480 210 572 100C626 34 682 60 724 26"></path>
+          <path class="discover-flow-line" d="M52 330C122 242 202 330 292 230C386 126 480 210 572 100C626 34 682 60 724 26"></path>
+          <circle cx="52" cy="330" r="5"></circle>
+          <circle cx="292" cy="230" r="5"></circle>
+          <circle cx="572" cy="100" r="5"></circle>
+          <circle cx="724" cy="26" r="5"></circle>
+        </svg>
+      </div>
+      <button type="button" class="discover-spot-title" ${nextStep ? starterPathStepActionAttributes(nextStep) : `data-tab-jump="home"`}>
+        <span class="eyebrow">For You</span>
+        <h2>${nextStep ? escapeHTML(cleanText(nextStep.title || nextStep.label || "Next step", 60)) : "You're all set for now."}</h2>
+      </button>
+      ${path ? `
+        <aside class="discover-starter" aria-label="Starter path progress">
+          <div class="discover-starter-head">
+            <div>
+              <p class="count-label">Starter path</p>
+              <p class="meta">${escapeHTML(path.label)}</p>
+            </div>
+            <div class="discover-count">${progress.done}/${progress.total}</div>
+          </div>
+          <div class="discover-bar" aria-hidden="true"><span style="width:${progress.percent}%"></span></div>
+          <div class="discover-quick-row">${pills}</div>
+        </aside>
+      ` : `
+        <aside class="discover-starter" aria-label="Starter path progress">
+          <p class="meta">Pick a starter path on Home so Discover can point you somewhere real.</p>
+          <button class="secondary-action compact-action" type="button" data-tab-jump="home">Pick starter path</button>
+        </aside>
+      `}
+      <div class="discover-launch-strip">
+        <div>
+          <p class="meta">Today</p>
+          <h3 class="discover-rec-title">${escapeHTML(topPick ? discoverFeedItemTitle(topPick) : "Nothing new yet")}</h3>
+        </div>
+        <button class="discover-launch" type="button" ${topPick ? discoverFeedItemLaunchAttrs(topPick) : `data-discover-mode="opportunities"`} aria-label="Look at this">
+          <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+// Real title text per feedBuildItems() type - a lighter read than
+// feedRenderCard() (which builds a full card with save/prepare/view
+// buttons), just enough for the spotlight's one-line "Today" pick.
+function discoverFeedItemTitle(item) {
+  const data = item.data;
+  if (item.type === "opportunity" || item.type === "community-opportunity") return cleanText(data.title, 60);
+  if (item.type === "squad") return cleanText(data.title, 60);
+  if (item.type === "post") return cleanText(data.body, 60);
+  if (item.type === "skill") return cleanText(data.note, 60) || data.category;
+  return "Something new";
+}
+
+// Real action per type, reusing exactly the same wired data-attributes
+// the full feed cards already use (data-prepare-opportunity,
+// data-open="communityGroup"/"communityAccountabilityRequest") - no new
+// click-handling logic, just supplying these attributes on a different
+// element.
+function discoverFeedItemLaunchAttrs(item) {
+  const data = item.data;
+  if (item.type === "opportunity" || item.type === "community-opportunity") {
+    return `data-prepare-opportunity="${escapeHTML(data.title)}" data-prepare-opportunity-category="${escapeHTML(data.category || "")}"`;
+  }
+  if (item.type === "squad") return `data-open="communityGroup" data-open-payload="${escapeHTML(data.id)}"`;
+  if (item.type === "skill") return `data-open="communityAccountabilityRequest" data-open-payload="${escapeHTML(data.user_id)}"`;
+  if (item.type === "post") return `data-discover-mode="feed"`;
+  return `data-discover-mode="opportunities"`;
+}
+
+function discoverTile(title, tag, attrs) {
+  return `
+    <article class="discover-tile" ${attrs || ""}>
+      <div class="discover-tile-visual"></div>
+      <div class="discover-tile-row"><h3 class="discover-tile-title">${escapeHTML(title)}</h3><span class="discover-tag">${escapeHTML(tag)}</span></div>
+    </article>
+  `;
+}
+
+function discoverTileGrid(tiles, emptyText) {
+  return `<div class="discover-tile-grid">${tiles.length ? tiles.join("") : `<p class="discover-tile-empty">${escapeHTML(emptyText)}</p>`}</div>`;
+}
+
+// Real opportunities (visibleOpportunities() - the same static list +
+// any stage/need/time filter already set elsewhere, just without the
+// filter-chip UI in this compact panel - see discoverMarketplaceFilters()
+// for the fuller browsing view this deliberately doesn't reproduce here).
+// Whole tile click = "Prepare with Compass", the same real in-app action
+// the full opportunity card's own button already triggers - chosen over
+// the external "View opportunity" link as the tile's primary action so
+// tapping a tile doesn't immediately leave the app.
+function discoverOpportunityTiles() {
+  const items = visibleOpportunities().slice(0, 6);
+  return discoverTileGrid(
+    items.map((item) => discoverTile(item.title, item.category, `data-prepare-opportunity="${escapeHTML(item.title)}" data-prepare-opportunity-category="${escapeHTML(item.category)}"`)),
+    "No opportunities match right now."
+  );
+}
+
+// Connect = People + Groups merged under one mode with its own
+// People/Groups sub-toggle (discoverConnectView) - People reuses the
+// real, already-correct communityPeopleSection() as-is (accountability
+// matches, skill exchange, mentors) rather than rebuilding it as tiles,
+// since its underlying data (mentor profiles, accountability matches)
+// isn't exposed outside community.js as raw arrays the way squads/posts
+// are - reusing the real function is correct where reconstructing it as
+// tiles would mean guessing at private internals.
+function discoverConnectSection() {
+  const view = discoverConnectView === "groups" ? "groups" : "people";
+  const switcher = `
+    <div class="discover-connect-switch">
+      <button type="button" class="discover-mini ${view === "people" ? "is-active" : ""}" data-discover-connect="people">People</button>
+      <button type="button" class="discover-mini ${view === "groups" ? "is-active" : ""}" data-discover-connect="groups">Groups</button>
+    </div>
+  `;
+  if (!(typeof hasCommunitySession === "function" && hasCommunitySession())) {
+    return `${switcher}<div class="discover-auth-wrap">${communityAuthGateScreen()}</div>`;
+  }
+  return `${switcher}${view === "people" ? `<div class="discover-people-wrap">${communityPeopleSection()}</div>` : discoverGroupTiles()}`;
+}
+
+// Real squads + real member counts, both from the exposed public
+// snapshots (communitySquadsCacheSnapshot/communitySquadMembersCacheSnapshot)
+// - same member-count logic communitySquadMemberCount() itself uses
+// internally, just computed here since that helper isn't exposed to app.js.
+function discoverGroupTiles() {
+  const squads = (typeof communitySquadsCacheSnapshot === "function" ? communitySquadsCacheSnapshot() : []).slice(0, 6);
+  const members = typeof communitySquadMembersCacheSnapshot === "function" ? communitySquadMembersCacheSnapshot() : [];
+  return discoverTileGrid(
+    squads.map((squad) => {
+      const count = members.filter((member) => member.squad_id === squad.id).length;
+      return discoverTile(squad.title, `${count} ${count === 1 ? "member" : "members"}`, `data-open="communityGroup" data-open-payload="${escapeHTML(squad.id)}"`);
+    }),
+    "No groups yet - create one."
+  );
+}
+
+// Real published posts from the exposed communityPostsCacheSnapshot(),
+// newest first. Not clickable (matches communityWall()'s own posts,
+// which were never clickable cards either - only a report button on
+// others' posts, which this compact preview doesn't reproduce).
+function discoverFeedTiles() {
+  if (!(typeof hasCommunitySession === "function" && hasCommunitySession())) return communityAuthGateScreen();
+  const posts = (typeof communityPostsCacheSnapshot === "function" ? communityPostsCacheSnapshot() : [])
+    .filter((post) => post.status === "published")
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 6);
+  return discoverTileGrid(
+    posts.map((post) => discoverTile(cleanText(post.body, 42), homeRelativeDateLabel(post.created_at) || "Today", "")),
+    "No posts yet."
+  );
+}
+
+function discoverExplorePanel() {
+  const mode = ["opportunities", "connect", "feed"].includes(discoverExploreMode) ? discoverExploreMode : "opportunities";
+  return `
+    <aside class="discover-explore-panel" aria-label="Discover modes">
+      <div class="discover-panel-head">
+        <p class="eyebrow">Explore</p>
+        <h2>Mode</h2>
+      </div>
+      <div class="discover-mode-tabs" role="tablist" aria-label="Discover modes">
+        <button type="button" class="discover-mode-tab ${mode === "opportunities" ? "is-active" : ""}" data-discover-mode="opportunities" aria-selected="${mode === "opportunities"}">Opp</button>
+        <button type="button" class="discover-mode-tab ${mode === "connect" ? "is-active" : ""}" data-discover-mode="connect" aria-selected="${mode === "connect"}">Connect</button>
+        <button type="button" class="discover-mode-tab ${mode === "feed" ? "is-active" : ""}" data-discover-mode="feed" aria-selected="${mode === "feed"}">Feed</button>
+      </div>
+      ${mode === "opportunities" ? discoverOpportunityTiles() : mode === "connect" ? discoverConnectSection() : discoverFeedTiles()}
+    </aside>
+  `;
+}
+
+// DORMANT, not deleted: the pre-redesign flat 5-way toggle screen
+// (discoverModeContent + the 5 discoverXSection functions below) is no
+// longer called by communityMergedScreen() above, but stays in place -
+// it's real, tested, and covers a fuller "browse everything" experience
+// (category tabs, stage/need/time filters via discoverMarketplaceFilters)
+// the new compact tile panel deliberately doesn't reproduce. Worth
+// reviving as a "See all" deep-link target from the new panel if a
+// future round wants one.
 function discoverModeContent(mode) {
   if (mode === "opportunities") return discoverOpportunitiesSection();
   if (mode === "people") return discoverPeopleSection();
@@ -17938,6 +18155,8 @@ document.addEventListener("click", async (event) => {
   const selectStarterPathButton = event.target.closest("[data-select-starter-path]");
   const toggleStarterStepButton = event.target.closest("[data-toggle-starter-step]");
   const discoverModeJumpButton = event.target.closest("[data-discover-mode-jump]");
+  const discoverModeTabButton = event.target.closest("[data-discover-mode]");
+  const discoverConnectButton = event.target.closest("[data-discover-connect]");
   const prevBlueprintStepButton = event.target.closest("[data-prev-blueprint-step]");
   const swipeTapButton = event.target.closest("[data-swipe-tap]");
   const answerBlueprintScenarioButton = event.target.closest("[data-answer-blueprint-scenario]");
@@ -18664,9 +18883,7 @@ document.addEventListener("click", async (event) => {
     renderScreen("discover");
   }
   if (communityViewModeButton) {
-    const requestedMode = communityViewModeButton.dataset.communityViewMode;
-    const normalizedMode = requestedMode === "browse" ? "opportunities" : requestedMode === "feed" ? "for-you" : requestedMode;
-    communityViewMode = DISCOVER_VIEW_MODES.some((mode) => mode.id === normalizedMode) ? normalizedMode : "for-you";
+    setDiscoverMode(communityViewModeButton.dataset.communityViewMode);
     renderScreen("discover");
   }
   if (discoverFilterButton) {
@@ -19076,8 +19293,17 @@ document.addEventListener("click", async (event) => {
   }
 
   if (discoverModeJumpButton) {
-    const nextMode = discoverModeJumpButton.dataset.discoverModeJump;
-    communityViewMode = DISCOVER_VIEW_MODES.some((mode) => mode.id === nextMode) ? nextMode : "for-you";
+    setDiscoverMode(discoverModeJumpButton.dataset.discoverModeJump);
+    renderScreen("discover");
+  }
+
+  if (discoverModeTabButton) {
+    setDiscoverMode(discoverModeTabButton.dataset.discoverMode);
+    renderScreen("discover");
+  }
+
+  if (discoverConnectButton) {
+    discoverConnectView = discoverConnectButton.dataset.discoverConnect === "groups" ? "groups" : "people";
     renderScreen("discover");
   }
 
@@ -19109,7 +19335,7 @@ document.addEventListener("click", async (event) => {
     if (targetPath) selectStarterPath(targetPath, onboardingAnswerDraft);
     closeModal();
     if (targetDiscoverMode) {
-      communityViewMode = targetDiscoverMode;
+      setDiscoverMode(targetDiscoverMode);
       renderScreen("discover");
     } else if (targetTab) {
       renderScreen(targetTab);

@@ -11576,18 +11576,44 @@ body.compass-public-app[data-active-screen="compass"] .prototype-view.app-worksp
    actually showed through - this repeats the exact qualifiers those rules
    use, plus the scoping attribute, so it wins unambiguously (0,5,0). */
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .phone-shell:not(.board-phone),
-body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .phone-shell:not(.board-phone) {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .phone-shell:not(.board-phone),
+body.compass-public-app:not(.life-sim-active)[data-active-screen="discover"] .phone-shell:not(.board-phone) {
   background: transparent;
   border: none;
   box-shadow: none;
 }
 
 /* The rich Today/Readiness/Adult-Life Map/Trust dashboard rail is hidden
-   only on Home/2BB - it still renders exactly as before on every other
-   tab (Discover/Life Sim/Profile), nothing about it changed or was removed. */
+   on Home/2BB/Discover (Discover added 2026-08-03 with its own redesign,
+   which reserves the same 76px+1fr 2-column layout these screens share)
+   - it still renders exactly as before on Life Sim/Profile, nothing
+   about it changed or was removed there. */
 body.compass-public-app[data-active-screen="home"] .desktop-right-rail,
-body.compass-public-app[data-active-screen="compass"] .desktop-right-rail {
+body.compass-public-app[data-active-screen="compass"] .desktop-right-rail,
+body.compass-public-app[data-active-screen="discover"] .desktop-right-rail {
   display: none;
+}
+
+/* Discover redesign (2026-08-03): its own night-map photo background,
+   same collapsed-to-2-columns treatment as Home/2BB above (no dashboard
+   rail column to reserve space for) but a distinct image/tint from the
+   warm daytime room - Discover's own visual identity, not a home/compass
+   reskin. */
+body.compass-public-app:not(.life-sim-active)[data-active-screen="discover"] .prototype-view.app-workspace.is-active {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  background: url("assets/discover-map-room.png") center / cover no-repeat;
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+body.compass-public-app[data-active-screen="discover"] .prototype-view.app-workspace.is-active::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(100deg, rgba(6, 6, 8, 0.62), rgba(6, 6, 8, 0.3) 42%, rgba(6, 6, 8, 0.12) 68%, rgba(6, 6, 8, 0.34));
+  pointer-events: none;
 }
 
 /* Floating icon-pill nav - desktop. Same 5 real nav-item buttons as
@@ -11681,7 +11707,8 @@ body.compass-public-app[data-active-screen="compass"] .desktop-right-rail {
    not centered - the vacated space below/left of it is where the Ctrl K
    and SOS image-cards now sit (see below). */
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .app-screen,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .app-screen {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .app-screen,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="discover"] .app-screen {
   position: relative;
   z-index: 1;
   background: transparent;
@@ -12140,6 +12167,513 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
   body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button {
     height: 70px;
+  }
+}
+
+/* ===========================================================================
+   Discover redesign (2026-08-03) - "For You" spotlight + a 3-mode Explore
+   panel (Opportunities/Connect/Feed), replacing the old flat 5-tab toggle.
+   Scoped entirely to [data-active-screen="discover"] .app-screen so nothing
+   here touches Home/2BB/Life Sim/Profile. Reuses the same --warm-ink/
+   --warm-active/--warm-line tokens as the Home/2BB redesign for a
+   consistent gold-accent look, plus one new violet accent (rgba(157, 124,
+   255, ...)) matching the reference mockup's night-map aesthetic.
+   =========================================================================== */
+body.compass-public-app[data-active-screen="discover"] .app-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  padding: 24px;
+  color: var(--warm-ink);
+}
+
+.discover-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex: 0 0 auto;
+}
+
+.discover-topbar .eyebrow {
+  color: rgba(255, 244, 223, 0.6);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.discover-title {
+  margin: 2px 0 0;
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--warm-ink);
+}
+
+.discover-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 1 340px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--warm-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 244, 223, 0.58);
+  font-size: 13px;
+  /* Decorative only, per product decision - a real cross-content search
+     over Opportunities/People/Groups/Updates is a real feature worth its
+     own round, not silently half-built here. */
+}
+
+.discover-search svg {
+  width: 16px;
+  height: 16px;
+  color: var(--warm-active);
+  flex: 0 0 auto;
+}
+
+.discover-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.8fr);
+  gap: 18px;
+}
+
+.discover-spotlight {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  border: 1px solid var(--warm-line);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 72% 24%, rgba(157, 124, 255, 0.2), transparent 34%),
+    radial-gradient(circle at 48% 82%, rgba(240, 199, 115, 0.16), transparent 38%),
+    rgba(10, 10, 12, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 26px 60px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px) saturate(1.05);
+}
+
+.discover-flow {
+  position: absolute;
+  left: 6%;
+  right: 4%;
+  top: 10%;
+  bottom: 32%;
+  pointer-events: none;
+}
+
+.discover-flow svg {
+  width: 100%;
+  height: 100%;
+}
+
+.discover-flow path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.discover-flow-glow {
+  stroke: rgba(240, 199, 115, 0.16);
+  stroke-width: 22;
+  filter: blur(10px);
+}
+
+.discover-flow-line {
+  stroke: rgba(240, 199, 115, 0.78);
+  stroke-width: 2.4;
+  stroke-dasharray: 10 16;
+  animation: discoverDash 4.6s linear infinite;
+}
+
+.discover-flow-thin {
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 1;
+}
+
+.discover-flow circle {
+  fill: var(--warm-active);
+  filter: drop-shadow(0 0 10px rgba(240, 199, 115, 0.6));
+}
+
+@keyframes discoverDash {
+  to { stroke-dashoffset: -52; }
+}
+
+.discover-spot-title {
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  display: grid;
+  gap: 8px;
+  margin: 20px 0 0 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--warm-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.discover-spot-title .eyebrow {
+  color: rgba(255, 244, 223, 0.62);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.discover-spot-title h2 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.05;
+  color: var(--warm-ink);
+}
+
+.discover-starter {
+  position: relative;
+  z-index: 1;
+  align-self: flex-end;
+  width: min(260px, 40%);
+  margin: 0 20px 16px 0;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--warm-line);
+  border-radius: 20px;
+  background: rgba(8, 8, 10, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.discover-starter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.discover-starter .count-label {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 244, 223, 0.6);
+}
+
+.discover-starter .meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--warm-ink);
+}
+
+.discover-count {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--warm-active);
+}
+
+.discover-bar {
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.discover-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--warm-active), rgba(141, 230, 216, 0.9));
+}
+
+.discover-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.discover-pill {
+  padding: 5px 9px;
+  border: 1px solid var(--warm-line);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 244, 223, 0.72);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.discover-pill.is-done {
+  color: var(--warm-active-ink);
+  background: var(--warm-active);
+  border-color: transparent;
+}
+
+.discover-launch-strip {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--warm-line);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.discover-launch-strip .meta {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 244, 223, 0.6);
+}
+
+.discover-rec-title {
+  margin: 3px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--warm-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+
+.discover-launch {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 16px;
+  color: var(--warm-active-ink);
+  background: var(--warm-active);
+  box-shadow: 0 14px 26px rgba(240, 199, 115, 0.24);
+  cursor: pointer;
+}
+
+.discover-explore-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--warm-line);
+  border-radius: 26px;
+  background: rgba(13, 13, 16, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 26px 60px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px) saturate(1.05);
+  overflow: hidden;
+}
+
+.discover-panel-head {
+  flex: 0 0 auto;
+}
+
+.discover-panel-head .eyebrow {
+  margin: 0;
+  color: rgba(255, 244, 223, 0.6);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.discover-panel-head h2 {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--warm-ink);
+}
+
+.discover-mode-tabs {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--warm-line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.discover-mode-tab {
+  min-height: 36px;
+  border: 0;
+  border-radius: 12px;
+  color: rgba(255, 244, 223, 0.62);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discover-mode-tab.is-active {
+  color: var(--warm-active-ink);
+  background: var(--warm-active);
+  box-shadow: 0 12px 22px rgba(240, 199, 115, 0.18);
+}
+
+.discover-connect-switch {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+
+.discover-mini {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--warm-line);
+  border-radius: 999px;
+  color: rgba(255, 244, 223, 0.64);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discover-mini.is-active {
+  color: var(--warm-active-ink);
+  background: var(--warm-active);
+  border-color: transparent;
+}
+
+.discover-tile-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.discover-tile {
+  position: relative;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--warm-line);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.discover-tile:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 229, 172, 0.35);
+}
+
+.discover-tile-visual {
+  height: 48px;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 26% 38%, rgba(240, 199, 115, 0.32), transparent 26%),
+    radial-gradient(circle at 76% 24%, rgba(157, 124, 255, 0.22), transparent 30%),
+    rgba(255, 255, 255, 0.05);
+}
+
+.discover-tile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.discover-tile-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--warm-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discover-tag {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--warm-line);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 244, 223, 0.72);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.discover-tile-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 244, 223, 0.55);
+}
+
+/* Connect > People reuses the real communityPeopleSection() output as-is
+   (accountability matches, skill exchange, mentors) rather than rebuilding
+   it as tiles - its underlying data isn't exposed outside community.js the
+   way squads/posts are. Known, disclosed visual seam: those cards keep
+   their own light-card styling rather than the dark glass look everything
+   else here has - not restyled this round. */
+.discover-people-wrap,
+.discover-auth-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+@media (max-width: 1020px) {
+  .discover-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .discover-spotlight {
+    min-height: 420px;
+  }
+
+  .discover-explore-panel {
+    min-height: 420px;
+  }
+}
+
+@media (max-width: 760px) {
+  body.compass-public-app[data-active-screen="discover"] .app-screen {
+    height: auto;
+    padding: 16px;
+  }
+
+  .discover-search {
+    display: none;
+  }
+
+  .discover-title {
+    font-size: 26px;
+  }
+
+  .discover-starter {
+    width: auto;
+  }
+
+  .discover-tile-grid {
+    grid-template-columns: 1fr;
   }
 }
 
