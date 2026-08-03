@@ -538,8 +538,21 @@ const defaultTrackerState = {
     history: [68, 74, 62, 38, 58, 72, 70],
     entries: [
       { id: "mood-demo-1", user_id: DEMO_USER_ID, label: "Okay", score: 62, note: "Bit tired juggling tuition gigs and job hunting.", created_at: "2026-06-24T21:00:00.000Z", display_time: "Jun 24, 9:00 PM" },
+      // Pattern Insight demo data (v9): these 5 entries plus the 2nd
+      // rejection/Calm Reset entries below are the ONLY new fields this
+      // round - placed so moodAfterRejectionPattern()/
+      // moodAfterCalmResetPattern() each get exactly 2 real usable
+      // before/after pairs (verified in an isolated Node simulation before
+      // writing these dates) without any single entry's window
+      // overlapping between the two patterns, so the demo shows a real,
+      // uncontaminated reading for both instead of "not enough data yet".
+      { id: "mood-demo-5", user_id: DEMO_USER_ID, label: "Low", score: 40, note: "Disappointed - a scholarship shortlist came out and I wasn't on it.", created_at: "2026-06-30T20:00:00.000Z", display_time: "Jun 30, 8:00 PM" },
       { id: "mood-demo-2", user_id: DEMO_USER_ID, label: "Stressed", score: 38, note: "Comparing myself to everyone who already has NS/a job sorted.", created_at: "2026-07-06T21:50:00.000Z", display_time: "Jul 6, 9:50 PM" },
       { id: "mood-demo-3", user_id: DEMO_USER_ID, label: "Okay", score: 58, note: "A bit better after messaging Wei Jie.", created_at: "2026-07-08T19:20:00.000Z", display_time: "Jul 8, 7:20 PM" },
+      { id: "mood-demo-6", user_id: DEMO_USER_ID, label: "Stressed", score: 42, note: "Anxious about an upcoming decision, hard to focus.", created_at: "2026-07-11T20:00:00.000Z", display_time: "Jul 11, 8:00 PM" },
+      { id: "mood-demo-7", user_id: DEMO_USER_ID, label: "Okay", score: 64, note: "Lighter after trying a grounding session.", created_at: "2026-07-14T18:00:00.000Z", display_time: "Jul 14, 6:00 PM" },
+      { id: "mood-demo-8", user_id: DEMO_USER_ID, label: "Stressed", score: 44, note: "Comparing myself to people who already have jobs sorted.", created_at: "2026-07-17T20:00:00.000Z", display_time: "Jul 17, 8:00 PM" },
+      { id: "mood-demo-9", user_id: DEMO_USER_ID, label: "Low", score: 31, note: "Another rejection stings more than I expected.", created_at: "2026-07-23T20:00:00.000Z", display_time: "Jul 23, 8:00 PM" },
       { id: "mood-demo-4", user_id: DEMO_USER_ID, label: "Calm", score: 70, note: "Feeling steady today.", created_at: "2026-08-01T08:30:00.000Z", display_time: "Aug 1, 8:30 AM" }
     ]
   },
@@ -574,6 +587,9 @@ const defaultTrackerState = {
   // record of what was declined/let go of, not another goal list. Pure
   // manual entry, same honesty as networkContacts above.
   rejectionList: [
+    // rejection-demo-2 is Pattern Insight demo data (v9) - see the mood
+    // entries comment above for why this specific date.
+    { id: "rejection-demo-2", user_id: DEMO_USER_ID, title: "A scholarship shortlist that didn't include me", reason: "Spent weeks on the application and didn't even make the interview round.", createdAt: "2026-06-28T14:00:00.000Z" },
     { id: "rejection-demo-1", user_id: DEMO_USER_ID, title: "An 'exposure only' internship offer", reason: "No pay and no real mentorship, just free labor for a resume line.", createdAt: "2026-07-20T11:05:00.000Z" }
   ],
   // Real usage history for the "use it once and it's gone" tools -
@@ -587,7 +603,10 @@ const defaultTrackerState = {
     { id: "qc-demo-1", user_id: DEMO_USER_ID, decision: "Study at the library or a cafe tonight", pick: "Cafe - change of scene", createdAt: "2026-07-13T15:00:00.000Z" }
   ],
   calmResetHistory: [
-    { id: "cr-demo-1", user_id: DEMO_USER_ID, technique: "grounding", createdAt: "2026-07-06T22:05:00.000Z" }
+    { id: "cr-demo-1", user_id: DEMO_USER_ID, technique: "grounding", createdAt: "2026-07-06T22:05:00.000Z" },
+    // cr-demo-2 is Pattern Insight demo data (v9) - see the mood entries
+    // comment above.
+    { id: "cr-demo-2", user_id: DEMO_USER_ID, technique: "breathing", createdAt: "2026-07-13T21:00:00.000Z" }
   ],
   beforeYouTextHistory: [
     { id: "byt-demo-1", user_id: DEMO_USER_ID, message: "Can I get a later curfew now that I'm managing my own money and schedule?", result: "This reads calm and reasonable - it leads with a real reason (managing your own money/schedule) instead of just asking. One thing to consider: naming a specific new time makes it easier for them to say yes than leaving it open-ended.", createdAt: "2026-07-19T20:30:00.000Z" }
@@ -1718,7 +1737,7 @@ const chatState = normalizeChatState(loadSessionJson(scopedKey("steadyChatState"
 // marker so refreshing mid-demo doesn't keep wiping out anything typed
 // live during the demo itself - bump DEMO_SEED_VERSION to force a re-seed
 // if the seeded content is ever edited again).
-const DEMO_SEED_VERSION = "2026-08-03-v8";
+const DEMO_SEED_VERSION = "2026-08-03-v9";
 if (currentUserId() === DEMO_USER_ID && localStorage.getItem("compassDemoSeedVersion") !== DEMO_SEED_VERSION) {
   Object.assign(trackerState, JSON.parse(JSON.stringify(defaultTrackerState)));
   chatState.messages = JSON.parse(JSON.stringify(defaultChatState.messages));
@@ -3263,6 +3282,112 @@ function badgeCards() {
   `).join("");
 }
 
+// Cross-domain pattern insight (2026-08-03): 2BB already collects several
+// kinds of real, dated data (mood, rejections, Calm Reset usage) but
+// nothing ever looked for a relationship BETWEEN them - the differentiator
+// no generic AI chatbot can fake, since it only means anything once real
+// history has accumulated. moodWindowShift is a small reusable engine (not
+// hardcoded to one pairing) that compares average mood in a window before
+// vs after a list of real event dates - more event sources can reuse it
+// later without new math. Mirrors calibrationStats()'s shape on purpose:
+// same "not-enough" floor before a read means anything, same house rule
+// that a real pattern needs real sample size, not just one data point
+// dressed up as a discovery.
+function moodWindowShift(eventDates, beforeDays, afterDays) {
+  const myId = currentUserId();
+  const moodEntries = trackerState.mood.entries.filter((entry) => entry.user_id === myId);
+  const pairs = [];
+  eventDates.forEach((atIso) => {
+    const eventTime = new Date(atIso).getTime();
+    if (!Number.isFinite(eventTime)) return;
+    const before = moodEntries.filter((entry) => {
+      const t = new Date(entry.created_at).getTime();
+      return Number.isFinite(t) && t < eventTime && t >= eventTime - beforeDays * 86400000;
+    });
+    const after = moodEntries.filter((entry) => {
+      const t = new Date(entry.created_at).getTime();
+      return Number.isFinite(t) && t > eventTime && t <= eventTime + afterDays * 86400000;
+    });
+    if (before.length && after.length) {
+      const avgB = before.reduce((sum, entry) => sum + entry.score, 0) / before.length;
+      const avgA = after.reduce((sum, entry) => sum + entry.score, 0) / after.length;
+      pairs.push({ before: avgB, after: avgA });
+    }
+  });
+  if (!pairs.length) return null;
+  const avgBefore = pairs.reduce((sum, pair) => sum + pair.before, 0) / pairs.length;
+  const avgAfter = pairs.reduce((sum, pair) => sum + pair.after, 0) / pairs.length;
+  return { count: pairs.length, avgBefore: Math.round(avgBefore), avgAfter: Math.round(avgAfter), gap: Math.round(avgAfter - avgBefore) };
+}
+
+// Rejections are a real stress event with a real timestamp - does mood
+// reliably dip afterward, or hold up? +/-5 days is wide enough to catch a
+// mood log that isn't logged same-day.
+function moodAfterRejectionPattern() {
+  const dates = trackerState.rejectionList.filter((item) => item.user_id === currentUserId()).map((item) => item.createdAt);
+  const shift = moodWindowShift(dates, 5, 5);
+  if (!shift || shift.count < 2) return { read: "not-enough", count: shift ? shift.count : 0 };
+  const read = shift.gap <= -8 ? "notable-dip" : shift.gap >= 5 ? "resilient" : "steady";
+  return { ...shift, read };
+}
+
+// Calm Reset is a real coping action, presumably taken while already
+// stressed - does it actually correlate with mood recovering afterward,
+// or not? Narrower +/-3 day window than rejection since this is meant as
+// a same-moment intervention, not a multi-day event.
+function moodAfterCalmResetPattern() {
+  const dates = trackerState.calmResetHistory.filter((item) => item.user_id === currentUserId()).map((item) => item.createdAt);
+  const shift = moodWindowShift(dates, 3, 3);
+  if (!shift || shift.count < 2) return { read: "not-enough", count: shift ? shift.count : 0 };
+  const read = shift.gap >= 8 ? "helping" : shift.gap <= -5 ? "unclear" : "steady";
+  return { ...shift, read };
+}
+
+const PATTERN_INSIGHT_READ_COPY = {
+  rejection: {
+    "notable-dip": (s) => `Across ${s.count} rejections, your mood tends to drop afterward - averaging ${s.avgBefore} before, ${s.avgAfter} after. Worth planning something grounding right after a hard no, not just once it already feels bad.`,
+    resilient: (s) => `Across ${s.count} rejections, your mood actually holds up or improves afterward - averaging ${s.avgBefore} before, ${s.avgAfter} after. You seem to bounce back from these faster than you might give yourself credit for.`,
+    steady: (s) => `Across ${s.count} rejections, your mood stays roughly steady either way - averaging ${s.avgBefore} before, ${s.avgAfter} after. No strong pattern yet.`
+  },
+  calmReset: {
+    helping: (s) => `Across ${s.count} Calm Reset sessions, your mood tends to improve afterward - averaging ${s.avgBefore} before, ${s.avgAfter} after. This tool seems to genuinely help you, not just pass the time.`,
+    unclear: (s) => `Across ${s.count} Calm Reset sessions, your mood was lower afterward, not higher - averaging ${s.avgBefore} before, ${s.avgAfter} after. Might be worth trying a different technique.`,
+    steady: (s) => `Across ${s.count} Calm Reset sessions, your mood stays roughly steady either way - averaging ${s.avgBefore} before, ${s.avgAfter} after.`
+  }
+};
+
+function patternInsightSection(title, stat, copyMap) {
+  return `
+    <div class="content-rail-title"><strong>${escapeHTML(title)}</strong></div>
+    ${stat.read === "not-enough" ? `
+      <p class="muted">${stat.count} matched moment${stat.count === 1 ? "" : "s"} so far (mood logged both before and after) - a real read needs at least 2.</p>
+    ` : `
+      <div class="desk-ledger">
+        <div class="desk-ledger-row"><span class="desk-ledger-label">Average mood before</span><span class="desk-ledger-value">${stat.avgBefore}</span></div>
+        <div class="desk-ledger-row"><span class="desk-ledger-label">Average mood after</span><span class="desk-ledger-value">${stat.avgAfter}</span></div>
+      </div>
+      <p class="muted">${escapeHTML(copyMap[stat.read](stat))}</p>
+    `}
+  `;
+}
+
+function patternInsightsModal() {
+  const rejection = moodAfterRejectionPattern();
+  const calmReset = moodAfterCalmResetPattern();
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="pattern-insight-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Pattern Insight</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="pattern-insight-title">Real patterns across what you've logged</h3>
+      <p class="muted">Compares your own real mood entries against real dated moments elsewhere in the app - not a personality read, just what your own history actually shows once there's enough of it.</p>
+      ${patternInsightSection("Rejections & mood", rejection, PATTERN_INSIGHT_READ_COPY.rejection)}
+      ${patternInsightSection("Calm Reset & mood", calmReset, PATTERN_INSIGHT_READ_COPY.calmReset)}
+    </div>
+  `;
+}
+
 // Growth Progress used to be one of three disconnected progress views
 // (this one, Career Studio, Community's trust/badges) with no awareness of
 // each other. Rather than tear out Career Studio's and Community's own
@@ -3273,12 +3398,20 @@ function progressReportCards() {
   const latestMood = latestRealMoodEntry();
   const interviewCount = trackerState.careerStudio.interviewSessions.filter((session) => session.user_id === currentUserId() && session.completedAt).length;
   const communitySnapshot = typeof communityMyProfileSnapshot === "function" ? communityMyProfileSnapshot() : null;
+  const rejectionPattern = moodAfterRejectionPattern();
+  const calmResetPattern = moodAfterCalmResetPattern();
+  const patternFound = rejectionPattern.read !== "not-enough" || calmResetPattern.read !== "not-enough";
   return `
     <div class="progress-report-grid">
       <article>
         <p class="eyebrow">Mood trend</p>
         <h4>${latestMood ? `${escapeHTML(latestMood.label)} - ${Number(latestMood.score)} energy` : "No mood log yet"}</h4>
         <p>${latestMood ? escapeHTML(latestMood.note) : "Log a mood to build a trend from real entries."}</p>
+      </article>
+      <article>
+        <p class="eyebrow">Pattern Insight</p>
+        <h4>${patternFound ? "Real pattern found" : "Still building signal"}</h4>
+        <p><button class="text-action" type="button" data-open="patternInsights">See real patterns across your history</button></p>
       </article>
       <article>
         <p class="eyebrow">Goal progress</p>
@@ -12799,6 +12932,8 @@ const modals = {
   aiTraceLog: () => aiTraceLogModal(),
 
   aiTraceDetail: (id) => aiTraceDetailModal(id),
+
+  patternInsights: () => patternInsightsModal(),
 
   calibration: () => calibrationModal(),
 
