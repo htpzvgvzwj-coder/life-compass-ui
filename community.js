@@ -184,6 +184,22 @@
     }
   }
 
+  // Real bug found 2026-08-03: nothing anywhere ever called
+  // refreshCommunityData() on its own - every squad_members/posts/
+  // skill_tags cache only ever got populated as a side effect of the user
+  // already performing some OTHER write action this session (join a
+  // squad, submit a post, etc). A user who signs in and only browses
+  // Discover/Community saw genuinely empty Feed/Connect panels regardless
+  // of how much real data existed in the database, because nothing had
+  // triggered a fetch yet. This is the safe entry point for a screen to
+  // call on render: a no-op once data is loaded or already loading, so it
+  // can be called from renderScreen() on every render without causing
+  // repeat fetches or request pile-ups.
+  async function ensureCommunityDataLoaded() {
+    if (communityDataLoaded || communityDataLoading) return;
+    await refreshCommunityData();
+  }
+
   // ---------------------------------------------------------------------
   // Auth gate
   // ---------------------------------------------------------------------
@@ -1496,6 +1512,7 @@
   // silent runtime crash node -c/the regression suite can't catch,
   // since they only check that the calling code exists, not that the
   // function it calls is actually reachable at runtime.
+  window.ensureCommunityDataLoaded = ensureCommunityDataLoaded;
   window.resetCommunityEncouragementFeedback = () => {
     communityEncouragementError = "";
     communityEncouragementStatus = "";
