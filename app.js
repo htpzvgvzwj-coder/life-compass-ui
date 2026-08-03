@@ -9535,6 +9535,12 @@ const DISCOVER_TILE_IMAGES = {
   Scholarships: "assets/2bb-money-jar.jpg",
   Competitions: "assets/2bb-domain-identity.jpg",
   "Volunteer Opportunities": "assets/2bb-domain-civic.jpg",
+  // Real gap found 2026-08-03: "Learn & Earn" (Canva/video editing/coding/
+  // content creation/entrepreneurship - see opportunityItems) was missing
+  // here entirely, so it silently fell back to the Jobs desk photo every
+  // time. This warm home-desk/laptop scene reads as self-directed
+  // learning rather than a 9-to-5 job, distinct from the Jobs image.
+  "Learn & Earn": "assets/2bb-room-background.jpg",
   squad: "assets/2bb-domain-relationships.jpg",
   post: "assets/2bb-domain-identity.jpg"
 };
