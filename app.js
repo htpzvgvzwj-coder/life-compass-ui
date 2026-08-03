@@ -9813,6 +9813,59 @@ function discoverTileGrid(tiles, emptyText) {
 // feedBuildItems() already applies) - blocked-submitter filtering isn't
 // replicated here (blockedCommunityUserIds() isn't exposed to app.js),
 // same accepted scope reduction as the Feed tiles already have.
+// Real bug found 2026-08-03 (user report: tapping a Jobs tile in
+// Discover's Explore panel silently jumped straight to 2BB with no
+// warning). Root cause: the compact tile's whole-card click reused the
+// same "Prepare with Compass" action as one of 4 explicitly labeled
+// buttons on the full opportunityCards() UI (data-prepare-opportunity ->
+// prepareOpportunityGoal() -> renderScreen("future") -> TAB_ALIASES
+// resolves future -> secondBrain -> compass), but with zero visible
+// label - so the tile teleported the user out of Discover entirely with
+// no cue it would do that. Every other Explore-mode tile keeps the user
+// inside Discover (Groups opens a modal, Feed isn't clickable) - this
+// modal makes Jobs consistent with that pattern instead of changing what
+// "Prepare with Compass" itself does, and surfaces the same real actions
+// (Save/Search/Prepare/Share) the full card already has, just reached
+// through an explicit button instead of an invisible whole-tile trigger.
+function discoverOpportunityDetailModal(payload) {
+  const [source, id] = String(payload || "").split(":");
+  const item = source === "community"
+    ? (typeof communityOpportunitiesCacheSnapshot === "function" ? communityOpportunitiesCacheSnapshot().find((entry) => entry.id === id) : null)
+    : opportunityItems.find((entry) => entry.id === id);
+  if (!item) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="discover-opp-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Opportunity</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="discover-opp-title">Not found</h3>
+        <p class="muted">This opportunity is no longer available.</p>
+      </div>
+    `;
+  }
+  const isCommunity = source === "community";
+  const link = isCommunity ? item.link : item.applyUrl;
+  const prepNeeded = isCommunity ? item.prep_needed : item.prepNeeded;
+  const saved = !isCommunity && savedOpportunityRecord(item.id);
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="discover-opp-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">${escapeHTML(item.category)}${isCommunity ? " - Community-submitted" : ""}</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="discover-opp-title">${escapeHTML(item.title)}</h3>
+      <p class="muted">${escapeHTML(item.description)}</p>
+      ${prepNeeded ? `<p class="tiny-note">Prep needed: ${escapeHTML(prepNeeded)}</p>` : ""}
+      <div class="profile-actions">
+        ${!isCommunity ? `<button class="${saved ? "secondary-action" : "primary-action"} compact-action" type="button" data-save-opportunity="${escapeHTML(item.id)}">${saved ? "Saved" : "Save for later"}</button>` : ""}
+        ${link ? `<button class="secondary-action compact-action" type="button" data-open-link="${escapeHTML(link)}">${item.category === "Learn & Earn" ? "Start learning" : "Search"}</button>` : ""}
+        <button class="${isCommunity ? "primary-action" : "secondary-action"} compact-action" type="button" data-prepare-opportunity="${escapeHTML(item.title)}" data-prepare-opportunity-category="${escapeHTML(item.category)}">Prepare with Compass</button>
+      </div>
+    </div>
+  `;
+}
+
 function discoverOpportunityTiles() {
   const signedIn = typeof hasCommunitySession === "function" && hasCommunitySession();
   const staticItems = visibleOpportunities();
@@ -9843,13 +9896,16 @@ function discoverOpportunityTiles() {
       }
     });
   }
-  const items = [...roundRobin, ...communityItems].slice(0, 10);
+  const items = [
+    ...roundRobin.map((item) => ({ item, source: "static" })),
+    ...communityItems.map((item) => ({ item, source: "community" }))
+  ].slice(0, 10);
   // "Share an opportunity" (data-open="communityOpportunitySubmit") is a
   // real action the old communityOpportunitiesRail() had - restored here,
   // signed-in only, same reasoning as Connect's restored Blocked/+New.
   const shareRow = signedIn ? `<div class="discover-connect-switch"><span class="discover-connect-spacer"></span><button type="button" class="discover-mini" data-open="communityOpportunitySubmit">+ Share</button></div>` : "";
   return `${shareRow}${discoverTileGrid(
-    items.map((item) => discoverTile(item.title, item.category, `data-prepare-opportunity="${escapeHTML(item.title)}" data-prepare-opportunity-category="${escapeHTML(item.category)}"`, item.category)),
+    items.map(({ item, source }) => discoverTile(item.title, item.category, `data-open="discoverOpportunityDetail" data-open-payload="${escapeHTML(source)}:${escapeHTML(item.id)}"`, item.category)),
     "No opportunities match right now."
   )}`;
 }
@@ -12934,6 +12990,8 @@ const modals = {
   aiTraceDetail: (id) => aiTraceDetailModal(id),
 
   patternInsights: () => patternInsightsModal(),
+
+  discoverOpportunityDetail: (payload) => discoverOpportunityDetailModal(payload),
 
   calibration: () => calibrationModal(),
 
