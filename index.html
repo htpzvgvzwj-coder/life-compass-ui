@@ -9,7 +9,15 @@
     <meta name="apple-mobile-web-app-title" content="Compass">
     <title>Compass - Future Mirror</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="styles.css?v=lifesim-colorgrade-20260722-1">
+    <!-- v= is a manual cache-buster - Vercel's CDN caches this exact
+         versioned URL aggressively, so any styles.css edit needs a new
+         value here or real users (and even fresh incognito checks) keep
+         getting the stale cached CSS indefinitely. Bump this on every
+         styles.css change, not just occasionally - found live 2026-08-03
+         after several rounds of CSS edits this session were never
+         actually reaching the deployed site because this was never
+         bumped once. -->
+    <link rel="stylesheet" href="styles.css?v=discover-redesign-20260803-1">
   </head>
   <body class="compass-public-app">
     <main class="page-shell">
