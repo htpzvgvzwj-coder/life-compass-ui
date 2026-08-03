@@ -10328,13 +10328,21 @@ body {
   body.compass-public-app:not(.life-sim-active) .growth-hero-card,
   body.compass-public-app:not(.life-sim-active) .mirror-form-card,
   body.compass-public-app:not(.life-sim-active) .home-quick-access,
-  body.compass-public-app:not(.life-sim-active) .profile-card,
-  body.compass-public-app:not(.life-sim-active) .profile-hero {
+  body.compass-public-app:not(.life-sim-active) .profile-card {
     border: 1px solid rgba(120, 132, 118, 0.34);
     border-radius: 10px;
     background-color: rgba(253, 253, 250, 0.86);
     box-shadow: 0 12px 26px rgba(28, 35, 33, 0.08);
   }
+
+  /* Real bug found 2026-08-03: .profile-hero used to be grouped into the
+     light-card override above, but its own base rule (line ~2231) sets
+     background: var(--color-ink) with color: #fff to match - swapping
+     just the background to near-white here left genuinely invisible
+     white-on-near-white text (name, email, role) on every desktop view
+     of Profile. .profile-hero keeps its own dark-card look here instead,
+     which was already legible and consistent with the rest of the warm
+     dark theme - no new styling needed, just not overriding it. */
 
   body.compass-public-app:not(.life-sim-active) .starter-path-picker {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -11937,6 +11945,18 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
   position: absolute;
   inset: 0;
   background: linear-gradient(0deg, rgba(15, 10, 7, 0.7) 0%, transparent 45%);
+}
+
+/* Visual polish found 2026-08-03: the Civic tile's photo (a white-background
+   ballot box shot) is the only one of the 8 domain images with a bright top
+   two-thirds - every other tile's photo is naturally dark/moody, so this one
+   stood out sharply against the row instead of blending in. Higher
+   specificity than the shared ::after rule above (adds the attribute
+   selector), so this only retints Civic - Money/Career/Quick Jump/SOS and
+   the other 6 domain tiles are untouched. */
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button[data-open-payload="civic-duties-basics"]::after,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button[data-open-payload="civic-duties-basics"]::after {
+  background: linear-gradient(0deg, rgba(15, 10, 7, 0.7) 0%, transparent 45%), rgba(10, 8, 6, 0.4);
 }
 
 body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-search .bb-quickjump-label,
