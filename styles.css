@@ -11833,6 +11833,21 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .des
   display: contents;
 }
 
+/* Discover redesign (2026-08-03): unlike Home/2BB, Discover's new layout
+   has no Quick Jump/SOS thumbnail column to give .desktop-command-search
+   a home in, and the reference mockup doesn't show one - so the whole
+   bar (still an opaque light pill from the pre-redesign theme) is hidden
+   outright here rather than repositioned. Real functionality isn't lost:
+   Ctrl+K/Cmd+K opens the same command launcher via a document-level
+   keydown listener, independent of this bar's visibility. Found live
+   (2026-08-02) as a leftover white strip across the top of the new dark
+   panel - this bar is a sibling of #screen-root that was never in scope
+   for any previous [data-active-screen] override before Discover needed
+   one of its own. */
+body.compass-public-app:not(.life-sim-active)[data-active-screen="discover"] .desktop-command-bar {
+  display: none;
+}
+
 /* .is-quiet included here to beat .desktop-command-bar.is-quiet
    .desktop-command-search's pre-existing opacity:0.55 rule (same
    specificity otherwise - the exact mistake already made once on
