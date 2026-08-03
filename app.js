@@ -14187,8 +14187,12 @@ function openModal(name, payload) {
     saveTrackerState();
   }
   if (name === "communityEncouragement" && !modalLayer.classList.contains("is-open")) {
-    communityEncouragementError = "";
-    communityEncouragementStatus = "";
+    // communityEncouragementError/Status live in community.js's closure, not
+    // as globals app.js can touch directly (see resetCommunityEncouragementFeedback
+    // fix, 2026-08-03) - a bare assignment here silently created an unrelated
+    // global and never actually cleared the stale status/error text shown
+    // when this modal is reopened later in the same session.
+    if (typeof resetCommunityEncouragementFeedback === "function") resetCommunityEncouragementFeedback();
   }
   modalLayer.innerHTML = getModal(name, payload) || "";
   modalLayer.classList.add("is-open");
@@ -18750,13 +18754,17 @@ document.addEventListener("click", async (event) => {
     const categorySelect = modalLayer.querySelector("#community-encouragement-category");
     const messageInput = modalLayer.querySelector("#community-encouragement-message");
     const category = categorySelect ? categorySelect.value : "";
-    if (!category) {
-      communityEncouragementError = "Pick a category first.";
-      openModal("communityEncouragement");
-    } else {
-      await sendCommunityEncouragement(category, messageInput ? messageInput.value : "");
-      openModal("communityEncouragement");
-    }
+    // Previously short-circuited here on an empty category and set
+    // `communityEncouragementError` - but app.js never declares that name,
+    // so it silently created an unrelated global instead of touching
+    // community.js's own closure-scoped state that communityEncouragementModal()
+    // actually reads. Result: picking nothing and clicking send did nothing
+    // visible at all. sendCommunityEncouragement() already validates
+    // (server rejects an empty/invalid category with "Pick a real
+    // category.") and correctly sets its own error state, so just always
+    // delegate to it.
+    await sendCommunityEncouragement(category, messageInput ? messageInput.value : "");
+    openModal("communityEncouragement");
   }
 
   if (markEncouragementReadButton) {

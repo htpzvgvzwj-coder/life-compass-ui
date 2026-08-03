@@ -1144,7 +1144,16 @@
   // Anonymous "been-there" encouragement modal (new idea)
   // ---------------------------------------------------------------------
 
-  const BEEN_THERE_CATEGORIES = (typeof BUILD_LIFE_MOMENT_CATEGORIES !== "undefined" ? BUILD_LIFE_MOMENT_CATEGORIES : []);
+  // NOT a top-level const: community.js loads and runs before app.js (see
+  // index.html script order), so BUILD_LIFE_MOMENT_CATEGORIES (defined in
+  // app.js) does not exist yet at that point - a top-level const here froze
+  // permanently to [], leaving the category checkboxes and the "Send one"
+  // dropdown silently empty for every user. Read fresh, inside the render
+  // function, same pattern already used elsewhere in this file (e.g.
+  // isBeenThereOptedIn, toggleBeenThereOptIn).
+  function beenThereCategories() {
+    return typeof BUILD_LIFE_MOMENT_CATEGORIES !== "undefined" ? BUILD_LIFE_MOMENT_CATEGORIES : [];
+  }
 
   function communityEncouragementModal() {
     // Reachable directly from the Growth Hub and the Inbox mood-trend
@@ -1178,7 +1187,7 @@
         <div class="content-rail-title"><strong>You've genuinely been through</strong><span></span></div>
         <p class="tiny-note">Opt into a category only if you've actually resolved something real there - this isn't a self-claimed skill listing.</p>
         <div class="option-grid">
-          ${BEEN_THERE_CATEGORIES.map((category) => `
+          ${beenThereCategories().map((category) => `
             <label class="check-option">
               <input type="checkbox" data-toggle-been-there="${escapeHTML(category.id)}" ${isBeenThereOptedIn(category.id) ? "checked" : ""}>
               <span>${escapeHTML(category.label)}</span>
@@ -1191,7 +1200,7 @@
           <label>What are you currently stuck on?
             <select id="community-encouragement-category">
               <option value="">Pick a category</option>
-              ${BEEN_THERE_CATEGORIES.map((category) => `<option value="${escapeHTML(category.id)}">${escapeHTML(category.label)}</option>`).join("")}
+              ${beenThereCategories().map((category) => `<option value="${escapeHTML(category.id)}">${escapeHTML(category.label)}</option>`).join("")}
             </select>
           </label>
           <label>Your message<textarea id="community-encouragement-message" maxlength="500" placeholder="Something honest and encouraging - no names, no contact info, this stays anonymous on both sides."></textarea></label>
@@ -1487,6 +1496,10 @@
   // silent runtime crash node -c/the regression suite can't catch,
   // since they only check that the calling code exists, not that the
   // function it calls is actually reachable at runtime.
+  window.resetCommunityEncouragementFeedback = () => {
+    communityEncouragementError = "";
+    communityEncouragementStatus = "";
+  };
   window.blockCommunityUser = blockCommunityUser;
   window.unblockCommunityUser = unblockCommunityUser;
   window.submitCommunityReport = submitCommunityReport;
