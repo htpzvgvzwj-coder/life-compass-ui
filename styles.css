@@ -12757,15 +12757,79 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
 /* Connect > People reuses the real communityPeopleSection() output as-is
    (accountability matches, skill exchange, mentors) rather than rebuilding
    it as tiles - its underlying data isn't exposed outside community.js the
-   way squads/posts are. Known, disclosed visual seam: those cards keep
-   their own light-card styling rather than the dark glass look everything
-   else here has - not restyled this round. */
+   way squads/posts are. */
 .discover-people-wrap,
 .discover-auth-wrap {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding-right: 2px;
+}
+
+/* User feedback 2026-08-03: the previously-disclosed visual seam above
+   ("those cards keep their own light-card styling") got flagged directly -
+   "still that cyan/teal card style, completely doesn't match our app UI".
+   Restyled here rather than left as a known gap. Scoped to
+   .discover-people-wrap so nothing outside Discover's Connect > People view
+   is touched - these community.js card classes are only ever rendered
+   inside this wrapper (confirmed via grep: community.js is their only
+   source, and it only renders inside the Discover screen now that
+   Community's own standalone screen has been merged into it). */
+.discover-people-wrap .growth-partner-card,
+.discover-people-wrap .accountability-match-card,
+.discover-people-wrap .community-card {
+  background: rgba(13, 13, 16, 0.5);
+  border: 1px solid var(--warm-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 20px 40px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px) saturate(1.05);
+}
+
+.discover-people-wrap .growth-partner-card h3,
+.discover-people-wrap .accountability-match-card h3,
+.discover-people-wrap .community-card h3,
+.discover-people-wrap .partner-match-preview strong {
+  color: var(--warm-ink);
+}
+
+.discover-people-wrap .growth-partner-card p,
+.discover-people-wrap .accountability-match-card p,
+.discover-people-wrap .community-card p,
+.discover-people-wrap .growth-partner-card .muted,
+.discover-people-wrap .accountability-match-card .muted,
+.discover-people-wrap .community-card small {
+  color: rgba(255, 244, 223, 0.65);
+}
+
+.discover-people-wrap .growth-partner-card .eyebrow,
+.discover-people-wrap .accountability-match-card .eyebrow {
+  color: rgba(255, 244, 223, 0.55);
+}
+
+.discover-people-wrap .content-rail-title span {
+  color: rgba(255, 244, 223, 0.5);
+}
+
+.discover-people-wrap .partner-match-preview span {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 244, 223, 0.55);
+}
+
+.discover-people-wrap .badge-chip {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--warm-ink);
+  border: 1px solid var(--warm-line);
+}
+
+.discover-people-wrap .mirror-example-row button {
+  border: 1px solid var(--warm-line);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 244, 223, 0.7);
+}
+
+.discover-people-wrap .mirror-example-row button.is-selected {
+  border-color: var(--warm-active);
+  background: var(--warm-active);
+  color: var(--warm-active-ink);
 }
 
 @media (max-width: 1020px) {
