@@ -1477,4 +1477,23 @@
   window.setCommunityAuthBusy = (busy) => { communityAuthBusy = busy; };
   window.getPendingMilestoneShare = () => pendingMilestoneShare;
   window.setPendingMilestoneShare = (value) => { pendingMilestoneShare = value; };
+
+  // Real bug found 2026-08-03: these 9 were defined here but never
+  // exposed to window, so every real call site in app.js
+  // (block/unblock a member, submit a report, the 3 modals that render
+  // them, and the entire Been There flow - toggle opt-in, send an
+  // encouragement, mark one read) threw "ReferenceError: X is not
+  // defined" the moment a user actually tried to use any of them - a
+  // silent runtime crash node -c/the regression suite can't catch,
+  // since they only check that the calling code exists, not that the
+  // function it calls is actually reachable at runtime.
+  window.blockCommunityUser = blockCommunityUser;
+  window.unblockCommunityUser = unblockCommunityUser;
+  window.submitCommunityReport = submitCommunityReport;
+  window.toggleBeenThereOptIn = toggleBeenThereOptIn;
+  window.sendCommunityEncouragement = sendCommunityEncouragement;
+  window.markEncouragementRead = markEncouragementRead;
+  window.communityReportModal = communityReportModal;
+  window.communityMembersBlockedModal = communityMembersBlockedModal;
+  window.communityEncouragementModal = communityEncouragementModal;
 })();
