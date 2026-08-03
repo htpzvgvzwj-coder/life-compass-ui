@@ -9429,6 +9429,7 @@ function communityMergedScreen() {
       ${discoverSpotlightCard()}
       ${discoverExplorePanel()}
     </div>
+    ${discoverHistoryPanel()}
   `;
 }
 
@@ -9521,10 +9522,28 @@ function discoverFeedItemLaunchAttrs(item) {
   return `data-discover-mode="opportunities"`;
 }
 
-function discoverTile(title, tag, attrs) {
+// Real existing art, reused rather than any new/downloaded asset - the
+// same 2bb-domain-*.jpg/2bb-money-jar.jpg photos already proven to look
+// right at this exact card-thumbnail treatment in the Home 8-domain grid.
+// A category picks the closest-fitting real photo; this is decorative
+// only (no semantic claim that a Job tile "is" the Career domain), so an
+// approximate-but-real image beats the plain gradient placeholder it
+// replaces without needing new art.
+const DISCOVER_TILE_IMAGES = {
+  Jobs: "assets/2bb-domain-career.jpg",
+  Internships: "assets/2bb-domain-decide.jpg",
+  Scholarships: "assets/2bb-money-jar.jpg",
+  Competitions: "assets/2bb-domain-identity.jpg",
+  "Volunteer Opportunities": "assets/2bb-domain-civic.jpg",
+  squad: "assets/2bb-domain-relationships.jpg",
+  post: "assets/2bb-domain-identity.jpg"
+};
+
+function discoverTile(title, tag, attrs, imageKey) {
+  const image = DISCOVER_TILE_IMAGES[imageKey] || DISCOVER_TILE_IMAGES.Jobs;
   return `
     <article class="discover-tile" ${attrs || ""}>
-      <div class="discover-tile-visual"></div>
+      <div class="discover-tile-visual"><img src="${escapeHTML(image)}" alt="" loading="lazy"></div>
       <div class="discover-tile-row"><h3 class="discover-tile-title">${escapeHTML(title)}</h3><span class="discover-tag">${escapeHTML(tag)}</span></div>
     </article>
   `;
@@ -9562,7 +9581,7 @@ function discoverOpportunityTiles() {
   // signed-in only, same reasoning as Connect's restored Blocked/+New.
   const shareRow = signedIn ? `<div class="discover-connect-switch"><span class="discover-connect-spacer"></span><button type="button" class="discover-mini" data-open="communityOpportunitySubmit">+ Share</button></div>` : "";
   return `${shareRow}${discoverTileGrid(
-    items.map((item) => discoverTile(item.title, item.category, `data-prepare-opportunity="${escapeHTML(item.title)}" data-prepare-opportunity-category="${escapeHTML(item.category)}"`)),
+    items.map((item) => discoverTile(item.title, item.category, `data-prepare-opportunity="${escapeHTML(item.title)}" data-prepare-opportunity-category="${escapeHTML(item.category)}"`, item.category)),
     "No opportunities match right now."
   )}`;
 }
@@ -9611,7 +9630,7 @@ function discoverGroupTiles() {
   return discoverTileGrid(
     squads.map((squad) => {
       const count = members.filter((member) => member.squad_id === squad.id).length;
-      return discoverTile(squad.title, `${count} ${count === 1 ? "member" : "members"}`, `data-open="communityGroup" data-open-payload="${escapeHTML(squad.id)}"`);
+      return discoverTile(squad.title, `${count} ${count === 1 ? "member" : "members"}`, `data-open="communityGroup" data-open-payload="${escapeHTML(squad.id)}"`, "squad");
     }),
     "No groups yet - create one."
   );
@@ -9635,7 +9654,7 @@ function discoverFeedTiles() {
   // only remaining unreachable real control from the pre-redesign screens.
   const signOutRow = `<div class="discover-connect-switch"><span class="discover-connect-spacer"></span><button type="button" class="discover-mini" data-community-sign-out>Sign out</button></div>`;
   return `${signOutRow}${discoverTileGrid(
-    posts.map((post) => discoverTile(cleanText(post.body, 42), homeRelativeDateLabel(post.created_at) || "Today", "")),
+    posts.map((post) => discoverTile(cleanText(post.body, 42), homeRelativeDateLabel(post.created_at) || "Today", "", "post")),
     "No posts yet."
   )}`;
 }
@@ -9655,6 +9674,74 @@ function discoverExplorePanel() {
       </div>
       ${mode === "opportunities" ? discoverOpportunityTiles() : mode === "connect" ? discoverConnectSection() : discoverFeedTiles()}
     </aside>
+  `;
+}
+
+// Real, dated history of the user's own Discover activity - the 2BB
+// equivalent of the memory shelf (bb-glance-panel/openLoopsEntries): a
+// visible track record, not just a static browse list, so a demo can show
+// "this account has actually been used" the same way 2BB already can.
+// Every source here is a genuinely tracked timestamp, nothing fabricated:
+// savedOpportunities works with zero Community sign-in (pure local
+// tracker state); the other 3 sources only have data once signed in,
+// since they live in the real Supabase-backed caches.
+function discoverHistoryEntries() {
+  const entries = [];
+  trackerState.savedOpportunities
+    .filter((item) => item.user_id === currentUserId())
+    .forEach((item) => {
+      const opp = opportunityItems.find((candidate) => candidate.id === item.opportunity_id);
+      entries.push({ at: item.saved_at, label: "Saved an opportunity", detail: opp ? opp.title : "An opportunity" });
+    });
+  const signedIn = typeof hasCommunitySession === "function" && hasCommunitySession();
+  if (signedIn) {
+    const myId = typeof communityUserId === "function" ? communityUserId() : null;
+    const squads = typeof communitySquadsCacheSnapshot === "function" ? communitySquadsCacheSnapshot() : [];
+    (typeof communitySquadMembersCacheSnapshot === "function" ? communitySquadMembersCacheSnapshot() : [])
+      .filter((member) => member.user_id === myId)
+      .forEach((member) => {
+        const squad = squads.find((candidate) => candidate.id === member.squad_id);
+        entries.push({ at: member.joined_at, label: "Joined a squad", detail: squad ? squad.title : "A squad" });
+      });
+    (typeof communityPostsCacheSnapshot === "function" ? communityPostsCacheSnapshot() : [])
+      .filter((post) => post.author_id === myId)
+      .forEach((post) => {
+        entries.push({ at: post.created_at, label: "Posted in Feed", detail: cleanText(post.body, 60) });
+      });
+    (typeof communitySkillTagsCacheSnapshot === "function" ? communitySkillTagsCacheSnapshot() : [])
+      .filter((tag) => tag.user_id === myId)
+      .forEach((tag) => {
+        entries.push({ at: tag.created_at, label: tag.type === "offered" ? "Offered a skill" : "Asked for a skill", detail: tag.note });
+      });
+  }
+  return entries
+    .filter((entry) => entry.at)
+    .sort((a, b) => new Date(b.at) - new Date(a.at))
+    .slice(0, 6);
+}
+
+function discoverHistoryPanel() {
+  const entries = discoverHistoryEntries();
+  return `
+    <section class="discover-history" aria-label="Your Discover history">
+      <div class="discover-panel-head">
+        <p class="eyebrow">Your history</p>
+        <h2>What you've actually done here</h2>
+      </div>
+      ${entries.length ? `
+        <div class="discover-history-list">
+          ${entries.map((entry) => `
+            <div class="discover-history-row">
+              <div>
+                <strong>${escapeHTML(entry.label)}</strong>
+                <span>${escapeHTML(cleanText(entry.detail, 60))}</span>
+              </div>
+              <time>${escapeHTML(homeRelativeDateLabel(entry.at))}</time>
+            </div>
+          `).join("")}
+        </div>
+      ` : `<p class="discover-tile-empty">Save an opportunity or join a squad to start building your Discover history.</p>`}
+    </section>
   `;
 }
 
