@@ -2901,6 +2901,55 @@ function realGrowthFactsText() {
   return facts.length ? facts.join(" | ") : "No saved Compass data yet.";
 }
 
+// Conversation source traceability: turns the actual `context` object
+// requestCompassAI() sent to the model for one specific chat reply into a
+// readable digest, stored on that reply's AI Trace Log entry (see
+// sendChatMessage/logAiTrace/aiTraceDetailModal). This is the literal
+// input for that turn, not a fresh recomputation - showing what Compass
+// ACTUALLY knew when it said something, not what it currently knows.
+// Only lists sections that were genuinely non-empty for this reply.
+function summarizeAiContext(context) {
+  if (!context || typeof context !== "object") return "No context recorded for this reply.";
+  const lines = [];
+  const profile = context.savedUserProfile;
+  if (profile && Object.keys(profile).length) {
+    lines.push(`Saved profile - ${Object.entries(profile).map(([key, value]) => `${key}: ${value}`).join("; ")}`);
+  }
+  if (context.personalBlueprint) {
+    const b = context.personalBlueprint;
+    lines.push(`Personal Blueprint - values: ${(b.values || []).join(", ") || "none set"}; strengths: ${(b.strengths || []).join(", ") || "none set"}; personality: ${b.personality || "not set"}; motivation: ${b.motivationStyle || "not set"}; work style: ${b.workStyle || "not set"}; decision style: ${b.decisionStyle || "not set"}`);
+  }
+  if (Array.isArray(context.realSavedFacts) && context.realSavedFacts.length) {
+    lines.push(`${context.realSavedFacts.length} real saved fact(s) - ${context.realSavedFacts.join(" | ")}`);
+  }
+  if (Array.isArray(context.lifeMemory) && context.lifeMemory.length) {
+    lines.push(`${context.lifeMemory.length} remembered real decision(s) available (most recent: "${cleanText(context.lifeMemory[0].situationTag, 80)}")`);
+  }
+  if (context.uploadedDocumentChunks && context.uploadedDocumentChunks.length) {
+    lines.push(`${context.uploadedDocumentChunks.length} chunk(s) from an uploaded document`);
+  }
+  if (Array.isArray(context.relevantHistory) && context.relevantHistory.length) {
+    lines.push(`Matched ${context.relevantHistory.length} real past entr${context.relevantHistory.length === 1 ? "y" : "ies"} to this question: ${context.relevantHistory.map((entry) => `"${entry.title}"`).join(", ")}`);
+  }
+  if (Array.isArray(context.domainBrief) && context.domainBrief.length) {
+    lines.push(`Domain guidance triggered by keywords in this message (${context.domainBrief.length} brief${context.domainBrief.length === 1 ? "" : "s"})`);
+  }
+  if (context.budgetSnapshot) {
+    lines.push(`Money Plan snapshot included - take-home S$${context.budgetSnapshot.takeHomeMonthly}/mo, ${context.budgetSnapshot.spendPercent}% of spending budget used this month`);
+  }
+  if (context.careerSnapshot) {
+    lines.push(`Career snapshot included - stage: ${context.careerSnapshot.stage}, top job fit: ${context.careerSnapshot.topRole} (${context.careerSnapshot.fitPercent}%)`);
+  }
+  if (context.personalityRead) {
+    lines.push(`AI-inferred personality read included (from your own writing, separate from the self-declared Blueprint)`);
+  }
+  if (context.pendingProactiveMessage) {
+    lines.push(`A queued proactive message was included as a fallback`);
+  }
+  lines.push(`Trust tier at the time: ${context.trustTier}`);
+  return lines.length ? lines.join("\n") : "No saved Compass data was available for this reply.";
+}
+
 // Knowledge Vault / Life Dashboard - the capstone Future Mirror module. It
 // does not hold its own data store: every section reads the SAME per-module
 // arrays/functions the other 8 modules already write to (Blueprint history,
@@ -9098,12 +9147,17 @@ async function evaluateAiReply({ feature, userGoal, coachType, context, reply })
   }
 }
 
-async function logAiTrace({ feature, userGoal, coachType, context, reply }) {
+async function logAiTrace({ id, feature, userGoal, coachType, context, reply }) {
   const trace = {
-    id: `trace-${Date.now()}`,
+    id: id || `trace-${Date.now()}`,
     feature,
     userGoal: cleanText(userGoal, 200),
     coachType: coachType || "",
+    // Real, literal text actually sent to the model for this reply - was
+    // computed and thrown away before 2026-08-03, so there was no way to
+    // check a past reply's grounding after the fact, only its live grade.
+    // See summarizeAiContext/aiTraceDetailModal.
+    context: cleanText(context, 4000),
     replySummary: cleanText(reply, 200),
     checks: null,
     createdAt: new Date().toISOString()
@@ -9113,6 +9167,7 @@ async function logAiTrace({ feature, userGoal, coachType, context, reply }) {
   trace.checks = await evaluateAiReply({ feature, userGoal, coachType, context, reply });
   saveTrackerState();
   if (isModalActive("aiTraceLog")) openModal("aiTraceLog");
+  return trace.id;
 }
 
 function aiTraceLogModal() {
@@ -9141,11 +9196,61 @@ function aiTraceLogModal() {
                   ${trace.checks.notes ? `<p class="tiny-note">${escapeHTML(trace.checks.notes)}</p>` : ""}
                 ` : `<p class="tiny-note">Grading...</p>`}
                 <small>${escapeHTML(new Date(trace.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</small>
+                <p><button class="text-action" type="button" data-open="aiTraceDetail" data-open-payload="${escapeHTML(trace.id)}">See what it actually knew</button></p>
               </div>
             </article>
           `).join("")}
         </div>
       ` : `<p class="muted">No traces logged yet - use Compass AI Chat or a Build Mode coach and check back.</p>`}
+    </div>
+  `;
+}
+
+// Conversation source traceability (2026-08-03): the Trace Log above only
+// ever showed a GRADE of whether a reply was grounded - the actual real
+// data used to generate it was computed and discarded, so there was no
+// way to verify a specific reply after the fact, only trust the grade.
+// This shows the literal recorded context for one trace: honest by
+// construction, since it's the same text logAiTrace() stored at the
+// moment that exact reply was generated, not a fresh recomputation of
+// "what Compass currently knows".
+function aiTraceDetailModal(id) {
+  const trace = trackerState.aiTraces.find((item) => item.id === id);
+  if (!trace) {
+    return `
+      <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="ai-trace-detail-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Why did I say that?</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="ai-trace-detail-title">Trace not found</h3>
+        <p class="muted">This trace is no longer available (older traces roll off after 100).</p>
+      </div>
+    `;
+  }
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="ai-trace-detail-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Why did I say that?</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="ai-trace-detail-title">What Compass actually knew for this reply</h3>
+      <p class="muted">The exact context sent to the model when it wrote this - not a fresh summary of what Compass knows now, the literal record from that moment.</p>
+      <div class="content-rail-title"><strong>You asked</strong></div>
+      <p class="quote-block">${escapeHTML(trace.userGoal)}</p>
+      <div class="content-rail-title"><strong>It knew</strong></div>
+      <div class="ledger-sheet"><article class="ledger-entry"><p class="ledger-entry-note" style="white-space:pre-line">${escapeHTML(trace.context || "No context recorded for this reply.")}</p></article></div>
+      <div class="content-rail-title"><strong>It replied</strong></div>
+      <p class="quote-block">${escapeHTML(trace.replySummary)}</p>
+      ${trace.checks ? `
+        <div class="chip-row">
+          <span class="mini-chip ${trace.checks.answeredQuestion ? "" : "is-warning"}">${trace.checks.answeredQuestion ? "Answered" : "Didn't answer"}</span>
+          <span class="mini-chip ${trace.checks.hasConcreteNextStep ? "" : "is-warning"}">${trace.checks.hasConcreteNextStep ? "Concrete next step" : "No concrete next step"}</span>
+          ${trace.checks.possibleFabrication ? `<span class="mini-chip is-warning">Possible fabrication</span>` : ""}
+        </div>
+        ${trace.checks.notes ? `<p class="tiny-note">${escapeHTML(trace.checks.notes)}</p>` : ""}
+      ` : `<p class="tiny-note">Grading...</p>`}
+      <small>${escapeHTML(new Date(trace.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</small>
     </div>
   `;
 }
@@ -11340,6 +11445,7 @@ function chatMessages() {
       <span>${message.from === "user" ? displayName() : "Compass AI"}${message.createdAt ? `<small class="chat-bubble-time">${escapeHTML(new Date(message.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</small>` : ""}</span>
       <p>${escapeHTML(message.text)}</p>
       ${message.suggestedOpen ? `<button class="chat-suggested-open" type="button" data-run-suggested-command="${escapeHTML(message.suggestedOpen.id)}">Open ${escapeHTML(message.suggestedOpen.title)}</button>` : ""}
+      ${message.traceId ? `<button class="chat-why-said-that" type="button" data-open="aiTraceDetail" data-open-payload="${escapeHTML(message.traceId)}">Why did I say that?</button>` : ""}
     </div>
   `).join("");
   const typing = isCompassResponding ? `
@@ -12691,6 +12797,8 @@ const modals = {
   advancedMode: () => advancedModeModal(),
 
   aiTraceLog: () => aiTraceLogModal(),
+
+  aiTraceDetail: (id) => aiTraceDetailModal(id),
 
   calibration: () => calibrationModal(),
 
@@ -14537,7 +14645,11 @@ async function requestCompassAI(question) {
   const reply = String(data.reply || "").trim();
   const toolCall = validateToolCall(data.toolCall);
   if (!reply && !toolCall) throw new Error("Empty Compass reply");
-  return { reply, toolCall };
+  // context is returned (not just used locally) so sendChatMessage can log
+  // exactly what was actually sent for this specific reply, for the AI
+  // Trace Log's "what Compass actually knew" detail - see
+  // summarizeAiContext/aiTraceDetailModal.
+  return { reply, toolCall, context };
 }
 
 // Conversational counterpart to the manual "remember this" modal
@@ -16659,7 +16771,7 @@ async function sendChatMessage(text) {
   isCompassResponding = true;
   renderScreen("compass");
   try {
-    const { reply, toolCall } = await requestCompassAI(clean);
+    const { reply, toolCall, context } = await requestCompassAI(clean);
     // The queued proactive message (if any) was already sent in this
     // request's context as a fallback - dequeue it now so it's used
     // exactly once, not repeated on every later message. A no-op if
@@ -16704,21 +16816,29 @@ async function sendChatMessage(text) {
     const displayText = toolCall && toolCall.tool !== "open_tool"
       ? toolCall.message_to_user
       : (matchedTool ? toolCall.message_to_user : reply);
+    // Pre-generated so it can be attached to the chat message synchronously
+    // - logAiTrace() runs (and writes the trace record, including this
+    // same id) up to its first await before this call site continues, so
+    // the "Why did I say that?" button works the moment this message
+    // renders, not just after the background grading finishes.
+    const traceId = `trace-${Date.now()}`;
     chatState.messages.push({
       from: "assistant",
       text: displayText,
       createdAt: new Date().toISOString(),
       suggestedOpen: matchedTool
         ? { id: matchedTool.id, title: matchedTool.title }
-        : (autoActionTool ? { id: autoActionTool.id, title: autoActionTool.title } : null)
+        : (autoActionTool ? { id: autoActionTool.id, title: autoActionTool.title } : null),
+      traceId
     });
     saveChatState();
     speak(displayText);
     void logAiTrace({
+      id: traceId,
       feature: "Compass AI Chat",
       userGoal: clean,
       coachType: "",
-      context: "Saved profile, Personal Blueprint, real saved facts, and recent chat history assembled by requestCompassAI",
+      context: summarizeAiContext(context),
       reply: displayText
     });
     maybeRunPersonalityInference();

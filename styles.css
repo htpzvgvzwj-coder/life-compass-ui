@@ -10935,6 +10935,24 @@ body {
   cursor: pointer;
 }
 
+/* Conversation source traceability: deliberately quieter than
+   .chat-suggested-open (a plain underlined text link, no pill/border) so
+   it reads as a secondary "inspect this" affordance, not another action
+   competing for attention in every single AI reply. Uses the same muted
+   token as .chat-bubble-time right above it, not the Discover screen's
+   warm-palette tokens - this lives in the chat bubble's own theme. */
+.chat-why-said-that {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-muted);
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* Second Brain, Phase 2a: History Search entry point - quiet, not a menu
    item competing with the room panels above it. */
 .room-history-search {
