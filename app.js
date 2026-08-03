@@ -513,7 +513,13 @@ const defaultUserProfile = {
   // This is the user's own opt-in intent, separate from the browser's
   // actual granted/denied permission state - both must be true for a
   // notification to actually fire (see fireProactiveNotification).
-  notificationsEnabled: false
+  notificationsEnabled: false,
+  // Real Web Push (2026-08-03, closes compass_push_notification_gap for
+  // real): separate opt-in from notificationsEnabled above - that one only
+  // fires while some tab is open, this one works with the browser fully
+  // closed. Deliberately not gated behind Community sign-in (works for
+  // local accounts too) - see subscribeToRealPush()/push_subscriptions.
+  realPushEnabled: false
 };
 
 // Demo login this data is bound to - see the DEMO DATA note above
@@ -1631,6 +1637,8 @@ let futureScanSuggestedStationIds = [];
 let buildModeGoalInput = "";
 let isBuildModeLoading = false;
 let buildModeError = "";
+// Real Web Push opt-in error, shown in profileScreen() - see subscribeToRealPush().
+let realPushError = "";
 let buildMomentCategory = "independence";
 let costOfLivingDraft = { housing: "shared-room", district: "suburban", transport: "public", lifestyle: "moderate" };
 let costOfLivingResult = null;
@@ -4897,6 +4905,99 @@ function notificationStatusLabel() {
   return "Off";
 }
 
+// Real Web Push (2026-08-03) - the actual "closed browser" fix
+// fireProactiveNotification()'s own comment names as the still-open gap.
+// Deliberately kept separate from that lighter path rather than replacing
+// it: this is the delivery mechanism only, sendRealPush() below is called
+// from the exact same place fireProactiveNotification() already is, so
+// what gets sent and when is still decided 100% client-side from the
+// user's own real data - only the transport changed.
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+function realPushSupported() {
+  return "serviceWorker" in navigator && "PushManager" in window;
+}
+
+async function subscribeToRealPush() {
+  if (!realPushSupported()) {
+    realPushError = "Your browser doesn't support real push notifications.";
+    renderScreen(activeTab);
+    return;
+  }
+  realPushError = "";
+  try {
+    const configResponse = await fetch(`${window.COMMUNITY_API_BASE || ""}/api/push-config`);
+    const config = await configResponse.json().catch(() => ({}));
+    if (!configResponse.ok || !config.vapidPublicKey) {
+      realPushError = config.error || "Real push isn't configured yet.";
+      renderScreen(activeTab);
+      return;
+    }
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(config.vapidPublicKey)
+    });
+    const response = await fetch(`${window.COMMUNITY_API_BASE || ""}/api/push-subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: currentUserId(), subscription: subscription.toJSON() })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      realPushError = data.error || "Could not save that subscription right now.";
+      renderScreen(activeTab);
+      return;
+    }
+    userProfile.realPushEnabled = true;
+    saveUserProfile();
+    renderScreen(activeTab);
+  } catch (error) {
+    console.error("[Push] subscribe failed", error);
+    realPushError = Notification.permission === "denied"
+      ? "Blocked in your browser's site settings - change it there to re-enable."
+      : "Could not turn on real push notifications right now.";
+    renderScreen(activeTab);
+  }
+}
+
+async function unsubscribeFromRealPush() {
+  userProfile.realPushEnabled = false;
+  saveUserProfile();
+  renderScreen(activeTab);
+  try {
+    if (!realPushSupported()) return;
+    const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+    const subscription = registration && await registration.pushManager.getSubscription();
+    if (!subscription) return;
+    const endpoint = subscription.endpoint;
+    await subscription.unsubscribe();
+    await fetch(`${window.COMMUNITY_API_BASE || ""}/api/push-subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: currentUserId(), action: "unsubscribe", endpoint })
+    });
+  } catch (error) {
+    console.error("[Push] unsubscribe failed", error);
+  }
+}
+
+// Fire-and-forget: this is a best-effort extra delivery channel, never
+// something the rest of the app waits on or fails over.
+function sendRealPush(title, text) {
+  if (!userProfile.realPushEnabled) return;
+  fetch(`${window.COMMUNITY_API_BASE || ""}/api/push-send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: currentUserId(), title, body: text })
+  }).catch((error) => console.error("[Push] send failed", error));
+}
+
 // Shared by every proactive-message source (fresh aiInsights, stale
 // check-ins) so delivery is one code path - see requestCompassAI (low/mid
 // tier: folded into the AI's next reply) and applyPendingProactiveMessage
@@ -4909,7 +5010,10 @@ function notificationStatusLabel() {
 function queueProactiveMessage(type, text) {
   trackerState.proactiveQueue.push({ id: `proactive-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, text: cleanText(text, 220), createdAt: new Date().toISOString() });
   trackerState.proactiveQueue = trackerState.proactiveQueue.slice(-5);
-  if (trustTier() === "high") fireProactiveNotification(text);
+  if (trustTier() === "high") {
+    fireProactiveNotification(text);
+    sendRealPush("2BB", text);
+  }
 }
 
 // A real friend checks back on something you mentioned and never heard
@@ -12180,6 +12284,18 @@ function profileScreen() {
           : `<button class="secondary-action" type="button" data-toggle-notifications>${userProfile.notificationsEnabled ? "Turn off notifications" : "Turn on notifications"}</button>`}
     </section>
     <section class="profile-card">
+      <p class="eyebrow">Real push notifications</p>
+      <p class="muted">The real fix for the limit above - works even with the browser fully closed, using a real Web Push subscription (not gated behind a Community account, works for this local profile too). A separate opt-in from the notification above.</p>
+      <div class="toggle-row">
+        <span>Status</span>
+        <strong>${userProfile.realPushEnabled ? "On" : "Off"}</strong>
+      </div>
+      ${realPushError ? `<p class="form-error">${escapeHTML(realPushError)}</p>` : ""}
+      ${!realPushSupported()
+        ? `<p class="muted">Your browser doesn't support real push - nothing to turn on here.</p>`
+        : `<button class="secondary-action" type="button" data-toggle-real-push>${userProfile.realPushEnabled ? "Turn off real push" : "Turn on real push"}</button>`}
+    </section>
+    <section class="profile-card">
       <div class="toggle-row"><span>Login method</span><strong>Local device login (not verified)</strong></div>
       <div class="toggle-row"><span>Role permissions</span><strong>${isAdmin() ? "Admin" : "User"}</strong></div>
       <div class="toggle-row"><span>Progress storage</span><strong>This browser only</strong></div>
@@ -17218,6 +17334,7 @@ document.addEventListener("click", async (event) => {
   const completeMission = event.target.closest("[data-complete-mission]");
   const saveVoice = event.target.closest("[data-save-voice]");
   const toggleNotifications = event.target.closest("[data-toggle-notifications]");
+  const toggleRealPush = event.target.closest("[data-toggle-real-push]");
   const startRoleplay = event.target.closest("[data-start-roleplay]");
   const sendRoleplay = event.target.closest("[data-send-roleplay]");
   const finishRoleplay = event.target.closest("[data-finish-roleplay]");
@@ -18102,6 +18219,14 @@ document.addEventListener("click", async (event) => {
       renderScreen(activeTab);
     } else {
       requestCompassNotificationPermission();
+    }
+  }
+
+  if (toggleRealPush) {
+    if (userProfile.realPushEnabled) {
+      await unsubscribeFromRealPush();
+    } else {
+      await subscribeToRealPush();
     }
   }
 

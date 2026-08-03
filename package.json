@@ -6,5 +6,8 @@
   "scripts": {
     "start": "node local-server.js",
     "test": "node tests/community-matching.test.js && node tests/build-mode.test.js && node tests/compass-provider-fallback.test.js && node tests/onboarding.test.js && node tests/real-consequences.test.js && node tests/bug-audit.test.js && node tests/community-safety.test.js && node tests/innovation-features.test.js && node tests/research-grounded-features.test.js"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
   }
 }

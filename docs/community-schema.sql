@@ -500,6 +500,37 @@ create policy "compass_backups_update_own" on compass_backups
   for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
+-- push_subscriptions
+-- Real Web Push (2026-08-03) - deliberately works for LOCAL accounts too,
+-- not just real Community sign-ins, so user_id is a plain text field (the
+-- Gmail-format string currentUserId() returns, or a real Community
+-- auth.uid() when signed in) rather than a foreign key into auth.users -
+-- same reasoning and same trust model as guardian_shares.local_user_id
+-- above: local accounts have no Supabase Auth session at all to scope RLS
+-- against, so there is genuinely no auth.uid() available here for most
+-- callers. Consequence, stated plainly: this endpoint trusts whatever
+-- user_id the client sends, exactly like every other local-account
+-- feature in this app (Money Plan, mood, etc. all trust currentUserId()
+-- with zero server-side verification) - not a new category of risk, the
+-- same one this app already accepts everywhere local accounts are used.
+-- RLS enabled with NO policies at all - every read/write goes through
+-- api/push-subscribe.js and api/push-send.js using the service-role key.
+-- ---------------------------------------------------------------------------
+create table if not exists push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth_key text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists push_subscriptions_user_id_idx on push_subscriptions (user_id);
+
+alter table push_subscriptions enable row level security;
+-- Intentionally no policies here - see comment above.
+
+-- ---------------------------------------------------------------------------
 -- Seed data: migrate the 6 static communityGroups from app.js (lines ~322-365)
 -- into real, joinable squads. created_by is left null (system-seeded).
 -- Guarded so re-running this script never duplicates the seed rows.
