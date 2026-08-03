@@ -836,7 +836,13 @@ const defaultTrackerState = {
   // dismissal path - Skip, the real suggestion, or the modal's own close
   // button - counts as "seen" and it never reopens.
   onboarding: { completedAt: null, seedAnswer: "" },
-  starterPath: { id: "", selectedAt: null, completedStepIds: [] },
+  // DEMO DATA: connects to the same real career-path facts already seeded
+  // below (careerStudio.resume, the completed interview session) - this
+  // doesn't invent new claims, it just reflects those 2 real actions as
+  // completed starter-path steps so Discover's "For You" spotlight shows
+  // real progress (2/4) instead of the honest-but-empty "pick a path"
+  // fallback every genuinely fresh account still correctly gets.
+  starterPath: { id: "career", selectedAt: "2026-07-05T09:00:00.000Z", completedStepIds: ["career-studio", "career-interview"] },
   // "Real consequences" (self-critique finding): Ghost Roommate and Jury
   // Duty both used to discard every episode's outcome the moment it ended -
   // a relationship breakdown wiped trackerState.ghostRoommate back to a
@@ -1712,7 +1718,7 @@ const chatState = normalizeChatState(loadSessionJson(scopedKey("steadyChatState"
 // marker so refreshing mid-demo doesn't keep wiping out anything typed
 // live during the demo itself - bump DEMO_SEED_VERSION to force a re-seed
 // if the seeded content is ever edited again).
-const DEMO_SEED_VERSION = "2026-08-01-v6";
+const DEMO_SEED_VERSION = "2026-08-03-v7";
 if (currentUserId() === DEMO_USER_ID && localStorage.getItem("compassDemoSeedVersion") !== DEMO_SEED_VERSION) {
   Object.assign(trackerState, JSON.parse(JSON.stringify(defaultTrackerState)));
   chatState.messages = JSON.parse(JSON.stringify(defaultChatState.messages));
