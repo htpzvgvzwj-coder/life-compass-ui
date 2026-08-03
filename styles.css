@@ -12524,6 +12524,14 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.discover-mode-hint {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 244, 223, 0.55);
+}
+
 .discover-mode-tab {
   min-height: 36px;
   border: 0;

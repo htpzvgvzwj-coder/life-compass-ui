@@ -9575,7 +9575,31 @@ function discoverOpportunityTiles() {
   const communityItems = (signedIn && typeof communityOpportunitiesCacheSnapshot === "function")
     ? communityOpportunitiesCacheSnapshot().filter((item) => item.status === "published")
     : [];
-  const items = [...staticItems, ...communityItems].slice(0, 6);
+  // Real bug found 2026-08-03 (user report: "I have no idea what's even
+  // in here"): a plain slice(0, 6) on the raw array silently hid 3 whole
+  // categories forever - Jobs (4) + Internships (5) alone already fill
+  // all 6 slots before Scholarships/Competitions/Volunteer Opportunities
+  // are ever reached, so a user could browse endlessly and never see
+  // them. Round-robins one item per category per pass instead, so every
+  // real category is guaranteed to show up near the top of the (already
+  // scrollable) tile grid regardless of how many items each has.
+  const byCategory = new Map();
+  staticItems.forEach((item) => {
+    if (!byCategory.has(item.category)) byCategory.set(item.category, []);
+    byCategory.get(item.category).push(item);
+  });
+  const roundRobin = [];
+  let addedThisPass = true;
+  while (addedThisPass) {
+    addedThisPass = false;
+    byCategory.forEach((list) => {
+      if (list.length) {
+        roundRobin.push(list.shift());
+        addedThisPass = true;
+      }
+    });
+  }
+  const items = [...roundRobin, ...communityItems].slice(0, 10);
   // "Share an opportunity" (data-open="communityOpportunitySubmit") is a
   // real action the old communityOpportunitiesRail() had - restored here,
   // signed-in only, same reasoning as Connect's restored Blocked/+New.
@@ -9625,7 +9649,7 @@ function discoverConnectSection() {
 // - same member-count logic communitySquadMemberCount() itself uses
 // internally, just computed here since that helper isn't exposed to app.js.
 function discoverGroupTiles() {
-  const squads = (typeof communitySquadsCacheSnapshot === "function" ? communitySquadsCacheSnapshot() : []).slice(0, 6);
+  const squads = (typeof communitySquadsCacheSnapshot === "function" ? communitySquadsCacheSnapshot() : []).slice(0, 10);
   const members = typeof communitySquadMembersCacheSnapshot === "function" ? communitySquadMembersCacheSnapshot() : [];
   return discoverTileGrid(
     squads.map((squad) => {
@@ -9659,6 +9683,18 @@ function discoverFeedTiles() {
   )}`;
 }
 
+// User report 2026-08-03: "as a user I have no idea what's even in here,
+// I'd have to keep browsing around" - "Opp" as a tab label is a cryptic
+// abbreviation, and nothing told a user what any of the 3 modes actually
+// contain before clicking in. This hint line names the real content of
+// whichever mode is active, so a fresh visitor gets an answer without
+// having to explore blind.
+const DISCOVER_MODE_HINTS = {
+  opportunities: "Real jobs, internships, scholarships, competitions, and volunteering - all in one list.",
+  connect: "People to match with (accountability, mentors, Been There) or real squads to join.",
+  feed: "What other real members have actually posted, newest first."
+};
+
 function discoverExplorePanel() {
   const mode = ["opportunities", "connect", "feed"].includes(discoverExploreMode) ? discoverExploreMode : "opportunities";
   return `
@@ -9668,10 +9704,11 @@ function discoverExplorePanel() {
         <h2>Mode</h2>
       </div>
       <div class="discover-mode-tabs" role="tablist" aria-label="Discover modes">
-        <button type="button" class="discover-mode-tab ${mode === "opportunities" ? "is-active" : ""}" data-discover-mode="opportunities" aria-selected="${mode === "opportunities"}">Opp</button>
+        <button type="button" class="discover-mode-tab ${mode === "opportunities" ? "is-active" : ""}" data-discover-mode="opportunities" aria-selected="${mode === "opportunities"}">Jobs</button>
         <button type="button" class="discover-mode-tab ${mode === "connect" ? "is-active" : ""}" data-discover-mode="connect" aria-selected="${mode === "connect"}">Connect</button>
         <button type="button" class="discover-mode-tab ${mode === "feed" ? "is-active" : ""}" data-discover-mode="feed" aria-selected="${mode === "feed"}">Feed</button>
       </div>
+      <p class="discover-mode-hint">${escapeHTML(DISCOVER_MODE_HINTS[mode])}</p>
       ${mode === "opportunities" ? discoverOpportunityTiles() : mode === "connect" ? discoverConnectSection() : discoverFeedTiles()}
     </aside>
   `;
