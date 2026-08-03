@@ -1718,13 +1718,23 @@ const chatState = normalizeChatState(loadSessionJson(scopedKey("steadyChatState"
 // marker so refreshing mid-demo doesn't keep wiping out anything typed
 // live during the demo itself - bump DEMO_SEED_VERSION to force a re-seed
 // if the seeded content is ever edited again).
-const DEMO_SEED_VERSION = "2026-08-03-v7";
+const DEMO_SEED_VERSION = "2026-08-03-v8";
 if (currentUserId() === DEMO_USER_ID && localStorage.getItem("compassDemoSeedVersion") !== DEMO_SEED_VERSION) {
   Object.assign(trackerState, JSON.parse(JSON.stringify(defaultTrackerState)));
   chatState.messages = JSON.parse(JSON.stringify(defaultChatState.messages));
   chatState.documents = [];
   saveTrackerState();
   saveChatState();
+  // Real AI-profile fields (not touched by the trackerState/chatState
+  // seed above) - these were never filled in for the demo account, which
+  // is why Discover's Growth Partner Matching card showed literal
+  // placeholder text ("your interests"/"your current growth goal")
+  // instead of anything real. Same honest-field-filling as any real
+  // user completing their own AI Profile, just done once for the demo.
+  userProfile.interests = "personal finance, career development, mental wellbeing";
+  userProfile.goals = "Land a stable analyst role and build better money habits before moving out";
+  userProfile.dreamCareer = "Business analyst";
+  saveUserProfile();
   localStorage.setItem("compassDemoSeedVersion", DEMO_SEED_VERSION);
 }
 
