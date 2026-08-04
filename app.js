@@ -4210,6 +4210,8 @@ function commandLauncherCommands() {
     { id: "living-with-someone", title: "Living with someone", detail: "Check agreements, chores, quiet hours, repair conversations.", lane: "People & Boundaries", tab: "secondBrain", open: "skillGuideDetail", payload: "before-renting-room", icon: "icon-home.png", keywords: ["roommate", "living", "chores", "agreement"] },
     { id: "civic-compass", title: "Civic Compass", detail: "Voting, raising a real local issue, spotting misinformation - plus the actual official channels for each.", lane: "Practical & Safety", tab: "secondBrain", open: "civicCompass", icon: "icon-guide.png", keywords: ["vote", "voting", "election", "national service", "civic", "town council", "misinformation", "local issue"] },
     { id: "living-compass", title: "Independent Living", detail: "Cooking, laundry, renting, roommates, moving, and getting around, plus real cost-of-living numbers.", lane: "Practical & Safety", tab: "secondBrain", open: "livingCompass", icon: "icon-home.png", keywords: ["living", "cook", "laundry", "rent", "renting", "roommate", "move", "moving", "transport", "cost of living"] },
+    { id: "relationships-compass", title: "Relationships", detail: "Before You Text, Ghost Roommate, and ending things without ghosting or blowing up.", lane: "People & Boundaries", tab: "secondBrain", open: "relationshipsCompass", icon: "icon-boundary.png", keywords: ["relationship", "boundaries", "roommate", "breakup", "text", "message"] },
+    { id: "emotion-compass", title: "Emotional Resilience", detail: "Mood, Calm Reset, reflection, journaling, Personal Weather, and Support Circle in one place.", lane: "Check-In", tab: "secondBrain", open: "emotionCompass", icon: "icon-mood.png", keywords: ["emotion", "mood", "calm", "reset", "reflection", "journal", "support"] },
     { id: "jury-trial", title: "Jury Duty on Yourself", detail: "Put a real decision on trial.", lane: "Advanced Labs", tab: "secondBrain", open: "juryTrial", icon: "icon-balance.png", keywords: ["jury", "trial", "decision", "verdict"] },
     { id: "failure-inoculation", title: "Failure Inoculation", detail: "This week's task is designed to fail. That is the point.", lane: "Advanced Labs", tab: "secondBrain", open: "failureInoculation", icon: "icon-warning.png", keywords: ["failure", "inoculation", "resilience"] },
     { id: "legacy-debugger", title: "Inherited Debugging", detail: "Refactor habits you did not choose, issue by issue.", lane: "Advanced Labs", tab: "secondBrain", open: "legacyDebugger", icon: "icon-settings.png", keywords: ["inherited", "habits", "debug", "refactor"] },
@@ -6593,6 +6595,119 @@ function firstRunOnboardingModal() {
       </div>
       <button class="primary-action" type="button" data-onboarding-finish data-onboarding-path="${escapeHTML(path.id)}" data-onboarding-tab="${escapeHTML(firstStep.tab || path.tab || suggestion.tab)}" data-onboarding-open="${escapeHTML(firstStep.modal || suggestion.open || "")}" data-onboarding-payload="${escapeHTML(firstStep.payload || suggestion.payload || "")}" data-onboarding-discover-mode="${escapeHTML(firstStep.discoverMode || "")}">Start my path</button>
       <button class="secondary-action compact-action" type="button" data-skip-onboarding>Skip, take me to Home</button>
+    </div>
+  `;
+}
+
+// Checked the remaining 2 Home tiles for the same pattern after Civic and
+// Living both turned out to have it. Relationships (beforeYouText) and
+// Emotion (mood) each opened exactly one real tool directly, silently
+// standing in for several other real, already-built features in the same
+// domain - the same "single narrow entry for a whole domain" shape, just
+// with feature launchers instead of skill guides this time. Emotion was
+// the worse case: Calm Reset (a real tool, already used as one of the 2
+// demo-worthy Pattern Insight readings) had NO everyday self-serve entry
+// point at all - its only trigger anywhere in the app was inside the SOS
+// crisis banner, meaning a user who just wants to calm down (not in a
+// crisis) could never find it.
+function relationshipsCompassModal() {
+  const guides = SKILL_GUIDES.filter((guide) => guide.category === "Relationships");
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="relationships-compass-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Relationships</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="relationships-compass-title">Before it becomes a real conversation</h3>
+      <p class="muted">A one-time read on a message before it's sent, a roommate relationship that actually remembers, and how to end things without ghosting or blowing up.</p>
+      <div class="content-rail-title"><strong>Tools</strong></div>
+      <div class="action-stack">
+        <button class="wide-action" type="button" data-open="beforeYouText">
+          <img src="assets/icon-boundary.png" alt="">
+          <span><strong>Before You Text</strong><small>A one-time honest read on a real message before it goes to a real person.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="ghostRoommate">
+          <img src="assets/icon-home.png" alt="">
+          <span><strong>Ghost Roommate</strong><small>Move in with someone - a relationship that remembers, week after week.</small></span>
+        </button>
+      </div>
+      ${guides.length ? `
+        <div class="content-rail-title"><strong>Guides</strong><span>${guides.length}</span></div>
+        <div class="action-stack">
+          ${guides.map((guide) => {
+            const progress = skillGuideProgress(guide.id);
+            const percent = Math.round((progress.checkedSteps.length / guide.steps.length) * 100);
+            return `
+              <button class="wide-action" type="button" data-open="skillGuideDetail" data-open-payload="${escapeHTML(guide.id)}">
+                <img src="assets/icon-checkin.png" alt="">
+                <span><strong>${escapeHTML(guide.title)}</strong><small>${escapeHTML(guide.summary)}</small></span>
+                <span class="kind-pill-inline ${progress.completedAt ? "kind-real" : "kind-practice"}">${progress.completedAt ? "Done" : `${percent}%`}</span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+// "Mind" is the SKILL_GUIDES category name for what's actually emotional-
+// resilience content (build-support-before-crisis, youre-not-actually-
+// behind) - filtered by that category name here, same forward-compatible
+// pattern as civicCompassModal()/livingCompassModal().
+function emotionCompassModal() {
+  const guides = SKILL_GUIDES.filter((guide) => guide.category === "Mind");
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="emotion-compass-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Emotional Resilience</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="emotion-compass-title">Check in, come down, and remember the pattern</h3>
+      <p class="muted">Mood, a real grounding reset, reflection, journaling, and the people worth keeping close - all the ways this actually gets tracked, not just one check-in box.</p>
+      <div class="content-rail-title"><strong>Tools</strong></div>
+      <div class="action-stack">
+        <button class="wide-action" type="button" data-open="mood">
+          <img src="assets/icon-mood.png" alt="">
+          <span><strong>Mood Check-In</strong><small>Log today's mood and energy - this is what Pattern Insight and your Weekly Letter draw from.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="calmReset">
+          <img src="assets/icon-support.png" alt="">
+          <span><strong>Calm Reset</strong><small>A real 2-minute grounding sequence - not just for a crisis, works any time you're wound up.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="dailyReflection">
+          <img src="assets/icon-spark.png" alt="">
+          <span><strong>Daily reflection</strong><small>A 3-minute rotating prompt.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="journal">
+          <img src="assets/icon-learn.png" alt="">
+          <span><strong>Journal</strong><small>Write what happened and what you learned.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="personalWeather">
+          <img src="assets/icon-warning.png" alt="">
+          <span><strong>Personal Weather Forecast</strong><small>A 7-day forecast built from your real mood pattern.</small></span>
+        </button>
+        <button class="wide-action" type="button" data-open="supportCircle">
+          <img src="assets/icon-support.png" alt="">
+          <span><strong>Support Circle</strong><small>Keep trusted people reachable before stress peaks.</small></span>
+        </button>
+      </div>
+      ${guides.length ? `
+        <div class="content-rail-title"><strong>Guides</strong><span>${guides.length}</span></div>
+        <div class="action-stack">
+          ${guides.map((guide) => {
+            const progress = skillGuideProgress(guide.id);
+            const percent = Math.round((progress.checkedSteps.length / guide.steps.length) * 100);
+            return `
+              <button class="wide-action" type="button" data-open="skillGuideDetail" data-open-payload="${escapeHTML(guide.id)}">
+                <img src="assets/icon-checkin.png" alt="">
+                <span><strong>${escapeHTML(guide.title)}</strong><small>${escapeHTML(guide.summary)}</small></span>
+                <span class="kind-pill-inline ${progress.completedAt ? "kind-real" : "kind-practice"}">${progress.completedAt ? "Done" : `${percent}%`}</span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+      ` : ""}
     </div>
   `;
 }
@@ -13243,6 +13358,10 @@ const modals = {
   civicCompass: () => civicCompassModal(),
 
   livingCompass: () => livingCompassModal(),
+
+  relationshipsCompass: () => relationshipsCompassModal(),
+
+  emotionCompass: () => emotionCompassModal(),
   // Direct Growth Hub entry point for this one guide specifically -
   // growthActionAttributes() only ever emits a bare data-open, no payload,
   // so item.modal can't target skillGuideDetail("build-support-before-crisis")
