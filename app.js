@@ -4208,7 +4208,7 @@ function commandLauncherCommands() {
     { id: "ghost-roommate", title: "Ghost Roommate", detail: "Move in with someone - a relationship that remembers.", lane: "People & Boundaries", tab: "secondBrain", open: "ghostRoommate", icon: "icon-home.png", keywords: ["roommate", "relationship", "living together"] },
     { id: "end-relationship-well", title: "Ending a relationship well", detail: "A clean ending without ghosting or blowing up.", lane: "People & Boundaries", tab: "secondBrain", open: "skillGuideDetail", payload: "end-a-relationship-well", icon: "icon-boundary.png", keywords: ["breakup", "relationship", "ending"] },
     { id: "living-with-someone", title: "Living with someone", detail: "Check agreements, chores, quiet hours, repair conversations.", lane: "People & Boundaries", tab: "secondBrain", open: "skillGuideDetail", payload: "before-renting-room", icon: "icon-home.png", keywords: ["roommate", "living", "chores", "agreement"] },
-    { id: "civic-duties-basics", title: "Voting and civic duties", detail: "What's automatic, what you have to act on yourself, and what's just internet noise.", lane: "Practical & Safety", tab: "secondBrain", open: "skillGuideDetail", payload: "civic-duties-basics", icon: "icon-guide.png", keywords: ["vote", "voting", "election", "national service", "civic", "town council"] },
+    { id: "civic-compass", title: "Civic Compass", detail: "Voting, raising a real local issue, spotting misinformation - plus the actual official channels for each.", lane: "Practical & Safety", tab: "secondBrain", open: "civicCompass", icon: "icon-guide.png", keywords: ["vote", "voting", "election", "national service", "civic", "town council", "misinformation", "local issue"] },
     { id: "jury-trial", title: "Jury Duty on Yourself", detail: "Put a real decision on trial.", lane: "Advanced Labs", tab: "secondBrain", open: "juryTrial", icon: "icon-balance.png", keywords: ["jury", "trial", "decision", "verdict"] },
     { id: "failure-inoculation", title: "Failure Inoculation", detail: "This week's task is designed to fail. That is the point.", lane: "Advanced Labs", tab: "secondBrain", open: "failureInoculation", icon: "icon-warning.png", keywords: ["failure", "inoculation", "resilience"] },
     { id: "legacy-debugger", title: "Inherited Debugging", detail: "Refactor habits you did not choose, issue by issue.", lane: "Advanced Labs", tab: "secondBrain", open: "legacyDebugger", icon: "icon-settings.png", keywords: ["inherited", "habits", "debug", "refactor"] },
@@ -6592,6 +6592,67 @@ function firstRunOnboardingModal() {
       </div>
       <button class="primary-action" type="button" data-onboarding-finish data-onboarding-path="${escapeHTML(path.id)}" data-onboarding-tab="${escapeHTML(firstStep.tab || path.tab || suggestion.tab)}" data-onboarding-open="${escapeHTML(firstStep.modal || suggestion.open || "")}" data-onboarding-payload="${escapeHTML(firstStep.payload || suggestion.payload || "")}" data-onboarding-discover-mode="${escapeHTML(firstStep.discoverMode || "")}">Start my path</button>
       <button class="secondary-action compact-action" type="button" data-skip-onboarding>Skip, take me to Home</button>
+    </div>
+  `;
+}
+
+// Civic & Social Responsibility was the thinnest of the 8 Home domains -
+// 3 real, carefully-written guides existed (civic-duties-basics,
+// raising-a-local-issue, spot-misinformation-before-sharing) but the Home
+// tile only ever opened the first one directly, so a user never
+// discovered the other 2 unless they separately browsed the full,
+// unrelated Skill Guides list - the exact same "real content, no
+// discoverability" shape as the Discover Opportunities bug found earlier.
+// This hub does for Civic what Money Plan/Career Studio already do for
+// their domains: one real entry point showing everything that's actually
+// there, not a single guide standing in for the whole topic.
+// External links are deliberately limited to well-known, stable
+// government domains already named in this app's own existing guide text
+// (OneService, REACH) or their obvious top-level equivalents (ELD, ICA,
+// NS Portal) - no fabricated deep links to a specific page/form, since
+// getting a civic-process detail wrong is a real harm, not just a broken
+// link. gov.sg is the safe general fallback.
+const CIVIC_REAL_RESOURCES = [
+  { label: "Check your voter registration", detail: "Elections Department Singapore", url: "https://www.eld.gov.sg" },
+  { label: "Update your address after moving", detail: "ICA - affects your polling station and official mail, not just voting", url: "https://www.ica.gov.sg" },
+  { label: "Report a municipal problem", detail: "OneService - litter, lifts, pests, illegal parking, cleanliness", url: "https://www.oneservice.sg" },
+  { label: "Give feedback on national policy", detail: "REACH - not what a Town Council or MP's office is for", url: "https://www.reach.gov.sg" },
+  { label: "Check your National Service status", detail: "NS Portal", url: "https://www.ns.sg" }
+];
+
+function civicCompassModal() {
+  const guides = SKILL_GUIDES.filter((guide) => guide.category === "Civic");
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="civic-compass-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Civic &amp; Social Responsibility</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="civic-compass-title">The parts of being a citizen nobody walks you through</h3>
+      <p class="muted">Voting, raising a real problem, and not being the one who spreads something false - real guides, plus the actual official channels for each.</p>
+      <div class="content-rail-title"><strong>Guides</strong><span>${guides.length}</span></div>
+      <div class="action-stack">
+        ${guides.map((guide) => {
+          const progress = skillGuideProgress(guide.id);
+          const percent = Math.round((progress.checkedSteps.length / guide.steps.length) * 100);
+          return `
+            <button class="wide-action" type="button" data-open="skillGuideDetail" data-open-payload="${escapeHTML(guide.id)}">
+              <img src="assets/icon-checkin.png" alt="">
+              <span><strong>${escapeHTML(guide.title)}</strong><small>${escapeHTML(guide.summary)}</small></span>
+              <span class="kind-pill-inline ${progress.completedAt ? "kind-real" : "kind-practice"}">${progress.completedAt ? "Done" : `${percent}%`}</span>
+            </button>
+          `;
+        }).join("")}
+      </div>
+      <div class="content-rail-title"><strong>Real channels, not a group chat</strong></div>
+      <div class="action-stack">
+        ${CIVIC_REAL_RESOURCES.map((resource) => `
+          <button class="wide-action" type="button" data-open-link="${escapeHTML(resource.url)}">
+            <img src="assets/icon-guide.png" alt="">
+            <span><strong>${escapeHTML(resource.label)}</strong><small>${escapeHTML(resource.detail)}</small></span>
+          </button>
+        `).join("")}
+      </div>
     </div>
   `;
 }
@@ -13134,6 +13195,8 @@ const modals = {
 
   skillGuides: () => skillGuidesModal(),
   skillGuideDetail: (guideId) => skillGuideDetailModal(guideId),
+
+  civicCompass: () => civicCompassModal(),
   // Direct Growth Hub entry point for this one guide specifically -
   // growthActionAttributes() only ever emits a bare data-open, no payload,
   // so item.modal can't target skillGuideDetail("build-support-before-crisis")

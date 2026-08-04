@@ -11954,8 +11954,8 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
    specificity than the shared ::after rule above (adds the attribute
    selector), so this only retints Civic - Money/Career/Quick Jump/SOS and
    the other 6 domain tiles are untouched. */
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button[data-open-payload="civic-duties-basics"]::after,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button[data-open-payload="civic-duties-basics"]::after {
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button[data-open="civicCompass"]::after,
+body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button[data-open="civicCompass"]::after {
   background: linear-gradient(0deg, rgba(15, 10, 7, 0.7) 0%, transparent 45%), rgba(10, 8, 6, 0.4);
 }
 
