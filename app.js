@@ -4209,6 +4209,7 @@ function commandLauncherCommands() {
     { id: "end-relationship-well", title: "Ending a relationship well", detail: "A clean ending without ghosting or blowing up.", lane: "People & Boundaries", tab: "secondBrain", open: "skillGuideDetail", payload: "end-a-relationship-well", icon: "icon-boundary.png", keywords: ["breakup", "relationship", "ending"] },
     { id: "living-with-someone", title: "Living with someone", detail: "Check agreements, chores, quiet hours, repair conversations.", lane: "People & Boundaries", tab: "secondBrain", open: "skillGuideDetail", payload: "before-renting-room", icon: "icon-home.png", keywords: ["roommate", "living", "chores", "agreement"] },
     { id: "civic-compass", title: "Civic Compass", detail: "Voting, raising a real local issue, spotting misinformation - plus the actual official channels for each.", lane: "Practical & Safety", tab: "secondBrain", open: "civicCompass", icon: "icon-guide.png", keywords: ["vote", "voting", "election", "national service", "civic", "town council", "misinformation", "local issue"] },
+    { id: "living-compass", title: "Independent Living", detail: "Cooking, laundry, renting, roommates, moving, and getting around, plus real cost-of-living numbers.", lane: "Practical & Safety", tab: "secondBrain", open: "livingCompass", icon: "icon-home.png", keywords: ["living", "cook", "laundry", "rent", "renting", "roommate", "move", "moving", "transport", "cost of living"] },
     { id: "jury-trial", title: "Jury Duty on Yourself", detail: "Put a real decision on trial.", lane: "Advanced Labs", tab: "secondBrain", open: "juryTrial", icon: "icon-balance.png", keywords: ["jury", "trial", "decision", "verdict"] },
     { id: "failure-inoculation", title: "Failure Inoculation", detail: "This week's task is designed to fail. That is the point.", lane: "Advanced Labs", tab: "secondBrain", open: "failureInoculation", icon: "icon-warning.png", keywords: ["failure", "inoculation", "resilience"] },
     { id: "legacy-debugger", title: "Inherited Debugging", detail: "Refactor habits you did not choose, issue by issue.", lane: "Advanced Labs", tab: "secondBrain", open: "legacyDebugger", icon: "icon-settings.png", keywords: ["inherited", "habits", "debug", "refactor"] },
@@ -6619,6 +6620,49 @@ const CIVIC_REAL_RESOURCES = [
   { label: "Give feedback on national policy", detail: "REACH - not what a Town Council or MP's office is for", url: "https://www.reach.gov.sg" },
   { label: "Check your National Service status", detail: "NS Portal", url: "https://www.ns.sg" }
 ];
+
+// Same "single narrow entry standing in for a whole domain" shape found
+// again while checking the other 7 Home tiles for the same issue Civic
+// had: Independent Living's tile opened the entire, unfiltered Skill
+// Guides list (all 17 guides across every category mixed together -
+// Money, Health, Work, Civic guides alongside the Home/Housing/Transport
+// ones that actually belong to Living) instead of a Living-focused view.
+// Not "content is invisible" like Civic was, but the same underlying
+// miss: the entry point didn't do the one thing its own label promised.
+// Filters SKILL_GUIDES by category (not a hardcoded id list) so any
+// future guide added to these 3 categories is automatically included,
+// same as civicCompassModal() above. costOfLivingEntryCard() is a real,
+// already-built tool (not a fabricated addition) whose own copy already
+// frames it as "what does independent living actually cost" - belongs
+// here more than anywhere else it's currently reachable from.
+function livingCompassModal() {
+  const guides = SKILL_GUIDES.filter((guide) => ["Home", "Housing", "Transport"].includes(guide.category));
+  return `
+    <div class="modal-card assessment-modal" role="dialog" aria-modal="true" aria-labelledby="living-compass-title">
+      <div class="modal-top">
+        <span class="risk-pill calm">Independent Living</span>
+        <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+      </div>
+      <h3 id="living-compass-title">Running your own place, for real</h3>
+      <p class="muted">Cooking, laundry, renting, roommates, moving, and getting around - the stuff nobody sits you down to teach.</p>
+      ${costOfLivingEntryCard()}
+      <div class="content-rail-title"><strong>Guides</strong><span>${guides.length}</span></div>
+      <div class="action-stack">
+        ${guides.map((guide) => {
+          const progress = skillGuideProgress(guide.id);
+          const percent = Math.round((progress.checkedSteps.length / guide.steps.length) * 100);
+          return `
+            <button class="wide-action" type="button" data-open="skillGuideDetail" data-open-payload="${escapeHTML(guide.id)}">
+              <img src="assets/icon-checkin.png" alt="">
+              <span><strong>${escapeHTML(guide.title)}</strong><small>${escapeHTML(guide.summary)}</small></span>
+              <span class="kind-pill-inline ${progress.completedAt ? "kind-real" : "kind-practice"}">${progress.completedAt ? "Done" : `${percent}%`}</span>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
 
 function civicCompassModal() {
   const guides = SKILL_GUIDES.filter((guide) => guide.category === "Civic");
@@ -13197,6 +13241,8 @@ const modals = {
   skillGuideDetail: (guideId) => skillGuideDetailModal(guideId),
 
   civicCompass: () => civicCompassModal(),
+
+  livingCompass: () => livingCompassModal(),
   // Direct Growth Hub entry point for this one guide specifically -
   // growthActionAttributes() only ever emits a bare data-open, no payload,
   // so item.modal can't target skillGuideDetail("build-support-before-crisis")
