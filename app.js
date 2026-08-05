@@ -70,7 +70,7 @@ const COMPASS_API_URL = window.location.protocol === "file:" ? "http://localhost
 const FUTURE_SCAN_STATIONS = [
   { id: "identityScan", title: "Future Identity Scan", blurb: "See which future self this choice moves you toward.", group: "now", icon: "icon-profile.png" },
   { id: "valuesCheck", title: "Values Consistency Check", blurb: "Compare this choice against the values you've already saved.", group: "now", icon: "icon-balance.png" },
-  { id: "hiddenCosts", title: "Hidden Cost Scanner", blurb: "See what this choice actually spends - sleep, focus, confidence.", group: "now", icon: "icon-warning.png" },
+  { id: "hiddenCosts", title: "Hidden Cost Scanner", blurb: "See the real monthly cost breakdown independent living actually spends.", group: "now", icon: "icon-warning.png" },
   { id: "noActionFuture", title: "No-Action Future", blurb: "See where staying exactly the same leads.", group: "now", icon: "icon-safety.png" },
   { id: "pressureTest", title: "Choice Pressure Test", blurb: "Check whether pressure, fear, or comparison is driving this.", group: "context", icon: "icon-boundary.png" },
   { id: "conflictMap", title: "Future Conflict Map", blurb: "See which of your goals are actually in tension here.", group: "context", icon: "icon-decide.png" },
@@ -1640,7 +1640,11 @@ let buildModeError = "";
 // Real Web Push opt-in error, shown in profileScreen() - see subscribeToRealPush().
 let realPushError = "";
 let buildMomentCategory = "independence";
-let costOfLivingDraft = { housing: "shared-room", district: "suburban", transport: "public", lifestyle: "moderate" };
+// Named so runFutureScanHiddenCosts() (Future Scan) can honestly tell
+// whether the user has actually customized this, without duplicating the
+// literal and risking the two drifting apart.
+const DEFAULT_COST_OF_LIVING_DRAFT = { housing: "shared-room", district: "suburban", transport: "public", lifestyle: "moderate" };
+let costOfLivingDraft = { ...DEFAULT_COST_OF_LIVING_DRAFT };
 let costOfLivingResult = null;
 let moneyPlanEditing = false;
 let activeBuildEntryId = null;
@@ -4165,6 +4169,7 @@ function commandLauncherCommands() {
     { id: "career-studio", title: "Career Studio", detail: "Resume, portfolio, interviews, job matching, paycheck checks.", lane: "Career Studio", tab: "secondBrain", open: "careerStudio", icon: "icon-work.png", keywords: ["career", "resume", "interview", "job"] },
     { id: "networking", title: "Networking", detail: "Mentors, referrals, alumni - and when you last actually reached out.", lane: "Career Studio", tab: "secondBrain", open: "networkContacts", icon: "icon-support.png", keywords: ["networking", "mentor", "referral", "alumni", "contacts"] },
     { id: "before-you-text", title: "Before You Text", detail: "A one-time honest read on a real message before it goes to a real person.", lane: "People & Boundaries", tab: "secondBrain", open: "beforeYouText", icon: "icon-boundary.png", keywords: ["text", "message", "send", "draft", "conversation"] },
+    { id: "decode-this", title: "Decode This", detail: "Upload a real lease, offer letter, contract, or payslip - 2BB walks through what actually matters.", lane: "Practical & Safety", tab: "secondBrain", open: "decodeThis", icon: "icon-receipt.png", keywords: ["decode", "document", "pdf", "lease", "contract", "offer letter", "payslip"] },
     { id: "skill-guides", title: "Skill Guides", detail: "Payslips, renting, SIM plans, cooking, first aid, and more.", lane: "Practical & Safety", tab: "secondBrain", open: "skillGuides", icon: "icon-guide.png", keywords: ["skills", "adulting", "guide", "home"] },
     { id: "due-dates", title: "Real Due Dates", detail: "Track bills, renewals, rent, and real deadlines.", lane: "Practical & Safety", tab: "secondBrain", open: "realLifeEvents", icon: "icon-checkin.png", keywords: ["deadline", "due", "bill", "reminder"] },
     { id: "opportunities", title: "Discover Opportunities", detail: "Browse doors by stage, need, time, and category.", lane: "Discover", tab: "discover", discoverMode: "opportunities", icon: "icon-support.png", keywords: ["opportunity", "internship", "scholarship", "volunteer"] },
@@ -12088,13 +12093,19 @@ async function roughExtractPdfText(file) {
   }
 }
 
+// Returns true/false (upload actually succeeded) - added for Decode This
+// (decodeThisModal/handleDecodeThisUpload below), which needs to know
+// whether it's safe to auto-send a follow-up question. The existing
+// plain chat-input upload path never used the return value and still
+// doesn't need to - every existing early-exit/success point already had
+// its own real behavior, this only adds a return value on top of it.
 async function handlePdfUpload(file) {
-  if (!file) return;
+  if (!file) return false;
   if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
     chatState.messages.push({ from: "assistant", text: "Please upload a PDF file so I can read it for this chat session.", local: true });
     saveChatState();
     renderScreen("compass");
-    return;
+    return false;
   }
   chatState.messages.push({ from: "assistant", text: `Reading ${file.name}...`, local: true });
   saveChatState();
@@ -12105,7 +12116,7 @@ async function handlePdfUpload(file) {
     chatState.messages.push({ from: "assistant", text: "I could not extract readable text from that PDF. If it is a scanned image, try uploading a text-based PDF or paste the key notes into chat.", local: true });
     saveChatState();
     renderScreen("compass");
-    return;
+    return false;
   }
   const documentRecord = {
     id: `doc-${Date.now()}`,
@@ -12117,6 +12128,23 @@ async function handlePdfUpload(file) {
   chatState.messages.push({ from: "assistant", text: `${file.name} is ready. Ask me questions about the uploaded document.`, local: true });
   saveChatState();
   renderScreen("compass");
+  return true;
+}
+
+// Decode This: names and gives a real entry point to the PDF-upload/RAG
+// capability handlePdfUpload/retrieveDocumentChunks already provide -
+// nobody currently discovers it exists (buried as a small icon in the
+// chat input row, chat starts blank with no prompt). Reuses that exact
+// same extraction/storage pipeline, zero new capability - just a name,
+// a door, and one well-formed opening question sent automatically so the
+// user doesn't have to think of a good question themselves.
+async function handleDecodeThisUpload(file) {
+  if (!file) return;
+  closeModal();
+  const ok = await handlePdfUpload(file);
+  if (ok) {
+    await sendChatMessage("I just uploaded a real document - a lease, offer letter, or contract. Please decode it for me: walk through what actually matters, flag anything unusual, and call out any real dates, costs, or obligations I should not miss.");
+  }
 }
 
 function adminStudio() {
@@ -12863,6 +12891,9 @@ const screens = {
             <button class="bb-icon-btn" type="button" data-open="beforeYouText" aria-label="Before You Text" title="Before You Text">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>
             </button>
+            <button class="bb-icon-btn" type="button" data-open="decodeThis" aria-label="Decode This" title="Decode This - real document literacy">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V9z"></path><path d="M14 3v6h6"></path><path d="M9 13h6M9 17h4"></path></svg>
+            </button>
           </div>
         </header>
         <div class="bb-status">
@@ -13056,6 +13087,44 @@ const modals = {
   commandLauncher: () => commandLauncherModal(),
 
   firstRunOnboarding: () => firstRunOnboardingModal(),
+
+  // Names and gives a real door to a capability that already existed
+  // (PDF upload + retrieveDocumentChunks, see handlePdfUpload) but was
+  // never discoverable - a tiny icon in the chat input row, no
+  // explanation, no guided question. Same real extraction pipeline,
+  // just packaged: a name, 4 concrete real examples, and an opening
+  // question sent automatically (see handleDecodeThisUpload) instead of
+  // leaving the user to think of a good one after a blank "ready" reply.
+  decodeThis: () => {
+    const docs = chatState.documents || [];
+    return `
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="decode-this-title">
+        <div class="modal-top">
+          <span class="risk-pill calm">Decode This</span>
+          <button class="ghost-circle" type="button" data-close aria-label="Close">x</button>
+        </div>
+        <h3 id="decode-this-title">Real document literacy</h3>
+        <p class="muted">Upload a real lease, job offer, contract, or payslip - 2BB reads it and walks through what actually matters: unusual clauses, real dates, costs, and obligations. Nothing is invented - it only points to what's actually on the page.</p>
+        <div class="advice-stack">
+          <div><strong>Lease / rental agreement</strong><span>Deposit terms, notice period, who pays for what.</span></div>
+          <div><strong>Job offer letter</strong><span>Probation terms, notice period, what's actually guaranteed.</span></div>
+          <div><strong>Contract</strong><span>Obligations, cancellation terms, hidden costs.</span></div>
+          <div><strong>Payslip</strong><span>Deductions, CPF, whether the math adds up.</span></div>
+        </div>
+        <label class="wide-action dark-action" style="cursor:pointer;">
+          <img src="assets/icon-receipt.png" alt="">
+          <span><strong>Upload a PDF to decode</strong><small>Stays in this chat session only</small></span>
+          <input type="file" accept="application/pdf" data-decode-this-upload style="display:none;">
+        </label>
+        ${docs.length ? `
+          <p class="muted" style="margin-top:14px;">Already uploaded this session:</p>
+          <div class="advice-stack">
+            ${docs.map((doc) => `<div><strong>${escapeHTML(doc.fileName)}</strong><span>${escapeHTML(homeRelativeDateLabel(doc.uploadedAt))}</span></div>`).join("")}
+          </div>
+        ` : ""}
+      </div>
+    `;
+  },
 
   username: () => `
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="username-title">
@@ -15963,15 +16032,15 @@ function futureScanHiddenCostsView() {
     <button class="primary-action mirror-run-action" type="button" data-run-scan-costs ${futureScanStationLoading === "hiddenCosts" ? "disabled" : ""}>${futureScanStationLoading === "hiddenCosts" ? "Scanning..." : result ? "Re-scan" : "Run Hidden Cost Scanner"}</button>
     ${result ? `
       <div class="scan-simulated-title">
-        <span class="risk-pill calm">Simulated</span>
-        <small>${result.personalized ? "Based on your LifeVerse profile" : "Based on a general starting-adult simulation"}</small>
+        <span class="risk-pill calm">Real numbers</span>
+        <small>${result.personalized ? "Based on your saved Cost of Living choices" : "Based on typical Singapore starting-adult costs - customize this in Real Cost of Living for your own numbers"}</small>
       </div>
       <div class="struggle-map">
         ${result.costs.map((cost, index) => `
           <div class="struggle-row scan-cost-row" style="animation-delay:${index * 120}ms">
             <span>${escapeHTML(cost.label)}</span>
             <i><b style="width:${cost.severity}%"></b></i>
-            <strong>${cost.severity}</strong>
+            <strong>${cost.severity}%</strong>
           </div>
         `).join("")}
       </div>
@@ -15982,17 +16051,35 @@ function futureScanHiddenCostsView() {
   `;
 }
 
-// The real severities here always came from LifeVerse's simulation engine
-// (computeHiddenCostSeverities(), deleted 2026-08-03 along with the rest
-// of the engine - a new Life Sim will be built later). This station
-// can't honestly run without it - inventing severity numbers instead
-// would be exactly the kind of fabricated data this app has never done
-// anywhere else. Left registered (not removed from the station list) so
-// it can come back once a new engine exists to compute real numbers
-// again, rather than surgically stripping it from the 4 places Future
-// Scan's other 10 stations still share with it.
-async function runFutureScanHiddenCosts() {
-  futureScanStationError = "The Hidden Cost Scanner needs Compass's life simulation to compute real severities - that engine is being rebuilt right now, so this scan is paused until it's back.";
+// Rebuilt (2026-08-05) on real static Cost of Living data
+// (computeCostOfLiving/COST_OF_LIVING_* - the same numbers the Real Cost
+// of Living tool uses) instead of LifeVerse's deleted simulation engine.
+// Re-scoped, not faked: the old station measured a simulated
+// psychological cost (sleep/focus/confidence) that only a real
+// life-simulation engine could honestly compute - inventing a mapping
+// from real dollar amounts to invented psychological severities would be
+// fabricated methodology, the same category of dishonesty this app
+// avoided elsewhere (see the Self-Perception Gap round, which refused to
+// force a numeric score between two incompatible frameworks for the same
+// reason). What IS honestly computable from real static data: each real
+// cost category's own share of the real total - a directly-derived 0-100
+// number, not invented, that happens to fit the same severity-bar UI the
+// old station already had.
+function runFutureScanHiddenCosts() {
+  const { rows, total } = computeCostOfLiving(costOfLivingDraft);
+  const totalMid = (total[0] + total[1]) / 2;
+  const isDefaultDraft = Object.keys(DEFAULT_COST_OF_LIVING_DRAFT).every((key) => costOfLivingDraft[key] === DEFAULT_COST_OF_LIVING_DRAFT[key]);
+  const costs = rows.map((row) => {
+    const mid = (row.range[0] + row.range[1]) / 2;
+    const severity = totalMid > 0 ? Math.round((mid / totalMid) * 100) : 0;
+    return {
+      label: row.label,
+      severity,
+      reason: `$${row.range[0]}-$${row.range[1]}/month - about ${severity}% of a real independent-living budget.`
+    };
+  }).sort((a, b) => b.severity - a.severity);
+  saveFutureScanStation("hiddenCosts", { costs, personalized: !isDefaultDraft, generatedAt: new Date().toISOString() });
+  futureScanStationError = "";
   openModal("futureScanStation", "hiddenCosts");
 }
 
@@ -20160,6 +20247,11 @@ document.addEventListener("change", async (event) => {
   if (upload && upload.files && upload.files[0]) {
     await handlePdfUpload(upload.files[0]);
     upload.value = "";
+  }
+  const decodeUpload = event.target && event.target.closest("[data-decode-this-upload]");
+  if (decodeUpload && decodeUpload.files && decodeUpload.files[0]) {
+    await handleDecodeThisUpload(decodeUpload.files[0]);
+    decodeUpload.value = "";
   }
   if (event.target && event.target.id === "import-tracker-file" && event.target.files && event.target.files[0]) {
     startImportBackup(event.target.files[0]);
