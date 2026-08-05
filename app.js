@@ -4374,6 +4374,15 @@ function historySearchEntries() {
     date: c.lastContactedAt
   }));
 
+  // Same shape/reasoning as networkContacts above - missed the first time
+  // this was added (Support Circle uses a separate real array,
+  // supportContacts, not networkContacts, even though the fields match).
+  trackerState.supportContacts.filter((c) => (c.user_id === myId || !c.user_id) && c.lastContactedAt).forEach((c) => entries.push({
+    id: `hs-support-${c.id}`, type: "Support Circle", title: `Checked in with ${c.name}`,
+    snippet: cleanText(c.note, 90), fullText: `${c.name} (${c.relationship || "contact"})${c.note ? `\n${c.note}` : ""}`,
+    date: c.lastContactedAt
+  }));
+
   myRoadmapGoals().forEach((goal) => (goal.milestones || []).filter((m) => m.status === "done").forEach((m) => entries.push({
     id: `hs-milestone-${m.id}`, type: "Roadmap", title: m.title,
     snippet: `Milestone in "${goal.title}"`, fullText: `${m.title} - milestone in "${goal.title}" (month ${m.month})`,
@@ -15624,13 +15633,21 @@ function fuzzyNameMatch(a, b) {
   return x === y || x.includes(y) || y.includes(x);
 }
 
-// log_contact_reached tool support - updates a real Networking contact's
-// lastContactedAt, the same field the manual form sets. Returns false
-// (silent no-op) if no real saved contact plausibly matches the name the
-// model extracted - deliberately does not create a new contact.
+// log_contact_reached tool support - updates a real contact's
+// lastContactedAt, the same field the manual Networking/Support Circle
+// forms set. Checks BOTH real rosters (networkContacts AND
+// supportContacts share the exact same shape - id/name/relationship/
+// lastContactedAt) since a name mentioned in chat could plausibly be
+// either a mentor/referral or a trusted person to lean on, and there's
+// no reason to require the user (or the model) to know which list it's
+// filed under. Returns false (silent no-op) if no real saved contact in
+// either list plausibly matches - deliberately does not create a new
+// contact.
 function logContactReachedFromChat(toolCall) {
   const myId = currentUserId();
-  const contact = trackerState.networkContacts.find((item) => (item.user_id === myId || !item.user_id) && fuzzyNameMatch(item.name, toolCall.contact_name));
+  const isMine = (item) => item.user_id === myId || !item.user_id;
+  const contact = trackerState.networkContacts.find((item) => isMine(item) && fuzzyNameMatch(item.name, toolCall.contact_name))
+    || trackerState.supportContacts.find((item) => isMine(item) && fuzzyNameMatch(item.name, toolCall.contact_name));
   if (!contact) {
     console.error("[Compass AI] log_contact_reached called with no matching saved contact - ignored", toolCall.contact_name);
     return false;

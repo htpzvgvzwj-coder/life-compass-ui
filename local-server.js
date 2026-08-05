@@ -408,9 +408,9 @@ function buildLogJournalSchema() {
 function buildLogContactReachedSchema() {
   return {
     name: 'log_contact_reached',
-    description: 'Mark that the user actually reached out to someone already in their real Networking contacts list (mentors, referrals, alumni) - updates that contact\'s real \'last contacted\' date, the same field the manual Networking form sets. Only call this when they clearly describe contacting a specific real person, and only if that person plausibly matches someone already in their saved contacts (see the saved facts in context) - never invent a new contact.',
+    description: 'Mark that the user actually reached out to or checked in with someone already saved as a real contact - either in Networking (mentors, referrals, alumni) or Support Circle (trusted people to lean on) - updates that contact\'s real \'last contacted\' date, the same field the manual forms set. Only call this when they clearly describe contacting a specific real person, and only if that person plausibly matches someone already in their saved contacts (see the saved facts in context) - never invent a new contact.',
     properties: {
-      contact_name: { type: 'string', description: 'The contact\'s name, as close as possible to how it\'s saved in their real Networking list.' },
+      contact_name: { type: 'string', description: 'The contact\'s name, as close as possible to how it\'s saved in their real Networking or Support Circle list.' },
       message_to_user: { type: 'string', description: 'A short, natural line telling the user you\'ve logged the check-in - write it the way you\'d actually say it, not a system notification.' },
     },
     required: ['contact_name', 'message_to_user'],
