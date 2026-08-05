@@ -13189,6 +13189,34 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
 }
 
+/* Only renders with 2+ real Blueprint versions - the "who you were vs who
+   you're becoming" pairing right where the image itself puts that idea
+   (next to the boy). */
+.home-day-change {
+  position: absolute;
+  left: 13%;
+  top: 50.5%;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--warm-active);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* One real forecast line, upper-right sky area near the adult figure/
+   skyline - echoes the image's own "light ahead" read without competing
+   with the "It shows you your future" waypoint below it. */
+.home-forecast {
+  position: absolute;
+  left: 68%;
+  top: 12%;
+  max-width: 26%;
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 244, 223, 0.65);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+
 /* Real named entries, not another stat - deliberately plain stacked text
    (no card background) so it reads as writing on the scene, matching
    .home-waypoint/.home-greet, not a 4th boxed widget. Placed lower-left,
@@ -13360,6 +13388,13 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
   50% { opacity: 1; transform: scale(1.15); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .home-tree-light {
+    animation: none;
+    opacity: 0.85;
+  }
+}
+
 .home-waypoint-text {
   font-size: 13px;
   line-height: 1.42;
@@ -13412,6 +13447,8 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
   .home-mood,
   .home-since,
   .home-day-marker,
+  .home-day-change,
+  .home-forecast,
   .home-waypoint,
   .home-recent {
     position: static;

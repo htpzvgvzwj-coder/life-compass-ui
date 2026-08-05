@@ -12678,6 +12678,32 @@ const screens = {
     }
     const daysIn = daysSince(userProfile.firstOpenedAt);
 
+    // Real "then -> now" identity change, not just a version count - same
+    // extraction growthGlancePanelHtml already used (pure computation, no
+    // side effects). Only ever renders when 2+ real Blueprint versions
+    // exist; silently absent otherwise, same "zero everywhere, not hidden
+    // behind a fake placeholder" discipline as everything else on Home.
+    const blueprintSummary = blueprintEvolutionSummary();
+    let blueprintChange = "";
+    if (blueprintSummary) {
+      if (blueprintSummary.valuesDropped.length && blueprintSummary.valuesAdded.length) {
+        blueprintChange = `${blueprintSummary.valuesDropped[0]} -> ${blueprintSummary.valuesAdded[0]}`;
+      } else if (blueprintSummary.strengthsDropped.length && blueprintSummary.strengthsAdded.length) {
+        blueprintChange = `${blueprintSummary.strengthsDropped[0]} -> ${blueprintSummary.strengthsAdded[0]}`;
+      } else {
+        const changedField = blueprintSummary.styleFields.find((field) => field.changed);
+        if (changedField) blueprintChange = `${changedField.label}: ${changedField.then || "?"} -> ${changedField.now || "?"}`;
+      }
+    }
+
+    // One real forecast line, not the full 7-day panel - Personal Weather
+    // Forecast already exists as its own feature (reachable from 2BB); this
+    // just borrows its output for one sentence. Picks the first upcoming
+    // day with enough real samples (hasData), skipping ahead past days
+    // with too little history rather than forcing today specifically.
+    const forecastDay = personalWeatherForecast().find((day) => day.hasData) || null;
+    const forecastLine = forecastDay ? `${forecastDay.weekdayName}'s usually ${forecastDay.condition.label.toLowerCase()} for you ${forecastDay.condition.icon}` : "";
+
     const rememberLine = dueEvent
       ? `${cleanText(dueEvent.title, 50)} - due ${new Date(dueEvent.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}.`
       : totalEntries
@@ -12725,6 +12751,9 @@ const screens = {
         ${sinceLastVisit ? `<p class="home-since">${escapeHTML(sinceLastVisit)}</p>` : ""}
 
         <p class="home-day-marker">${daysIn === 0 ? "Day 1 - today." : `Day 1 was ${daysIn} day${daysIn === 1 ? "" : "s"} ago.`}</p>
+        ${blueprintChange ? `<p class="home-day-change">${escapeHTML(blueprintChange)}</p>` : ""}
+
+        ${forecastLine ? `<p class="home-forecast">${escapeHTML(forecastLine)}</p>` : ""}
 
         ${areaNames.length ? `
           <button class="home-tree-progress" type="button" data-open="historySearch" aria-label="What Compass remembers, grown around the tree">
