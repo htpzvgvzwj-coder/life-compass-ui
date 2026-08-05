@@ -11604,7 +11604,7 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .protot
   position: relative;
   overflow: hidden;
   border-radius: 26px;
-  background: url("assets/home-growth-path.jpg") center / cover no-repeat;
+  background: url("assets/home-growth-path.png") center / cover no-repeat;
   grid-template-columns: 76px minmax(0, 1fr);
 }
 

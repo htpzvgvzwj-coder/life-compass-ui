@@ -14925,7 +14925,14 @@ function renderScreen(tab) {
   // glow (the light reaching from the tree toward the adult figure) to
   // the real trustTier() that already gates 2BB's own proactive reach,
   // rather than inventing a second, fake "progress level" just for looks.
-  document.body.dataset.homeTrust = trustTier();
+  // Gated to tab === "home" deliberately: trustTier() -> checkTrustMoments()
+  // is a heavier call (calibrationStats/habitChainStats/updateAvoidanceWatchList,
+  // plus a real trackerState write+save when a moment first fires) that was
+  // previously only ever invoked from inside the "compass" tab's own proactive
+  // logic - calling it unconditionally on EVERY renderScreen() (Profile,
+  // Discover, Life Sim, including the very first render at page load) was
+  // unnecessary and a real regression risk, not just wasted work.
+  if (tab === "home") document.body.dataset.homeTrust = trustTier();
   if (tab === "compass") {
     applyCoachProactiveOpener();
     if (isEnteringCompass) applyPendingProactiveMessage();
