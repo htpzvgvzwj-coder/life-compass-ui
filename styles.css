@@ -13431,9 +13431,18 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
   text-align: right;
 }
 
-@media (max-width: 760px) {
+/* 920px, not 760px: .phone-shell (and the whole desktop chrome grid) only
+   switches to the wide desktop layout at min-width:921px - below that,
+   .phone-shell stays a narrow ~382px-max mobile shell (see .phone-shell's
+   own base rule) regardless of how much wider the actual window is. A
+   760px cutoff left a real 761-920px gap where this block's absolute-%
+   composition (designed for the WIDE desktop container) was still active
+   inside that narrow shell - scattered/overlapping text, not just a
+   suboptimal crop. Matches this stylesheet's own established 921px
+   threshold instead of inventing a third one. */
+@media (max-width: 920px) {
   /* The absolute-percentage composition assumes the landscape image's
-     real proportions - doesn't survive a portrait phone width, same
+     real proportions - doesn't survive a narrow shell width, same
      reasoning as .bb-card's own mobile fallback above. Stack instead. */
   .home-scene {
     position: static;
@@ -13470,6 +13479,31 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
      text, so nothing is actually lost by hiding the ring here. */
   .home-tree-progress {
     display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  /* Without this, the landscape (roughly 16:9) source image gets forced
+     to `cover` a tall, narrow portrait-phone container - crops away most
+     of its width, likely leaving just an unrecognizable vertical sliver
+     (no boy, no tree, no adult figure - the entire point of the image).
+     Constraining the container to something close to the image's own
+     ratio instead of letting it stretch to fill available height means
+     `cover` only has to crop a little, not almost everything. */
+  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .prototype-view.app-workspace.is-active {
+    aspect-ratio: 16 / 9;
+    height: auto;
+    max-height: none;
+  }
+
+  /* A stronger, uniform dark scrim under the stacked text specifically on
+     phone widths - the exact crop a narrow phone shows can't be
+     predicted/tuned without seeing a real device, so this makes every
+     line of text reliably legible regardless of which part of the image
+     ends up behind it, instead of relying on per-element text-shadow
+     alone the way the wide desktop layout does. */
+  body.compass-public-app[data-active-screen="home"] .prototype-view.app-workspace.is-active::before {
+    background: linear-gradient(180deg, rgba(6, 8, 10, 0.55), rgba(6, 8, 10, 0.72) 40%, rgba(6, 8, 10, 0.55));
   }
 }
 
