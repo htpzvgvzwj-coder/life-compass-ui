@@ -12724,7 +12724,7 @@ const screens = {
         <p class="home-mood">${escapeHTML(mood.label)}${mood.note ? ` - ${escapeHTML(mood.note)}` : ""}</p>
         ${sinceLastVisit ? `<p class="home-since">${escapeHTML(sinceLastVisit)}</p>` : ""}
 
-        <p class="home-day-marker">Day 1 was ${daysIn} day${daysIn === 1 ? "" : "s"} ago</p>
+        <p class="home-day-marker">${daysIn === 0 ? "Day 1 - today." : `Day 1 was ${daysIn} day${daysIn === 1 ? "" : "s"} ago.`}</p>
 
         ${areaNames.length ? `
           <button class="home-tree-progress" type="button" data-open="historySearch" aria-label="What Compass remembers, grown around the tree">

@@ -11918,6 +11918,22 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="discover"] .de
   display: none;
 }
 
+/* Home redesign (2026-08-05): same bug class as Discover's above, found
+   live from a real screenshot - removing Home from the [data-active-
+   screen="home"] override that used to reposition this bar (see
+   screens.home()'s own rewrite) makes it fall back to the plain desktop
+   default (an opaque light pill, display:flex), not hidden, since that
+   default was never scoped away for a screen that doesn't want it. Same
+   fix as Discover: hide outright, Ctrl+K still works via the document-
+   level keydown listener. */
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar {
+  display: none;
+}
+
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab {
+  display: none;
+}
+
 /* .is-quiet included here to beat .desktop-command-bar.is-quiet
    .desktop-command-search's pre-existing opacity:0.55 rule (same
    specificity otherwise - the exact mistake already made once on
