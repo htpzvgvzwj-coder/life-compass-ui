@@ -4363,6 +4363,23 @@ function historySearchEntries() {
     snippet: cleanText(d.report, 90), fullText: d.report, date: d.excavatedAt
   }));
 
+  // Only contacts that have actually been reached (lastContactedAt set) -
+  // a saved contact who's never been checked in with isn't a "history"
+  // event yet, same reasoning as roadmap milestones below only counting
+  // once done. Dated by the real check-in date, not when the contact was
+  // first added.
+  trackerState.networkContacts.filter((c) => (c.user_id === myId || !c.user_id) && c.lastContactedAt).forEach((c) => entries.push({
+    id: `hs-network-${c.id}`, type: "Networking", title: `Reached out to ${c.name}`,
+    snippet: cleanText(c.note, 90), fullText: `${c.name} (${c.relationship || "contact"})${c.note ? `\n${c.note}` : ""}`,
+    date: c.lastContactedAt
+  }));
+
+  myRoadmapGoals().forEach((goal) => (goal.milestones || []).filter((m) => m.status === "done").forEach((m) => entries.push({
+    id: `hs-milestone-${m.id}`, type: "Roadmap", title: m.title,
+    snippet: `Milestone in "${goal.title}"`, fullText: `${m.title} - milestone in "${goal.title}" (month ${m.month})`,
+    date: m.doneAt
+  })));
+
   return entries
     .filter((e) => e.title || e.fullText)
     .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
