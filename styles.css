@@ -13480,6 +13480,18 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
   .home-tree-progress {
     display: none;
   }
+
+  /* Real touch-target sizing (WCAG's own 44px minimum) - on the wide
+     desktop layout these are large floating text blocks, easy to hit
+     with a mouse; stacked on a phone they're just thin lines of text
+     with nothing to actually tap around. Padding only, no positioning
+     math, so it can't reintroduce a layout bug. */
+  .home-waypoint,
+  .home-recent-row {
+    min-height: 44px;
+    padding: 6px 4px;
+    margin: -6px -4px;
+  }
 }
 
 @media (max-width: 760px) {
