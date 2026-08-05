@@ -12612,25 +12612,153 @@ function bbMiniCardRowHtml({ sectionClass, label, items, emptyText }) {
   `;
 }
 
+// "Since you were last here" - a real delta, not a snapshot. Nothing else
+// in the app compares a visit to the PREVIOUS visit; Home is the right
+// place for it since "welcome back, here's what changed" is literally a
+// home-screen thing to say, not a 2BB/Discover thing. Only updates the
+// stored snapshot once per real calendar day (daysSince>=1) so revisiting
+// Home repeatedly in one sitting keeps comparing against the same
+// baseline instead of always reading "nothing changed" against itself.
+function homeSinceLastVisitLine(current) {
+  const snap = trackerState.homeVisitSnapshot || null;
+  let line = null;
+  if (snap && daysSince(snap.at) >= 1) {
+    const parts = [];
+    const dEntries = current.totalEntries - snap.totalEntries;
+    const dDiscover = current.discoverMoves - snap.discoverMoves;
+    if (dEntries > 0) parts.push(`${dEntries} more thing${dEntries === 1 ? "" : "s"} remembered`);
+    if (dDiscover > 0) parts.push(`${dDiscover} more real move${dDiscover === 1 ? "" : "s"} on Discover`);
+    if (current.trustTier !== snap.trustTier) parts.push(`trust moved to ${current.trustTier}`);
+    line = parts.length ? `Since last time: ${parts.join(", ")}.` : null;
+  }
+  if (!snap || daysSince(snap.at) >= 1) {
+    trackerState.homeVisitSnapshot = { ...current, at: new Date().toISOString() };
+    saveTrackerState();
+  }
+  return line;
+}
+
 const screens = {
-  // Home is a distinct destination again, not an alias for the chat - a
-  // single small glass card (no shelf/dashboard bolted on) floating on the
-  // same photo background as 2BB, matching the approved reference mockup
-  // exactly. See the "2BB photo redesign" CSS block for the shared
-  // .bb-card/.bb-icon-pill treatment this and screens.compass() both use.
+  // Home is its own destination, not a quieter copy of 2BB - it used to
+  // share 2BB's exact photo, domain grid, and glance panel (only the
+  // center card differed), which is why it read as "2BB with less on it"
+  // instead of something with its own job. Home's job: one glance across
+  // everything real Compass is tracking, not another way into the chat.
+  // Own background image (see the [data-active-screen="home"] CSS block).
+  // No card, no dashboard grid - v2 of this rewrite (the boxed 3-card
+  // version) still read as "another glass-card screen" like 2BB/Discover,
+  // just with different labels. This version states the product's own
+  // 3-part promise (the exact line already proven live in the pitch: "It
+  // remembers you. It connects you. It shows you your future.") as 3
+  // waypoints floating along the image's own glowing path, each proven
+  // with ONE real fact - and each jumps OUT to the real tab that actually
+  // does that thing, rather than re-showing that tab's own content here.
+  // Numbers reused from functions that already exist elsewhere
+  // (historySearchEntries, discoverHistoryEntries, dueRealLifeEvents) -
+  // nothing new computed just for this screen.
   home: () => {
     const mood = trackerState.mood;
+    const entries = historySearchEntries();
+    const totalEntries = entries.length;
+    const distinctAreas = new Set(entries.map((entry) => entry.type)).size;
+    const discoverEntries = discoverHistoryEntries();
+    const dueEvent = dueRealLifeEvents()[0] || null;
+    const tier = trustTier();
+
+    const sinceLastVisit = homeSinceLastVisitLine({ totalEntries, discoverMoves: discoverEntries.length, trustTier: tier });
+
+    // Real, lazily-started timestamp (not a fabricated "founding date") -
+    // set once, the first time this ever runs for this profile, same
+    // honesty pattern as the demo-seed version markers elsewhere in this
+    // file. An existing account just starts counting from today, an
+    // accurate "0 days" rather than a guessed backstory.
+    if (!userProfile.firstOpenedAt) {
+      userProfile.firstOpenedAt = new Date().toISOString();
+      saveUserProfile();
+    }
+    const daysIn = daysSince(userProfile.firstOpenedAt);
+
+    const rememberLine = dueEvent
+      ? `${cleanText(dueEvent.title, 50)} - due ${new Date(dueEvent.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}.`
+      : totalEntries
+        ? `${totalEntries} thing${totalEntries === 1 ? "" : "s"} remembered, across ${distinctAreas} area${distinctAreas === 1 ? "" : "s"} of your life.`
+        : "Nothing remembered yet - that starts the moment you talk to it.";
+
+    const connectLine = discoverEntries.length
+      ? `${discoverEntries.length} real move${discoverEntries.length === 1 ? "" : "s"} - ${cleanText(discoverEntries[0].label, 40)}.`
+      : "Nothing saved yet - go find something real.";
+
+    // Progress "grown" around the image's own tree, not another stat card -
+    // one small light per distinct real area historySearchEntries() has an
+    // entry for (Journal/Rejection/Calm Reset/...), same source the
+    // "remembers you" waypoint's count already reads from. Positioned in a
+    // ring around the tree's canopy (eyeballed against the source image,
+    // same disclosed caveat as the waypoints below). Capped at 10 so a
+    // heavy account doesn't overcrowd the canopy; honestly renders nothing
+    // at all for a fresh account rather than faking a bare/dead tree.
+    const areaTally = {};
+    entries.forEach((entry) => { areaTally[entry.type] = (areaTally[entry.type] || 0) + 1; });
+    const areaNames = Object.keys(areaTally).slice(0, 10);
+    const treeLights = areaNames.map((name, i) => {
+      const angle = (i / areaNames.length) * Math.PI * 2 - Math.PI / 2;
+      const left = (54 + Math.cos(angle) * 11).toFixed(1);
+      const top = (25 + Math.sin(angle) * 9).toFixed(1);
+      const count = areaTally[name];
+      return `<span class="home-tree-light" style="left:${left}%;top:${top}%" title="${escapeHTML(name)} - ${count} entr${count === 1 ? "y" : "ies"}"></span>`;
+    }).join("");
+
+    // The actual real moments, named - not just a count. Counts ("47
+    // things remembered") prove scale but read as marketing copy; naming
+    // the 3 most recent real entries is what actually feels like "this is
+    // MY stuff, not a pitch line." Sorted freshly here (historySearchEntries()
+    // doesn't guarantee order) rather than trusting insertion order across
+    // 15+ different source trackers.
+    const recentMoments = entries
+      .slice()
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+      .slice(0, 3);
+
     return `
-      <div class="bb-card">
-        <div class="bb-card-inner bb-home-inner">
-          <p class="bb-kicker">2BB</p>
-          <h2 class="bb-home-title">Welcome back, ${displayName()}.</h2>
-          <p class="bb-home-status">
-            <span class="bb-status-dot"></span>
-            ${escapeHTML(mood.label)}${mood.note ? ` - ${escapeHTML(mood.note)}` : ""}
-          </p>
-          <button class="bb-home-cta" type="button" data-tab-jump="secondBrain">Continue the conversation</button>
-        </div>
+      <div class="home-scene">
+        <p class="home-greet">Welcome back, ${escapeHTML(displayName())}</p>
+        <p class="home-mood">${escapeHTML(mood.label)}${mood.note ? ` - ${escapeHTML(mood.note)}` : ""}</p>
+        ${sinceLastVisit ? `<p class="home-since">${escapeHTML(sinceLastVisit)}</p>` : ""}
+
+        <p class="home-day-marker">Day 1 was ${daysIn} day${daysIn === 1 ? "" : "s"} ago</p>
+
+        ${areaNames.length ? `
+          <button class="home-tree-progress" type="button" data-open="historySearch" aria-label="What Compass remembers, grown around the tree">
+            ${treeLights}
+          </button>
+        ` : ""}
+
+        ${recentMoments.length ? `
+          <div class="home-recent">
+            <p class="home-recent-label">Recently, for real</p>
+            ${recentMoments.map((entry) => `
+              <button class="home-recent-row" type="button" data-open="historySearch">
+                <strong>${escapeHTML(entry.type)}</strong>
+                <span>${escapeHTML(cleanText(entry.snippet || entry.title, 46))}</span>
+                <time>${escapeHTML(homeRelativeDateLabel(entry.date))}</time>
+              </button>
+            `).join("")}
+          </div>
+        ` : ""}
+
+        <button class="home-waypoint home-waypoint--remember" type="button" data-tab-jump="secondBrain">
+          <span class="home-waypoint-dot"></span>
+          <span class="home-waypoint-text"><strong>It remembers you.</strong><br>${escapeHTML(rememberLine)}</span>
+        </button>
+
+        <button class="home-waypoint home-waypoint--connect" type="button" data-tab-jump="discover">
+          <span class="home-waypoint-dot"></span>
+          <span class="home-waypoint-text"><strong>It connects you.</strong><br>${escapeHTML(connectLine)}</span>
+        </button>
+
+        <button class="home-waypoint home-waypoint--future" type="button" data-tab-jump="simulator">
+          <span class="home-waypoint-dot"></span>
+          <span class="home-waypoint-text"><strong>It shows you your future.</strong><br>One choice away - coming back soon.</span>
+        </button>
       </div>
     `;
   },
@@ -14793,6 +14921,11 @@ function renderScreen(tab) {
   // Second Brain restyle target just those two screens' shared .app-screen
   // container without touching Discover/Life Sim/Profile's styling.
   document.body.dataset.activeScreen = tab;
+  // CSS hook only, same as activeScreen above - ties Home's background
+  // glow (the light reaching from the tree toward the adult figure) to
+  // the real trustTier() that already gates 2BB's own proactive reach,
+  // rather than inventing a second, fake "progress level" just for looks.
+  document.body.dataset.homeTrust = trustTier();
   if (tab === "compass") {
     applyCoachProactiveOpener();
     if (isEnteringCompass) applyPendingProactiveMessage();

@@ -11566,7 +11566,6 @@ body {
   --warm-active-ink: #21150e;
 }
 
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .prototype-view.app-workspace.is-active,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .prototype-view.app-workspace.is-active {
   position: relative;
   overflow: hidden;
@@ -11584,7 +11583,6 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .pro
   grid-template-columns: 76px minmax(0, 1fr);
 }
 
-body.compass-public-app[data-active-screen="home"] .prototype-view.app-workspace.is-active::before,
 body.compass-public-app[data-active-screen="compass"] .prototype-view.app-workspace.is-active::before {
   content: "";
   position: absolute;
@@ -11592,6 +11590,53 @@ body.compass-public-app[data-active-screen="compass"] .prototype-view.app-worksp
   z-index: 0;
   background: linear-gradient(90deg, rgba(20, 12, 7, 0.26), transparent 22%, transparent 76%, rgba(20, 12, 7, 0.14));
   pointer-events: none;
+}
+
+/* Home redesign: its own image (boy in the dark on the left watching a
+   glowing tree grow into a lit path toward an adult figure on the right,
+   city skyline behind him) - deliberately NOT the 2BB room photo. Home
+   used to share every rule with Compass (same photo, same domain grid,
+   same glance panel), which is exactly why it read as "a quieter 2BB"
+   instead of its own destination - see screens.home()'s own dashboard
+   rewrite for the content-side half of this fix. Same collapsed 2-column
+   layout as Compass/Discover (no dashboard-rail column to reserve). */
+body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .prototype-view.app-workspace.is-active {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  background: url("assets/home-growth-path.jpg") center / cover no-repeat;
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+/* Darkens the left (boy/city) third slightly less than Compass's tint and
+   leaves the golden tree+path+skyline mostly untouched - that glow is the
+   point of this image, not something to mute under a flat overlay. */
+body.compass-public-app[data-active-screen="home"] .prototype-view.app-workspace.is-active::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(100deg, rgba(6, 8, 10, 0.5), rgba(6, 8, 10, 0.18) 38%, transparent 55%);
+  pointer-events: none;
+}
+
+/* Ties the image's own golden light (tree -> adult figure) to the real
+   trustTier() that already gates 2BB's proactive reach - the light
+   growing is a real system state, not decoration invented for its own
+   sake. [data-home-trust] is set alongside [data-active-screen] itself
+   (see renderScreen()). "low" needs no override - the base rule above
+   already IS the low state. Higher specificity than the base rule via
+   the extra attribute selector, so source order doesn't matter here. */
+body.compass-public-app[data-active-screen="home"][data-home-trust="mid"] .prototype-view.app-workspace.is-active::before {
+  background:
+    radial-gradient(circle at 82% 45%, rgba(240, 199, 115, 0.22), transparent 46%),
+    linear-gradient(100deg, rgba(6, 8, 10, 0.5), rgba(6, 8, 10, 0.18) 38%, transparent 55%);
+}
+
+body.compass-public-app[data-active-screen="home"][data-home-trust="high"] .prototype-view.app-workspace.is-active::before {
+  background:
+    radial-gradient(circle at 74% 45%, rgba(240, 199, 115, 0.32), transparent 62%),
+    linear-gradient(100deg, rgba(6, 8, 10, 0.5), rgba(6, 8, 10, 0.18) 38%, transparent 55%);
 }
 
 /* .phone-shell keeps an opaque cream box-background from 3 separate older
@@ -11854,7 +11899,6 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="discover"] .ap
    display:contents removes the wrapper from the box model entirely so
    .desktop-command-search resolves its position against .phone-shell
    directly, same as .sos-fab already does correctly. */
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-bar {
   display: contents;
 }
@@ -11889,7 +11933,6 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="discover"] .de
    This silently affected Quick Jump/SOS the entire time they've existed,
    not just the new 8-domain grid below - it just went unnoticed until the
    grid made someone actually try clicking one. */
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar.is-quiet .desktop-command-search,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-bar.is-quiet .desktop-command-search {
   position: absolute;
   z-index: 2;
@@ -11916,16 +11959,12 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .des
   color: var(--warm-ink);
 }
 
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-search kbd,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search kbd {
   display: none;
 }
 
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-search .bb-card-image,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search .bb-card-image,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab .bb-card-image,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab .bb-card-image,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button .bb-card-image,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button .bb-card-image {
   display: block;
   position: absolute;
@@ -11935,11 +11974,8 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
   object-fit: cover;
 }
 
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-search::after,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search::after,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab::after,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab::after,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button::after,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button::after {
   content: "";
   position: absolute;
@@ -11954,12 +11990,10 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
    specificity than the shared ::after rule above (adds the attribute
    selector), so this only retints Civic - Money/Career/Quick Jump/SOS and
    the other 6 domain tiles are untouched. */
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button[data-open="civicCompass"]::after,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button[data-open="civicCompass"]::after {
   background: linear-gradient(0deg, rgba(15, 10, 7, 0.7) 0%, transparent 45%), rgba(10, 8, 6, 0.4);
 }
 
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-search .bb-quickjump-label,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-search .bb-quickjump-label {
   display: block;
   position: absolute;
@@ -11972,7 +12006,6 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .des
   color: var(--warm-ink);
 }
 
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab {
   z-index: 2;
   left: 12%;
@@ -11991,9 +12024,7 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos
   font-size: 0;
 }
 
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab .bb-sos-label,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab .bb-sos-label,
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button .bb-sos-label,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button .bb-sos-label {
   position: absolute;
   left: 5px;
@@ -12016,7 +12047,6 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
    guessing one fixed pixel width that could overflow on a narrower render.
    Row height stays fixed px, same "don't mix % and px in one calc()" rule
    as .sos-fab's top above. */
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -12030,7 +12060,6 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
   bottom: auto;
 }
 
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button {
   position: relative;
   height: 62px;
@@ -12056,7 +12085,6 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
   display: none;
 }
 
-body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-glance-panel,
 body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-glance-panel {
   display: flex;
   flex-direction: column;
@@ -12188,7 +12216,6 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
      disappearing entirely - Quick Jump/SOS/the domain grid all keep their
      mobile content this way, this panel should not be the one exception
      that only exists on desktop. */
-  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-glance-panel,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-glance-panel {
     position: static;
     width: auto;
@@ -12198,9 +12225,7 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
 }
 
 @media (max-width: 760px) {
-  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .desktop-command-bar.is-quiet .desktop-command-search,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .desktop-command-bar.is-quiet .desktop-command-search,
-  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .sos-fab,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .sos-fab {
     position: static;
     width: auto;
@@ -12211,13 +12236,11 @@ body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-
   /* Grid stays a grid at mobile too, just drops the desktop-only 38% width
      assumption - static position lets it sit in normal document flow,
      1fr columns still split whatever width it's given. */
-  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid {
     position: static;
     width: auto;
   }
 
-  body.compass-public-app:not(.life-sim-active)[data-active-screen="home"] .bb-domain-grid button,
   body.compass-public-app:not(.life-sim-active)[data-active-screen="compass"] .bb-domain-grid button {
     height: 70px;
   }
@@ -13074,36 +13097,263 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
 /* Home's card is simpler still - just a greeting and the way into 2BB,
    no shelf/dashboard content bolted on (that was the earlier version's
    clutter problem - kept out until asked for). */
-.bb-home-inner {
-  align-items: flex-start;
-  justify-content: center;
-  gap: 14px;
-  text-align: left;
+/* .bb-home-inner/.bb-home-title/.bb-home-status/.bb-home-cta: unused now
+   that screens.home() no longer renders a .bb-card at all (see .home-scene
+   below) - left deleted rather than kept around as dead CSS. */
+
+/* Home v3: no card at all - two earlier attempts (a "continue chatting"
+   teaser, then a boxed 3-card dashboard) both still read as a reskinned
+   2BB, just with different content inside the same glass-card shell. This
+   version puts nothing but text directly on the image: 3 waypoints along
+   the artwork's own glowing path, stating the product's 3-part promise
+   (the exact line already proven live in the pitch - "It remembers you.
+   It connects you. It shows you your future.") each backed by one real
+   fact, each linking OUT to the real tab that does that thing rather than
+   re-showing that tab's own content here. Positions are eyeballed against
+   the source image's real composition (boy+tree lower-left, path
+   sweeping right, adult figure + skyline upper-right) - nudge against a
+   real screenshot if a waypoint lands on a face or building instead of
+   open path/sky. */
+.home-scene {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
-.bb-home-title {
+.home-greet {
+  position: absolute;
+  left: 6%;
+  top: 6%;
   margin: 0;
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: rgba(255, 244, 223, 0.55);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
 }
 
-.bb-home-status {
+.home-mood {
+  position: absolute;
+  left: 6%;
+  top: 10%;
+  margin: 0;
   display: flex;
   align-items: center;
-  gap: 7px;
-  color: rgba(255, 244, 223, 0.6);
-  font-size: 12.5px;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 244, 223, 0.7);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
 }
 
-.bb-home-cta {
-  padding: 11px 22px;
+/* Only rendered when something genuinely changed since the last real
+   calendar-day visit (see homeSinceLastVisitLine) - a gold accent line
+   right under mood so it reads as the one "new" thing on the screen. */
+.home-since {
+  position: absolute;
+  left: 6%;
+  top: 14%;
+  max-width: 32%;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--warm-active);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Near the boy in the source image (past-you side, lower-left-ish) - a
+   real lazily-started timestamp, not a fabricated founding date. Nudge
+   the coordinates once checked against a real screenshot. */
+.home-day-marker {
+  position: absolute;
+  left: 13%;
+  top: 47%;
+  margin: 0;
+  font-size: 11px;
+  color: rgba(255, 244, 223, 0.5);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Real named entries, not another stat - deliberately plain stacked text
+   (no card background) so it reads as writing on the scene, matching
+   .home-waypoint/.home-greet, not a 4th boxed widget. Placed lower-left,
+   away from the tree-light ring (centered ~54%/25%) and all 3 waypoints -
+   nudge if it lands on the boy/train in the actual source image. */
+.home-recent {
+  position: absolute;
+  left: 5%;
+  top: 80%;
+  width: 30%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.home-recent-label {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--warm-active);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+
+.home-recent-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--warm-ink);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.65);
+}
+
+.home-recent-row strong {
+  font-weight: 700;
+  color: var(--warm-active);
+}
+
+.home-recent-row time {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 10.5px;
+  color: rgba(255, 244, 223, 0.5);
+}
+
+.home-waypoint {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  max-width: 230px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home-waypoint-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
   background: var(--warm-active);
-  color: var(--warm-active-ink);
+  box-shadow: 0 0 10px 3px rgba(240, 199, 115, 0.65);
+}
+
+/* Real progress "grown" around the image's own tree - a soft-pulsing
+   light per distinct real area of life, positioned by screens.home() via
+   inline left/top (computed in a ring, not fixed here). The wrapping
+   button is a plain full-bleed hit target (one click = History Search),
+   not a visible shape itself - only the lights render. */
+.home-tree-progress {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.home-tree-light {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: #f7dfa8;
+  box-shadow: 0 0 9px 3px rgba(240, 199, 115, 0.75);
+  animation: home-tree-light-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes home-tree-light-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+.home-waypoint-text {
+  font-size: 13px;
+  line-height: 1.42;
+  color: var(--warm-ink);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
+}
+
+.home-waypoint-text strong {
+  display: block;
+  font-size: 14.5px;
   font-weight: 750;
-  font-size: 13.5px;
-  box-shadow: 0 10px 24px rgba(240, 199, 115, 0.28);
+  margin-bottom: 2px;
+}
+
+.home-waypoint--remember {
+  left: 20%;
+  top: 58%;
+}
+
+.home-waypoint--connect {
+  left: 47%;
+  top: 74%;
+}
+
+/* Mirrored (dot on the right, text right-aligned) so the text grows away
+   from the adult figure/skyline instead of over them. */
+.home-waypoint--future {
+  left: 70%;
+  top: 34%;
+  flex-direction: row-reverse;
+}
+
+.home-waypoint--future .home-waypoint-text {
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  /* The absolute-percentage composition assumes the landscape image's
+     real proportions - doesn't survive a portrait phone width, same
+     reasoning as .bb-card's own mobile fallback above. Stack instead. */
+  .home-scene {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding: 18px 16px;
+  }
+
+  .home-greet,
+  .home-mood,
+  .home-since,
+  .home-day-marker,
+  .home-waypoint,
+  .home-recent {
+    position: static;
+    max-width: none;
+    width: auto;
+  }
+
+  .home-waypoint--future {
+    flex-direction: row;
+  }
+
+  .home-waypoint--future .home-waypoint-text {
+    text-align: left;
+  }
+
+  /* The ring math (left/top computed around a landscape-photo tree
+     position) has nothing sensible to reflow into on a stacked mobile
+     layout - .home-recent already names the same real entries as plain
+     text, so nothing is actually lost by hiding the ring here. */
+  .home-tree-progress {
+    display: none;
+  }
 }
 
 /* Open Loops + memory shelf mini-card rows surrounding the 2BB card,
