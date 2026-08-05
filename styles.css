@@ -13242,6 +13242,43 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
   color: rgba(255, 244, 223, 0.5);
 }
 
+.home-recent-row {
+  transition: opacity 0.15s ease;
+}
+
+.home-recent-row:hover,
+.home-recent-row:focus-visible {
+  opacity: 0.72;
+}
+
+.home-recent-row:hover strong,
+.home-recent-row:focus-visible strong {
+  text-decoration: underline;
+  text-decoration-color: rgba(240, 199, 115, 0.7);
+  text-underline-offset: 2px;
+}
+
+.home-recent-row:focus-visible {
+  outline: 1px solid var(--warm-active);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+/* The tree-light ring's hit target - a subtle whole-canopy brighten so it
+   reads as one clickable area, not N individually-interactive dots (each
+   dot IS decorative-only via inline style, the wrapping button is the
+   real target). */
+.home-tree-progress:hover .home-tree-light,
+.home-tree-progress:focus-visible .home-tree-light {
+  filter: brightness(1.3);
+}
+
+.home-tree-progress:focus-visible {
+  outline: 1px solid var(--warm-active);
+  outline-offset: 8px;
+  border-radius: 50%;
+}
+
 .home-waypoint {
   position: absolute;
   display: flex;
@@ -13253,6 +13290,33 @@ body.compass-public-app[data-active-screen="discover"] .app-screen {
   background: none;
   text-align: left;
   cursor: pointer;
+}
+
+/* Real hover/press/focus feedback - these 3 lines (and .home-recent-row/
+   .home-tree-progress below) are the only clickable things on Home, but
+   had zero visual affordance until now: nothing distinguished them from
+   plain decorative text on the photo. Pure CSS, no logic touched. */
+.home-waypoint:hover .home-waypoint-dot,
+.home-waypoint:focus-visible .home-waypoint-dot {
+  transform: scale(1.35);
+  box-shadow: 0 0 14px 5px rgba(240, 199, 115, 0.85);
+}
+
+.home-waypoint:hover .home-waypoint-text strong,
+.home-waypoint:focus-visible .home-waypoint-text strong {
+  text-decoration: underline;
+  text-decoration-color: rgba(240, 199, 115, 0.7);
+  text-underline-offset: 3px;
+}
+
+.home-waypoint-dot {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.home-waypoint:focus-visible {
+  outline: 1px solid var(--warm-active);
+  outline-offset: 6px;
+  border-radius: 8px;
 }
 
 .home-waypoint-dot {
