@@ -130,7 +130,7 @@ function extractChatCompletionText(data) {
 // EXISTING lifeMemory entry instead of creating an unrelated new one).
 const REMEMBER_THIS_KINDS = ['missed_opportunity', 'decision', 'note'];
 const LOG_MOOD_LABELS = ['Calm', 'Okay', 'Tired', 'Stressed'];
-const TOOL_NAMES = ['open_tool', 'remember_this', 'update_memory', 'log_savings', 'log_rejection', 'log_mood', 'log_journal'];
+const TOOL_NAMES = ['open_tool', 'remember_this', 'update_memory', 'log_savings', 'log_rejection', 'log_mood', 'log_journal', 'log_contact_reached', 'log_milestone_progress'];
 
 function parseOpenToolArgs(rawArgs) {
   if (!rawArgs || typeof rawArgs !== 'object') return null;
@@ -226,6 +226,30 @@ function parseLogJournalArgs(rawArgs) {
   };
 }
 
+function parseLogContactReachedArgs(rawArgs) {
+  if (!rawArgs || typeof rawArgs !== 'object') return null;
+  const { contact_name, message_to_user } = rawArgs;
+  if (typeof contact_name !== 'string' || !contact_name.trim()) return null;
+  if (typeof message_to_user !== 'string' || !message_to_user.trim()) return null;
+  return {
+    tool: 'log_contact_reached',
+    contact_name: contact_name.trim().slice(0, 120),
+    message_to_user: message_to_user.trim(),
+  };
+}
+
+function parseLogMilestoneProgressArgs(rawArgs) {
+  if (!rawArgs || typeof rawArgs !== 'object') return null;
+  const { milestone_title, message_to_user } = rawArgs;
+  if (typeof milestone_title !== 'string' || !milestone_title.trim()) return null;
+  if (typeof message_to_user !== 'string' || !message_to_user.trim()) return null;
+  return {
+    tool: 'log_milestone_progress',
+    milestone_title: milestone_title.trim().slice(0, 200),
+    message_to_user: message_to_user.trim(),
+  };
+}
+
 function parseNamedToolArgs(name, rawArgs) {
   if (name === 'open_tool') return parseOpenToolArgs(rawArgs);
   if (name === 'remember_this') return parseRememberThisArgs(rawArgs);
@@ -234,6 +258,8 @@ function parseNamedToolArgs(name, rawArgs) {
   if (name === 'log_rejection') return parseLogRejectionArgs(rawArgs);
   if (name === 'log_mood') return parseLogMoodArgs(rawArgs);
   if (name === 'log_journal') return parseLogJournalArgs(rawArgs);
+  if (name === 'log_contact_reached') return parseLogContactReachedArgs(rawArgs);
+  if (name === 'log_milestone_progress') return parseLogMilestoneProgressArgs(rawArgs);
   return null;
 }
 
@@ -379,6 +405,30 @@ function buildLogJournalSchema() {
   };
 }
 
+function buildLogContactReachedSchema() {
+  return {
+    name: 'log_contact_reached',
+    description: 'Mark that the user actually reached out to someone already in their real Networking contacts list (mentors, referrals, alumni) - updates that contact\'s real \'last contacted\' date, the same field the manual Networking form sets. Only call this when they clearly describe contacting a specific real person, and only if that person plausibly matches someone already in their saved contacts (see the saved facts in context) - never invent a new contact.',
+    properties: {
+      contact_name: { type: 'string', description: 'The contact\'s name, as close as possible to how it\'s saved in their real Networking list.' },
+      message_to_user: { type: 'string', description: 'A short, natural line telling the user you\'ve logged the check-in - write it the way you\'d actually say it, not a system notification.' },
+    },
+    required: ['contact_name', 'message_to_user'],
+  };
+}
+
+function buildLogMilestoneProgressSchema() {
+  return {
+    name: 'log_milestone_progress',
+    description: 'Mark a real milestone from one of the user\'s real Life Roadmap goals as done - the same action the manual \'Mark done\' button performs. Only call this when they clearly describe completing something that matches a real saved milestone (see the saved facts in context) closely enough that there\'s no real ambiguity - never guess at or invent a milestone that isn\'t actually saved.',
+    properties: {
+      milestone_title: { type: 'string', description: 'The milestone\'s title, as close as possible to how it\'s saved in their real Roadmap.' },
+      message_to_user: { type: 'string', description: 'A short, natural line telling the user you\'ve marked it done - write it the way you\'d actually say it, not a system notification.' },
+    },
+    required: ['milestone_title', 'message_to_user'],
+  };
+}
+
 function buildToolSchemas(tools) {
   return {
     openTool: buildOpenToolSchema(tools),
@@ -388,11 +438,13 @@ function buildToolSchemas(tools) {
     logRejection: buildLogRejectionSchema(),
     logMood: buildLogMoodSchema(),
     logJournal: buildLogJournalSchema(),
+    logContactReached: buildLogContactReachedSchema(),
+    logMilestoneProgress: buildLogMilestoneProgressSchema(),
   };
 }
 
 function schemaList(schemas) {
-  return [schemas.openTool, schemas.rememberThis, schemas.updateMemory, schemas.logSavings, schemas.logRejection, schemas.logMood, schemas.logJournal].filter(Boolean);
+  return [schemas.openTool, schemas.rememberThis, schemas.updateMemory, schemas.logSavings, schemas.logRejection, schemas.logMood, schemas.logJournal, schemas.logContactReached, schemas.logMilestoneProgress].filter(Boolean);
 }
 
 function groqToolsParam(schemas) {

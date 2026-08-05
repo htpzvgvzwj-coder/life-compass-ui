@@ -15591,6 +15591,55 @@ function logJournalFromChat(toolCall) {
   return true;
 }
 
+// Unlike log_rejection/log_journal/log_mood (real event streams - a new
+// entry is always correct), Networking contacts and Roadmap milestones
+// are a fixed roster/plan the user already set up on purpose. Match
+// against a real EXISTING record only - never create one from an
+// offhand chat mention, since that would let an AI guess pollute real
+// data instead of updating something the user deliberately saved. Case-
+// insensitive, either-direction substring match (same lightweight
+// fuzziness the model's own paraphrased title/name needs, since it won't
+// come back byte-identical to what's saved).
+function fuzzyNameMatch(a, b) {
+  const x = String(a || "").trim().toLowerCase();
+  const y = String(b || "").trim().toLowerCase();
+  if (!x || !y) return false;
+  return x === y || x.includes(y) || y.includes(x);
+}
+
+// log_contact_reached tool support - updates a real Networking contact's
+// lastContactedAt, the same field the manual form sets. Returns false
+// (silent no-op) if no real saved contact plausibly matches the name the
+// model extracted - deliberately does not create a new contact.
+function logContactReachedFromChat(toolCall) {
+  const myId = currentUserId();
+  const contact = trackerState.networkContacts.find((item) => (item.user_id === myId || !item.user_id) && fuzzyNameMatch(item.name, toolCall.contact_name));
+  if (!contact) {
+    console.error("[Compass AI] log_contact_reached called with no matching saved contact - ignored", toolCall.contact_name);
+    return false;
+  }
+  contact.lastContactedAt = new Date().toISOString().slice(0, 10);
+  contact.updated_at = new Date().toISOString();
+  saveTrackerState();
+  return true;
+}
+
+// log_milestone_progress tool support - reuses setMilestoneStatus(), the
+// exact same function the manual "Mark done" button calls, rather than
+// duplicating its mutation logic. Returns false (silent no-op) if no
+// real saved milestone plausibly matches the title the model extracted.
+function logMilestoneProgressFromChat(toolCall) {
+  for (const goal of myRoadmapGoals()) {
+    const milestone = (goal.milestones || []).find((item) => fuzzyNameMatch(item.title, toolCall.milestone_title));
+    if (milestone) {
+      setMilestoneStatus(goal.id, milestone.id, "done");
+      return true;
+    }
+  }
+  console.error("[Compass AI] log_milestone_progress called with no matching saved milestone - ignored", toolCall.milestone_title);
+  return false;
+}
+
 function validateToolCall(raw) {
   if (!raw || typeof raw !== "object") return null;
   if (raw.tool === "open_tool" && typeof raw.tool_id === "string" && typeof raw.message_to_user === "string") {
@@ -15628,6 +15677,12 @@ function validateToolCall(raw) {
   }
   if (raw.tool === "log_journal" && typeof raw.text === "string" && raw.text.trim() && typeof raw.message_to_user === "string") {
     return { tool: "log_journal", text: raw.text, message_to_user: raw.message_to_user };
+  }
+  if (raw.tool === "log_contact_reached" && typeof raw.contact_name === "string" && raw.contact_name.trim() && typeof raw.message_to_user === "string") {
+    return { tool: "log_contact_reached", contact_name: raw.contact_name, message_to_user: raw.message_to_user };
+  }
+  if (raw.tool === "log_milestone_progress" && typeof raw.milestone_title === "string" && raw.milestone_title.trim() && typeof raw.message_to_user === "string") {
+    return { tool: "log_milestone_progress", milestone_title: raw.milestone_title, message_to_user: raw.message_to_user };
   }
   return null;
 }
@@ -17604,7 +17659,7 @@ async function sendChatMessage(text) {
     // unlike open_tool which always offers a jump-to button. Same lookup
     // discipline as matchedTool above: resolved against the real catalog,
     // never assumed to exist.
-    const autoActionCommandIds = { log_savings: "money-plan", log_rejection: "rejection-list", log_mood: "mood", log_journal: "journal" };
+    const autoActionCommandIds = { log_savings: "money-plan", log_rejection: "rejection-list", log_mood: "mood", log_journal: "journal", log_contact_reached: "networking", log_milestone_progress: "roadmap" };
     const autoActionTool = toolCall && autoActionCommandIds[toolCall.tool]
       ? commandLauncherCommands().find((command) => command.id === autoActionCommandIds[toolCall.tool])
       : null;
@@ -17625,6 +17680,12 @@ async function sendChatMessage(text) {
     }
     if (toolCall && toolCall.tool === "log_journal") {
       logJournalFromChat(toolCall);
+    }
+    if (toolCall && toolCall.tool === "log_contact_reached") {
+      logContactReachedFromChat(toolCall);
+    }
+    if (toolCall && toolCall.tool === "log_milestone_progress") {
+      logMilestoneProgressFromChat(toolCall);
     }
     const displayText = toolCall && toolCall.tool !== "open_tool"
       ? toolCall.message_to_user
